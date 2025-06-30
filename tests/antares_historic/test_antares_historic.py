@@ -18,7 +18,10 @@ from andromede.study.resolve_components import (
     consistency_check,
     resolve_system,
 )
-
+from src.andromede.expression.parsing.parse_expression import ModelIdentifiers, parse_expression
+from src.andromede.simulation.optimization import EvaluationVisitor, ValueProvider
+from src.andromede.expression.expression import MaxNode, ParameterNode
+from src.andromede.expression.visitor import visit
 
 @dataclass(frozen=True)
 class ToolTestStudy:
@@ -167,6 +170,30 @@ def input_library(
     with library.open() as lib:
         return parse_yaml_library(lib)
 
+@pytest.fixture
+def input_test_library(
+    data_dir: Path,
+) -> InputLibrary:
+    library = (
+        data_dir
+        / "tests"
+        / "antares_historic"
+        / "lib_max_operator.yml"
+    )
+    with library.open() as lib:
+        return parse_yaml_library(lib)
+
+def test_parsing_max():
+    from src.andromede.expression.parsing.parse_expression import ModelIdentifiers, parse_expression
+
+    identifiers = ModelIdentifiers(
+        variables={'level', 'p_withdrawal', 'p_injection'},
+        parameters={'injection_nominal_capacity', 'lower_rule_curve', 'efficiency_injection', 'inflows', 'reservoir_capacity', 'withdrawal_nominal_capacity', 'p_max_withdrawal_modulation', 'initial_level', 'efficiency_withdrawal', 'p_max_injection_modulation', 'upper_rule_curve'}
+    )
+    expression = "max(p_max_withdrawal_modulation)"
+    ast = parse_expression(expression, identifiers)
+    assert ast == MaxNode(operands=[ParameterNode(name='p_max_withdrawal_modulation')])
+
 
 def build_test_problem(
     study_test_component: ToolTestStudy, input_library: InputLibrary
@@ -182,13 +209,15 @@ def build_test_problem(
     study_component_data = study_test_component.study_component_data
 
     result_lib = resolve_library([input_library])
+
     components_input = resolve_system(study_component_data, result_lib)
+
     consistency_check(
         components_input.components, result_lib["antares-historic"].models
     )
     database = build_data_base(study_component_data, study_path)
-    network = build_network(components_input)
 
+    network = build_network(components_input)
     scenarios = 1
     return build_problem(network, database, TimeBlock(1, [0, 1]), scenarios)
 
@@ -230,3 +259,35 @@ def test_storage_balance_using_converter(
     status = problem.solver.Solve()
     assert status == problem.solver.OPTIMAL
     assert int(problem.solver.Objective().Value()) == 165
+
+def test_max_operator(
+    input_test_library: InputLibrary
+) -> None:
+    """
+    Test study with max operator using the converter.
+    """
+    model = input_test_library.models[0]
+    parameters = {p.id for p in model.parameters}
+
+    # Define identifiers
+    identifiers = ModelIdentifiers(variables=set(), parameters=parameters)
+
+    # Expression to test
+    expression = "max(p_max_withdrawal_modulation)"
+    ast = parse_expression(expression, identifiers)
+
+    assert len(ast.operands) == 1
+    assert ast.operands[0].name == "p_max_withdrawal_modulation"
+
+    class TestValueProvider(ValueProvider):
+        def get_variable_value(self, name: str) -> float: return 0.0
+        def get_parameter_value(self, name: str) -> float:
+            if name == "p_max_withdrawal_modulation":
+                return max([0.5, 0.8, 0.3])
+            return 0.0
+        def get_component_variable_value(self, component_id: str, name: str) -> float: return 0.0
+        def get_component_parameter_value(self, component_id: str, name: str) -> float: return 0.0
+
+    visitor = EvaluationVisitor(TestValueProvider())
+    result = visit(ast, visitor)
+    assert result == 0.8, f"Expected max([0.5, 0.8, 0.3]) = 0.8, got {result}"

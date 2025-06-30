@@ -137,7 +137,6 @@ def _resolve_lib(
     for id in cur_yaml_lib_model_ids:
         if cur_yaml_lib_model_ids.count(id) > 1:
             raise Exception(f"Model {id} is defined twice")
-
     models = [_resolve_model(m, current_lib.port_types) for m in cur_yaml_lib.models]
 
     models_dict = dict((m.id, m) for m in models)

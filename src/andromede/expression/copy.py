@@ -30,6 +30,7 @@ from .expression import (
     TimeShiftNode,
     TimeSumNode,
     VariableNode,
+    MaxNode,
 )
 from .visitor import ExpressionVisitorOperations, visit
 
@@ -94,6 +95,9 @@ class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> ExpressionNode:
         return PortFieldAggregatorNode(visit(node.operand, self), node.aggregator)
+    
+    def max_node(self, node) -> ExpressionNode:
+        return MaxNode(operands=[visit(op, self) for op in node.operands])
 
 
 def copy_expression(expression: ExpressionNode) -> ExpressionNode:

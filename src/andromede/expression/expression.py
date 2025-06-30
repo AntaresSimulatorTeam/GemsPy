@@ -64,6 +64,17 @@ class ExpressionNode:
         lhs = _wrap_in_node(lhs)
         return lhs + self
 
+
+    def __max__(self, rhs: Any) -> "ExpressionNode":
+        def _create_max_node(*operands: Any) -> "ExpressionNode":
+            wrapped_operands = [_wrap_in_node(op) for op in operands]
+            return MaxNode(*wrapped_operands)
+
+        lhs = self
+        operands = [lhs] + list(rhs)
+        return _create_max_node(*operands)
+
+
     def __mul__(self, rhs: Any) -> "ExpressionNode":
         return _apply_if_node(rhs, lambda x: MultiplicationNode(self, x))
 
@@ -383,6 +394,11 @@ class Comparator(enum.Enum):
 @dataclass(frozen=True, eq=False)
 class ComparisonNode(BinaryOperatorNode):
     comparator: Comparator
+
+
+@dataclass(frozen=True)
+class MaxNode(ExpressionNode):
+    operands: List[ExpressionNode]
 
 
 @dataclass(frozen=True, eq=False)

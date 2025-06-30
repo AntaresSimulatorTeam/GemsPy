@@ -22,6 +22,7 @@ from andromede.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    MaxNode,
 )
 
 from .expression import (
@@ -110,6 +111,8 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int]):
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> int:
         return visit(node.operand, self)
 
+    def max_node(self, node: MaxNode) -> int:
+        return max(visit(op, self) for op in node.operands)
 
 def compute_degree(expression: ExpressionNode) -> int:
     return visit(expression, ExpressionDegreeVisitor())
