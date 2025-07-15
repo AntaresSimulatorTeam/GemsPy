@@ -163,7 +163,7 @@ class PyPSAStudyConverter:
                 == "co2_emissions"
             )
 
-    def _rename_buses(self) -> None:    
+    def _rename_buses(self) -> None:
         ### Rename PyPSA buses, to delete spaces
         if len(self.pypsa_network.buses) > 0:
             self.pypsa_network.buses.index = self.pypsa_network.buses.index.str.replace(
@@ -178,7 +178,6 @@ class PyPSAStudyConverter:
                 for col in ["bus", "bus0", "bus1"]:
                     if col in df.columns:
                         df[col] = df[col].str.replace(" ", "_")
-
 
     def _pypsa_network_preprocessing(self) -> None:
         ###Add fictitious carrier
@@ -204,7 +203,7 @@ class PyPSAStudyConverter:
         for _, val in dictionnary.items():
             val.columns = prefix + "_" + val.columns.str.replace(" ", "_")
 
-    def _fix_capacities(self, component_type: str, capa_str:str) -> None:
+    def _fix_capacities(self, component_type: str, capa_str: str) -> None:
         df = getattr(self.pypsa_network, component_type)
         if len(df) == 0:
             return
@@ -234,7 +233,6 @@ class PyPSAStudyConverter:
         self._rename_pypsa_components(component_type)
         if extendable:
             self._fix_capacities(component_type, capa_str)
-                
 
     def _register_pypsa_components(self) -> None:
         ### PyPSA components : Generators
