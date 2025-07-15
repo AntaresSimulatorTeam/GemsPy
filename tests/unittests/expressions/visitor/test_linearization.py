@@ -14,8 +14,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from andromede.expression import ExpressionNode, LiteralNode, literal, var
-from andromede.expression.expression import (
+from gems.expression import ExpressionNode, LiteralNode, literal, var
+from gems.expression.expression import (
     ComponentVariableNode,
     CurrentScenarioIndex,
     TimeShift,
@@ -23,15 +23,15 @@ from andromede.expression.expression import (
     comp_var,
     problem_var,
 )
-from andromede.expression.indexing import IndexingStructureProvider
-from andromede.expression.indexing_structure import IndexingStructure
-from andromede.expression.operators_expansion import (
+from gems.expression.indexing import IndexingStructureProvider
+from gems.expression.indexing_structure import IndexingStructure
+from gems.expression.operators_expansion import (
     ProblemDimensions,
     ProblemIndex,
     expand_operators,
 )
-from andromede.simulation.linear_expression import LinearExpression, Term
-from andromede.simulation.linearize import ParameterGetter, linearize_expression
+from gems.simulation.linear_expression import LinearExpression, Term
+from gems.simulation.linearize import ParameterGetter, linearize_expression
 
 
 class AllTimeScenarioDependent(IndexingStructureProvider):

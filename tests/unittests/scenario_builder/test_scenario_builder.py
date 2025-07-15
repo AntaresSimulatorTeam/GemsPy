@@ -15,10 +15,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from andromede.study import DataBase
-from andromede.study.data import ComponentParameterIndex
-from andromede.study.parsing import parse_scenario_builder, parse_yaml_components
-from andromede.study.resolve_components import build_scenarized_data_base
+from gems.study import DataBase
+from gems.study.data import ComponentParameterIndex
+from gems.study.parsing import parse_scenario_builder, parse_yaml_components
+from gems.study.resolve_components import build_scenarized_data_base
 
 
 @pytest.fixture(scope="session")

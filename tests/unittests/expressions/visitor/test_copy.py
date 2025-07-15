@@ -11,16 +11,16 @@
 # This file is part of the Antares project.
 
 
-from andromede.expression import (
+from gems.expression import (
     AdditionNode,
     DivisionNode,
     LiteralNode,
     ParameterNode,
     VariableNode,
 )
-from andromede.expression.copy import copy_expression
-from andromede.expression.equality import expressions_equal
-from andromede.expression.expression import (
+from gems.expression.copy import copy_expression
+from gems.expression.equality import expressions_equal
+from gems.expression.expression import (
     AllTimeSumNode,
     ComponentParameterNode,
     MultiplicationNode,

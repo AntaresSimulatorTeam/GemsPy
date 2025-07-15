@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from andromede.model.parsing import parse_yaml_library
-from andromede.model.resolve_library import Library, resolve_library
+from gems.model.parsing import parse_yaml_library
+from gems.model.resolve_library import Library, resolve_library
 
 
 @pytest.fixture(scope="session")

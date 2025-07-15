@@ -16,11 +16,11 @@ from pathlib import Path
 import pypsa
 import pytest
 
-from andromede.model.parsing import parse_yaml_library
-from andromede.model.resolve_library import resolve_library
-from andromede.pypsa_converter.utils import transform_to_yaml
-from andromede.study.parsing import parse_yaml_components
-from andromede.study.resolve_components import resolve_system
+from gems.model.parsing import parse_yaml_library
+from gems.model.resolve_library import resolve_library
+from gems.pypsa_converter.utils import transform_to_yaml
+from gems.study.parsing import parse_yaml_components
+from gems.study.resolve_components import resolve_system
 from tests.pypsa_converter.utils import build_problem_from_system, convert_pypsa_network
 
 

@@ -21,15 +21,8 @@ from libs.standard_sc import (
     TWO_INPUTS_CONVERTOR_MODEL,
 )
 
-from andromede.simulation import OutputValues, TimeBlock, build_problem
-from andromede.study import (
-    ConstantData,
-    DataBase,
-    Network,
-    Node,
-    PortRef,
-    create_component,
-)
+from gems.simulation import OutputValues, TimeBlock, build_problem
+from gems.study import ConstantData, DataBase, Network, Node, PortRef, create_component
 
 """
 This file tests various modellings for an electrolyser with multiple inputs. The models are created in Python directly.

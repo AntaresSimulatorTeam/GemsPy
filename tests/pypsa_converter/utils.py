@@ -2,12 +2,12 @@ from pathlib import Path
 
 from pypsa import Network
 
-from andromede.input_converter.src.logger import Logger
-from andromede.pypsa_converter.pypsa_converter import PyPSAStudyConverter
-from andromede.simulation.optimization import OptimizationProblem, build_problem
-from andromede.simulation.time_block import TimeBlock
-from andromede.study.parsing import InputSystem
-from andromede.study.resolve_components import System, build_data_base, build_network
+from gems.input_converter.src.logger import Logger
+from gems.pypsa_converter.pypsa_converter import PyPSAStudyConverter
+from gems.simulation.optimization import OptimizationProblem, build_problem
+from gems.simulation.time_block import TimeBlock
+from gems.study.parsing import InputSystem
+from gems.study.resolve_components import System, build_data_base, build_network
 
 
 def convert_pypsa_network(

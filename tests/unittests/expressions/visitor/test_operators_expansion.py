@@ -15,9 +15,9 @@ from typing import Dict
 
 import pytest
 
-from andromede.expression import ExpressionNode, LiteralNode
-from andromede.expression.equality import expressions_equal
-from andromede.expression.expression import (
+from gems.expression import ExpressionNode, LiteralNode
+from gems.expression.equality import expressions_equal
+from gems.expression.expression import (
     CurrentScenarioIndex,
     NoScenarioIndex,
     NoTimeIndex,
@@ -30,9 +30,9 @@ from andromede.expression.expression import (
     problem_param,
     problem_var,
 )
-from andromede.expression.indexing import IndexingStructureProvider
-from andromede.expression.indexing_structure import IndexingStructure
-from andromede.expression.operators_expansion import ProblemDimensions, expand_operators
+from gems.expression.indexing import IndexingStructureProvider
+from gems.expression.indexing_structure import IndexingStructure
+from gems.expression.operators_expansion import ProblemDimensions, expand_operators
 
 P = comp_param("c", "p")
 X = comp_var("c", "x")

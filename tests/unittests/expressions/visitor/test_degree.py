@@ -12,7 +12,7 @@
 
 import pytest
 
-from andromede.expression import ExpressionDegreeVisitor, LiteralNode, param, var, visit
+from gems.expression import ExpressionDegreeVisitor, LiteralNode, param, var, visit
 
 
 def test_degree() -> None:

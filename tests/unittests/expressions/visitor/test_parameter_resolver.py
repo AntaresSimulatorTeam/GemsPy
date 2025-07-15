@@ -10,7 +10,7 @@
 #
 # This file is part of the Antares project.
 
-from andromede.expression import ParameterValueProvider, param, resolve_parameters, var
+from gems.expression import ParameterValueProvider, param, resolve_parameters, var
 
 
 def test_parameters_resolution() -> None:

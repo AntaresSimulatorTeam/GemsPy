@@ -17,13 +17,13 @@ from antares.craft.model.area import Area
 from antares.craft.model.study import Study
 from antares.craft.model.thermal import ThermalCluster
 
-from andromede.input_converter.src.converter import AntaresStudyConverter
-from andromede.input_converter.src.data_preprocessing.thermal import (
+from gems.input_converter.src.converter import AntaresStudyConverter
+from gems.input_converter.src.data_preprocessing.thermal import (
     Direction,
     ThermalDataPreprocessing,
 )
-from andromede.input_converter.src.logger import Logger
-from andromede.study.parsing import InputComponentParameter
+from gems.input_converter.src.logger import Logger
+from gems.study.parsing import InputComponentParameter
 from tests.input_converter.conftest import create_dataframe_from_constant
 
 DATAFRAME_PREPRO_THERMAL_CONFIG = (

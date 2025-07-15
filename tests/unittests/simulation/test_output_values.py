@@ -14,8 +14,8 @@ from unittest.mock import Mock
 
 import ortools.linear_solver.pywraplp as lp
 
-from andromede.simulation import OutputValues
-from andromede.simulation.optimization import (
+from gems.simulation import OutputValues
+from gems.simulation.optimization import (
     OptimizationContext,
     OptimizationProblem,
     TimestepComponentVariableKey,

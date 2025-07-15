@@ -14,7 +14,7 @@ from typing import Dict
 
 import pytest
 
-from andromede.simulation.linear_expression import LinearExpression, Term, TermKey
+from gems.simulation.linear_expression import LinearExpression, Term, TermKey
 
 
 @pytest.mark.parametrize(

@@ -16,11 +16,11 @@ import pandas as pd
 import pytest
 from antares.craft.model.study import Study
 
-from andromede.input_converter.src.converter import AntaresStudyConverter
-from andromede.input_converter.src.data_preprocessing.dataclasses import Operation
-from andromede.input_converter.src.logger import Logger
-from andromede.input_converter.src.utils import read_yaml_file, transform_to_yaml
-from andromede.study.parsing import (
+from gems.input_converter.src.converter import AntaresStudyConverter
+from gems.input_converter.src.data_preprocessing.dataclasses import Operation
+from gems.input_converter.src.logger import Logger
+from gems.input_converter.src.utils import read_yaml_file, transform_to_yaml
+from gems.study.parsing import (
     InputComponent,
     InputComponentParameter,
     InputPortConnections,

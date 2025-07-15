@@ -12,8 +12,8 @@
 
 import pytest
 
-from andromede.expression import ExpressionNode, copy_expression, literal, param, var
-from andromede.expression.equality import expressions_equal
+from gems.expression import ExpressionNode, copy_expression, literal, param, var
+from gems.expression.equality import expressions_equal
 
 
 @pytest.mark.parametrize(

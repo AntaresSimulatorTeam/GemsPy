@@ -13,15 +13,15 @@
 """
 The standard module contains the definition of standard models.
 """
-from andromede.expression import literal, param, var
-from andromede.expression.expression import port_field
-from andromede.expression.indexing_structure import IndexingStructure
-from andromede.model.common import ProblemContext
-from andromede.model.constraint import Constraint
-from andromede.model.model import ModelPort, model
-from andromede.model.parameter import float_parameter, int_parameter
-from andromede.model.port import PortField, PortFieldDefinition, PortFieldId, PortType
-from andromede.model.variable import float_variable, int_variable
+from gems.expression import literal, param, var
+from gems.expression.expression import port_field
+from gems.expression.indexing_structure import IndexingStructure
+from gems.model.common import ProblemContext
+from gems.model.constraint import Constraint
+from gems.model.model import ModelPort, model
+from gems.model.parameter import float_parameter, int_parameter
+from gems.model.port import PortField, PortFieldDefinition, PortFieldId, PortType
+from gems.model.variable import float_variable, int_variable
 
 CONSTANT = IndexingStructure(False, False)
 TIME_AND_SCENARIO_FREE = IndexingStructure(True, True)

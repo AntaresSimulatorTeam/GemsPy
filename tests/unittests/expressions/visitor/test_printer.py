@@ -10,7 +10,7 @@
 #
 # This file is part of the Antares project.
 
-from andromede.expression import ExpressionNode, PrinterVisitor, param, var, visit
+from gems.expression import ExpressionNode, PrinterVisitor, param, var, visit
 
 
 def test_comparison() -> None:

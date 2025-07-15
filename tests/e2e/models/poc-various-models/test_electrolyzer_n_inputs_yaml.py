@@ -12,16 +12,9 @@
 
 import math
 
-from andromede.model.library import Library
-from andromede.simulation import OutputValues, TimeBlock, build_problem
-from andromede.study import (
-    ConstantData,
-    DataBase,
-    Network,
-    Node,
-    PortRef,
-    create_component,
-)
+from gems.model.library import Library
+from gems.simulation import OutputValues, TimeBlock, build_problem
+from gems.study import ConstantData, DataBase, Network, Node, PortRef, create_component
 
 """
 This file tests various modellings for an electrolyser with multiple inputs. The models are read from a YAML model file.

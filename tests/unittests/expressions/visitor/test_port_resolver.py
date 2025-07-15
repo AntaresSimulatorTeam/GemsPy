@@ -12,11 +12,11 @@
 
 from typing import Dict, List
 
-from andromede.expression import ExpressionNode, var
-from andromede.expression.equality import expressions_equal
-from andromede.expression.expression import port_field
-from andromede.expression.port_resolver import PortFieldKey, resolve_port
-from andromede.model.port import PortFieldId
+from gems.expression import ExpressionNode, var
+from gems.expression.equality import expressions_equal
+from gems.expression.expression import port_field
+from gems.expression.port_resolver import PortFieldKey, resolve_port
+from gems.model.port import PortFieldId
 
 
 def test_port_field_resolution() -> None:

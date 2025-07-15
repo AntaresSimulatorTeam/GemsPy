@@ -13,11 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from andromede.expression import literal, param, var
-from andromede.expression.expression import port_field
-from andromede.expression.indexing_structure import IndexingStructure
-from andromede.expression.parsing.parse_expression import AntaresParseException
-from andromede.model import (
+from gems.expression import literal, param, var
+from gems.expression.expression import port_field
+from gems.expression.indexing_structure import IndexingStructure
+from gems.expression.parsing.parse_expression import AntaresParseException
+from gems.model import (
     Constraint,
     ModelPort,
     PortField,
@@ -26,9 +26,9 @@ from andromede.model import (
     float_variable,
     model,
 )
-from andromede.model.model import PortFieldDefinition, PortFieldId
-from andromede.model.parsing import parse_yaml_library
-from andromede.model.resolve_library import resolve_library
+from gems.model.model import PortFieldDefinition, PortFieldId
+from gems.model.parsing import parse_yaml_library
+from gems.model.resolve_library import resolve_library
 
 CONSTANT = IndexingStructure(False, False)
 

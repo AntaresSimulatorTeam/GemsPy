@@ -12,9 +12,9 @@
 
 from libs.standard import CONSTANT, TIME_AND_SCENARIO_FREE
 
-from andromede.expression import literal, param, var
-from andromede.expression.expression import port_field
-from andromede.model import (
+from gems.expression import literal, param, var
+from gems.expression.expression import port_field
+from gems.model import (
     Constraint,
     ModelPort,
     PortField,
@@ -23,16 +23,9 @@ from andromede.model import (
     float_variable,
     model,
 )
-from andromede.model.port import PortFieldDefinition, PortFieldId
-from andromede.simulation import TimeBlock, build_problem
-from andromede.study import (
-    ConstantData,
-    DataBase,
-    Network,
-    Node,
-    PortRef,
-    create_component,
-)
+from gems.model.port import PortFieldDefinition, PortFieldId
+from gems.simulation import TimeBlock, build_problem
+from gems.study import ConstantData, DataBase, Network, Node, PortRef, create_component
 
 ELECTRICAL_PORT = PortType(id="electrical_port", fields=[PortField("flow")])
 

@@ -14,10 +14,10 @@ from pathlib import Path
 
 import pytest
 
-from andromede.model.library import Library
-from andromede.model.parsing import parse_yaml_library
-from andromede.model.resolve_library import resolve_library
-from andromede.study.network import Network, Node
+from gems.model.library import Library
+from gems.model.parsing import parse_yaml_library
+from gems.model.resolve_library import resolve_library
+from gems.study.network import Network, Node
 
 
 @pytest.fixture(scope="session")

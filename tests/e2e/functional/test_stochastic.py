@@ -15,16 +15,9 @@ from typing import List
 import pandas as pd
 import pytest
 
-from andromede.simulation import TimeBlock, build_problem
-from andromede.study import (
-    ConstantData,
-    DataBase,
-    Network,
-    Node,
-    PortRef,
-    create_component,
-)
-from andromede.study.data import TimeScenarioSeriesData
+from gems.simulation import TimeBlock, build_problem
+from gems.study import ConstantData, DataBase, Network, Node, PortRef, create_component
+from gems.study.data import TimeScenarioSeriesData
 from tests.e2e.functional.libs.standard import (
     DEMAND_MODEL,
     NODE_BALANCE_MODEL,
