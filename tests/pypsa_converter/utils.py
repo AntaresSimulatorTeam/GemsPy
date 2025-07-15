@@ -11,10 +11,7 @@ from andromede.study.resolve_components import System, build_data_base, build_ne
 
 
 def convert_pypsa_network(
-    pypsa_network: Network,
-    systems_dir: Path,
-    series_dir: Path,
-    series_file_format:str
+    pypsa_network: Network, systems_dir: Path, series_dir: Path, series_file_format: str
 ) -> InputSystem:
     """
     Convert a PyPSA network to an Andromede InputSystem.
@@ -28,7 +25,9 @@ def convert_pypsa_network(
         InputSystem: The converted Andromede InputSystem
     """
     logger = Logger(__name__, "")
-    converter = PyPSAStudyConverter(pypsa_network, logger, systems_dir, series_dir,series_file_format)
+    converter = PyPSAStudyConverter(
+        pypsa_network, logger, systems_dir, series_dir, series_file_format
+    )
     input_system_from_pypsa_converter = converter.to_gems_study()
     return input_system_from_pypsa_converter
 
