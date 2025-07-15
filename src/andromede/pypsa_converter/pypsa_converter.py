@@ -162,18 +162,7 @@ class PyPSAStudyConverter:
                 ]
                 == "co2_emissions"
             )
-
-    def _pypsa_network_preprocessing(self) -> None:
-        ###Add fictitious carrier
-        self.pypsa_network.add(
-            "Carrier",
-            self.null_carrier_id,
-            co2_emissions=0,
-            max_growth=any_to_float(inf),
-        )
-        self.pypsa_network.carriers[
-            "carrier"
-        ] = self.pypsa_network.carriers.index.values
+    def _rename_buses(self) -> None:    
         ### Rename PyPSA buses, to delete spaces
         if len(self.pypsa_network.buses) > 0:
             self.pypsa_network.buses.index = self.pypsa_network.buses.index.str.replace(
@@ -188,6 +177,39 @@ class PyPSAStudyConverter:
                 for col in ["bus", "bus0", "bus1"]:
                     if col in df.columns:
                         df[col] = df[col].str.replace(" ", "_")
+                        
+    def _pypsa_network_preprocessing(self) -> None:
+        ###Add fictitious carrier
+        self.pypsa_network.add(
+            "Carrier",
+            self.null_carrier_id,
+            co2_emissions=0,
+            max_growth=any_to_float(inf),
+        )
+        self.pypsa_network.carriers[
+            "carrier"
+        ] = self.pypsa_network.carriers.index.values
+        self._rename_buses()
+
+    def _rename_pypsa_components(self, component_type: str)-> None:
+        df = getattr(self.pypsa_network, component_type)
+        if len(df)==0:
+            return
+        ### Rename PyPSA components, to make sure that the names are uniques (used as id in the Gems model)
+        prefix = component_type[:-1]
+        df.index = prefix + "_" + df.index.str.replace(" ", "_")
+        dictionnary = getattr(self.pypsa_network, component_type + "_t")
+        for _, val in dictionnary.items():
+            val.columns = prefix + "_" + val.columns.str.replace(" ", "_")
+
+    def _fix_capacities(self, component_type: str, capa_str:str)-> None:
+        df = getattr(self.pypsa_network, component_type)
+        if len(df)==0:
+            return
+        ### Adding min and max capacities to non-extendable objects
+        for field in [capa_str + "_min", capa_str + "_max"]:
+            df.loc[df[capa_str + "_extendable"] == False, field] = df[capa_str]
+            df.loc[df[capa_str + "_extendable"] == False, "capital_cost"] = 0.0
 
     def _preprocess_pypsa_components(
         self, component_type: str, extendable: bool, capa_str: str
@@ -207,19 +229,10 @@ class PyPSAStudyConverter:
                 rsuffix="_carrier",
             ),
         )
-        df = getattr(self.pypsa_network, component_type)
-        if len(df) > 0:
-            ### Rename PyPSA components, to make sure that the names are uniques (used as id in the Gems model)
-            prefix = component_type[:-1]
-            df.index = prefix + "_" + df.index.str.replace(" ", "_")
-            dictionnary = getattr(self.pypsa_network, component_type + "_t")
-            for _, val in dictionnary.items():
-                val.columns = prefix + "_" + val.columns.str.replace(" ", "_")
-            if extendable:
-                ### Adding min and max capacities to non-extendable objects
-                for field in [capa_str + "_min", capa_str + "_max"]:
-                    df.loc[df[capa_str + "_extendable"] == False, field] = df[capa_str]
-                df.loc[df[capa_str + "_extendable"] == False, "capital_cost"] = 0.0
+        self._rename_pypsa_components(component_type)
+        if extendable:
+            self._fix_capacities(component_type,capa_str)
+                
 
     def _register_pypsa_components(self) -> None:
         ### PyPSA components : Generators
