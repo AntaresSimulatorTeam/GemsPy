@@ -14,7 +14,7 @@ def convert_pypsa_network(
     pypsa_network: Network, systems_dir: Path, series_dir: Path, series_file_format: str
 ) -> InputSystem:
     """
-    Convert a PyPSA network to an Andromede InputSystem.
+    Convert a PyPSA network to an Gems InputSystem.
 
     Args:
         pypsa_network: The PyPSA network to convert
@@ -22,7 +22,7 @@ def convert_pypsa_network(
         series_dir: Directory to store time series data
 
     Returns:
-        InputSystem: The converted Andromede InputSystem
+        InputSystem: The converted Gems InputSystem
     """
     logger = Logger(__name__, "")
     converter = PyPSAStudyConverter(
@@ -39,7 +39,7 @@ def build_problem_from_system(
     Build an optimization problem from a resolved system.
 
     Args:
-        resolved_system: The resolved Andromede system
+        resolved_system: The resolved Gems system
         input_system: The input system
         series_dir: Directory containing time series data
         timesteps: Number of timesteps in the simulation

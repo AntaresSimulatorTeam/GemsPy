@@ -166,9 +166,7 @@ def pypsa_gemspy_benchmark(
     logger.info("Loading model library...")
     # Get the path to the project root by going up two levels from the current directory
     project_root = Path(__file__).parents[2]
-    pypsa_models_path = (
-        project_root / "src/andromede/libs/pypsa_models/pypsa_models.yml"
-    )
+    pypsa_models_path = project_root / "src/gems/libs/pypsa_models/pypsa_models.yml"
     logger.info(f"Loading PyPSA models from {pypsa_models_path}...")
     with open(pypsa_models_path) as lib_file:
         input_libraries = [parse_yaml_library(lib_file)]

@@ -32,7 +32,7 @@ from tests.input_converter.conftest import create_dataframe_from_constant
 RESOURCES_FOLDER = (
     Path(__file__).parents[2]
     / "src"
-    / "andromede"
+    / "gems"
     / "input_converter"
     / "data"
     / "model_configuration"
@@ -876,7 +876,7 @@ class TestConverter:
         path_cc = (
             Path(__file__).parent.parent.parent
             / "src"
-            / "andromede"
+            / "gems"
             / "input_converter"
             / "data"
             / "model_configuration"

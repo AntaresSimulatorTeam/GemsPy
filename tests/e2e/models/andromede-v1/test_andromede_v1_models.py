@@ -47,11 +47,9 @@ def series_dir(data_dir: Path) -> Path:
 
 @pytest.fixture
 def input_libraries() -> List[InputLibrary]:
-    with open("src/andromede/libs/antares_historic/antares_historic.yml") as lib_file:
+    with open("src/gems/libs/antares_historic/antares_historic.yml") as lib_file:
         lib_historic = parse_yaml_library(lib_file)
-    with open(
-        "src/andromede/libs/reference_models/andromede_v1_models.yml"
-    ) as lib_file:
+    with open("src/gems/libs/reference_models/andromede_v1_models.yml") as lib_file:
         lib_v1 = parse_yaml_library(lib_file)
     return [lib_historic, lib_v1]
 

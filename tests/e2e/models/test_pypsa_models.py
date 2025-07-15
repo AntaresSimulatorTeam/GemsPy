@@ -62,7 +62,7 @@ def test_model_behaviour(
     with open(systems_dir / system_file) as compo_file:
         input_component = parse_yaml_components(compo_file)
 
-    with open("src/andromede/libs/pypsa_models/pypsa_models.yml") as lib_file1:
+    with open("src/gems/libs/pypsa_models/pypsa_models.yml") as lib_file1:
         input_libraries = [parse_yaml_library(lib_file1)]
 
     result_lib = resolve_library(input_libraries)
