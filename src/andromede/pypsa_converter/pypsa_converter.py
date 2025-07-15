@@ -69,6 +69,7 @@ class PyPSAStudyConverter:
         logger: logging.Logger,
         system_dir: Path,
         series_dir: Path,
+        series_file_format: str,
     ):
         """
         Initialize processor
@@ -80,6 +81,7 @@ class PyPSAStudyConverter:
         self.pypsalib_id = "pypsa_models"
         self.null_carrier_id = "null"
         self.system_name = pypsa_network.name
+        self.series_file_format = series_file_format
 
         self._pypsa_network_assertion()
         self._pypsa_network_preprocessing()
@@ -530,7 +532,7 @@ class PyPSAStudyConverter:
                 timeseries_name = self.system_name + "_" + component + "_" + param
                 comp_param_to_timeseries_name[(component, param)] = timeseries_name
                 param_df[[component]].to_csv(
-                    self.series_dir / Path(timeseries_name + ".tsv"),
+                    self.series_dir / Path(timeseries_name + self.series_file_format),
                     index=False,
                     header=False,
                 )

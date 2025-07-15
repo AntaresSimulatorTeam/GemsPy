@@ -673,7 +673,7 @@ def run_conversion_test(
 
     # Conversion to Andromede System
     input_system_from_pypsa_converter = convert_pypsa_network(
-        pypsa_network, systems_dir, series_dir
+        pypsa_network, systems_dir, series_dir, ".txt"
     )
 
     # Loading the model library

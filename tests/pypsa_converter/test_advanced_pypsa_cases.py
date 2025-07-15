@@ -159,7 +159,7 @@ def pypsa_gemspy_benchmark(file: str, load_scaling: float, activate_quota: bool)
     # Convert to Gems System
     logger.info("Converting PyPSA network to Gems format...")
     input_system_from_pypsa_converter = convert_pypsa_network(
-        pypsa_network, systems_dir, series_dir
+        pypsa_network, systems_dir, series_dir, ".txt"
     )
 
     # Save the InputSystem to YAML
@@ -254,7 +254,7 @@ def pypsa_antares_benchmark(nc_file: str) -> None:
     # Convert to Gems System
     logger.info("Converting PyPSA network to Gems format...")
     input_system_from_pypsa_converter = convert_pypsa_network(
-        pypsa_network, systems_dir, series_dir
+        pypsa_network, systems_dir, series_dir, ".tsv"
     )
 
     # Save the InputSystem to YAML
