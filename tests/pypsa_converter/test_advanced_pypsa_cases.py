@@ -214,7 +214,7 @@ def test_case_gemspy() -> None:
     pypsa_gemspy_benchmark("simple.nc", 1.0, False)
 
 
-def pypsa_to_antares_e2e(nc_file: str) -> None:
+def pypsa_to_antares_e2e(nc_file: str, scale_load: float) -> None:
     """
     Main function to convert a PyPSA study to Gems format and run it.
     """
@@ -233,7 +233,7 @@ def pypsa_to_antares_e2e(nc_file: str) -> None:
 
     # Load the PyPSA study
     logger.info("Loading PyPSA study...")
-    pypsa_network = load_pypsa_study(nc_file, 1.0)
+    pypsa_network = load_pypsa_study(nc_file, scale_load)
     logger.info(
         f"Loaded PyPSA network with {len(pypsa_network.buses)} buses and {len(pypsa_network.generators)} generators"
     )
@@ -247,7 +247,7 @@ def pypsa_to_antares_e2e(nc_file: str) -> None:
     # Convert to Gems System
     logger.info("Converting PyPSA network to Gems format...")
     input_system_from_pypsa_converter = convert_pypsa_network(
-        pypsa_network, systems_dir, series_dir, ".tsv"
+        pypsa_network.copy(), systems_dir, series_dir, ".tsv"
     )
     print(input_system_from_pypsa_converter)
 
@@ -259,7 +259,7 @@ def pypsa_to_antares_e2e(nc_file: str) -> None:
         model=input_system_from_pypsa_converter,
         output_path=systems_dir + system_filename,
     )
-
+    logger.info(f"Launching Antares-modeler")
     modeler_exec_path = "C:/Users/oustryant/Documents/4_Modeleur/AntaresCD/rte-antares-9.3.0-rc2-installer-64bits/bin/antares-modeler"
     command =modeler_exec_path+ " " + study_dir
     os.system(command)
@@ -270,11 +270,22 @@ def pypsa_to_antares_e2e(nc_file: str) -> None:
     print("Output from command:", result)
 
     #Loading Antares objective function
-    df = pd.read_csv(study_dir+"/output/solution.csv",header=0)
-    print(df.values[0,0])
+    antares_objective = pd.read_csv(study_dir+"/output/solution.csv",header=None, sep=" ").values[0,1]
+    
+    # Optimize PyPSA network
+    logger.info("Solving PyPSA network after line to link...")
+    pypsa_network.optimize()
+    logger.info(f"PyPSA objective value: {pypsa_network.objective + pypsa_network.objective_constant}")
+    assert math.isclose(
+        pypsa_network.objective + pypsa_network.objective_constant,
+        antares_objective,
+        rel_tol=1e-6,
+    )
+
 
 def test_antares()-> None:
-    pypsa_to_antares_e2e("simple.nc")
+    #pypsa_to_antares_e2e("simple.nc",1.0)
+    pypsa_to_antares_e2e("base_s_6_elec_lvopt_.nc",0.4)
 
 if __name__ == "__main__":
     test_case_gemspy()
