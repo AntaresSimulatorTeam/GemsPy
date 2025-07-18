@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pypsa import Network
+import yaml
 
 from andromede.input_converter.src.logger import Logger
 from andromede.pypsa_converter.pypsa_converter import PyPSAStudyConverter
@@ -8,6 +9,7 @@ from andromede.simulation.optimization import OptimizationProblem, build_problem
 from andromede.simulation.time_block import TimeBlock
 from andromede.study.parsing import InputSystem
 from andromede.study.resolve_components import System, build_data_base, build_network
+
 
 
 def convert_pypsa_network(
@@ -70,7 +72,6 @@ def load_pypsa_study(file: str, load_scaling: float) -> Network:
         pypsa.Network: A PyPSA network object loaded from the NetCDF file,
                       containing all components and settings from the dataset.
     """
-    import os
     from pathlib import Path
 
     import pypsa
@@ -143,5 +144,28 @@ def replace_lines_by_links(network: Network) -> Network:
     return network
 
 
+
+
+def export_parameters_yaml(last_time_step: int, filepath: str = "config.yaml"):
+    """
+    Export a YAML file with default parameters,
+    and the provided `last-time-step` value.
+
+    Args:
+        last_time_step (int): Value of the last time step.
+        filepath (str): Path to the YAML file to create.
+    """
+    config = {
+        "solver": "highs",
+        "solver-logs": True,
+        "solver-parameters": "THREADS 1",
+        "no-output": False,
+        "first-time-step": 0,
+        "last-time-step": last_time_step
+    }
+
+    # Write the YAML file
+    with open(filepath, "w") as f:
+        yaml.dump(config, f, sort_keys=False)
 
 

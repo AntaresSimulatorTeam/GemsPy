@@ -20,101 +20,22 @@ converts it to Gems format, and runs the converted study.
 import math
 import os
 from pathlib import Path
+import time
 
 import pandas as pd
 from pypsa import Network
+import yaml
 
 from andromede.input_converter.src.logger import Logger
 from andromede.model.parsing import parse_yaml_library
 from andromede.model.resolve_library import resolve_library
 from andromede.pypsa_converter.utils import transform_to_yaml
 from andromede.study.resolve_components import resolve_system
-from tests.pypsa_converter.utils import build_problem_from_system, convert_pypsa_network
+from tests.pypsa_converter.utils import build_problem_from_system, convert_pypsa_network, extend_quota, load_pypsa_study, replace_lines_by_links
 
 
-def load_pypsa_study(file: str, load_scaling: float) -> Network:
-    """
-    Load a PyPSA study from a NetCDF file, preparing it for analysis or manipulation.
-
-    This function loads a PyPSA network from a predefined NetCDF file located in the
-    pypsa_input_files directory. It uses a relative path to avoid hardcoding the
-    absolute path.
-
-    Returns:
-        pypsa.Network: A PyPSA network object loaded from the NetCDF file,
-                      containing all components and settings from the dataset.
-    """
-    import os
-    from pathlib import Path
-
-    import pypsa
-
-    # Get the directory of the current file
-    current_dir = Path(__file__).parent
-
-    # Define the relative path to the input file
-    input_file = current_dir / "pypsa_input_files" / file
-
-    # Load the PyPSA network from the file
-    network = pypsa.Network(input_file)
-
-    # Scale the load to make the test case feasible
-    network = scale_load(network, load_scaling)
-
-    return network
 
 
-def extend_quota(network: Network) -> Network:
-    # Temporary function, used while the GlobalConstraint model is not implemented yet.
-    # Set the CO2 bound to very large value
-    network.global_constraints["constant"][0] = 10000000000
-    return network
-
-
-def scale_load(network: Network, factor: float) -> Network:
-    network.loads_t["p_set"] *= factor
-    return network
-
-
-def replace_lines_by_links(network: Network) -> Network:
-    """
-    Replace lines in a PyPSA network with equivalent links.
-
-    This function converts transmission lines to links, which allows for more
-    flexible modeling of power flow constraints. Each line is replaced with
-    two links (one for each direction) to maintain bidirectional flow capability.
-
-    Args:
-        network (pypsa.Network): The PyPSA network to modify
-
-    Returns:
-        pypsa.Network: The modified network with lines replaced by links
-    """
-
-    # Create a copy of the lines DataFrame to iterate over
-    lines = network.lines.copy()
-
-    # For each line, create two links (one for each direction)
-    for idx, line in lines.iterrows():
-        # Get line parameters
-        bus0 = line["bus0"]
-        bus1 = line["bus1"]
-        s_nom = line["s_nom"]
-        efficiency = 1.0
-
-        # Add forward link
-        network.add(
-            "Link",
-            f"{idx}-link-{bus0}-{bus1}",
-            bus0=bus0,
-            bus1=bus1,
-            p_min_pu=-1,
-            p_max_pu=1,
-            p_nom=s_nom,  # Use line capacity as link capacity
-            efficiency=efficiency,
-        )
-    network.remove("Line", lines.index)
-    return network
 
 
 def pypsa_gemspy_benchmark(
@@ -214,78 +135,3 @@ def test_case_gemspy() -> None:
     pypsa_gemspy_benchmark("simple.nc", 1.0, False)
 
 
-def pypsa_to_antares_e2e(nc_file: str, scale_load: float) -> None:
-    """
-    Main function to convert a PyPSA study to Gems format and run it.
-    """
-    # Set up logger
-    logger = Logger(__name__, "")
-
-    # Define directories for systems and series
-    study_dir = "C:/Users/oustryant/Documents/4_Modeleur/PyPSA_Antares/study"
-    
-    systems_dir = study_dir + "/input/"
-    series_dir = systems_dir + "data-series/"
-
-    # Create directories if they don't exist
-    #systems_dir.mkdir(exist_ok=True)
-    #series_dir.mkdir(exist_ok=True)
-
-    # Load the PyPSA study
-    logger.info("Loading PyPSA study...")
-    pypsa_network = load_pypsa_study(nc_file, scale_load)
-    logger.info(
-        f"Loaded PyPSA network with {len(pypsa_network.buses)} buses and {len(pypsa_network.generators)} generators"
-    )
-    logger.info(f"Replacing {len(pypsa_network.lines)} Lines by links")
-    pypsa_network = replace_lines_by_links(pypsa_network)
-   
-    # Get the number of timesteps
-    T = len(pypsa_network.snapshots)
-    logger.info(f"Number of timesteps: {T}")
-    print(pypsa_network)
-    # Convert to Gems System
-    logger.info("Converting PyPSA network to Gems format...")
-    input_system_from_pypsa_converter = convert_pypsa_network(
-        pypsa_network.copy(), systems_dir, series_dir, ".tsv"
-    )
-    print(input_system_from_pypsa_converter)
-
-    # Save the InputSystem to YAML
-    system_filename = "system.yml"
-    logger.info(f"Saving Gems system to {systems_dir + system_filename}...")
-    input_system_from_pypsa_converter.id = "test"
-    transform_to_yaml(
-        model=input_system_from_pypsa_converter,
-        output_path=systems_dir + system_filename,
-    )
-    logger.info(f"Launching Antares-modeler")
-    modeler_exec_path = "C:/Users/oustryant/Documents/4_Modeleur/AntaresCD/rte-antares-9.3.0-rc2-installer-64bits/bin/antares-modeler"
-    command =modeler_exec_path+ " " + study_dir
-    os.system(command)
-    # Capture the output of the command using subprocess
-    result = os.popen(command).read()
-
-    # Print the result
-    print("Output from command:", result)
-
-    #Loading Antares objective function
-    antares_objective = pd.read_csv(study_dir+"/output/solution.csv",header=None, sep=" ").values[0,1]
-    
-    # Optimize PyPSA network
-    logger.info("Solving PyPSA network after line to link...")
-    pypsa_network.optimize()
-    logger.info(f"PyPSA objective value: {pypsa_network.objective + pypsa_network.objective_constant}")
-    assert math.isclose(
-        pypsa_network.objective + pypsa_network.objective_constant,
-        antares_objective,
-        rel_tol=1e-6,
-    )
-
-
-def test_antares()-> None:
-    #pypsa_to_antares_e2e("simple.nc",1.0)
-    pypsa_to_antares_e2e("base_s_6_elec_lvopt_.nc",0.4)
-
-if __name__ == "__main__":
-    test_case_gemspy()
