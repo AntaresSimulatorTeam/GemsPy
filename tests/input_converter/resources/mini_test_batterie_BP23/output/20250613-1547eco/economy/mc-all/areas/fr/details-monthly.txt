@@ -1,0 +1,19 @@
+FR	area	de	monthly
+	VARIABLES	BEGIN	END
+	8	1	12
+
+FR	monthly		FR_batteries_inj	FR_Nuclear_epr	FR_batteries_inj	FR_Nuclear_epr	FR_batteries_inj	FR_Nuclear_epr	FR_batteries_inj	FR_Nuclear_epr
+			MWh	MWh	NP Cost - Euro	NP Cost - Euro	NODU	NODU	Profit - Euro	Profit - Euro
+	index	month	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP
+	1	JAN	11770	803256	0	0	38	168	39090147	1757527305
+	2	FEB	0	0	0	0	0	0	0	0
+	3	MAR	0	0	0	0	0	0	0	0
+	4	APR	0	0	0	0	0	0	0	0
+	5	MAY	0	0	0	0	0	0	0	0
+	6	JUN	0	0	0	0	0	0	0	0
+	7	JUL	0	0	0	0	0	0	0	0
+	8	AUG	0	0	0	0	0	0	0	0
+	9	SEP	0	0	0	0	0	0	0	0
+	10	OCT	0	0	0	0	0	0	0	0
+	11	NOV	0	0	0	0	0	0	0	0
+	12	DEC	0	0	0	0	0	0	0	0

@@ -4,6 +4,6 @@ scipy==1.10.1
 antlr4-python3-runtime==4.13.1
 PyYAML~=6.0.1
 pydantic
-antares_craft>=0.2.6
+antares_craft>0.2.6
 anytree==2.12.1
 pypsa

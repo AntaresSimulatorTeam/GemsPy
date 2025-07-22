@@ -1,0 +1,165 @@
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# Configuration file to convert a complex modelling artefact in an Antares study into an Andromede model.
+
+#TODOs :
+#*idem pour battery_pcomp
+
+template:
+  name: battery
+  generator-version-compatibility: X.Y #TODO: find this information
+  model: andromede-v1-models.battery
+  template-parameters:
+    - name: area
+      description: "Area identifier for the battery component"
+      exclude: 
+        - z_batteries
+        - z_batteries_pcomp
+
+  component:
+    id: battery_${area}
+    parameters:
+      - id: reservoir_capacity
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          type: thermal
+          data:
+            area: z_batteries
+            cluster: z_batteries_batteries_${area}_1
+            field: nominalcapacity #field in the file "list.ini"
+
+      - id: injection_nominal_capacity
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          type: link
+          data:
+            area_from: ${area}
+            area_to: z_batteries
+            timeseries_file_type: links_capacities_direct
+            column: 0
+            operation:
+              type: max
+
+      - id: withdrawal_nominal_capacity
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          type: thermal
+          data:
+            area: ${area}
+            cluster: ${area}_batteries_inj
+            field: nominalcapacity  #field in the file "list.ini"
+
+      - id: efficiency_injection
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          type: binding_constraint
+          data:
+            id: batteries_${area}
+            field: ${area}%z_batteries
+            operation:
+              multiply_by: -1
+
+      - id: efficiency_withdrawal
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          type: binding_constraint
+          data:
+            id: batteries_${area}
+            field: ${area}.${area}_batteries_inj
+
+      - id: lower_rule_curve
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          type: constant
+          data: 0
+
+      - id: upper_rule_curve
+        time-dependent: true
+        scenario-dependent: false
+        value:
+          type: thermal
+          data:
+            area: z_batteries
+            cluster: z_batteries_batteries_${area}_1
+            timeseries_file_type: thermal_series
+            column: 0
+            operation:
+              divide_by: reservoir_capacity
+
+      - id: p_max_injection_modulation
+        time-dependent: true
+        scenario-dependent: false
+        value:
+          type: link
+          data:
+            area_from: ${area}
+            area_to: z_batteries
+            timeseries_file_type: links_capacities_direct  # peut etre properties ou capacity_indirect
+            column: 0
+            operation:
+              divide_by: injection_nominal_capacity
+
+      - id: p_max_withdrawal_modulation
+        time-dependent: true
+        scenario-dependent: false
+        value:
+          type: thermal
+          data:
+            area: ${area}
+            cluster: ${area}_batteries_inj
+            timeseries_file_type: thermal_series
+            column: 0
+            operation:
+              divide_by: withdrawal_nominal_capacity
+
+      - id: marginal_cost
+        time-dependent: true
+        scenario-dependent: false
+        value:
+          type: link
+          data:
+            area_from: ${area}
+            area_to: z_batteries
+            timeseries_file_type: links_parameters
+            column: 0
+
+  connections:
+    - component1: battery_${area}
+      port1: injection_port
+      component2: ${area}
+      port2: balance_port
+
+  area-connections: #Syntax for hybrid connections: https://antares-simulator.readthedocs.io/en/latest/user-guide/solver/08-hybrid-studies/
+  #To handle the case of hybrid studies, where we replace complex modeling artifacts for batteries by a model.
+    - component: battery_${area}
+      port: injection_port
+      area: ${area}
+
+
+  legacy-objects-to-delete:
+    binding_constraints:
+      - batteries_${area}
+      - battery_level_${area}
+    links:
+      - ${area}%z_batteries
+    nodes:
+      - z_batteries
+    thermal_clusters:
+      - ${area}.${area}_batteries_inj
+      - z_batteries.z_batteries_batteries_${area}_1
+      - z_batteries.z_batteries_batteries_${area}_2

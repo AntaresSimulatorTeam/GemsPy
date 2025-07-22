@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 from antares.craft.model.area import Area, AreaProperties
 from antares.craft.model.hydro import HydroProperties
+from antares.craft.model.link import Link
 from antares.craft.model.renewable import RenewableClusterProperties
 from antares.craft.model.st_storage import STStorageProperties
 from antares.craft.model.study import Study, create_study_local
@@ -218,3 +219,71 @@ def fr_load(area_fr) -> None:
     return area object with a load object that has custom parameters
     """
     return area_fr.set_load(pd.DataFrame([1, 1, 1]))
+
+
+@pytest.fixture
+def local_study_w_areas_for_battery(local_study) -> Study:
+    """
+    Create an empty study
+    Create 2 areas with custom area properties
+    """
+    areas_to_create = ["fr", "it"]
+    for area in areas_to_create:
+        area_properties = AreaProperties(
+            energy_cost_spilled="1", energy_cost_unsupplied="0.5"
+        )
+        local_study.create_area(area, properties=area_properties)
+    return local_study
+
+
+@pytest.fixture
+def local_study_with_constraint(
+    local_study_w_areas_for_battery, request: pytest.FixtureRequest
+) -> Study:
+    param = getattr(request, "param", None)
+    parameters_df, capacities_df = param if param else (None, None)
+
+    # Add area and links
+    local_study_w_areas_for_battery.create_area("z_batteries")
+    links_to_create = ["fr|z_batteries", "it|z_batteries", "fr|it"]
+    for link in links_to_create:
+        area_from, area_to = link.split("|")
+        object_link: Link = local_study_w_areas_for_battery.create_link(
+            area_from=area_from, area_to=area_to
+        )
+        if parameters_df is not None:
+            object_link.set_parameters(parameters_df)
+
+        if capacities_df is not None:
+            object_link.set_capacity_direct(capacities_df)
+            object_link.set_capacity_indirect(capacities_df)
+    # Add thermal clusters
+    for area_id in ["fr", "z_batteries"]:
+        local_study_w_areas_for_battery.get_areas()[area_id].create_thermal_cluster(
+            f"{area_id}_batteries_inj",
+            ThermalClusterProperties(unit_count=1, nominal_capacity=2.0),
+        )
+        local_study_w_areas_for_battery.get_areas()[area_id].create_thermal_cluster(
+            f"z_batteries_batteries_{area_id}_1",
+            ThermalClusterProperties(unit_count=1, nominal_capacity=3.0),
+        )
+        local_study_w_areas_for_battery.get_areas()[area_id].create_thermal_cluster(
+            f"z_batteries_batteries_{area_id}_2",
+            ThermalClusterProperties(unit_count=1, nominal_capacity=6.0),
+        )
+    local_study_w_areas_for_battery.get_areas()["z_batteries"].create_thermal_cluster(
+        "z_batteries_batteries_fr_1",
+        ThermalClusterProperties(unit_count=1, nominal_capacity=6.0),
+    )
+    local_study_w_areas_for_battery.get_areas()["z_batteries"].create_thermal_cluster(
+        "z_batteries_batteries_it_1",
+        ThermalClusterProperties(unit_count=1, nominal_capacity=6.0),
+    )
+    local_study_w_areas_for_battery.get_areas()["it"].create_thermal_cluster(
+        "it_batteries_inj", ThermalClusterProperties(unit_count=1, nominal_capacity=6.0)
+    )
+
+    # Add binding constraint
+    local_study_w_areas_for_battery.create_binding_constraint(name="batteries_fr")
+
+    return local_study_w_areas_for_battery

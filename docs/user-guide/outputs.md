@@ -1,4 +1,4 @@
-# Outputs: retrieving outputs with pyGems
+# Outputs: retrieving outputs with GemsPy
 
 
 Once the optimisation problem was built and solved, one can retrieve the results as follows:

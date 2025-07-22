@@ -20,35 +20,36 @@ from .converter import AntaresStudyConverter
 from .logger import Logger
 
 DEFAULT: dict = {}
-LOGGER_PATH: str = os.path.join(os.path.dirname(__file__), "../data/logging.log")
+LOGGER_PATH: str = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data/logging.log"
+)
+
+
+class CreateFileIfMissing:
+    """
+    Argparse type that accepts a file path and creates the file if it doesn't exist.
+    Fails if the path points to an existing directory or if the parent directory is missing.
+    """
+
+    def __call__(self, string: str) -> Path:
+        path = Path(string).expanduser().resolve()
+
+        if path.exists() and not path.is_file():
+            raise ArgumentTypeError(f"Path exists and is not a file: '{path}'")
+
+        if not path.parent.exists():
+            raise ArgumentTypeError(f"Parent directory does not exist: '{path.parent}'")
+
+        if not path.exists():
+            try:
+                path.touch()
+            except Exception as e:
+                raise ArgumentTypeError(f"Failed to create file: {e}")
+
+        return path
 
 
 class PathType:
-    """file or directory path type for `argparse` parser
-
-    The `PathType` class represents a type of argument that can be used
-    with the `argparse` library.
-    This class takes three boolean arguments, `exists`, `file_ok`, and `dir_ok`,
-    which specify whether the path argument must exist, whether it can be a file,
-    and whether it can be a directory, respectively.
-
-    Example Usage::
-
-        import argparse
-        from antarest.main import PathType
-
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--input", type=PathType(file_ok=True, exists=True))
-        args = parser.parse_args()
-
-        print(args.input)
-
-    In the above example, `PathType` is used to specify the type of the `--input`
-    argument for the `argparse` parser. The argument must be an existing file path.
-    If the given path is not an existing file, the argparse library raises an error.
-    The Path object representing the given path is then printed to the console.
-    """
-
     def __init__(
         self,
         exists: bool = False,
@@ -63,25 +64,6 @@ class PathType:
         self.dir_ok = dir_ok
 
     def __call__(self, string: str) -> Path:
-        """
-        Check whether the given string represents a valid path.
-
-        If `exists` is `False`, the method simply returns the given path.
-        If `exists` is True, it checks whether the path exists and whether it is
-        a file or a directory, depending on the values of `file_ok` and `dir_ok`.
-        If the path exists and is of the correct type, the method returns the path;
-        otherwise, it raises an :class:`argparse.ArgumentTypeError` with an
-        appropriate error message.
-
-        Args:
-            string: file or directory path
-
-        Returns:
-            the file or directory path
-
-        Raises
-            argparse.ArgumentTypeError: if the path is invalid
-        """
         file_path = Path(string).expanduser()
         if not self.exists:
             return file_path
@@ -119,12 +101,12 @@ def parse_commandline() -> Namespace:
         "--conf",
         type=PathType(exists=True, file_ok=True),
         help="Give the path of the configuration file",
-        default="../data/config.ini",
+        default="data/config.ini",
     )
     parser.add_argument(
         "-l",
         "--logging",
-        type=PathType(exists=True, file_ok=True),
+        type=CreateFileIfMissing(),
         help="Give the path of the logger file",
         default=LOGGER_PATH,
     )
@@ -146,7 +128,11 @@ def parse_commandline() -> Namespace:
 if __name__ == "__main__":
     config: dict = {}
     args = parse_commandline()
-    logger: logging.Logger = Logger(__name__, args.logging)
+    log_path = args.logging
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    logger: logging.Logger = Logger(__name__, log_path)
+
     config_parser = ConfigParser()
 
     # Load the default configuration dictionary into the config parser.

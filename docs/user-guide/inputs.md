@@ -1,4 +1,4 @@
-# Reading input files with pyGems
+# Reading input files with GemsPy
 
 
 ## Loading the libraries & the system 

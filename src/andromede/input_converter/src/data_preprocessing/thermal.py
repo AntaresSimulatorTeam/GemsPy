@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from antares.craft.model.thermal import ThermalCluster
 
-from andromede.study.data import load_ts_from_txt
 from andromede.study.parsing import InputComponentParameter
 
 
@@ -74,10 +73,15 @@ class ThermalDataPreprocessing:
     ) -> pd.DataFrame:
         nb_units_max = self._compute_nb_units_max()
         indices = np.arange(len(nb_units_max))
+        max_valid_index = len(nb_units_max) - 1  # 8759
+
         previous_indices: np.ndarray = (indices - 1) % period + (
             indices // period
         ) * period
 
+        previous_indices = np.where(
+            indices == 0, 0, np.minimum(previous_indices, max_valid_index)
+        )
         variation = pd.DataFrame()
         if direction == Direction.BACKWARD:
             variation = nb_units_max.reset_index(drop=True) - nb_units_max.iloc[

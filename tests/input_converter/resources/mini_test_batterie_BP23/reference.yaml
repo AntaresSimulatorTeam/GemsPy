@@ -1,0 +1,140 @@
+system:
+  components:
+  - id: fr_nuclear_epr
+    model: antares-historic.thermal
+    parameters:
+    - id: p_min_cluster
+      scenario-dependent: true
+      time-dependent: true
+      value:  input/thermal/series/fr/fr_nuclear_epr/p_min_cluster
+    - id: nb_units_min
+      scenario-dependent: true
+      time-dependent: true
+      value:  input/thermal/series/fr/fr_nuclear_epr/nb_units_min
+    - id: nb_units_max
+      scenario-dependent: true
+      time-dependent: true
+      value:  input/thermal/series/fr/fr_nuclear_epr/nb_units_max
+    - id: nb_units_max_variation_forward
+      scenario-dependent: true
+      time-dependent: true
+      value:  input/thermal/series/fr/fr_nuclear_epr/nb_units_max_variation_forward
+    - id: nb_units_max_variation_backward
+      scenario-dependent: true
+      time-dependent: true
+      value:  input/thermal/series/fr/fr_nuclear_epr/nb_units_max_variation_backward
+    - id: unit_count
+      scenario-dependent: false
+      time-dependent: false
+      value: 1.0
+    - id: p_min_unit
+      scenario-dependent: false
+      time-dependent: false
+      value: 1130.25
+    - id: efficiency
+      scenario-dependent: false
+      time-dependent: false
+      value: 100.0
+    - id: p_max_unit
+      scenario-dependent: false
+      time-dependent: false
+      value: 5000.0
+    - id: generation_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 6.2
+    - id: fixed_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: startup_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 46200.0
+    - id: d_min_up
+      scenario-dependent: false
+      time-dependent: false
+      value: 24.0
+    - id: d_min_down
+      scenario-dependent: false
+      time-dependent: false
+      value: 24.0
+    - id: p_max_cluster
+      scenario-dependent: true
+      time-dependent: true
+      value:  input/thermal/series/fr/fr_nuclear_epr/series
+  - id: load
+    model: antares-historic.load
+    parameters:
+    - id: load
+      scenario-dependent: true
+      time-dependent: true
+      value:  input/load/series/load_fr
+  - id: battery_fr
+    model: andromede-v1-models.battery
+    parameters:
+    - id: reservoir_capacity
+      scenario-dependent: false
+      time-dependent: false
+      value: 2000.0
+    - id: injection_nominal_capacity
+      scenario-dependent: false
+      time-dependent: false
+      value: 1100.0
+    - id: withdrawal_nominal_capacity
+      scenario-dependent: false
+      time-dependent: false
+      value: 1000.0
+    - id: efficiency_injection
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.923
+    - id: efficiency_withdrawal
+      scenario-dependent: false
+      time-dependent: false
+      value: 1.026
+    - id: lower_rule_curve
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: upper_rule_curve
+      scenario-dependent: false
+      time-dependent: true
+      value:  input/thermal/series/z_batteries/z_batteries_batteries_fr_1/upper_rule_curve_z_batteries
+    - id: p_max_injection_modulation
+      scenario-dependent: false
+      time-dependent: true
+      value:  input/links/fr/capacities/p_max_injection_modulation_fr
+    - id: p_max_withdrawal_modulation
+      scenario-dependent: false
+      time-dependent: true
+      value:  input/thermal/series/fr/fr_batteries_inj/p_max_withdrawal_modulation_fr
+    - id: marginal_cost
+      scenario-dependent: false
+      time-dependent: true
+      value:  input/links/fr/marginal_cost_fr
+  connections:
+  - component1: fr_nuclear_epr
+    component2: fr
+    port1: balance_port
+    port2: balance_port
+  - component1: load
+    component2: fr
+    port1: balance_port
+    port2: balance_port
+  - component1: battery_fr
+    component2: fr
+    port1: injection_port
+    port2: balance_port
+  nodes:
+  - id: fr
+    model: antares-historic.area
+    parameters:
+    - id: ens_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 4000.0
+    - id: spillage_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0

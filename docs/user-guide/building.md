@@ -1,11 +1,11 @@
 # Building systems with the Python API
 
-Instead of reading a .yml file, one can build a system with pyGems by using the API of the package.
+Instead of reading a .yml file, one can build a system with GemsPy by using the API of the package.
 
 
 ## Defining an InputComponent
 
-The syntax to build components with the pyGems API is the following:
+The syntax to build components with the GemsPy API is the following:
 
 ~~~ python
 components = []
@@ -71,7 +71,7 @@ components.append(
 
 ## Defining an InputPortConnection
 
-The syntax to build connections between components with the pyGems API is the following:
+The syntax to build connections between components with the GemsPy API is the following:
 
 
 ~~~ python

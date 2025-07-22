@@ -1,0 +1,38 @@
+	digest
+	VARIABLES	AREAS	LINKS
+	84	2	1
+
+		OV. COST	OP. COST	MRG. PRICE	CO2 EMIS.	NH3 EMIS.	SO2 EMIS.	NOX EMIS.	PM2_5 EMIS.	PM5 EMIS.	PM10 EMIS.	NMVOC EMIS.	OP1 EMIS.	OP2 EMIS.	OP3 EMIS.	OP4 EMIS.	OP5 EMIS.	BALANCE	ROW BAL.	PSP	MISC. NDG	LOAD	H. ROR	NUCLEAR	LIGNITE	COAL	GAS	OIL	MIX. FUEL	MISC. DTG	MISC. DTG 2	MISC. DTG 3	MISC. DTG 4	WIND OFFSHORE	WIND ONSHORE	SOLAR CONCRT.	SOLAR PV	SOLAR ROOFT	RENW. 1	RENW. 2	RENW. 3	RENW. 4	H. STOR	H. PUMP	H. LEV	H. INFL	H. OVFL	H. VAL	H. COST	PSP_open_injection	PSP_open_withdrawal	PSP_open_level	PSP_closed_injection	PSP_closed_withdrawal	PSP_closed_level	Pondage_injection	Pondage_withdrawal	Pondage_level	Battery_injection	Battery_withdrawal	Battery_level	Other1_injection	Other1_withdrawal	Other1_level	Other2_injection	Other2_withdrawal	Other2_level	Other3_injection	Other3_withdrawal	Other3_level	Other4_injection	Other4_withdrawal	Other4_level	Other5_injection	Other5_withdrawal	Other5_level	UNSP. ENRG	SPIL. ENRG	LOLD	LOLP	AVL DTG	DTG MRG	MAX MRG	NP COST	NODU
+		Euro	Euro	Euro	Tons	Tons	Tons	Tons	Tons	Tons	Tons	Tons	Tons	Tons	Tons	Tons	Tons	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	MWh	%	MWh	%	Euro/MWh	Euro	MW	MW	MWh	MW	MW	MWh	MW	MW	MWh	MW	MW	MWh	MW	MW	MWh	MW	MW	MWh	MW	MW	MWh	MW	MW	MWh	MW	MW	MWh	MWh	MWh	Hours	%	MWh	MWh	MWh	Euro	 
+		EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	values	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP	values	EXP	EXP	EXP	EXP	EXP
+	fr	186543869	4980184	46.72	0	0	0	0	0	0	0	0	0	0	0	0	0	13084	0	0	0	847333	0	803256	0	0	0	0	0	11770	0	0	0	0	0	0	0	0	0	0	0	0	0	0	N/A	0	N/A	N/A	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	45391	0	68.00	100.00	51979200	51164174	51118783	0	206
+	z_batteries	0	0	0.00	0	0	0	0	0	0	0	0	0	0	0	0	0	-13084	0	-8735991264	0	0	0	0	0	0	0	0	0	34814029	0	0	0	0	0	0	0	0	0	0	0	0	0	0	N/A	0	N/A	N/A	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	8701164151	0	8736.00	100.00	34944000	129971	-8701034180	0	17462
+
+
+	digest
+	VARIABLES	AREAS	LINKS
+	0	0	1
+
+	
+	
+	
+
+
+
+
+
+
+	Links (FLOW LIN.)
+		From...
+	...To	fr	z_batteries
+	fr	X	-13084
+	z_batteries	13084	X
+
+
+
+
+	Links (FLOW QUAD.)
+		From...
+	...To	fr	z_batteries
+	fr	X	0
+	z_batteries	0	X

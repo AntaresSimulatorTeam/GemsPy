@@ -1,5 +1,5 @@
 site_name: Gems - Generic Energy systems Modeling Scheme
-repo_url: https://github.com/AntaresSimulatorTeam/pyGems
+repo_url: https://github.com/AntaresSimulatorTeam/GemsPy
 nav:
   - 'Home': 'index.md'
   - 'Getting started': 'getting-started.md'
@@ -10,7 +10,7 @@ nav:
       - 'Systems': 'user-guide/systems.md'
       - 'Data series': 'user-guide/data.md'
     - 'Reference libraries' : 'user-guide/reference-libraries.md'
-  - 'User guide: pyGems interpreter package':
+  - 'User guide: GemsPy interpreter package':
     - 'Reading input files': 'user-guide/inputs.md'
     - 'Building systems with the Python API': 'user-guide/building.md'
     - 'Optimization: building and solving problems': 'user-guide/optimisation.md'

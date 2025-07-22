@@ -146,19 +146,19 @@ Here is an example for the data file ~load_data~ mentioned in the system file ab
 ~~~
 A data file may have a `.txt` or `.csv` extension.
 
-# Getting started with pyGems
+# Getting started with GemsPy
 
 ## Installation
 
-You can directly clone the [GitHub repo](https://github.com/AntaresSimulatorTeam/pyGems) of the project.
+You can directly clone the [GitHub repo](https://github.com/AntaresSimulatorTeam/GemsPy) of the project.
 
-## Interpretation and simulation with pyGems
+## Interpretation and simulation with GemsPy
 
-Here is an example of how to load component and library files, resolve the system, and solve the optimisation problem using the ***pyGems*** package.
+Here is an example of how to load component and library files, resolve the system, and solve the optimisation problem using the ***GemsPy*** package.
 
 ### Loading the library, the system and the timeseries:
 
-Here is the pyGems syntax to read a test case described by
+Here is the GemsPy syntax to read a test case described by
 
 -  A library of models: `library.yml`
 -  A system file: `system.yml`

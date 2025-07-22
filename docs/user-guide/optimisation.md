@@ -1,4 +1,4 @@
-# Optimisation: building and solving problems with pyGems
+# Optimisation: building and solving problems with GemsPy
 
 
 ### Building the optimisation problem

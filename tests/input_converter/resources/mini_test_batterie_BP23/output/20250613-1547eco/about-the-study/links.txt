@@ -1,0 +1,3 @@
+fr
+	z_batteries
+z_batteries
