@@ -12,10 +12,10 @@
 
 import pytest
 
-from andromede.expression import literal
-from andromede.expression.expression import port_field
-from andromede.model import Constraint, ModelPort, PortType, model
-from andromede.study import Node, PortRef, PortsConnection, create_component
+from gems.expression import literal
+from gems.expression.expression import port_field
+from gems.model import Constraint, ModelPort, PortType, model
+from gems.study import Node, PortRef, PortsConnection, create_component
 from tests.unittests.system.libs.standard import DEMAND_MODEL
 
 

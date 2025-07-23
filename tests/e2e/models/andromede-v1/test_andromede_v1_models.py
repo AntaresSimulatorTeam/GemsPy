@@ -17,16 +17,12 @@ from typing import List
 import pandas as pd
 import pytest
 
-from andromede.model.parsing import InputLibrary, parse_yaml_library
-from andromede.model.resolve_library import resolve_library
-from andromede.simulation.optimization import build_problem
-from andromede.simulation.time_block import TimeBlock
-from andromede.study.parsing import parse_yaml_components
-from andromede.study.resolve_components import (
-    build_data_base,
-    build_network,
-    resolve_system,
-)
+from gems.model.parsing import InputLibrary, parse_yaml_library
+from gems.model.resolve_library import resolve_library
+from gems.simulation.optimization import build_problem
+from gems.simulation.time_block import TimeBlock
+from gems.study.parsing import parse_yaml_components
+from gems.study.resolve_components import build_data_base, build_network, resolve_system
 
 
 @pytest.fixture
@@ -51,11 +47,9 @@ def series_dir(data_dir: Path) -> Path:
 
 @pytest.fixture
 def input_libraries() -> List[InputLibrary]:
-    with open("src/andromede/libs/antares_historic/antares_historic.yml") as lib_file:
+    with open("src/gems/libs/antares_historic/antares_historic.yml") as lib_file:
         lib_historic = parse_yaml_library(lib_file)
-    with open(
-        "src/andromede/libs/reference_models/andromede_v1_models.yml"
-    ) as lib_file:
+    with open("src/gems/libs/reference_models/andromede_v1_models.yml") as lib_file:
         lib_v1 = parse_yaml_library(lib_file)
     return [lib_historic, lib_v1]
 

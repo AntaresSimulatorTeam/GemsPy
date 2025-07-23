@@ -2,21 +2,19 @@ from pathlib import Path
 
 from pypsa import Network
 
-from andromede.input_converter.src.logger import Logger
-from andromede.pypsa_converter.pypsa_converter import PyPSAStudyConverter
-from andromede.simulation.optimization import OptimizationProblem, build_problem
-from andromede.simulation.time_block import TimeBlock
-from andromede.study.parsing import InputSystem
-from andromede.study.resolve_components import System, build_data_base, build_network
+from gems.input_converter.src.logger import Logger
+from gems.pypsa_converter.pypsa_converter import PyPSAStudyConverter
+from gems.simulation.optimization import OptimizationProblem, build_problem
+from gems.simulation.time_block import TimeBlock
+from gems.study.parsing import InputSystem
+from gems.study.resolve_components import System, build_data_base, build_network
 
 
 def convert_pypsa_network(
-    pypsa_network: Network,
-    systems_dir: Path,
-    series_dir: Path,
+    pypsa_network: Network, systems_dir: Path, series_dir: Path, series_file_format: str
 ) -> InputSystem:
     """
-    Convert a PyPSA network to an Andromede InputSystem.
+    Convert a PyPSA network to an Gems InputSystem.
 
     Args:
         pypsa_network: The PyPSA network to convert
@@ -24,10 +22,12 @@ def convert_pypsa_network(
         series_dir: Directory to store time series data
 
     Returns:
-        InputSystem: The converted Andromede InputSystem
+        InputSystem: The converted Gems InputSystem
     """
     logger = Logger(__name__, "")
-    converter = PyPSAStudyConverter(pypsa_network, logger, systems_dir, series_dir)
+    converter = PyPSAStudyConverter(
+        pypsa_network, logger, systems_dir, series_dir, series_file_format
+    )
     input_system_from_pypsa_converter = converter.to_gems_study()
     return input_system_from_pypsa_converter
 
@@ -39,7 +39,7 @@ def build_problem_from_system(
     Build an optimization problem from a resolved system.
 
     Args:
-        resolved_system: The resolved Andromede system
+        resolved_system: The resolved Gems system
         input_system: The input system
         series_dir: Directory containing time series data
         timesteps: Number of timesteps in the simulation

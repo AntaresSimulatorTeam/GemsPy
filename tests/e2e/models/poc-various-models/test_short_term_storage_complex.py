@@ -9,8 +9,8 @@ from libs.standard import (
 )
 from libs.standard_sc import SHORT_TERM_STORAGE_COMPLEX
 
-from andromede.simulation import BlockBorderManagement, TimeBlock, build_problem
-from andromede.study import (
+from gems.simulation import BlockBorderManagement, TimeBlock, build_problem
+from gems.study import (
     ConstantData,
     DataBase,
     Network,

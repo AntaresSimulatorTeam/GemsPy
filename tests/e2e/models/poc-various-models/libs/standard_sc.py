@@ -12,9 +12,9 @@
 
 from libs.standard import BALANCE_PORT_TYPE, CONSTANT
 
-from andromede.expression import literal, param, var
-from andromede.expression.expression import port_field
-from andromede.model import (
+from gems.expression import literal, param, var
+from gems.expression.expression import port_field
+from gems.model import (
     Constraint,
     ModelPort,
     PortField,
@@ -23,7 +23,7 @@ from andromede.model import (
     float_variable,
     model,
 )
-from andromede.model.port import PortFieldDefinition, PortFieldId
+from gems.model.port import PortFieldDefinition, PortFieldId
 
 """
 Simple Convertor model.

@@ -15,13 +15,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from andromede.model.parsing import parse_yaml_library
-from andromede.model.resolve_library import resolve_library
-from andromede.simulation.optimization import build_problem
-from andromede.simulation.time_block import TimeBlock
-from andromede.study.data import DataBase
-from andromede.study.parsing import parse_scenario_builder, parse_yaml_components
-from andromede.study.resolve_components import (
+from gems.model.parsing import parse_yaml_library
+from gems.model.resolve_library import resolve_library
+from gems.simulation.optimization import build_problem
+from gems.simulation.time_block import TimeBlock
+from gems.study.data import DataBase
+from gems.study.parsing import parse_scenario_builder, parse_yaml_components
+from gems.study.resolve_components import (
     build_network,
     build_scenarized_data_base,
     consistency_check,

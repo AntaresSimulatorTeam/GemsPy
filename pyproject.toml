@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "andromede_modeling_prototype"
+name = "gems"
 version = "0.0.1"
 license = {text="MPL-2.0"}
 dependencies = [

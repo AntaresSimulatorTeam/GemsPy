@@ -13,8 +13,8 @@
 import pandas as pd
 import pytest
 
-from andromede.expression.expression import literal, param, var
-from andromede.model import (
+from gems.expression.expression import literal, param, var
+from gems.model import (
     Constraint,
     Model,
     ModelPort,
@@ -23,17 +23,13 @@ from andromede.model import (
     float_variable,
     model,
 )
-from andromede.model.port import PortFieldDefinition, PortFieldId
-from andromede.simulation import (
-    BendersSolution,
-    TimeBlock,
-    build_benders_decomposed_problem,
-)
-from andromede.simulation.decision_tree import (
+from gems.model.port import PortFieldDefinition, PortFieldId
+from gems.simulation import BendersSolution, TimeBlock, build_benders_decomposed_problem
+from gems.simulation.decision_tree import (
     DecisionTreeNode,
     InterDecisionTimeScenarioConfig,
 )
-from andromede.study import (
+from gems.study import (
     Component,
     ConstantData,
     DataBase,

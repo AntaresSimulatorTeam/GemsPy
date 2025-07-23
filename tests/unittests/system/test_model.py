@@ -12,7 +12,7 @@
 
 import pytest
 
-from andromede.expression.expression import (
+from gems.expression.expression import (
     ExpressionNode,
     comp_param,
     comp_var,
@@ -21,8 +21,8 @@ from andromede.expression.expression import (
     port_field,
     var,
 )
-from andromede.model import Constraint, float_variable, model
-from andromede.model.port import port_field_def
+from gems.model import Constraint, float_variable, model
+from gems.model.port import port_field_def
 
 
 @pytest.mark.parametrize(

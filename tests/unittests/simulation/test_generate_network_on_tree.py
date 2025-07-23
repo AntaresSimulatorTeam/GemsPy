@@ -12,12 +12,12 @@
 
 import pytest
 
-from andromede.simulation import TimeBlock
-from andromede.simulation.decision_tree import (
+from gems.simulation import TimeBlock
+from gems.simulation.decision_tree import (
     DecisionTreeNode,
     InterDecisionTimeScenarioConfig,
 )
-from andromede.study.network import Network
+from gems.study.network import Network
 
 
 def test_decision_tree_generation() -> None:

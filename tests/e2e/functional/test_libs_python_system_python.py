@@ -36,12 +36,12 @@ Several cases are tested:
 import pandas as pd
 import pytest
 
-from andromede.expression import literal, param, var
-from andromede.expression.indexing_structure import IndexingStructure
-from andromede.model import Model, ModelPort, float_parameter, float_variable, model
-from andromede.model.port import PortFieldDefinition, PortFieldId
-from andromede.simulation import BlockBorderManagement, TimeBlock, build_problem
-from andromede.study import (
+from gems.expression import literal, param, var
+from gems.expression.indexing_structure import IndexingStructure
+from gems.model import Model, ModelPort, float_parameter, float_variable, model
+from gems.model.port import PortFieldDefinition, PortFieldId
+from gems.simulation import BlockBorderManagement, TimeBlock, build_problem
+from gems.study import (
     ConstantData,
     DataBase,
     Network,

@@ -15,9 +15,9 @@ from typing import Union
 import pandas as pd
 import pytest
 
-from andromede.expression import param, var
-from andromede.expression.indexing_structure import IndexingStructure
-from andromede.model import (
+from gems.expression import param, var
+from gems.expression.indexing_structure import IndexingStructure
+from gems.model import (
     Constraint,
     Model,
     ModelPort,
@@ -25,8 +25,8 @@ from andromede.model import (
     float_variable,
     model,
 )
-from andromede.model.port import PortFieldDefinition, PortFieldId
-from andromede.study import (
+from gems.model.port import PortFieldDefinition, PortFieldId
+from gems.study import (
     ConstantData,
     DataBase,
     Network,
@@ -39,7 +39,7 @@ from andromede.study import (
     TimeSeriesData,
     create_component,
 )
-from andromede.study.data import load_ts_from_txt
+from gems.study.data import load_ts_from_txt
 from tests.unittests.system.libs.standard import (
     BALANCE_PORT_TYPE,
     CONSTANT,

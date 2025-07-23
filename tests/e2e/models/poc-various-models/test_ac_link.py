@@ -14,18 +14,11 @@ from pathlib import Path
 import pytest
 from libs.standard import BALANCE_PORT_TYPE, DEMAND_MODEL, GENERATOR_MODEL
 
-from andromede.model.library import Library, library
-from andromede.model.parsing import parse_yaml_library
-from andromede.model.resolve_library import resolve_library
-from andromede.simulation import OutputValues, TimeBlock, build_problem
-from andromede.study import (
-    ConstantData,
-    DataBase,
-    Network,
-    Node,
-    PortRef,
-    create_component,
-)
+from gems.model.library import Library, library
+from gems.model.parsing import parse_yaml_library
+from gems.model.resolve_library import resolve_library
+from gems.simulation import OutputValues, TimeBlock, build_problem
+from gems.study import ConstantData, DataBase, Network, Node, PortRef, create_component
 
 
 @pytest.fixture

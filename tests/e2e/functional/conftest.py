@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from andromede.model.parsing import InputLibrary, parse_yaml_library
-from andromede.model.resolve_library import Library, resolve_library
-from andromede.study.parsing import InputSystem, parse_yaml_components
+from gems.model.parsing import InputLibrary, parse_yaml_library
+from gems.model.resolve_library import Library, resolve_library
+from gems.study.parsing import InputSystem, parse_yaml_components
 
 
 @pytest.fixture(scope="session")

@@ -16,11 +16,11 @@ import pandas as pd
 import pytest
 from antares.craft.model.study import Study
 
-from andromede.input_converter.src.converter import AntaresStudyConverter
-from andromede.input_converter.src.data_preprocessing.dataclasses import Operation
-from andromede.input_converter.src.logger import Logger
-from andromede.input_converter.src.utils import read_yaml_file, transform_to_yaml
-from andromede.study.parsing import (
+from gems.input_converter.src.converter import AntaresStudyConverter
+from gems.input_converter.src.data_preprocessing.dataclasses import Operation
+from gems.input_converter.src.logger import Logger
+from gems.input_converter.src.utils import read_yaml_file, transform_to_yaml
+from gems.study.parsing import (
     InputComponent,
     InputComponentParameter,
     InputPortConnections,
@@ -32,7 +32,7 @@ from tests.input_converter.conftest import create_dataframe_from_constant
 RESOURCES_FOLDER = (
     Path(__file__).parents[2]
     / "src"
-    / "andromede"
+    / "gems"
     / "input_converter"
     / "data"
     / "model_configuration"
@@ -876,7 +876,7 @@ class TestConverter:
         path_cc = (
             Path(__file__).parent.parent.parent
             / "src"
-            / "andromede"
+            / "gems"
             / "input_converter"
             / "data"
             / "model_configuration"

@@ -15,7 +15,7 @@ from typing import Dict
 
 import pytest
 
-from andromede.expression import (
+from gems.expression import (
     AdditionNode,
     DivisionNode,
     EvaluationContext,
@@ -32,11 +32,8 @@ from andromede.expression import (
     var,
     visit,
 )
-from andromede.expression.equality import expressions_equal
-from andromede.expression.expression import (
-    ComponentParameterNode,
-    ComponentVariableNode,
-)
+from gems.expression.equality import expressions_equal
+from gems.expression.expression import ComponentParameterNode, ComponentVariableNode
 
 
 @dataclass(frozen=True)

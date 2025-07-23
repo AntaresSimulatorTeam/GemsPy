@@ -12,25 +12,21 @@
 
 import pytest
 
-from andromede.expression import literal, param, var
-from andromede.expression.indexing_structure import IndexingStructure
-from andromede.model.common import ProblemContext
-from andromede.model.constraint import Constraint
-from andromede.model.model import ModelPort, model
-from andromede.model.parameter import float_parameter
-from andromede.model.port import PortField, PortFieldDefinition, PortFieldId, PortType
-from andromede.model.variable import float_variable
-from andromede.simulation import (
-    BendersSolution,
-    TimeBlock,
-    build_benders_decomposed_problem,
-)
-from andromede.simulation.decision_tree import (
+from gems.expression import literal, param, var
+from gems.expression.indexing_structure import IndexingStructure
+from gems.model.common import ProblemContext
+from gems.model.constraint import Constraint
+from gems.model.model import ModelPort, model
+from gems.model.parameter import float_parameter
+from gems.model.port import PortField, PortFieldDefinition, PortFieldId, PortType
+from gems.model.variable import float_variable
+from gems.simulation import BendersSolution, TimeBlock, build_benders_decomposed_problem
+from gems.simulation.decision_tree import (
     DecisionTreeNode,
     InterDecisionTimeScenarioConfig,
 )
-from andromede.study.data import ConstantData, DataBase, TreeData
-from andromede.study.network import Component, Network, Node, PortRef, create_component
+from gems.study.data import ConstantData, DataBase, TreeData
+from gems.study.network import Component, Network, Node, PortRef, create_component
 from tests.e2e.functional.libs.standard import (
     DEMAND_MODEL,
     GENERATOR_MODEL,

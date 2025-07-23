@@ -16,19 +16,12 @@ from typing import cast
 
 import pandas as pd
 
-from andromede.expression.expression import ExpressionNode, literal, param, var
-from andromede.expression.indexing_structure import IndexingStructure
-from andromede.model import float_parameter, float_variable, model
-from andromede.simulation import TimeBlock, build_problem
-from andromede.study import (
-    ConstantData,
-    DataBase,
-    Network,
-    Node,
-    PortRef,
-    create_component,
-)
-from andromede.study.data import TimeScenarioSeriesData
+from gems.expression.expression import ExpressionNode, literal, param, var
+from gems.expression.indexing_structure import IndexingStructure
+from gems.model import float_parameter, float_variable, model
+from gems.simulation import TimeBlock, build_problem
+from gems.study import ConstantData, DataBase, Network, Node, PortRef, create_component
+from gems.study.data import TimeScenarioSeriesData
 from tests.e2e.functional.libs.standard import (
     DEMAND_MODEL,
     GENERATOR_MODEL,

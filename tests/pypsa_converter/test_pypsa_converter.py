@@ -16,11 +16,11 @@ from pathlib import Path
 import pypsa
 import pytest
 
-from andromede.model.parsing import parse_yaml_library
-from andromede.model.resolve_library import resolve_library
-from andromede.pypsa_converter.utils import transform_to_yaml
-from andromede.study.parsing import parse_yaml_components
-from andromede.study.resolve_components import resolve_system
+from gems.model.parsing import parse_yaml_library
+from gems.model.resolve_library import resolve_library
+from gems.pypsa_converter.utils import transform_to_yaml
+from gems.study.parsing import parse_yaml_components
+from gems.study.resolve_components import resolve_system
 from tests.pypsa_converter.utils import build_problem_from_system, convert_pypsa_network
 
 
@@ -51,7 +51,7 @@ def test_load_gen(systems_dir: Path, series_dir: Path) -> None:
     )
     n1.optimize()
 
-    # Testing the PyPSA_to_Andromede converter
+    # Testing the PyPSA_to_Gems converter
     run_conversion_test(n1, n1.objective, "test_load_gen.yml", systems_dir, series_dir)
 
 
@@ -101,7 +101,7 @@ def test_load_gen_ext(
     )
     n1.optimize()
 
-    # Testing the PyPSA_to_Andromede converter
+    # Testing the PyPSA_to_Gems converter
     run_conversion_test(
         n1, n1.objective, "test_load_gen_ext.yml", systems_dir, series_dir
     )
@@ -155,7 +155,7 @@ def test_load_gen_emissions(
     )
     n1.add("GlobalConstraint", name="co2_budget", sense="<=", constant=quota)
     n1.optimize()
-    # Testing the PyPSA_to_Andromede converter
+    # Testing the PyPSA_to_Gems converter
     run_conversion_test(
         n1, n1.objective, "test_load_gen_emissions.yml", systems_dir, series_dir
     )
@@ -190,7 +190,7 @@ def test_load_gen_pmin(systems_dir: Path, series_dir: Path) -> None:
     )
     n1.optimize()
 
-    # Testing the PyPSA_to_Andromede converter
+    # Testing the PyPSA_to_Gems converter
     run_conversion_test(
         n1, n1.objective, "test_load_gen_pmin.yml", systems_dir, series_dir
     )
@@ -224,7 +224,7 @@ def test_load_gen_sum(systems_dir: Path, series_dir: Path) -> None:
     )
     n1.optimize()
 
-    # Testing the PyPSA_to_Andromede converter
+    # Testing the PyPSA_to_Gems converter
     run_conversion_test(
         n1, n1.objective, "test_load_gen_sum.yml", systems_dir, series_dir
     )
@@ -277,7 +277,7 @@ def test_load_gen_link(systems_dir: Path, series_dir: Path) -> None:
     )
     n1.optimize()
 
-    # Testing the PyPSA_to_Andromede converter
+    # Testing the PyPSA_to_Gems converter
     run_conversion_test(
         n1, n1.objective, "test_load_gen_link.yml", systems_dir, series_dir
     )
@@ -350,7 +350,7 @@ def test_load_gen_link_ext(
     )
     n1.optimize()
 
-    # Testing the PyPSA_to_Andromede converter
+    # Testing the PyPSA_to_Gems converter
     run_conversion_test(
         n1, n1.objective, "test_load_gen_link_ext.yml", systems_dir, series_dir
     )
@@ -435,7 +435,7 @@ def test_storage_unit(
     )
     n1.optimize()
 
-    # Testing the PyPSA_to_Andromede converter
+    # Testing the PyPSA_to_Gems converter
     run_conversion_test(
         n1, n1.objective, "test_storage_unit.yml", systems_dir, series_dir
     )
@@ -525,7 +525,7 @@ def test_storage_unit_ext(
     )
     n1.optimize()
 
-    # Testing the PyPSA_to_Andromede converter
+    # Testing the PyPSA_to_Gems converter
     run_conversion_test(
         n1, n1.objective, "test_storage_unit.yml", systems_dir, series_dir
     )
@@ -596,7 +596,7 @@ def test_store(
     )
     n1.optimize()
 
-    # Testing the PyPSA_to_Andromede converter
+    # Testing the PyPSA_to_Gems converter
     run_conversion_test(n1, n1.objective, "test_store.yml", systems_dir, series_dir)
 
 
@@ -658,7 +658,7 @@ def test_store_ext(systems_dir: Path, series_dir: Path) -> None:
     )
     n1.optimize()
 
-    # Testing the PyPSA_to_Andromede converter
+    # Testing the PyPSA_to_Gems converter
     run_conversion_test(n1, n1.objective, "test_store_ext.yml", systems_dir, series_dir)
 
 
@@ -671,17 +671,17 @@ def run_conversion_test(
 ) -> None:
     T = len(pypsa_network.timesteps)
 
-    # Conversion to Andromede System
+    # Conversion to Gems System
     input_system_from_pypsa_converter = convert_pypsa_network(
-        pypsa_network, systems_dir, series_dir
+        pypsa_network, systems_dir, series_dir, ".txt"
     )
 
     # Loading the model library
-    with open("src/andromede/libs/pypsa_models/pypsa_models.yml") as lib_file:
+    with open("src/gems/libs/pypsa_models/pypsa_models.yml") as lib_file:
         input_libraries = [parse_yaml_library(lib_file)]
     result_lib = resolve_library(input_libraries)
 
-    # Approach 1 : Comparing PyPSA result with Andromede result using the InputSystem directly
+    # Approach 1 : Comparing PyPSA result with Gems result using the InputSystem directly
     resolved_system_from_pypsa_converter = resolve_system(
         input_system_from_pypsa_converter, result_lib
     )

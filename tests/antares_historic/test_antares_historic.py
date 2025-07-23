@@ -4,15 +4,15 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from andromede.input_converter.src.converter import AntaresStudyConverter
-from andromede.input_converter.src.logger import Logger
-from andromede.model.parsing import InputLibrary, parse_yaml_library
-from andromede.model.resolve_library import resolve_library
-from andromede.simulation import TimeBlock, build_problem
-from andromede.simulation.optimization import OptimizationProblem
-from andromede.study.data import load_ts_from_txt
-from andromede.study.parsing import InputSystem, parse_yaml_components
-from andromede.study.resolve_components import (
+from gems.input_converter.src.converter import AntaresStudyConverter
+from gems.input_converter.src.logger import Logger
+from gems.model.parsing import InputLibrary, parse_yaml_library
+from gems.model.resolve_library import resolve_library
+from gems.simulation import TimeBlock, build_problem
+from gems.simulation.optimization import OptimizationProblem
+from gems.study.data import load_ts_from_txt
+from gems.study.parsing import InputSystem, parse_yaml_components
+from gems.study.resolve_components import (
     build_data_base,
     build_network,
     consistency_check,
@@ -160,12 +160,7 @@ def input_library(
     data_dir: Path,
 ) -> InputLibrary:
     library = (
-        data_dir
-        / "src"
-        / "andromede"
-        / "libs"
-        / "antares_historic"
-        / "antares_historic.yml"
+        data_dir / "src" / "gems" / "libs" / "antares_historic" / "antares_historic.yml"
     )
     with library.open() as lib:
         return parse_yaml_library(lib)

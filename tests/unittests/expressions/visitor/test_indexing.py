@@ -11,9 +11,9 @@
 # This file is part of the Antares project.
 
 
-from andromede.expression import param, var
-from andromede.expression.indexing import IndexingStructureProvider, compute_indexation
-from andromede.expression.indexing_structure import IndexingStructure
+from gems.expression import param, var
+from gems.expression.indexing import IndexingStructureProvider, compute_indexation
+from gems.expression.indexing_structure import IndexingStructure
 
 
 class StructureProvider(IndexingStructureProvider):

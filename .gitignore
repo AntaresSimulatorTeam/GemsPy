@@ -12,4 +12,4 @@ coverage.xml
 bin
 outputs
 build
-src/andromede_modeling_prototype.egg-info/
+src/gems.egg-info/

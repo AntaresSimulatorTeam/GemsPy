@@ -17,9 +17,9 @@ This file tests that the modeller is able to generate investment problems proble
 import pandas as pd
 import pytest
 
-from andromede.expression.expression import literal, param, var
-from andromede.expression.indexing_structure import IndexingStructure
-from andromede.model import (
+from gems.expression.expression import literal, param, var
+from gems.expression.indexing_structure import IndexingStructure
+from gems.model import (
     Constraint,
     Model,
     ModelPort,
@@ -29,14 +29,14 @@ from andromede.model import (
     int_variable,
     model,
 )
-from andromede.model.port import PortFieldDefinition, PortFieldId
-from andromede.simulation import (
+from gems.model.port import PortFieldDefinition, PortFieldId
+from gems.simulation import (
     MergedProblemStrategy,
     OutputValues,
     TimeBlock,
     build_problem,
 )
-from andromede.study import (
+from gems.study import (
     Component,
     ConstantData,
     DataBase,

@@ -13,10 +13,10 @@ from typing import Set
 
 import pytest
 
-from andromede.expression import ExpressionNode, literal, param, print_expr, var
-from andromede.expression.equality import expressions_equal
-from andromede.expression.expression import port_field
-from andromede.expression.parsing.parse_expression import (
+from gems.expression import ExpressionNode, literal, param, print_expr, var
+from gems.expression.equality import expressions_equal
+from gems.expression.expression import port_field
+from gems.expression.parsing.parse_expression import (
     AntaresParseException,
     ModelIdentifiers,
     parse_expression,

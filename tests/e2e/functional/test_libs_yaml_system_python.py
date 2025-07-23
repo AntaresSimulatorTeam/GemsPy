@@ -33,14 +33,14 @@ parameters, and solves the problem. Assertions are made to ensure the solver's r
 import pandas as pd
 import pytest
 
-from andromede.model.library import Library
-from andromede.simulation import (
+from gems.model.library import Library
+from gems.simulation import (
     BlockBorderManagement,
     OutputValues,
     TimeBlock,
     build_problem,
 )
-from andromede.study import (
+from gems.study import (
     ConstantData,
     DataBase,
     Network,
