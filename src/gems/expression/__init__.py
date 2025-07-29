@@ -29,6 +29,8 @@ from .expression import (
     NegationNode,
     ParameterNode,
     VariableNode,
+    MaxNode,
+    TimeShiftNode,
     literal,
     param,
     sum_expressions,

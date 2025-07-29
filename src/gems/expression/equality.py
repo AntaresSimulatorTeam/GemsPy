@@ -24,6 +24,7 @@ from gems.expression import (
     NegationNode,
     ParameterNode,
     VariableNode,
+    MaxNode
 )
 from gems.expression.expression import (
     AllTimeSumNode,
@@ -111,6 +112,8 @@ class EqualityVisitor:
             right, PortFieldAggregatorNode
         ):
             return self.port_field_aggregator(left, right)
+        if isinstance(left, MaxNode) and isinstance(right, MaxNode):
+            return self.max_node(left, right)
         raise NotImplementedError(f"Equality not implemented for {left.__class__}")
 
     def literal(self, left: LiteralNode, right: LiteralNode) -> bool:
@@ -132,6 +135,11 @@ class EqualityVisitor:
         return len(left_ops) == len(right_ops) and all(
             self.visit(l, r) for l, r in zip(left_ops, right_ops)
         )
+
+    def max_node(self, left: MaxNode, right: MaxNode) -> bool:
+        if len(left.operands) != len(right.operands):
+            return False
+        return all(self.visit(l_op, r_op) for l_op, r_op in zip(left.operands, right.operands))
 
     def multiplication(
         self, left: MultiplicationNode, right: MultiplicationNode

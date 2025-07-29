@@ -25,6 +25,7 @@ from gems.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    MaxNode
 )
 
 from .expression import (
@@ -129,7 +130,10 @@ class PrinterVisitor(ExpressionVisitor[str]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> str:
         return f"({visit(node.operand, self)}.{node.aggregator})"
-
+    
+    def max_node(self, node: MaxNode) -> str:
+        operand_strings = [visit(op, self) for op in node.operands]
+        return f"max({', '.join(operand_strings)})"
 
 def print_expr(expression: ExpressionNode) -> str:
     return visit(expression, PrinterVisitor())

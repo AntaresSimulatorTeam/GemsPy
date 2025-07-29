@@ -25,6 +25,7 @@ from gems.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    MaxNode,
 )
 
 from .expression import (

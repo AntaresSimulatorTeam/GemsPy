@@ -22,6 +22,7 @@ from gems.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    MaxNode,
 )
 
 from .expression import (
@@ -98,7 +99,9 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int]):
         return visit(node.operand, self)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> int:
-        scenario_operator_cls = getattr(gems.expression.scenario_operator, node.name)
+        scenario_operator_cls = getattr(
+            gems.expression.scenario_operator, node.name
+        )
         # TODO: Carefully check if this formula is correct
         return scenario_operator_cls.degree() * visit(node.operand, self)
 
@@ -108,6 +111,8 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int]):
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> int:
         return visit(node.operand, self)
 
+    def max_node(self, node: MaxNode) -> int:
+        return 0  # always constant if operands are constants
 
 def compute_degree(expression: ExpressionNode) -> int:
     return visit(expression, ExpressionDegreeVisitor())

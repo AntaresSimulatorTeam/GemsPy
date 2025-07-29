@@ -22,6 +22,7 @@ from gems.expression.expression import (
     ComparisonNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    MaxNode
 )
 from gems.expression.parsing.antlr.ExprLexer import ExprLexer
 from gems.expression.parsing.antlr.ExprParser import ExprParser
@@ -232,6 +233,9 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     def visitRightAtom(self, ctx: ExprParser.RightAtomContext) -> ExpressionNode:
         return ctx.atom().accept(self)  # type: ignore
 
+    def visitMaxExpr(self, ctx: ExprParser.MaxExprContext) -> ExpressionNode:
+        operands: list[ExpressionNode] = [expr.accept(self) for expr in ctx.expr()]
+        return MaxNode(operands=operands)
 
 _FUNCTIONS = {
     "expec": ExpressionNode.expec,

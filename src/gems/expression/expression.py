@@ -64,6 +64,13 @@ class ExpressionNode:
         lhs = _wrap_in_node(lhs)
         return lhs + self
 
+    def max(self, rhs: Any) -> "ExpressionNode":
+        lhs = self
+        operands = []
+        operands.extend(lhs.operands if isinstance(lhs, MaxNode) else [_wrap_in_node(lhs)])
+        operands.extend(rhs.operands if isinstance(rhs, MaxNode) else [_wrap_in_node(rhs)])
+        return MaxNode(operands)
+
     def __mul__(self, rhs: Any) -> "ExpressionNode":
         return _apply_if_node(rhs, lambda x: MultiplicationNode(self, x))
 
@@ -383,6 +390,18 @@ class Comparator(enum.Enum):
 @dataclass(frozen=True, eq=False)
 class ComparisonNode(BinaryOperatorNode):
     comparator: Comparator
+
+@dataclass(frozen=True, eq=False)
+class MaxNode(ExpressionNode):
+    operands: List[ExpressionNode]
+    def __post_init__(self):
+        if len(self.operands) < 2:
+            raise ValueError("MaxNode requires at least two operands")
+        if not all(isinstance(op, ExpressionNode) for op in self.operands):
+            raise TypeError("All operands must be instances of ExpressionNode")
+        from gems.model.max import _validate_max_expression
+        _validate_max_expression(self)
+
 
 
 @dataclass(frozen=True, eq=False)

@@ -37,6 +37,7 @@ from .expression import (
     TimeShiftNode,
     TimeSumNode,
     VariableNode,
+    MaxNode
 )
 from .visitor import ExpressionVisitor, T, visit
 
@@ -158,6 +159,9 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         raise ValueError(
             "Port fields aggregators must be resolved before computing indexing structure."
         )
+    
+    def max_node(self, node: MaxNode) -> IndexingStructure:
+        return self._combine(node.operands)
 
 
 def compute_indexation(

@@ -38,6 +38,7 @@ from gems.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    MaxNode,
 )
 from gems.expression.visitor import visit
 
@@ -167,7 +168,9 @@ class _PortFieldExpressionChecker(ExpressionVisitor[None]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> None:
         raise ValueError("Port definition cannot contain port field aggregation.")
-
+    
+    def max_node(self, node: MaxNode) -> None:
+        raise ValueError("Port definition must not contain a max expression.")
 
 def _validate_port_field_expression(definition: PortFieldDefinition) -> None:
     visit(definition.definition, _PortFieldExpressionChecker())
