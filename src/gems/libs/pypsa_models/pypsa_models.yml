@@ -137,8 +137,8 @@ library:
           time-dependent: false
           scenario-dependent: false
         - id: efficiency
-          time_dependent: true
-          scenario_dependent: false
+          time-dependent: true
+          scenario-dependent: false
         #- id: committable #Parameter not instantiated for now
         #- id: start_up_cost #Parameter not instantiated for now
         #- id: shut_down_cost #Parameter not instantiated for now
@@ -154,8 +154,8 @@ library:
         #- id: weight #Parameter not instantiated for now
         ##Additional parameters that are not stored in the PyPSA object, but in a Carrier object
         - id: emission_factor
-          time_dependent: false
-          scenario_dependent: false
+          time-dependent: false
+          scenario-dependent: false
         
       variables:
         - id: p_nom
@@ -341,12 +341,12 @@ library:
           scenario-dependent: false
       ##Additional parameters that are not stored in the PyPSA object, but in a Carrier object
         - id: emission_factor
-          time_dependent: false
-          scenario_dependent: false
+          time-dependent: false
+          scenario-dependent: false
       variables:
         - id: p_nom
-          time_dependent: false
-          scenario_dependent: false
+          time-dependent: false
+          scenario-dependent: false
           lower-bound: p_nom_min
           upper-bound: p_nom_max
         - id: p_store
@@ -429,8 +429,8 @@ library:
         #- id: lifetime #Parameter not instantiated for now
       ##Additional parameters that are not stored in the PyPSA object, but in a Carrier object
         - id: emission_factor
-          time_dependent: false
-          scenario_dependent: false
+          time-dependent: false
+          scenario-dependent: false
       variables:
         - id: e_nom
           time-dependent: false
