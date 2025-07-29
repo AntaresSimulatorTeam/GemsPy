@@ -376,7 +376,7 @@ library:
         - id: p_store_upper
           expression: p_store <= p_max_pu * p_nom
         - id: p_dispatch_upper
-          expression: p_store <= p_max_pu * p_nom
+          expression: p_dispatch <= p_max_pu * p_nom
         - id: state_of_charge_upper
           expression: state_of_charge <= max_hours * p_nom
         - id: state_of_charge_balance
