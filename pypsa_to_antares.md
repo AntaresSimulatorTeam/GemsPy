@@ -4,7 +4,7 @@ This page provides guidelines for conducting end-to-end tests from PyPSA network
 
 ## 1. Clone the GemsPy repo and switch to the relevant branch
 
-1.a Inside a folder (thereafter called `parent_folder`), call the current command line in your Git terminal:
+1.a Inside a folder (thereafter called `{parent_folder}`), call the current command line in your Git terminal:
 
 ~~~
 git clone https://github.com/AntaresSimulatorTeam/GemsPy
@@ -36,8 +36,8 @@ Depending on your Python installation, you may need to replace `python` with `py
 ## 4. Check the paths
 
 The following relative paths should result from the previous steps:
-- `parent_folder/GemsPy`
-- `parent_folder/rte-antares-cd-release/bin`, `parent_folder/rte-antares-cd-release/lib`... etc
+- `{parent_folder}/GemsPy`
+- `{parent_folder}/rte-antares-cd-release/bin`, `{parent_folder}/rte-antares-cd-release/lib`... etc
 
 
 ## 5. Run the tests
