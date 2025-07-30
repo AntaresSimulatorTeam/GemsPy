@@ -49,7 +49,7 @@ python src/main.py
 ~~~
 
 This Python script performs, for all PyPSA network files (.nc) stored in the folder [tests\pypsa_converter\pypsa_input_files](tests\pypsa_converter\pypsa_input_files), the following operations:
-- From the PyPSA file, create an Antares study (Gems format) in [antares-resources\antares-studies](antares-resources\antares-studies)
+- From the PyPSA file, create an Antares study (Gems format) in [antares-resources\antares-studies](https://github.com/AntaresSimulatorTeam/GemsPy/tree/pypsa_to_gems/antares_demo/antares-resources/antares-studies)
 - Run Antares Simulator (Gems interpreter),
 - Run PyPSA,
 - Compare the results (objective function).
