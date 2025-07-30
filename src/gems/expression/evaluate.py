@@ -139,7 +139,9 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> float:
         raise NotImplementedError()
-
+    
+    def max_node(self, node: MaxNode) -> float:
+        return max(visit(op, self) for op in node.operands)
 
 def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:
     return visit(expression, EvaluationVisitor(value_provider))

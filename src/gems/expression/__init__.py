@@ -31,6 +31,7 @@ from .expression import (
     VariableNode,
     MaxNode,
     TimeShiftNode,
+    max_expr,
     literal,
     param,
     sum_expressions,

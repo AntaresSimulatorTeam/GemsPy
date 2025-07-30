@@ -283,7 +283,12 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
         )
     
     def max_node(self, node: MaxNode) -> LinearExpressionData:
-            raise ValueError("MaxNode is not supported in linear expressions, as it needs constants.")
+        operands = [visit(o, self) for o in node.operands]
+        terms: list = []
+        if any(o.terms for o in operands):
+            raise ValueError("Cannot linearize max expressions with variable terms.")
+        max_const = max(o.constant for o in operands)
+        return LinearExpressionData(terms=terms, constant=max_const)
 
 def linearize_expression(
     expression: ExpressionNode,
