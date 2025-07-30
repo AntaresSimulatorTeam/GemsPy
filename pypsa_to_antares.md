@@ -55,4 +55,8 @@ This Python script performs, for all PyPSA network files (.nc) stored in the fol
 - Compare the results (objective function).
 
 
+## Additionnal remarks
 
+- Current limitations of the PyPSA > Gems converter: The following objects are currently supported (July 2025): Bus, Load, Generator, Store, StorageUnit, GlobalConstraint, Link and Carrier. Line and Transformer objects are not yet supported. Other current restrictions of the data converter, such as hourly granularity only, are verified using assertions.
+
+- Performance of the Gems interpreter in the Antares simulator: the current implementation is not optimised and is mainly used to demonstrate the concept. Several performance improvements can be made to the implementation, and will be included in the roadmap.
