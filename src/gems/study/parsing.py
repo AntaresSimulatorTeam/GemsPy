@@ -57,6 +57,7 @@ class InputComponent(ModifiedBaseModel):
 
 
 class InputSystem(ModifiedBaseModel):
+    id: Optional[str] = None
     model_libraries: Optional[str] = None  # Parsed but unused for now
     nodes: List[InputComponent] = Field(default_factory=list)
     components: List[InputComponent] = Field(default_factory=list)

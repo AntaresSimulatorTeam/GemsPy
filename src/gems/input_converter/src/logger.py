@@ -39,5 +39,5 @@ def Logger(name: str, file_name: Optional[str]) -> logging.Logger:
     screen_handler.setFormatter(formatter)
     logging.getLogger().addHandler(screen_handler)
 
-    log_obj.info("Logger object created successfully.. ")
+    #log_obj.info("Logger object created successfully.. ")
     return log_obj

@@ -431,7 +431,7 @@ class PyPSAStudyConverter:
     def to_gems_study(self) -> InputSystem:
         """Main function, to export PyPSA as Gems system"""
 
-        self.logger.info("Study conversion started")
+        #self.logger.info("Study conversion started")
         list_components, list_connections = [], []
 
         for pypsa_components_data in self.pypsa_components_data.values():
@@ -463,9 +463,9 @@ class PyPSAStudyConverter:
 
         """
 
-        self.logger.info(
-            f"Creating objects of type: {pypsa_components_data.gems_model_id}. "
-        )
+        #self.logger.info(
+        #    f"Creating objects of type: {pypsa_components_data.gems_model_id}. "
+        #)
 
         # We test whether the keys of the conversion dictionary are allowed in the PyPSA model : all authorized parameters are columns in the constant data frame (even though they are specified as time-varying values in the time-varying data frame)
         pypsa_components_data.check_params_consistency()
@@ -495,9 +495,9 @@ class PyPSAStudyConverter:
     def _convert_pypsa_globalconstraint_of_given_model(
         self, pypsa_gc_data: PyPSAGlobalConstraintData
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
-        self.logger.info(
-            f"Creating PyPSA GlobalConstraint of type: {pypsa_gc_data.gems_model_id}. "
-        )
+        #self.logger.info(
+        #    f"Creating PyPSA GlobalConstraint of type: {pypsa_gc_data.gems_model_id}. "
+        #)
         components = [
             InputComponent(
                 id=pypsa_gc_data.pypsa_name,
