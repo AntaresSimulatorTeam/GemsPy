@@ -371,11 +371,13 @@ class OptimizationContext:
     def linearize_expression(
         self,
         expanded: ExpressionNode,
-        timestep: Optional[int] = None,
-        scenario: Optional[int] = None,
-    ) -> LinearExpression:
+        timesteps: Optional[
+            Iterable[int]
+        ] = None,  # Maybe only an indexing structure plus context could do ?
+        scenarios: Optional[Iterable[int]] = None,
+    ) -> List[List[LinearExpression]]:
         return linearize_expression(
-            expanded, timestep, scenario, self._parameter_getter
+            expanded, timesteps, scenarios, self._parameter_getter
         )
 
     def compute_indexing(self, expression: ExpressionNode) -> IndexingStructure:
@@ -456,28 +458,23 @@ def _create_constraint(
     expanded = context.expand_operators(constraint.expression)
     constraint_indexing = _compute_indexing(context, constraint)
 
+    linear_expr = context.linearize_expression(
+        expanded,
+        context.get_time_indices(constraint_indexing),
+        context.get_scenario_indices(constraint_indexing),
+    )
     for block_timestep in context.get_time_indices(constraint_indexing):
         for scenario in context.get_scenario_indices(constraint_indexing):
-            linear_expr_at_t = context.linearize_expression(
-                expanded, block_timestep, scenario
-            )
-
             # What happens if there is some time_operator in the bounds ?
             constraint_data = ConstraintData(
                 name=constraint.name,
                 lower_bound=_compute_expression_value(
-                    constraint.lower_bound,
-                    context,
-                    block_timestep,
-                    scenario,
+                    constraint.lower_bound, context, block_timestep, scenario
                 ),
                 upper_bound=_compute_expression_value(
-                    constraint.upper_bound,
-                    context,
-                    block_timestep,
-                    scenario,
+                    constraint.upper_bound, context, block_timestep, scenario
                 ),
-                expression=linear_expr_at_t,
+                expression=linear_expr[block_timestep][scenario],
             )
             make_constraint(
                 solver,
@@ -501,7 +498,7 @@ def _create_objective(
     linear_expr = opt_context.linearize_expression(expanded)
 
     obj: lp.Objective = solver.Objective()
-    for term in linear_expr.terms.values():
+    for term in linear_expr[0][0].terms.values():
         solver_var = _get_solver_var(
             term,
             opt_context,
@@ -513,7 +510,7 @@ def _create_objective(
         )
 
     # This should have no effect on the optimization
-    obj.SetOffset(linear_expr.constant + obj.offset())
+    obj.SetOffset(linear_expr[0][0].constant + obj.offset())
 
 
 @dataclass
