@@ -207,18 +207,6 @@ class SupportsOperations(Protocol[T]):
     def __truediv__(self, other: T) -> T:
         pass
 
-    def __lt__(self, other: T) -> bool:
-        ...
-
-    def __le__(self, other: T) -> bool:
-        ...
-
-    def __gt__(self, other: T) -> bool:
-        ...
-
-    def __ge__(self, other: T) -> bool:
-        ...
-
 
 T_op = TypeVar("T_op", bound=SupportsOperations)
 
@@ -249,6 +237,5 @@ class ExpressionVisitorOperations(ExpressionVisitor[T_op], ABC):
         right_value = visit(node.right, self)
         return left_value / right_value
 
-    def max_node(self, node: MaxNode) -> T_op:
-        res = [visit(op, self) for op in node.operands]
-        return max(res)
+    def max_node(self, node: MaxNode) -> ExpressionNode:  # type: ignore
+        return MaxNode(operands=[visit(op, self) for op in node.operands])  # type: ignore
