@@ -25,6 +25,7 @@ from .expression import (
     DivisionNode,
     ExpressionNode,
     LiteralNode,
+    MaxNode,
     MultiplicationNode,
     NegationNode,
     ParameterNode,
@@ -37,7 +38,6 @@ from .expression import (
     TimeShiftNode,
     TimeSumNode,
     VariableNode,
-    MaxNode,
 )
 from .visitor import ExpressionVisitor, T, visit
 

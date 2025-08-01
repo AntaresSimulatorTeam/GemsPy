@@ -29,6 +29,7 @@ from gems.expression.expression import (
     CurrentScenarioIndex,
     ExpressionNode,
     LiteralNode,
+    MaxNode,
     NoScenarioIndex,
     NoTimeIndex,
     OneScenarioIndex,
@@ -46,7 +47,6 @@ from gems.expression.expression import (
     TimeStep,
     TimeSumNode,
     VariableNode,
-    MaxNode,
 )
 from gems.expression.visitor import visit
 from gems.simulation.linear_expression import LinearExpression, Term, TermKey
@@ -281,7 +281,7 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
         raise ValueError(
             "Port fields aggregators must be replaced before linearization."
         )
-    
+
     def max_node(self, node: MaxNode) -> LinearExpressionData:
         operands = [visit(o, self) for o in node.operands]
         terms: list = []
@@ -289,6 +289,7 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
             raise ValueError("Cannot linearize max expressions with variable terms.")
         max_const = max(o.constant for o in operands)
         return LinearExpressionData(terms=terms, constant=max_const)
+
 
 def linearize_expression(
     expression: ExpressionNode,

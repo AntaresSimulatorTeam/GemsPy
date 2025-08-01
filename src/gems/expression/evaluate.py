@@ -18,6 +18,7 @@ from gems.expression.expression import (
     AllTimeSumNode,
     ComponentParameterNode,
     ComponentVariableNode,
+    MaxNode,
     PortFieldAggregatorNode,
     PortFieldNode,
     ProblemParameterNode,
@@ -25,7 +26,6 @@ from gems.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
-    MaxNode,
 )
 
 from .expression import (
