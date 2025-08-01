@@ -138,16 +138,20 @@ class LinearExpressionBuilder(ExpressionVisitor[List[List[LinearExpressionData]]
         return operand_all_time_scenario
 
     def addition(self, node: AdditionNode) -> List[List[LinearExpressionData]]:
-        operands_all_time_scenario = [visit(o, self) for o in node.operands]
+        operands_linear_expr_data = [visit(o, self) for o in node.operands]
         linear_expr_datas = []
-        for operands_given_time in operands_all_time_scenario:
+        for timestep in range(len(operands_linear_expr_data[0])):
             linear_expr_data_given_time = []
-            for operands in operands_given_time:
+            for scenario in range(len(operands_linear_expr_data[0][timestep])):
                 terms = []
                 constant: float = 0
-                for o in operands:
-                    constant += o.constant
-                    terms.extend(o.terms)
+                for operand_nb in range(len(operands_linear_expr_data)):
+                    constant += operands_linear_expr_data[operand_nb][timestep][
+                        scenario
+                    ].constant
+                    terms.extend(
+                        operands_linear_expr_data[operand_nb][timestep][scenario].terms
+                    )
                 linear_expr_data_given_time.append(
                     LinearExpressionData(terms=terms, constant=constant)
                 )
