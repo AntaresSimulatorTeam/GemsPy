@@ -10,12 +10,15 @@
 #
 # This file is part of the Antares project.
 
-from gems.expression import ExpressionNode, PrinterVisitor, param, var, visit
+from gems.expression import ExpressionNode, PrinterVisitor, max_expr, param, var, visit
 
 
 def test_comparison() -> None:
     x = var("x")
     p = param("p")
-    expr: ExpressionNode = (5 * x + 3) >= p - 2
+    expr: ExpressionNode = (5 * x + 3 + max_expr(5, 8)) >= p - 2
 
-    assert visit(expr, PrinterVisitor()) == "((5.0 * x) + 3.0) >= (p - 2.0)"
+    assert (
+        visit(expr, PrinterVisitor())
+        == "((5.0 * x) + 3.0 + max(5.0, 8.0)) >= (p - 2.0)"
+    )

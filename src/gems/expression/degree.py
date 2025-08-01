@@ -22,6 +22,7 @@ from gems.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    MaxNode,
 )
 
 from .expression import (
@@ -52,8 +53,7 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int]):
 
     # TODO: Take into account simplification that can occur with literal coefficient for add, sub, mult, div
     def addition(self, node: AdditionNode) -> int:
-        degrees = [visit(o, self) for o in node.operands]
-        return max(degrees)
+        return max([visit(o, self) for o in node.operands])
 
     def multiplication(self, node: MultiplicationNode) -> int:
         return visit(node.left, self) + visit(node.right, self)
@@ -107,6 +107,9 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> int:
         return visit(node.operand, self)
+
+    def max_node(self, node: MaxNode) -> int:
+        return max([visit(o, self) for o in node.operands])
 
 
 def compute_degree(expression: ExpressionNode) -> int:

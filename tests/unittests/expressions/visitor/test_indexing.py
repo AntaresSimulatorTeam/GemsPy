@@ -10,8 +10,9 @@
 #
 # This file is part of the Antares project.
 
+import pytest
 
-from gems.expression import param, var
+from gems.expression import max_expr, param, var
 from gems.expression.indexing import IndexingStructureProvider, compute_indexation
 from gems.expression.indexing_structure import IndexingStructure
 
@@ -40,6 +41,18 @@ def test_shift() -> None:
 
     provider = StructureProvider()
     assert compute_indexation(expr, provider) == IndexingStructure(True, True)
+
+
+@pytest.mark.parametrize(
+    "expr, expected_indexing",
+    [
+        (max_expr(param("a"), 3), IndexingStructure(True, True)),
+        (max_expr(1, 3), IndexingStructure(False, False)),
+    ],
+)
+def test_max(expr, expected_indexing) -> None:
+    provider = StructureProvider()
+    assert compute_indexation(expr, provider) == expected_indexing
 
 
 def test_time_eval() -> None:
