@@ -59,4 +59,6 @@ The Python script [main.py](https://github.com/AntaresSimulatorTeam/GemsPy/tree/
 
 - Current limitations of the PyPSA > Gems converter: The following objects are currently supported (July 2025): Bus, Load, Generator, Store, StorageUnit, GlobalConstraint, Link and Carrier. Line and Transformer objects are not yet supported. Other current restrictions of the data converter, such as hourly granularity only, are verified using assertions.
 
+- After executing the `main.py` script, the Antares studies in Gems format representing the PyPSA test cases can be found in `GemsPy/antares-resources/antares-studies`, particularly the inputs (libraries of abstract models, the system file and the timeseries). The outputs are in raw format for now. More structured outputs will be available soon.
+
 - Performance of the Gems interpreter in the Antares simulator: the current implementation is not optimised and is mainly used to demonstrate the concept. Several performance improvements can be made to the implementation, and will be included in the roadmap.
