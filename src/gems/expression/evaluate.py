@@ -47,20 +47,16 @@ class ValueProvider(ABC):
     """
 
     @abstractmethod
-    def get_variable_value(self, name: str) -> float:
-        ...
+    def get_variable_value(self, name: str) -> float: ...
 
     @abstractmethod
-    def get_parameter_value(self, name: str) -> float:
-        ...
+    def get_parameter_value(self, name: str) -> float: ...
 
     @abstractmethod
-    def get_component_variable_value(self, component_id: str, name: str) -> float:
-        ...
+    def get_component_variable_value(self, component_id: str, name: str) -> float: ...
 
     @abstractmethod
-    def get_component_parameter_value(self, component_id: str, name: str) -> float:
-        ...
+    def get_component_parameter_value(self, component_id: str, name: str) -> float: ...
 
 
 @dataclass(frozen=True)
@@ -139,9 +135,10 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> float:
         raise NotImplementedError()
-    
+
     def max_node(self, node: MaxNode) -> float:
         return max(visit(op, self) for op in node.operands)
+
 
 def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:
     return visit(expression, EvaluationVisitor(value_provider))

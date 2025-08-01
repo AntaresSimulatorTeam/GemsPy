@@ -24,7 +24,7 @@ from gems.expression import (
     NegationNode,
     ParameterNode,
     VariableNode,
-    MaxNode
+    MaxNode,
 )
 from gems.expression.expression import (
     AllTimeSumNode,
@@ -139,8 +139,9 @@ class EqualityVisitor:
     def max_node(self, left: MaxNode, right: MaxNode) -> bool:
         if len(left.operands) != len(right.operands):
             return False
-        print("yoooo", left.operands, right.operands, all(self.visit(l_op, r_op) for l_op, r_op in zip(left.operands, right.operands)))
-        return all(self.visit(l_op, r_op) for l_op, r_op in zip(left.operands, right.operands))
+        return all(
+            self.visit(l_op, r_op) for l_op, r_op in zip(left.operands, right.operands)
+        )
 
     def multiplication(
         self, left: MultiplicationNode, right: MultiplicationNode

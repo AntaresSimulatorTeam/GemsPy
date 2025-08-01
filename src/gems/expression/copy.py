@@ -11,7 +11,6 @@
 # This file is part of the Antares project.
 
 from dataclasses import dataclass
-from typing import List, cast
 
 from .expression import (
     AllTimeSumNode,
