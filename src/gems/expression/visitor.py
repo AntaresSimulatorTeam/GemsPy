@@ -207,9 +207,17 @@ class SupportsOperations(Protocol[T]):
     def __truediv__(self, other: T) -> T:
         pass
 
-    @abstractmethod
-    def __max__(self, other: T) -> T:
-        pass
+    def __lt__(self, other: T) -> bool:
+        ...
+
+    def __le__(self, other: T) -> bool:
+        ...
+
+    def __gt__(self, other: T) -> bool:
+        ...
+
+    def __ge__(self, other: T) -> bool:
+        ...
 
 
 T_op = TypeVar("T_op", bound=SupportsOperations)
