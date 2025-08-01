@@ -27,12 +27,10 @@ from .visitor import visit
 
 class ParameterValueProvider(ABC):
     @abstractmethod
-    def get_parameter_value(self, name: str) -> float:
-        ...
+    def get_parameter_value(self, name: str) -> float: ...
 
     @abstractmethod
-    def get_component_parameter_value(self, component_id: str, name: str) -> float:
-        ...
+    def get_component_parameter_value(self, component_id: str, name: str) -> float: ...
 
 
 @dataclass(frozen=True)

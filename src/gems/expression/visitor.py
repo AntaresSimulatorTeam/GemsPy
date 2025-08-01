@@ -13,6 +13,7 @@
 """
 Defines abstract base class for visitors of expressions.
 """
+
 import typing
 from abc import ABC, abstractmethod
 from typing import Generic, Protocol, TypeVar
@@ -38,7 +39,7 @@ from gems.expression.expression import (
     TimeShiftNode,
     TimeSumNode,
     VariableNode,
-    MaxNode
+    MaxNode,
 )
 
 T = TypeVar("T")
@@ -54,84 +55,64 @@ class ExpressionVisitor(ABC, Generic[T]):
     """
 
     @abstractmethod
-    def literal(self, node: LiteralNode) -> T:
-        ...
+    def literal(self, node: LiteralNode) -> T: ...
 
     @abstractmethod
-    def negation(self, node: NegationNode) -> T:
-        ...
+    def negation(self, node: NegationNode) -> T: ...
 
     @abstractmethod
-    def addition(self, node: AdditionNode) -> T:
-        ...
+    def addition(self, node: AdditionNode) -> T: ...
 
     @abstractmethod
-    def multiplication(self, node: MultiplicationNode) -> T:
-        ...
+    def multiplication(self, node: MultiplicationNode) -> T: ...
 
     @abstractmethod
-    def division(self, node: DivisionNode) -> T:
-        ...
+    def division(self, node: DivisionNode) -> T: ...
 
     @abstractmethod
-    def comparison(self, node: ComparisonNode) -> T:
-        ...
+    def comparison(self, node: ComparisonNode) -> T: ...
 
     @abstractmethod
-    def variable(self, node: VariableNode) -> T:
-        ...
+    def variable(self, node: VariableNode) -> T: ...
 
     @abstractmethod
-    def parameter(self, node: ParameterNode) -> T:
-        ...
+    def parameter(self, node: ParameterNode) -> T: ...
 
     @abstractmethod
-    def comp_parameter(self, node: ComponentParameterNode) -> T:
-        ...
+    def comp_parameter(self, node: ComponentParameterNode) -> T: ...
 
     @abstractmethod
-    def comp_variable(self, node: ComponentVariableNode) -> T:
-        ...
+    def comp_variable(self, node: ComponentVariableNode) -> T: ...
 
     @abstractmethod
-    def pb_parameter(self, node: ProblemParameterNode) -> T:
-        ...
+    def pb_parameter(self, node: ProblemParameterNode) -> T: ...
 
     @abstractmethod
-    def pb_variable(self, node: ProblemVariableNode) -> T:
-        ...
+    def pb_variable(self, node: ProblemVariableNode) -> T: ...
 
     @abstractmethod
-    def time_shift(self, node: TimeShiftNode) -> T:
-        ...
+    def time_shift(self, node: TimeShiftNode) -> T: ...
 
     @abstractmethod
-    def time_eval(self, node: TimeEvalNode) -> T:
-        ...
+    def time_eval(self, node: TimeEvalNode) -> T: ...
 
     @abstractmethod
-    def time_sum(self, node: TimeSumNode) -> T:
-        ...
+    def time_sum(self, node: TimeSumNode) -> T: ...
 
     @abstractmethod
-    def all_time_sum(self, node: AllTimeSumNode) -> T:
-        ...
+    def all_time_sum(self, node: AllTimeSumNode) -> T: ...
 
     @abstractmethod
-    def scenario_operator(self, node: ScenarioOperatorNode) -> T:
-        ...
+    def scenario_operator(self, node: ScenarioOperatorNode) -> T: ...
 
     @abstractmethod
-    def port_field(self, node: PortFieldNode) -> T:
-        ...
+    def port_field(self, node: PortFieldNode) -> T: ...
 
     @abstractmethod
-    def port_field_aggregator(self, node: PortFieldAggregatorNode) -> T:
-        ...
-    
+    def port_field_aggregator(self, node: PortFieldAggregatorNode) -> T: ...
+
     @abstractmethod
-    def max_node(self, node: MaxNode) -> T:
-        ...
+    def max_node(self, node: MaxNode) -> T: ...
 
 
 def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
@@ -210,6 +191,7 @@ class SupportsOperations(Protocol[T]):
     def __max__(self, other: T) -> T:
         pass
 
+
 T_op = TypeVar("T_op", bound=SupportsOperations)
 
 
@@ -238,6 +220,6 @@ class ExpressionVisitorOperations(ExpressionVisitor[T_op], ABC):
         left_value = visit(node.left, self)
         right_value = visit(node.right, self)
         return left_value / right_value
-    
+
     def max_node(self, node) -> ExpressionNode:
         return MaxNode(operands=[visit(op, self) for op in node.operands])

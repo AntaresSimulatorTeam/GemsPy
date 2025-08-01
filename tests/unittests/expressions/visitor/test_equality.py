@@ -12,8 +12,29 @@
 
 import pytest
 
-from gems.expression import ExpressionNode, copy_expression, literal, param, var
+from gems.expression import (
+    ExpressionNode,
+    copy_expression,
+    literal,
+    max_expr,
+    param,
+    var,
+)
 from gems.expression.equality import expressions_equal
+
+
+@pytest.mark.parametrize(
+    "left, right, expected_equal",
+    [
+        (max_expr(5, 87), max_expr(5, 87), True),
+        (max_expr(5, 87), max_expr(87, 5), False),
+        (max_expr(1, param("a")), max_expr(1, param("a")), True),
+        (max_expr(1, param("a")), max_expr(param("a"), 1), False),
+        (max_expr(1, param("a")), max_expr(1, param("b")), False),
+    ],
+)
+def test_max_expr_equality(left, right, expected_equal):
+    assert expressions_equal(left, right) == expected_equal
 
 
 @pytest.mark.parametrize(
@@ -30,6 +51,7 @@ from gems.expression.equality import expressions_equal
         var("x").time_sum(),
         var("x") + 5 <= 2,
         var("x").expec(),
+        max_expr(1, param("a")),
     ],
 )
 def test_equals(expr: ExpressionNode) -> None:
