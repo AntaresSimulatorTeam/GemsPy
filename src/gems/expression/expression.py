@@ -155,7 +155,7 @@ def var(name: str) -> VariableNode:
 class MaxNode(ExpressionNode):
     operands: List[ExpressionNode]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if len(self.operands) < 2:
             raise ValueError("MaxNode requires at least two operands")
         for operand in self.operands:

@@ -241,5 +241,6 @@ class ExpressionVisitorOperations(ExpressionVisitor[T_op], ABC):
         right_value = visit(node.right, self)
         return left_value / right_value
 
-    def max_node(self, node) -> ExpressionNode:
-        return MaxNode(operands=[visit(op, self) for op in node.operands])
+    def max_node(self, node: MaxNode) -> T_op:
+        res = [visit(op, self) for op in node.operands]
+        return max(res)
