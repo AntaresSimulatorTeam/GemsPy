@@ -14,6 +14,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
+import numpy as np
+import pandas as pd
+
 from gems.expression import (
     AdditionNode,
     DivisionNode,
@@ -57,26 +60,26 @@ class ParameterGetter(ABC):
         self,
         component_id: str,
         parameter_name: str,
-        timestep: Optional[int],
-        scenario: Optional[int],
-    ) -> float:
+        timesteps: Optional[Iterable[int]],
+        scenarios: Optional[Iterable[int]],
+    ) -> pd.DataFrame:
         pass
 
 
 @dataclass
 class MutableTerm:
-    coefficient: float
+    coefficient: pd.DataFrame
     component_id: str
     variable_name: str
-    time_index: Optional[int]
-    scenario_index: Optional[int]
+    # time_index: Optional[int]
+    # scenario_index: Optional[int]
 
     def to_key(self) -> TermKey:
         return TermKey(
             self.component_id,
             self.variable_name,
-            self.time_index,
-            self.scenario_index,
+            # self.time_index,
+            # self.scenario_index,
         )
 
     def to_term(self) -> Term:
@@ -84,15 +87,15 @@ class MutableTerm:
             self.coefficient,
             self.component_id,
             self.variable_name,
-            self.time_index,
-            self.scenario_index,
+            # self.time_index,
+            # self.scenario_index,
         )
 
 
 @dataclass
 class LinearExpressionData:
     terms: List[MutableTerm]
-    constant: float
+    constant: pd.DataFrame
 
     def build(self) -> LinearExpression:
         res_terms: Dict[TermKey, Any] = {}
@@ -109,7 +112,7 @@ class LinearExpressionData:
 
 
 @dataclass(frozen=True)
-class LinearExpressionBuilder(ExpressionVisitor[List[List[LinearExpressionData]]]):
+class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
     """
     Reduces a generic expression to a linear expression.
 
@@ -118,95 +121,59 @@ class LinearExpressionBuilder(ExpressionVisitor[List[List[LinearExpressionData]]
     it must only contain `ProblemVariableNode` for variables
     and `ProblemParameterNode` parameters. It cannot contain anymore
     time aggregators or scenario aggregators, nor port-related nodes.
-
-    Returns a list of lists of LinearExpressionData, one for each timestep and scenario: access to timestep t, scenario w with linear_expr_data[t][w]
-    Use list as access may be faster than map, but much less readable code...
     """
 
     timesteps: Optional[Iterable[int]] = None
     scenarios: Optional[Iterable[int]] = None
     value_provider: Optional[ParameterGetter] = None
 
-    ### There still many copies of LinearExpressionData objects that may be avoided by rather updating existing ones rather than creating new ones
-    def negation(self, node: NegationNode) -> List[List[LinearExpressionData]]:
-        operand_all_time_scenario = visit(node.operand, self)
-        for operand_given_time in operand_all_time_scenario:
-            for op in operand_given_time:
-                op.constant = -op.constant
-                for t in op.terms:
-                    t.coefficient = -t.coefficient
-        return operand_all_time_scenario
+    def negation(self, node: NegationNode) -> LinearExpressionData:
+        operand = visit(node.operand, self)
+        operand.constant = -operand.constant
+        for t in operand.terms:
+            t.coefficient = -t.coefficient
+        return operand
 
-    def addition(self, node: AdditionNode) -> List[List[LinearExpressionData]]:
-        operands_linear_expr_data = [visit(o, self) for o in node.operands]
-        linear_expr_datas = []
-        for timestep in range(len(operands_linear_expr_data[0])):
-            linear_expr_data_given_time = []
-            for scenario in range(len(operands_linear_expr_data[0][timestep])):
-                terms = []
-                constant: float = 0
-                for operand_nb in range(len(operands_linear_expr_data)):
-                    constant += operands_linear_expr_data[operand_nb][timestep][
-                        scenario
-                    ].constant
-                    terms.extend(
-                        operands_linear_expr_data[operand_nb][timestep][scenario].terms
-                    )
-                linear_expr_data_given_time.append(
-                    LinearExpressionData(terms=terms, constant=constant)
-                )
-            linear_expr_datas.append(linear_expr_data_given_time)
-        return linear_expr_datas
+    def addition(self, node: AdditionNode) -> LinearExpressionData:
+        operands = [visit(o, self) for o in node.operands]
+        terms = []
+        constant: float = 0
+        for o in operands:
+            constant += o.constant
+            terms.extend(o.terms)
+        return LinearExpressionData(terms=terms, constant=constant)
 
-    def multiplication(
-        self, node: MultiplicationNode
-    ) -> List[List[LinearExpressionData]]:
-        lhs_all_time_scenario = visit(node.left, self)
-        rhs_all_time_scenario = visit(node.right, self)
-        linear_expr_datas = []
-        for lhs_given_time, rhs_given_time in zip(
-            lhs_all_time_scenario, rhs_all_time_scenario
-        ):
-            linear_expr_data_given_time = []
-            for lhs, rhs in zip(lhs_given_time, rhs_given_time):
-                if not lhs.terms:
-                    multiplier = lhs.constant
-                    actual_expr = rhs
-                elif not rhs.terms:
-                    multiplier = rhs.constant
-                    actual_expr = lhs
-                else:
-                    raise ValueError(
-                        "At least one operand of a multiplication must be a constant expression."
-                    )
-                actual_expr.constant *= multiplier
-                for t in actual_expr.terms:
-                    t.coefficient *= multiplier
-                linear_expr_data_given_time.append(actual_expr)
-            linear_expr_datas.append(linear_expr_data_given_time)
-        return linear_expr_datas
+    def multiplication(self, node: MultiplicationNode) -> LinearExpressionData:
+        lhs = visit(node.left, self)
+        rhs = visit(node.right, self)
+        if not lhs.terms:
+            multiplier = lhs.constant
+            actual_expr = rhs
+        elif not rhs.terms:
+            multiplier = rhs.constant
+            actual_expr = lhs
+        else:
+            raise ValueError(
+                "At least one operand of a multiplication must be a constant expression."
+            )
+        actual_expr.constant *= multiplier
+        for t in actual_expr.terms:
+            t.coefficient *= multiplier
+        return actual_expr
 
-    def division(self, node: DivisionNode) -> List[List[LinearExpressionData]]:
-        lhs_all_time_scenario = visit(node.left, self)
-        rhs_all_time_scenario = visit(node.right, self)
-        linear_expr_datas = []
-        for lhs_given_time, rhs_given_time in zip(
-            lhs_all_time_scenario, rhs_all_time_scenario
-        ):
-            linear_expr_data_given_time = []
-            for lhs, rhs in zip(lhs_given_time, rhs_given_time):
-                if rhs.terms:
-                    raise ValueError(
-                        "The second operand of a division must be a constant expression."
-                    )
-                divider = rhs.constant
-                actual_expr = lhs
-                actual_expr.constant /= divider
-                for t in actual_expr.terms:
-                    t.coefficient /= divider
-                linear_expr_data_given_time.append(actual_expr)
-            linear_expr_datas.append(linear_expr_data_given_time)
-        return linear_expr_datas
+    def division(self, node: DivisionNode) -> LinearExpressionData:
+        lhs = visit(node.left, self)
+        rhs = visit(node.right, self)
+        if rhs.terms:
+            raise ValueError(
+                "The second operand of a division must be a constant expression."
+            )
+        divider = rhs.constant
+        actual_expr = lhs
+        actual_expr.constant /= divider
+        for t in actual_expr.terms:
+            t.coefficient /= divider
+        return actual_expr
 
     @staticmethod
     def _get_timestep(
@@ -238,107 +205,100 @@ class LinearExpressionBuilder(ExpressionVisitor[List[List[LinearExpressionData]]
                 f"Type {type(scenario_index)} is not a valid ScenarioIndex type."
             )
 
-    def literal(self, node: LiteralNode) -> List[List[LinearExpressionData]]:
-        return [
-            [
-                LinearExpressionData([], node.value)
-                for _ in self.linear_expr_scenario_indexing()
-            ]
-            for _ in self.linear_expr_time_indexing()
-        ]
+    def constant_value_data(self, value: float) -> pd.DataFrame:
+        return pd.DataFrame(
+            np.full(
+                (
+                    self.timesteps_count(),
+                    self.scenarios_count(),
+                ),
+                value,
+            )
+        )
 
-    def linear_expr_scenario_indexing(self) -> Iterable[int]:
-        return self.scenarios if self.scenarios else [0]
+    def literal(self, node: LiteralNode) -> LinearExpressionData:
+        return LinearExpressionData(
+            [],
+            self.constant_value_data(node.value),
+        )
 
-    def linear_expr_time_indexing(self) -> Iterable[int]:
-        return self.timesteps if self.timesteps else [0]
+    def timesteps_count(self) -> int:
+        return len(self.timesteps) if self.timesteps else 1
 
-    def comparison(self, node: ComparisonNode) -> List[List[LinearExpressionData]]:
+    def scenarios_count(self) -> int:
+        return len(self.scenarios) if self.scenarios else 1
+
+    def linear_expr_time_indexing(self) -> Optional[Iterable[int]]:
+        return self.timesteps if self.timesteps else None
+
+    def linear_expr_scenario_indexing(self) -> Optional[Iterable[int]]:
+        return self.scenarios if self.scenarios else None
+
+    def comparison(self, node: ComparisonNode) -> LinearExpressionData:
         raise ValueError("Linear expression cannot contain a comparison operator.")
 
-    def variable(self, node: VariableNode) -> List[List[LinearExpressionData]]:
+    def variable(self, node: VariableNode) -> LinearExpressionData:
         raise ValueError(
             "Variables need to be associated with their component ID before linearization."
         )
 
-    def parameter(self, node: ParameterNode) -> List[List[LinearExpressionData]]:
+    def parameter(self, node: ParameterNode) -> LinearExpressionData:
         raise ValueError("Parameters must be evaluated before linearization.")
 
-    def comp_variable(
-        self, node: ComponentVariableNode
-    ) -> List[List[LinearExpressionData]]:
+    def comp_variable(self, node: ComponentVariableNode) -> LinearExpressionData:
         raise ValueError(
             "Variables need to be associated with their timestep/scenario before linearization."
         )
 
-    def pb_variable(
-        self, node: ProblemVariableNode
-    ) -> List[List[LinearExpressionData]]:
-        return [
+    def pb_variable(self, node: ProblemVariableNode) -> LinearExpressionData:
+        return LinearExpressionData(
             [
-                LinearExpressionData(
-                    [
-                        MutableTerm(
-                            1,
-                            node.component_id,
-                            node.name,
-                            time_index=self._get_timestep(
-                                node.time_index, current_timestep
-                            ),
-                            scenario_index=self._get_scenario(
-                                node.scenario_index, current_scenario
-                            ),
-                        )
-                    ],
-                    0,
+                MutableTerm(
+                    self.constant_value_data(1),
+                    node.component_id,
+                    node.name,
                 )
-                for current_scenario in self.linear_expr_scenario_indexing()
-            ]
-            for current_timestep in self.linear_expr_time_indexing()
-        ]
+            ],
+            self.constant_value_data(0),
+        )
 
-    def comp_parameter(
-        self, node: ComponentParameterNode
-    ) -> List[List[LinearExpressionData]]:
+    def comp_parameter(self, node: ComponentParameterNode) -> LinearExpressionData:
         raise ValueError(
             "Parameters need to be associated with their timestep/scenario before linearization."
         )
 
-    def pb_parameter(
-        self, node: ProblemParameterNode
-    ) -> List[List[LinearExpressionData]]:
-        # TODO SL: not the best place to do this.
-        # in the future, we should evaluate coefficients of variables as time vectors once for all timesteps
-        # TODO: Update the value_provider to be able to pass a list time/scenario indices
-        linear_expr_datas = []
-        for current_timestep in self.linear_expr_time_indexing():
-            linear_expr_given_time = []
-            time_index = self._get_timestep(node.time_index, current_timestep)
-            for current_scenario in self.linear_expr_scenario_indexing():
-                scenario_index = self._get_scenario(
-                    node.scenario_index, current_scenario
-                )
-                linear_expr_given_time.append(
-                    LinearExpressionData(
-                        [],
-                        self._value_provider().get_parameter_value(
-                            node.component_id, node.name, time_index, scenario_index
-                        ),
-                    )
-                )
-            linear_expr_datas.append((linear_expr_given_time))
-        return linear_expr_datas
+    def pb_parameter(self, node: ProblemParameterNode) -> LinearExpressionData:
+        if self.linear_expr_time_indexing():
+            time_indices = [
+                self._get_timestep(node.time_index, current_timestep)
+                for current_timestep in self.linear_expr_time_indexing()
+            ]
+        else:
+            time_indices = None
+        if self.linear_expr_scenario_indexing():
+            scenario_indices = [
+                self._get_scenario(node.scenario_index, current_scenario)
+                for current_scenario in self.linear_expr_scenario_indexing()
+            ]
+        else:
+            scenario_indices = None
+        return LinearExpressionData(
+            [],
+            self._value_provider().get_parameter_value(
+                node.component_id, node.name, time_indices, scenario_indices
+            ),
+        )
 
-    def time_eval(self, node: TimeEvalNode) -> List[List[LinearExpressionData]]:
+    def time_eval(self, node: TimeEvalNode) -> LinearExpressionData:
         raise ValueError("Time operators need to be expanded before linearization.")
 
-    def time_shift(self, node: TimeShiftNode) -> List[List[LinearExpressionData]]:
+    def time_shift(self, node: TimeShiftNode) -> LinearExpressionData:
         raise ValueError("Time operators need to be expanded before linearization.")
 
-    def time_sum(self, node: TimeSumNode) -> List[List[LinearExpressionData]]:
+    def time_sum(self, node: TimeSumNode) -> LinearExpressionData:
         raise ValueError("Time operators need to be expanded before linearization.")
 
-    def all_time_sum(self, node: AllTimeSumNode) -> List[List[LinearExpressionData]]:
+    def all_time_sum(self, node: AllTimeSumNode) -> LinearExpressionData:
         raise ValueError("Time operators need to be expanded before linearization.")
 
     def _value_provider(self) -> ParameterGetter:
@@ -350,17 +310,15 @@ class LinearExpressionBuilder(ExpressionVisitor[List[List[LinearExpressionData]]
             )
         return self.value_provider
 
-    def scenario_operator(
-        self, node: ScenarioOperatorNode
-    ) -> List[List[LinearExpressionData]]:
+    def scenario_operator(self, node: ScenarioOperatorNode) -> LinearExpressionData:
         raise ValueError("Scenario operators need to be expanded before linearization.")
 
-    def port_field(self, node: PortFieldNode) -> List[List[LinearExpressionData]]:
+    def port_field(self, node: PortFieldNode) -> LinearExpressionData:
         raise ValueError("Port fields must be replaced before linearization.")
 
     def port_field_aggregator(
         self, node: PortFieldAggregatorNode
-    ) -> List[List[LinearExpressionData]]:
+    ) -> LinearExpressionData:
         raise ValueError(
             "Port fields aggregators must be replaced before linearization."
         )
@@ -371,20 +329,10 @@ def linearize_expression(
     timesteps: Optional[Iterable[int]] = None,
     scenarios: Optional[Iterable[int]] = None,
     value_provider: Optional[ParameterGetter] = None,
-) -> List[List[LinearExpression]]:
-    linear_expr_datas = visit(
+) -> LinearExpression:
+    return visit(
         expression,
         LinearExpressionBuilder(
             value_provider=value_provider, timesteps=timesteps, scenarios=scenarios
         ),
-    )
-    linear_expr = []
-    for timestep in range(
-        len(linear_expr_datas)
-    ):  # Suppose timesteps are from 0 to len(linear_expr_datas), i.e. no expr on custom range, need Dict for that
-        linear_expr_given_time = []
-        for scenario in range(len(linear_expr_datas[timestep])):
-            linear_expr_given_time.append(linear_expr_datas[timestep][scenario].build())
-        linear_expr.append(linear_expr_given_time)
-
-    return linear_expr
+    ).build()

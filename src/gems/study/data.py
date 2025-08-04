@@ -12,8 +12,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Mapping, Optional
+from typing import Dict, Iterable, Mapping, Optional
 
+import numpy as np
 import pandas as pd
 
 from gems.study.network import Network
@@ -52,8 +53,11 @@ class Scenarization:
 class AbstractDataStructure(ABC):
     @abstractmethod
     def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
-    ) -> float:
+        self,
+        timesteps: Optional[Iterable[int]],
+        scenarios: Optional[Iterable[int]],
+        node_id: str = "",
+    ) -> pd.DataFrame:
         raise NotImplementedError()
 
     @abstractmethod
@@ -65,14 +69,23 @@ class AbstractDataStructure(ABC):
         pass
 
 
+def value_count(values: Optional[Iterable[int]]):
+    return len(values) if values else 1
+
+
 @dataclass(frozen=True)
 class ConstantData(AbstractDataStructure):
     value: float
 
     def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
-    ) -> float:
-        return self.value
+        self,
+        timesteps: Optional[Iterable[int]],
+        scenarios: Optional[Iterable[int]],
+        node_id: str = "",
+    ) -> pd.DataFrame:
+        return pd.DataFrame(
+            np.full((value_count(timesteps), value_count(scenarios)), self.value)
+        )
 
     # ConstantData can be used for time varying or constant models
     def check_requirement(self, time: bool, scenario: bool) -> bool:
@@ -92,11 +105,17 @@ class TimeSeriesData(AbstractDataStructure):
     time_series: Mapping[TimeIndex, float]
 
     def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
-    ) -> float:
-        if timestep is None:
+        self,
+        timesteps: Optional[Iterable[int]],
+        scenarios: Optional[Iterable[int]],
+        node_id: str = "",
+    ) -> list[list[float]]:
+        if timesteps is None:
             raise KeyError("Time series data requires a time index.")
-        return self.time_series[TimeIndex(timestep)]
+        timeseries = pd.Series(
+            [self.time_series[TimeIndex(timestep)] for timestep in timesteps]
+        )
+        return pd.concat([timeseries] * value_count(scenarios), axis=1)
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, TimeSeriesData):
@@ -117,13 +136,22 @@ class ScenarioSeriesData(AbstractDataStructure):
     scenarization: Optional[Scenarization] = None
 
     def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
-    ) -> float:
-        if scenario is None:
+        self,
+        timesteps: Optional[Iterable[int]],
+        scenarios: Optional[Iterable[int]],
+        node_id: str = "",
+    ) -> list[list[float]]:
+        if scenarios is None:
             raise KeyError("Scenario series data requires a scenario index.")
         if self.scenarization:
-            scenario = self.scenarization.get_scenario_for_year(scenario)
-        return self.scenario_series[ScenarioIndex(scenario)]
+            scenarios = [
+                self.scenarization.get_scenario_for_year(scenario)
+                for scenario in scenarios
+            ]
+        scenario_series = pd.Series(
+            [self.scenario_series[ScenarioIndex(scenario)] for scenario in scenarios]
+        )
+        return pd.DataFrame(pd.concat([scenario_series] * value_count(timesteps)))
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, ScenarioSeriesData):
@@ -187,16 +215,23 @@ class TimeScenarioSeriesData(AbstractDataStructure):
     scenarization: Optional[Scenarization] = None
 
     def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
-    ) -> float:
-        if timestep is None:
+        self,
+        timesteps: Optional[Iterable[int]],
+        scenarios: Optional[Iterable[int]],
+        node_id: str = "",
+    ) -> list[list[float]]:
+        if timesteps is None:
             raise KeyError("Time scenario data requires a time index.")
-        if scenario is None:
+        if scenarios is None:
             raise KeyError("Time scenario data requires a scenario index.")
         if self.scenarization:
-            scenario = self.scenarization.get_scenario_for_year(scenario)
-        value = str(self.time_scenario_series.iloc[timestep, scenario])
-        return float(value)
+            scenarios = [
+                self.scenarization.get_scenario_for_year(scenario)
+                for scenario in scenarios
+            ]
+        value = self.time_scenario_series.iloc[timesteps, scenarios]
+        # .applymap(str)
+        return value.applymap(float)
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, TimeScenarioSeriesData):
@@ -210,9 +245,12 @@ class TreeData(AbstractDataStructure):
     data: Mapping[str, AbstractDataStructure]
 
     def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
-    ) -> float:
-        return self.data[node_id].get_value(timestep, scenario)
+        self,
+        timesteps: Optional[Iterable[int]],
+        scenarios: Optional[Iterable[int]],
+        node_id: str = "",
+    ) -> list[list[float]]:
+        return self.data[node_id].get_value(timesteps, scenarios)
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         return all(
@@ -249,10 +287,13 @@ class DataBase:
         self._data[ComponentParameterIndex(component_id, parameter_name)] = data
 
     def get_value(
-        self, index: ComponentParameterIndex, timestep: int, scenario: int
-    ) -> float:
+        self,
+        index: ComponentParameterIndex,
+        timesteps: Iterable[int],
+        scenarios: Iterable[int],
+    ) -> list[list[float]]:
         if index in self._data:
-            return self._data[index].get_value(timestep, scenario)
+            return self._data[index].get_value(timesteps, scenarios)
         else:
             raise KeyError(f"Index {index} not found.")
 

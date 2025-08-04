@@ -21,7 +21,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, Iterable, List, Optional
 
+import numpy as np
 import ortools.linear_solver.pywraplp as lp
+import pandas as pd
 
 from gems.expression import EvaluationVisitor, ExpressionNode, ValueProvider, visit
 from gems.expression.context_adder import add_component_context
@@ -60,20 +62,20 @@ class TimestepComponentVariableKey:
 
 def _get_parameter_value(
     context: "OptimizationContext",
-    block_timestep: Optional[int],
-    scenario: Optional[int],
+    block_timesteps: Optional[Iterable[int]],
+    scenarios: Optional[Iterable[int]],
     component_id: str,
     name: str,
-) -> float:
+) -> pd.DataFrame:
     data = context.database.get_data(component_id, name)
-    absolute_timestep = context.block_timestep_to_absolute_timestep(block_timestep)
-    return data.get_value(absolute_timestep, scenario, context.tree_node)
+    absolute_timesteps = context.block_timestep_to_absolute_timestep(block_timesteps)
+    return data.get_value(absolute_timesteps, scenarios, context.tree_node)
 
 
 def _make_value_provider(
     context: "OptimizationContext",
-    block_timestep: Optional[int],
-    scenario: Optional[int],
+    block_timesteps: Optional[Iterable[int]],
+    scenarios: Optional[Iterable[int]],
 ) -> ValueProvider:
     """
     Create a value provider which takes its values from
@@ -83,22 +85,26 @@ def _make_value_provider(
     """
 
     class Impl(ValueProvider):
-        def get_component_variable_value(self, component_id: str, name: str) -> float:
+        def get_component_variable_value(
+            self, component_id: str, name: str
+        ) -> list[list[float]]:
             raise NotImplementedError(
                 "Cannot provide variable value at problem build time."
             )
 
-        def get_component_parameter_value(self, component_id: str, name: str) -> float:
+        def get_component_parameter_value(
+            self, component_id: str, name: str
+        ) -> list[list[float]]:
             return _get_parameter_value(
-                context, block_timestep, scenario, component_id, name
+                context, block_timesteps, scenarios, component_id, name
             )
 
-        def get_variable_value(self, name: str) -> float:
+        def get_variable_value(self, name: str) -> list[list[float]]:
             raise NotImplementedError(
                 "Cannot provide variable value at problem build time."
             )
 
-        def get_parameter_value(self, name: str) -> float:
+        def get_parameter_value(self, name: str) -> list[list[float]]:
             raise ValueError(
                 "Parameter must be associated to its component before resolution."
             )
@@ -109,11 +115,14 @@ def _make_value_provider(
 def _compute_expression_value(
     expression: ExpressionNode,
     context: "OptimizationContext",
-    block_timestep: Optional[int],
-    scenario: Optional[int],
-) -> float:
-    value_provider = _make_value_provider(context, block_timestep, scenario)
-    visitor = EvaluationVisitor(value_provider)
+    block_timesteps: Optional[Iterable[int]],
+    scenarios: Optional[Iterable[int]],
+) -> pd.DataFrame:
+    value_provider = _make_value_provider(context, block_timesteps, scenarios)
+    dimensions = ProblemDimensions(context.block_length(), context.scenarios)
+    visitor = EvaluationVisitor(
+        value_provider, dimensions.timesteps_count, dimensions.scenarios_count
+    )
     return visit(expression, visitor)
 
 
@@ -224,14 +233,17 @@ class OptimizationContext:
 
     # TODO: Need to think about data processing when creating blocks with varying or inequal time steps length (aggregation, sum ?, mean of data ?)
     def block_timestep_to_absolute_timestep(
-        self, block_timestep: Optional[int]
-    ) -> Optional[int]:
+        self, block_timesteps: Optional[Iterable[int]]
+    ) -> Optional[Iterable[int]]:
         """
         Timestep may be None for parameters or variables that don't depend on time.
         """
-        if block_timestep is None:
+        if not block_timesteps:
             return None
-        return self._block.timesteps[self.get_actual_block_timestep(block_timestep)]
+        return [
+            self._block.timesteps[self.get_actual_block_timestep(block_timestep)]
+            for block_timestep in block_timesteps
+        ]
 
     def get_actual_block_timestep(self, block_timestep: int) -> int:
         if self._border_management == BlockBorderManagement.CYCLE:
@@ -305,8 +317,15 @@ class OptimizationContext:
         )
 
     def evaluate_time_bound(self, expression: ExpressionNode) -> int:
-        res = visit(expression, EvaluationVisitor(self._constant_value_provider))
-        return float_to_int(res)
+        res = visit(
+            expression,
+            EvaluationVisitor(
+                self._constant_value_provider,
+                1,
+                1,
+            ),
+        )
+        return [[float_to_int(item) for item in res_per_scen] for res_per_scen in res]
 
     def _make_data_structure_provider(self) -> IndexingStructureProvider:
         """
@@ -355,13 +374,13 @@ class OptimizationContext:
                 self,
                 component_id: str,
                 parameter_name: str,
-                timestep: Optional[int],
-                scenario: Optional[int],
-            ) -> float:
+                timesteps: Optional[Iterable[int]],
+                scenarios: Optional[Iterable[int]],
+            ) -> pd.DataFrame:
                 return _get_parameter_value(
                     ctxt,
-                    timestep,
-                    scenario,
+                    timesteps,
+                    scenarios,
                     component_id,
                     parameter_name,
                 )
@@ -375,7 +394,7 @@ class OptimizationContext:
             Iterable[int]
         ] = None,  # Maybe only an indexing structure plus context could do ?
         scenarios: Optional[Iterable[int]] = None,
-    ) -> List[List[LinearExpression]]:
+    ) -> LinearExpression:
         return linearize_expression(
             expanded, timesteps, scenarios, self._parameter_getter
         )
@@ -457,32 +476,34 @@ def _create_constraint(
     """
     expanded = context.expand_operators(constraint.expression)
     constraint_indexing = _compute_indexing(context, constraint)
+    block_timesteps = context.get_time_indices(constraint_indexing)
+    scenarios = context.get_scenario_indices(constraint_indexing)
 
     linear_expr = context.linearize_expression(
         expanded,
-        context.get_time_indices(constraint_indexing),
-        context.get_scenario_indices(constraint_indexing),
+        block_timesteps,
+        scenarios,
     )
-    for block_timestep in context.get_time_indices(constraint_indexing):
-        for scenario in context.get_scenario_indices(constraint_indexing):
-            # What happens if there is some time_operator in the bounds ?
-            constraint_data = ConstraintData(
-                name=constraint.name,
-                lower_bound=_compute_expression_value(
-                    constraint.lower_bound, context, block_timestep, scenario
-                ),
-                upper_bound=_compute_expression_value(
-                    constraint.upper_bound, context, block_timestep, scenario
-                ),
-                expression=linear_expr[block_timestep][scenario],
-            )
-            make_constraint(
-                solver,
-                context,
-                block_timestep,
-                scenario,
-                constraint_data,
-            )
+    # for block_timestep in context.get_time_indices(constraint_indexing):
+    #     for scenario in context.get_scenario_indices(constraint_indexing):
+    # What happens if there is some time_operator in the bounds ?
+    constraint_data = ConstraintData(
+        name=constraint.name,
+        lower_bound=_compute_expression_value(
+            constraint.lower_bound, context, block_timesteps, scenarios
+        ),
+        upper_bound=_compute_expression_value(
+            constraint.upper_bound, context, block_timesteps, scenarios
+        ),
+        expression=linear_expr,
+    )
+    make_constraint(
+        solver,
+        context,
+        block_timesteps,
+        scenarios,
+        constraint_data,
+    )
 
 
 def _create_objective(
@@ -498,36 +519,40 @@ def _create_objective(
     linear_expr = opt_context.linearize_expression(expanded)
 
     obj: lp.Objective = solver.Objective()
-    for term in linear_expr[0][0].terms.values():
+    for term in linear_expr.terms.values():
         solver_var = _get_solver_var(
             term,
+            0,
+            0,
             opt_context,
         )
         opt_context._solver_variables[solver_var.name()].is_in_objective = True
         obj.SetCoefficient(
             solver_var,
-            obj.GetCoefficient(solver_var) + term.coefficient,
+            obj.GetCoefficient(solver_var) + term.coefficient.iloc[0, 0],
         )
 
     # This should have no effect on the optimization
-    obj.SetOffset(linear_expr[0][0].constant + obj.offset())
+    obj.SetOffset(linear_expr.constant.iloc[0, 0] + obj.offset())
 
 
 @dataclass
 class ConstraintData:
     name: str
-    lower_bound: float
-    upper_bound: float
+    lower_bound: pd.DataFrame
+    upper_bound: pd.DataFrame
     expression: LinearExpression
 
 
 def _get_solver_var(
     term: Term,
+    block_timestep: int,
+    scenario: int,
     context: OptimizationContext,
 ) -> lp.Variable:
     return context.get_component_variable(
-        term.time_index,
-        term.scenario_index,
+        block_timestep,
+        scenario,
         term.component_id,
         term.variable_name,
     )
@@ -536,29 +561,36 @@ def _get_solver_var(
 def make_constraint(
     solver: lp.Solver,
     context: OptimizationContext,
-    block_timestep: int,
-    scenario: int,
+    block_timesteps: Iterable[int],
+    scenarios: Iterable[int],
     data: ConstraintData,
 ) -> None:
     """
     Adds constraint to the solver.
     """
-    constraint_name = f"{data.name}_t{block_timestep}_s{scenario}"
+    for block_timestep in block_timesteps:
+        for scenario in scenarios:
+            constraint_name = f"{data.name}_t{block_timestep}_s{scenario}"
 
-    solver_constraint: lp.Constraint = solver.Constraint(constraint_name)
-    constant: float = 0
-    for term in data.expression.terms.values():
-        solver_var = _get_solver_var(
-            term,
-            context,
-        )
-        coefficient = term.coefficient + solver_constraint.GetCoefficient(solver_var)
-        solver_constraint.SetCoefficient(solver_var, coefficient)
+            solver_constraint: lp.Constraint = solver.Constraint(constraint_name)
+            constant: float = 0
+            for term in data.expression.terms.values():
+                solver_var = _get_solver_var(
+                    term,
+                    block_timestep,
+                    scenario,
+                    context,
+                )
+                coefficient = term.coefficient.iloc[
+                    block_timestep, scenario
+                ] + solver_constraint.GetCoefficient(solver_var)
+                solver_constraint.SetCoefficient(solver_var, coefficient)
 
-    constant += data.expression.constant
-    solver_constraint.SetBounds(
-        data.lower_bound - constant, data.upper_bound - constant
-    )
+            constant += data.expression.constant.iloc[block_timestep, scenario]
+            solver_constraint.SetBounds(
+                data.lower_bound.iloc[block_timestep, scenario] - constant,
+                data.upper_bound.iloc[block_timestep, scenario] - constant,
+            )
 
 
 class OptimizationProblem:
@@ -661,25 +693,44 @@ class OptimizationProblem:
                 if var_indexing.is_scenario_varying():
                     scenario_indices = self.context.get_scenario_indices(var_indexing)
 
+                if instantiated_lb_expr:
+                    lower_bound = _compute_expression_value(
+                        instantiated_lb_expr,
+                        self.context,
+                        time_indices,
+                        scenario_indices,
+                    )
+                else:
+                    lower_bound = pd.DataFrame(
+                        np.full(
+                            (len(time_indices), len(scenario_indices)),
+                            -self.solver.infinity(),
+                        )
+                    )
+                if instantiated_ub_expr:
+                    upper_bound = _compute_expression_value(
+                        instantiated_ub_expr,
+                        self.context,
+                        time_indices,
+                        scenario_indices,
+                    )
+                else:
+                    upper_bound = pd.DataFrame(
+                        np.full(
+                            (len(time_indices), len(scenario_indices)),
+                            self.solver.infinity(),
+                        )
+                    )
                 for t, s in itertools.product(time_indices, scenario_indices):
-                    lower_bound = -self.solver.infinity()
-                    upper_bound = self.solver.infinity()
-                    if instantiated_lb_expr:
-                        lower_bound = _compute_expression_value(
-                            instantiated_lb_expr, self.context, t, s
-                        )
-                    if instantiated_ub_expr:
-                        upper_bound = _compute_expression_value(
-                            instantiated_ub_expr, self.context, t, s
-                        )
-
                     solver_var_name = self._solver_variable_name(
                         component.id, model_var.name, t, s
                     )
+                    lb = lower_bound.iloc[t, s]
+                    ub = upper_bound.iloc[t, s]
 
-                    if lower_bound > upper_bound:
+                    if lb > ub:
                         raise ValueError(
-                            f"Upper bound ({upper_bound}) must be strictly greater than lower bound ({lower_bound}) for variable {solver_var_name}"
+                            f"Upper bound ({ub}) must be strictly greater than lower bound ({lb}) for variable {solver_var_name}"
                         )
 
                     if model_var.data_type == ValueType.BOOLEAN:
@@ -688,14 +739,14 @@ class OptimizationProblem:
                         )
                     elif model_var.data_type == ValueType.INTEGER:
                         solver_var = self.solver.IntVar(
-                            lower_bound,
-                            upper_bound,
+                            lb,
+                            ub,
                             solver_var_name,
                         )
                     else:
                         solver_var = self.solver.NumVar(
-                            lower_bound,
-                            upper_bound,
+                            lb,
+                            ub,
                             solver_var_name,
                         )
                     self.context.register_component_variable(
@@ -822,11 +873,9 @@ def fusion_problems(
                 root_var = root_vars[var.name()]
                 root_var.SetLb(var.lb())
                 root_var.SetUb(var.ub())
-                root_master.context._solver_variables[
-                    var.name()
-                ].is_in_objective = context._solver_variables[
-                    var.name()
-                ].is_in_objective
+                root_master.context._solver_variables[var.name()].is_in_objective = (
+                    context._solver_variables[var.name()].is_in_objective
+                )
 
             for cstr in master.solver.constraints():
                 coeff = cstr.GetCoefficient(var)

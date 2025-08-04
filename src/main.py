@@ -111,4 +111,4 @@ if __name__ == "__main__":
     p = pstats.Stats("profile_results")
 
     # Sort the stats by cumulative time and print the first 30 lines
-    p.sort_stats("cumulative").print_stats(30)
+    p.sort_stats("cumulative").print_stats(50)

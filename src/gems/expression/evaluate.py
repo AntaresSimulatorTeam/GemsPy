@@ -12,7 +12,10 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Iterable
+
+import numpy as np
+import pandas as pd
 
 from gems.expression.expression import (
     AllTimeSumNode,
@@ -26,6 +29,7 @@ from gems.expression.expression import (
     TimeShiftNode,
     TimeSumNode,
 )
+from gems.expression.utils import ProblemDimensions
 
 from .expression import (
     ComparisonNode,
@@ -46,20 +50,20 @@ class ValueProvider(ABC):
     """
 
     @abstractmethod
-    def get_variable_value(self, name: str) -> float:
-        ...
+    def get_variable_value(self, name: str) -> pd.DataFrame: ...
 
     @abstractmethod
-    def get_parameter_value(self, name: str) -> float:
-        ...
+    def get_parameter_value(self, name: str) -> pd.DataFrame: ...
 
     @abstractmethod
-    def get_component_variable_value(self, component_id: str, name: str) -> float:
-        ...
+    def get_component_variable_value(
+        self, component_id: str, name: str
+    ) -> pd.DataFrame: ...
 
     @abstractmethod
-    def get_component_parameter_value(self, component_id: str, name: str) -> float:
-        ...
+    def get_component_parameter_value(
+        self, component_id: str, name: str
+    ) -> pd.DataFrame: ...
 
 
 @dataclass(frozen=True)
@@ -72,73 +76,90 @@ class EvaluationContext(ValueProvider):
     variables: Dict[str, float] = field(default_factory=dict)
     parameters: Dict[str, float] = field(default_factory=dict)
 
-    def get_variable_value(self, name: str) -> float:
+    def get_variable_value(self, name: str) -> pd.DataFrame:
         return self.variables[name]
 
-    def get_parameter_value(self, name: str) -> float:
+    def get_parameter_value(self, name: str) -> pd.DataFrame:
         return self.parameters[name]
 
-    def get_component_variable_value(self, component_id: str, name: str) -> float:
+    def get_component_variable_value(
+        self, component_id: str, name: str
+    ) -> pd.DataFrame:
         raise NotImplementedError()
 
-    def get_component_parameter_value(self, component_id: str, name: str) -> float:
+    def get_component_parameter_value(
+        self, component_id: str, name: str
+    ) -> pd.DataFrame:
         raise NotImplementedError()
 
 
 @dataclass(frozen=True)
-class EvaluationVisitor(ExpressionVisitorOperations[float]):
+class EvaluationVisitor(ExpressionVisitorOperations[pd.DataFrame]):
     """
     Evaluates the expression with respect to the provided context
     (variables and parameters values).
     """
 
     context: ValueProvider
+    timesteps_count: int
+    scenarios_count: int
 
-    def literal(self, node: LiteralNode) -> float:
-        return node.value
+    def literal(self, node: LiteralNode) -> pd.DataFrame:
+        return pd.DataFrame(
+            np.full((self.timesteps_count, self.scenarios_count), node.value)
+        )
 
-    def comparison(self, node: ComparisonNode) -> float:
+    def comparison(self, node: ComparisonNode) -> pd.DataFrame:
         raise ValueError("Cannot evaluate comparison operator.")
 
-    def variable(self, node: VariableNode) -> float:
+    def variable(self, node: VariableNode) -> pd.DataFrame:
         return self.context.get_variable_value(node.name)
 
-    def parameter(self, node: ParameterNode) -> float:
+    def parameter(self, node: ParameterNode) -> pd.DataFrame:
         return self.context.get_parameter_value(node.name)
 
-    def comp_parameter(self, node: ComponentParameterNode) -> float:
+    def comp_parameter(self, node: ComponentParameterNode) -> pd.DataFrame:
         return self.context.get_component_parameter_value(node.component_id, node.name)
 
-    def comp_variable(self, node: ComponentVariableNode) -> float:
+    def comp_variable(self, node: ComponentVariableNode) -> pd.DataFrame:
         return self.context.get_component_variable_value(node.component_id, node.name)
 
-    def pb_parameter(self, node: ProblemParameterNode) -> float:
+    def pb_parameter(self, node: ProblemParameterNode) -> pd.DataFrame:
         raise ValueError("Should not reach here.")
 
-    def pb_variable(self, node: ProblemVariableNode) -> float:
+    def pb_variable(self, node: ProblemVariableNode) -> pd.DataFrame:
         raise ValueError("Should not reach here.")
 
-    def time_shift(self, node: TimeShiftNode) -> float:
+    def time_shift(self, node: TimeShiftNode) -> pd.DataFrame:
         raise NotImplementedError()
 
-    def time_eval(self, node: TimeEvalNode) -> float:
+    def time_eval(self, node: TimeEvalNode) -> pd.DataFrame:
         raise NotImplementedError()
 
-    def time_sum(self, node: TimeSumNode) -> float:
+    def time_sum(self, node: TimeSumNode) -> pd.DataFrame:
         raise NotImplementedError()
 
-    def all_time_sum(self, node: AllTimeSumNode) -> float:
+    def all_time_sum(self, node: AllTimeSumNode) -> pd.DataFrame:
         raise NotImplementedError()
 
-    def scenario_operator(self, node: ScenarioOperatorNode) -> float:
+    def scenario_operator(self, node: ScenarioOperatorNode) -> pd.DataFrame:
         raise NotImplementedError()
 
-    def port_field(self, node: PortFieldNode) -> float:
+    def port_field(self, node: PortFieldNode) -> pd.DataFrame:
         raise NotImplementedError()
 
-    def port_field_aggregator(self, node: PortFieldAggregatorNode) -> float:
+    def port_field_aggregator(self, node: PortFieldAggregatorNode) -> pd.DataFrame:
         raise NotImplementedError()
 
 
-def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:
-    return visit(expression, EvaluationVisitor(value_provider))
+def evaluate(
+    expression: ExpressionNode,
+    value_provider: ValueProvider,
+    dimensions: ProblemDimensions,
+) -> pd.DataFrame:
+    return visit(
+        expression,
+        EvaluationVisitor(
+            value_provider, dimensions.timesteps_count, dimensions.scenarios_count
+        ),
+    )
