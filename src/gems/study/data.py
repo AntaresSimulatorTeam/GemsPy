@@ -151,7 +151,7 @@ class ScenarioSeriesData(AbstractDataStructure):
         scenario_series = pd.Series(
             [self.scenario_series[ScenarioIndex(scenario)] for scenario in scenarios]
         )
-        return pd.DataFrame(pd.concat([scenario_series] * value_count(timesteps)))
+        return pd.concat([scenario_series] * value_count(timesteps), axis=1).T
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, ScenarioSeriesData):
