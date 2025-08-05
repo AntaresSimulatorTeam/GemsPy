@@ -14,16 +14,6 @@ from gems.expression.expression import (
     ProblemVariableNode,
 )
 
-NodeList = [
-    ComparisonNode,
-    ExpressionNode,
-    VariableNode,
-    ComponentVariableNode,
-    ProblemVariableNode,
-    PortFieldNode,
-    PortFieldAggregatorNode,
-]
-
 
 @pytest.mark.parametrize(
     "node, left_arg, right_arg",

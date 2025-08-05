@@ -16,7 +16,6 @@ import pytest
 
 from gems.expression import ExpressionNode, LiteralNode, literal, var
 from gems.expression.expression import (
-    AdditionNode,
     ComponentVariableNode,
     CurrentScenarioIndex,
     TimeShift,

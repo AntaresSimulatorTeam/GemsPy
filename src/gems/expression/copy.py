@@ -35,7 +35,7 @@ from .visitor import ExpressionVisitorOperations, visit
 
 
 @dataclass(frozen=True)
-class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):  # type: ignore
+class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
     """
     Simply copies the whole AST.
     """

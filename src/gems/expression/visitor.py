@@ -14,7 +14,6 @@
 Defines abstract base class for visitors of expressions.
 """
 
-from typing import cast
 from abc import ABC, abstractmethod
 from typing import Generic, Protocol, TypeVar
 
