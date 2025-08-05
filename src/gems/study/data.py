@@ -84,7 +84,11 @@ class ConstantData(AbstractDataStructure):
         node_id: str = "",
     ) -> pd.DataFrame:
         return pd.DataFrame(
-            np.full((value_count(timesteps), value_count(scenarios)), self.value)
+            np.full((value_count(timesteps) * value_count(scenarios), 1), self.value),
+            index=pd.MultiIndex.from_product(
+                [timesteps, scenarios], names=["timestep", "scenario"]
+            ),
+            columns=["value"],
         )
 
     # ConstantData can be used for time varying or constant models
@@ -109,13 +113,20 @@ class TimeSeriesData(AbstractDataStructure):
         timesteps: Optional[Iterable[int]],
         scenarios: Optional[Iterable[int]],
         node_id: str = "",
-    ) -> list[list[float]]:
+    ) -> pd.DataFrame:
         if timesteps is None:
             raise KeyError("Time series data requires a time index.")
         timeseries = pd.Series(
             [self.time_series[TimeIndex(timestep)] for timestep in timesteps]
         )
-        return pd.concat([timeseries] * value_count(scenarios), axis=1)
+        df = pd.DataFrame(
+            pd.concat([timeseries] * value_count(scenarios), ignore_index=True),
+            columns=["value"],
+        )
+        df.index = pd.MultiIndex.from_product(
+            [scenarios, timesteps], names=["scenario", "timestep"]
+        )
+        return df
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, TimeSeriesData):
@@ -140,7 +151,7 @@ class ScenarioSeriesData(AbstractDataStructure):
         timesteps: Optional[Iterable[int]],
         scenarios: Optional[Iterable[int]],
         node_id: str = "",
-    ) -> list[list[float]]:
+    ) -> pd.DataFrame:
         if scenarios is None:
             raise KeyError("Scenario series data requires a scenario index.")
         if self.scenarization:
@@ -151,7 +162,14 @@ class ScenarioSeriesData(AbstractDataStructure):
         scenario_series = pd.Series(
             [self.scenario_series[ScenarioIndex(scenario)] for scenario in scenarios]
         )
-        return pd.concat([scenario_series] * value_count(timesteps), axis=1).T
+        df = pd.DataFrame(
+            pd.concat([scenario_series] * value_count(timesteps), ignore_index=True),
+            columns=["value"],
+        )
+        df.index = pd.MultiIndex.from_product(
+            [timesteps, scenarios], names=["timestep", "scenario"]
+        )
+        return df
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, ScenarioSeriesData):
@@ -219,7 +237,7 @@ class TimeScenarioSeriesData(AbstractDataStructure):
         timesteps: Optional[Iterable[int]],
         scenarios: Optional[Iterable[int]],
         node_id: str = "",
-    ) -> list[list[float]]:
+    ) -> pd.DataFrame:
         if timesteps is None:
             raise KeyError("Time scenario data requires a time index.")
         if scenarios is None:
@@ -229,9 +247,10 @@ class TimeScenarioSeriesData(AbstractDataStructure):
                 self.scenarization.get_scenario_for_year(scenario)
                 for scenario in scenarios
             ]
-        value = self.time_scenario_series.iloc[timesteps, scenarios]
-        # .applymap(str)
-        return value.applymap(float)
+        value = self.time_scenario_series.iloc[timesteps, scenarios].applymap(float)
+        stacked = pd.DataFrame(value.stack(), columns=["value"])
+        stacked.index.set_names(["timestep", "scenario"], inplace=True)
+        return stacked
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, TimeScenarioSeriesData):
@@ -249,7 +268,7 @@ class TreeData(AbstractDataStructure):
         timesteps: Optional[Iterable[int]],
         scenarios: Optional[Iterable[int]],
         node_id: str = "",
-    ) -> list[list[float]]:
+    ) -> pd.DataFrame:
         return self.data[node_id].get_value(timesteps, scenarios)
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:

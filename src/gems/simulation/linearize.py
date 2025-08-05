@@ -12,7 +12,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -60,8 +60,10 @@ class ParameterGetter(ABC):
         self,
         component_id: str,
         parameter_name: str,
-        timesteps: Optional[Iterable[int]],
-        scenarios: Optional[Iterable[int]],
+        timesteps: Optional[Iterable[Tuple[int, int]]],  # current_timestep, timeshift
+        scenarios: Optional[
+            Iterable[Tuple[int, int]]
+        ],  # current_scenario, scenarioshift
     ) -> pd.DataFrame:
         pass
 
@@ -109,6 +111,21 @@ class LinearExpressionData:
         for k, v in res_terms.items():
             res_terms[k] = v.to_term()
         return LinearExpression(res_terms, self.constant)
+
+
+@dataclass(frozen=True)
+class TimeScenarioShift:
+    """
+    A class to represent a time and scenario shift in dataframes of coefficient and constant linear expressions.
+
+    A data value at line (t,w) for the x coefficient in column TimeScenarioShift(t', w') means in contraint number (t,w), there is the term value * x[t+t', w+w']
+    """
+
+    time_shift: int
+    scenario_shift: int
+
+    def __str__(self) -> str:
+        return f"TimeScenarioShift(time_shift={self.time_shift}, scenario_shift={self.scenario_shift})"
 
 
 @dataclass(frozen=True)
@@ -176,28 +193,28 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
         return actual_expr
 
     @staticmethod
-    def _get_timestep(
+    def _get_timeshift(
         time_index: TimeIndex, current_timestep: Optional[int]
     ) -> Optional[int]:
         if isinstance(time_index, TimeShift):
-            if current_timestep is None:
-                raise ValueError("Cannot shift a time-independent expression.")
-            return current_timestep + time_index.timeshift
+            # if current_timestep is None:
+            #     raise ValueError("Cannot shift a time-independent expression.")
+            return time_index.timeshift
         if isinstance(time_index, TimeStep):
-            return time_index.timestep
+            return time_index.timestep - current_timestep
         if isinstance(time_index, NoTimeIndex):
             return None
         else:
             raise TypeError(f"Type {type(time_index)} is not a valid TimeIndex type.")
 
     @staticmethod
-    def _get_scenario(
+    def _get_scenarioshift(
         scenario_index: ScenarioIndex, current_scenario: int
     ) -> Optional[int]:
         if isinstance(scenario_index, OneScenarioIndex):
-            return scenario_index.scenario
+            return scenario_index.scenario - current_scenario
         elif isinstance(scenario_index, CurrentScenarioIndex):
-            return current_scenario
+            return 0
         elif isinstance(scenario_index, NoScenarioIndex):
             return None
         else:
@@ -205,16 +222,29 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
                 f"Type {type(scenario_index)} is not a valid ScenarioIndex type."
             )
 
+    @staticmethod
+    def add_shift_indices(df: pd.DataFrame) -> pd.DataFrame:
+        return pd.concat([df], keys=[(0, 0)], names=["timeshift", "scenarioshift"])
+
     def constant_value_data(self, value: float) -> pd.DataFrame:
-        return pd.DataFrame(
+        df = pd.DataFrame(
             np.full(
                 (
-                    self.timesteps_count(),
-                    self.scenarios_count(),
+                    self.timesteps_count() * self.scenarios_count(),
+                    1,
                 ),
                 value,
-            )
+            ),
+            index=pd.MultiIndex.from_product(
+                [
+                    self.linear_expr_time_indexing(),
+                    self.linear_expr_scenario_indexing(),
+                ],
+                names=["timestep", "scenario"],
+            ),
+            columns=["value"],
         )
+        return self.add_shift_indices(df)
 
     def literal(self, node: LiteralNode) -> LinearExpressionData:
         return LinearExpressionData(
@@ -228,11 +258,11 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
     def scenarios_count(self) -> int:
         return len(self.scenarios) if self.scenarios else 1
 
-    def linear_expr_time_indexing(self) -> Optional[Iterable[int]]:
-        return self.timesteps if self.timesteps else None
+    def linear_expr_time_indexing(self) -> Iterable[int]:
+        return self.timesteps if self.timesteps else [0]
 
-    def linear_expr_scenario_indexing(self) -> Optional[Iterable[int]]:
-        return self.scenarios if self.scenarios else None
+    def linear_expr_scenario_indexing(self) -> Iterable[int]:
+        return self.scenarios if self.scenarios else [0]
 
     def comparison(self, node: ComparisonNode) -> LinearExpressionData:
         raise ValueError("Linear expression cannot contain a comparison operator.")
@@ -268,20 +298,17 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
         )
 
     def pb_parameter(self, node: ProblemParameterNode) -> LinearExpressionData:
-        if self.linear_expr_time_indexing():
-            time_indices = [
-                self._get_timestep(node.time_index, current_timestep)
-                for current_timestep in self.linear_expr_time_indexing()
-            ]
-        else:
-            time_indices = None
-        if self.linear_expr_scenario_indexing():
-            scenario_indices = [
-                self._get_scenario(node.scenario_index, current_scenario)
-                for current_scenario in self.linear_expr_scenario_indexing()
-            ]
-        else:
-            scenario_indices = None
+        time_indices = [
+            (current_timestep, self._get_timeshift(node.time_index, current_timestep))
+            for current_timestep in self.linear_expr_time_indexing()
+        ]
+        scenario_indices = [
+            (
+                current_scenario,
+                self._get_scenarioshift(node.scenario_index, current_scenario),
+            )
+            for current_scenario in self.linear_expr_scenario_indexing()
+        ]
         return LinearExpressionData(
             [],
             self._value_provider().get_parameter_value(

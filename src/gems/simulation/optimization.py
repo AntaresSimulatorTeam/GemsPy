@@ -19,7 +19,7 @@ import itertools
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import ortools.linear_solver.pywraplp as lp
@@ -69,6 +69,9 @@ def _get_parameter_value(
 ) -> pd.DataFrame:
     data = context.database.get_data(component_id, name)
     absolute_timesteps = context.block_timestep_to_absolute_timestep(block_timesteps)
+    # Timesteps[0] in the indexing in the constraint
+    # Timesteps[1] is the timeshift for timesteps[0]
+    # Data at (timeshift, scenarioshift, timestep, scenario) is evaluated at timestep + timeshift, scenario + scenarioshift
     return data.get_value(absolute_timesteps, scenarios, context.tree_node)
 
 
@@ -374,8 +377,12 @@ class OptimizationContext:
                 self,
                 component_id: str,
                 parameter_name: str,
-                timesteps: Optional[Iterable[int]],
-                scenarios: Optional[Iterable[int]],
+                timesteps: Optional[
+                    Iterable[Tuple[int, int]]
+                ],  # current_timestep, timeshift,
+                scenarios: Optional[
+                    Iterable[Tuple[int, int]]
+                ],  # current_scenario, scenarioshift,
             ) -> pd.DataFrame:
                 return _get_parameter_value(
                     ctxt,
