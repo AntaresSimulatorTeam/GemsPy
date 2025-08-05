@@ -33,7 +33,7 @@ expr
     | IDENTIFIER '[' expr  ']'                 # timeIndex
     | '(' expr ')' '[' shift ']'               # timeShiftExpr
     | '(' expr ')' '[' expr ']'               # timeIndexExpr
-    | 'max' '(' expr (',' expr)* ')'          # maxExpr
+    | MAX '(' expr (',' expr)* ')'          # maxExpr
     ;
 
 atom
