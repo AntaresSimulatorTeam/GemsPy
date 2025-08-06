@@ -375,7 +375,7 @@ class OptimizationContext:
                 1,
             ),
         )
-        return [[float_to_int(item) for item in res_per_scen] for res_per_scen in res]
+        return res.astype(int, copy=False)
 
     def _make_data_structure_provider(self) -> IndexingStructureProvider:
         """
