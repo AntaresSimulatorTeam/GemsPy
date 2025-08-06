@@ -102,7 +102,6 @@ def _get_parameter_value(
     df.index = pd.MultiIndex.from_tuples(
         new_index, names=["timeshift", "scenarioshift", "timestep", "scenario"]
     )
-    print(df)
     return df
 
 
@@ -652,14 +651,11 @@ def make_constraint(
                     ] + solver_constraint.GetCoefficient(solver_var)
                     solver_constraint.SetCoefficient(solver_var, coefficient)
 
-            constant = float(
-                data.expression.constant.loc[
-                    (block_timestep, current_scenario), "value"
-                ].iloc[0]
-            )
+            current_constant = constant.loc[(block_timestep, current_scenario), "value"]
+
             solver_constraint.SetBounds(
-                lb.loc[(block_timestep, current_scenario), "value"] - constant,
-                ub.loc[(block_timestep, current_scenario), "value"] - constant,
+                lb.loc[(block_timestep, current_scenario), "value"] - current_constant,
+                ub.loc[(block_timestep, current_scenario), "value"] - current_constant,
             )
 
 

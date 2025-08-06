@@ -12,6 +12,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from itertools import product
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
@@ -105,7 +106,7 @@ class LinearExpressionData:
             k = t.to_key()
             if k in res_terms:
                 current_t = res_terms[k]
-                current_t.coefficient += t.coefficient
+                current_t.coefficient.add(t.coefficient, fill_value=0)
             else:
                 res_terms[k] = t
         for k, v in res_terms.items():
@@ -233,25 +234,25 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
     def add_shift_indices(df: pd.DataFrame) -> pd.DataFrame:
         return pd.concat([df], keys=[(0, 0)], names=["timeshift", "scenarioshift"])
 
-    def constant_value_data(self, value: float) -> pd.DataFrame:
-        df = pd.DataFrame(
-            np.full(
-                (
-                    self.timesteps_count() * self.scenarios_count(),
-                    1,
-                ),
-                value,
-            ),
-            index=pd.MultiIndex.from_product(
+    def constant_value_data(
+        self, value: float, indexing: Optional[pd.MultiIndex] = None
+    ) -> pd.DataFrame:
+        if indexing is None:
+            # indexing is specified if we want to define a constant or coefficient  for a specific (timestep, scenario) a variable (i.e. when evaluating a ProblemvariableNode), it is None if we want to fill a dataframe with constant value over all timesteps and scenarios (ie. when evaluating a literal node)
+            indexing = pd.MultiIndex.from_product(
                 [
+                    [0],
+                    [0],
                     self.linear_expr_time_indexing(),
                     self.linear_expr_scenario_indexing(),
                 ],
-                names=["timestep", "scenario"],
-            ),
+                names=["timeshift", "scenarioshift", "timestep", "scenario"],
+            )
+        return pd.DataFrame(
+            np.full((len(indexing), 1), value),
+            index=indexing,
             columns=["value"],
         )
-        return self.add_shift_indices(df)
 
     def literal(self, node: LiteralNode) -> LinearExpressionData:
         return LinearExpressionData(
@@ -288,15 +289,42 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
         )
 
     def pb_variable(self, node: ProblemVariableNode) -> LinearExpressionData:
+        time_indices = [
+            (current_timestep, self._get_timeshift(node.time_index, current_timestep))
+            for current_timestep in self.linear_expr_time_indexing()
+        ]
+        scenario_indices = [
+            (
+                current_scenario,
+                self._get_scenarioshift(node.scenario_index, current_scenario),
+            )
+            for current_scenario in self.linear_expr_scenario_indexing()
+        ]
+        index_map_values = [
+            (
+                timeshift if timeshift is not None else 0,
+                scenarioshift if scenarioshift is not None else 0,
+                timestep,
+                scenario,
+            )
+            for (timestep, timeshift), (scenario, scenarioshift) in product(
+                time_indices, scenario_indices
+            )
+        ]
+        index = pd.MultiIndex.from_tuples(
+            index_map_values,
+            names=["timeshift", "scenarioshift", "timestep", "scenario"],
+        )
+
         return LinearExpressionData(
             [
                 MutableTerm(
-                    self.constant_value_data(1),
+                    self.constant_value_data(1, index),
                     node.component_id,
                     node.name,
                 )
             ],
-            self.constant_value_data(0),
+            self.constant_value_data(0, index),
         )
 
     def comp_parameter(self, node: ComponentParameterNode) -> LinearExpressionData:

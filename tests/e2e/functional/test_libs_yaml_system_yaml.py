@@ -106,6 +106,8 @@ def test_basic_balance_time_only_series(
     scenarios = 1
     problem = build_problem(network, database, TimeBlock(1, [0, 1]), scenarios)
     status = problem.solver.Solve()
+    serialize("test.lp", problem.export_as_lp(), Path("."))
+    serialize("test.mps", problem.export_as_mps(), Path("."))
     assert status == problem.solver.OPTIMAL
     assert problem.solver.Objective().Value() == 10000
 
