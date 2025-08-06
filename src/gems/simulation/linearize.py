@@ -106,7 +106,7 @@ class LinearExpressionData:
             k = t.to_key()
             if k in res_terms:
                 current_t = res_terms[k]
-                current_t.coefficient.add(t.coefficient, fill_value=0)
+                current_t.coefficient = current_t.coefficient.add(t.coefficient, fill_value=0)
             else:
                 res_terms[k] = t
         for k, v in res_terms.items():
@@ -181,6 +181,30 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
             raise ValueError(
                 "At least one operand of a multiplication must be a constant expression."
             )
+        timeshift_id = (
+            actual_expr.constant.index.get_level_values("timeshift")
+            .unique()
+            .tolist()[0]
+        )  # There should be only 1 ?
+        scenarioshift_id = (
+            actual_expr.constant.index.get_level_values("scenarioshift")
+            .unique()
+            .tolist()[0]
+        )  # There should be only 1 ?
+        new_timeshift_index = [
+            timeshift_id if mult_id == "NoTimeIndex" else mult_id
+            for mult_id in multiplier.index.levels[0]
+        ]
+        new_scenarioshift_index = [
+            scenarioshift_id if mult_id == "NoScenarioIndex" else mult_id
+            for mult_id in multiplier.index.levels[1]
+        ]
+        multiplier.set_index(
+            multiplier.index.set_levels(
+                [new_timeshift_index, new_scenarioshift_index], level=[0, 1]
+            ),
+            inplace=True,
+        )
         actual_expr.constant *= multiplier
         for t in actual_expr.terms:
             t.coefficient *= multiplier
@@ -195,9 +219,34 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
             )
         divider = rhs.constant
         actual_expr = lhs
-        actual_expr.constant /= divider
+
+        if "NoTimeIndex" in divider.index.get_level_values("timeshift"):
+            divider.set_index(
+                divider.index.droplevel("timeshift"),
+                inplace=True,
+            )
+        if "NoScenarioIndex" in divider.index.get_level_values("scenarioshift"):
+            divider.set_index(
+                divider.index.droplevel("scenarioshift"),
+                inplace=True,
+            )
+        constant_df = divider.join(
+            actual_expr.constant, how="inner", lsuffix="_divider"
+        )
+        constant_df["value"] = constant_df["value"] / constant_df["value_divider"]
+        constant_df.drop("value_divider", axis=1, inplace=True)
+        constant_df.index = constant_df.index.reorder_levels(
+            ["timeshift", "scenarioshift", "timestep", "scenario"]
+        )
+        actual_expr.constant = constant_df
         for t in actual_expr.terms:
-            t.coefficient /= divider
+            coeff_df = divider.join(t.coefficient, how="inner", lsuffix="_divider")
+            coeff_df["value"] = coeff_df["value"] / coeff_df["value_divider"]
+            coeff_df.drop("value_divider", axis=1, inplace=True)
+            coeff_df = coeff_df.reorder_levels(
+                ["timeshift", "scenarioshift", "timestep", "scenario"]
+            )
+            t.coefficient = coeff_df
         return actual_expr
 
     @staticmethod
@@ -241,8 +290,8 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
             # indexing is specified if we want to define a constant or coefficient  for a specific (timestep, scenario) a variable (i.e. when evaluating a ProblemvariableNode), it is None if we want to fill a dataframe with constant value over all timesteps and scenarios (ie. when evaluating a literal node)
             indexing = pd.MultiIndex.from_product(
                 [
-                    [0],
-                    [0],
+                    ["NoTimeIndex"],
+                    ["NoScenarioIndex"],
                     self.linear_expr_time_indexing(),
                     self.linear_expr_scenario_indexing(),
                 ],
@@ -267,6 +316,7 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
         return len(self.scenarios) if self.scenarios else 1
 
     def linear_expr_time_indexing(self) -> Iterable[int]:
+
         return self.timesteps if self.timesteps else [0]
 
     def linear_expr_scenario_indexing(self) -> Iterable[int]:

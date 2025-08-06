@@ -70,11 +70,15 @@ def _get_parameter_value(
 ) -> pd.DataFrame:
     data = context.database.get_data(component_id, name)
     eval_timesteps = [
-        block_timestep[0] + block_timestep[1] if block_timestep[1] is not None else 0
+        (
+            block_timestep[0] + block_timestep[1]
+            if block_timestep[1] is not None
+            else "NoTimeIndex"
+        )
         for block_timestep in block_timesteps
     ]
     eval_scenarios = [
-        scenario[0] + scenario[1] if scenario[1] is not None else 0
+        scenario[0] + scenario[1] if scenario[1] is not None else "NoScenarioIndex"
         for scenario in scenarios
     ]
     absolute_timesteps = context.block_timestep_to_absolute_timestep(eval_timesteps)
@@ -88,8 +92,8 @@ def _get_parameter_value(
     ]
     index_map_values = [
         (
-            timeshift if timeshift is not None else 0,
-            scenarioshift if scenarioshift is not None else 0,
+            timeshift if timeshift is not None else "NoTimeIndex",
+            scenarioshift if scenarioshift is not None else "NoScenarioIndex",
             timestep,
             scenario,
         )
@@ -283,11 +287,15 @@ class OptimizationContext:
         if not block_timesteps:
             return None
         return [
-            self._block.timesteps[self.get_actual_block_timestep(block_timestep)]
+            (
+                self._block.timesteps[self.get_actual_block_timestep(block_timestep)]
+                if block_timestep is not "NoTimeIndex"
+                else "NoTimeIndex"
+            )
             for block_timestep in block_timesteps
         ]
 
-    def get_actual_block_timestep(self, block_timestep: Optional[int]) -> int:
+    def get_actual_block_timestep(self, block_timestep: int) -> int:
         if self._border_management == BlockBorderManagement.CYCLE:
             return block_timestep % self.block_length()
         else:
@@ -566,20 +574,37 @@ def _create_objective(
 
     obj: lp.Objective = solver.Objective()
     for term in linear_expr.terms.values():
-        solver_var = _get_solver_var(
-            term,
-            0,
-            0,
-            opt_context,
-        )
-        opt_context._solver_variables[solver_var.name()].is_in_objective = True
-        obj.SetCoefficient(
-            solver_var,
-            obj.GetCoefficient(solver_var) + term.coefficient.iloc[0, 0],
-        )
+        var_timesteps_and_scenarios = [
+            ((timeshift, scenarioshift))
+            for (
+                timeshift,
+                scenarioshift,
+                timestep,
+                scenario,
+            ) in term.coefficient.index
+            if timestep == 0 and scenario == 0
+        ]
+        for timeshift, scenarioshift in var_timesteps_and_scenarios:
+            solver_var = _get_solver_var(
+                term,
+                timeshift,
+                scenarioshift,
+                opt_context,
+            )
+            opt_context._solver_variables[solver_var.name()].is_in_objective = True
+            obj.SetCoefficient(
+                solver_var,
+                obj.GetCoefficient(solver_var)
+                + term.coefficient.loc[(timeshift, scenarioshift, 0, 0), "value"],
+            )
 
     # This should have no effect on the optimization
-    obj.SetOffset(linear_expr.constant.iloc[0, 0] + obj.offset())
+    obj.SetOffset(
+        linear_expr.constant.groupby(level=["timestep", "scenario"])
+        .sum()
+        .loc[(0, 0), "value"]
+        + obj.offset()
+    )
 
 
 @dataclass
