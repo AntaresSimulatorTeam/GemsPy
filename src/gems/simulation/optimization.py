@@ -62,17 +62,42 @@ class TimestepComponentVariableKey:
 
 def _get_parameter_value(
     context: "OptimizationContext",
-    block_timesteps: Optional[Iterable[int]],
-    scenarios: Optional[Iterable[int]],
+    block_timesteps: Optional[Iterable[Tuple[int, int]]],
+    scenarios: Optional[Iterable[Tuple[int, int]]],
     component_id: str,
     name: str,
 ) -> pd.DataFrame:
     data = context.database.get_data(component_id, name)
-    absolute_timesteps = context.block_timestep_to_absolute_timestep(block_timesteps)
+    eval_timesteps = [
+        block_timestep[0] + block_timestep[1] if block_timestep[1] is not None else 0
+        for block_timestep in block_timesteps
+    ]
+    eval_scenarios = [
+        scenario[0] + scenario[1] if scenario[1] is not None else 0
+        for scenario in scenarios
+    ]
+    absolute_timesteps = context.block_timestep_to_absolute_timestep(eval_timesteps)
     # Timesteps[0] in the indexing in the constraint
     # Timesteps[1] is the timeshift for timesteps[0]
     # Data at (timeshift, scenarioshift, timestep, scenario) is evaluated at timestep + timeshift, scenario + scenarioshift
-    return data.get_value(absolute_timesteps, scenarios, context.tree_node)
+    df = data.get_value(absolute_timesteps, eval_scenarios, context.tree_node)
+    index_map_keys = [
+        (timestep, scenario)
+        for timestep, scenario in zip(absolute_timesteps, eval_scenarios)
+    ]
+    index_map_values = [
+        (timeshift, scenarioshift, timestep, scenario)
+        for (timestep, timeshift), (scenario, scenarioshift) in zip(
+            block_timesteps, scenarios
+        )
+    ]
+    index_map = dict(zip(index_map_keys, index_map_values))
+    new_index = [index_map[idx] for idx in df.index]
+    df.index = pd.MultiIndex.from_tuples(
+        new_index, names=["timeshift", "scenarioshift", "timestep", "scenario"]
+    )
+    print(df)
+    return df
 
 
 def _make_value_provider(
@@ -86,28 +111,37 @@ def _make_value_provider(
 
     Cannot evaluate expressions which contain variables.
     """
+    ### Convert block_timesteps and scenarios to tuple making shift appear for the ValueProvider
+    block_timesteps_tuple = (
+        [(block_timestep, 0) for block_timestep in block_timesteps]
+        if block_timesteps is not None
+        else None
+    )
+    scenarios_tuple = (
+        [(scenario, 0) for scenario in scenarios] if scenarios is not None else None
+    )
 
     class Impl(ValueProvider):
         def get_component_variable_value(
             self, component_id: str, name: str
-        ) -> list[list[float]]:
+        ) -> pd.DataFrame:
             raise NotImplementedError(
                 "Cannot provide variable value at problem build time."
             )
 
         def get_component_parameter_value(
             self, component_id: str, name: str
-        ) -> list[list[float]]:
+        ) -> pd.DataFrame:
             return _get_parameter_value(
-                context, block_timesteps, scenarios, component_id, name
+                context, block_timesteps_tuple, scenarios_tuple, component_id, name
             )
 
-        def get_variable_value(self, name: str) -> list[list[float]]:
+        def get_variable_value(self, name: str) -> pd.DataFrame:
             raise NotImplementedError(
                 "Cannot provide variable value at problem build time."
             )
 
-        def get_parameter_value(self, name: str) -> list[list[float]]:
+        def get_parameter_value(self, name: str) -> pd.DataFrame:
             raise ValueError(
                 "Parameter must be associated to its component before resolution."
             )
@@ -248,7 +282,7 @@ class OptimizationContext:
             for block_timestep in block_timesteps
         ]
 
-    def get_actual_block_timestep(self, block_timestep: int) -> int:
+    def get_actual_block_timestep(self, block_timestep: Optional[int]) -> int:
         if self._border_management == BlockBorderManagement.CYCLE:
             return block_timestep % self.block_length()
         else:
@@ -575,28 +609,56 @@ def make_constraint(
     """
     Adds constraint to the solver.
     """
+    constant = data.expression.constant.groupby(
+        level=["timeshift", "scenarioshift"]
+    ).sum()
+    lb = data.lower_bound.groupby(level=["timeshift", "scenarioshift"]).sum()
+    ub = data.upper_bound.groupby(level=["timeshift", "scenarioshift"]).sum()
     for block_timestep in block_timesteps:
-        for scenario in scenarios:
-            constraint_name = f"{data.name}_t{block_timestep}_s{scenario}"
+        for current_scenario in scenarios:
+            constraint_name = f"{data.name}_t{block_timestep}_s{current_scenario}"
 
             solver_constraint: lp.Constraint = solver.Constraint(constraint_name)
-            constant: float = 0
             for term in data.expression.terms.values():
-                solver_var = _get_solver_var(
-                    term,
-                    block_timestep,
-                    scenario,
-                    context,
-                )
-                coefficient = term.coefficient.iloc[
-                    block_timestep, scenario
-                ] + solver_constraint.GetCoefficient(solver_var)
-                solver_constraint.SetCoefficient(solver_var, coefficient)
+                var_timesteps_and_scenarios = [
+                    (
+                        (block_timestep + timeshift, current_scenario + scenarioshift)
+                        if timestep == block_timestep and scenario == current_scenario
+                        else None
+                    )
+                    for (
+                        timeshift,
+                        scenarioshift,
+                        timestep,
+                        scenario,
+                    ) in term.coefficient.index
+                ]
+                for timestep, scenario in var_timesteps_and_scenarios:
+                    solver_var = _get_solver_var(
+                        term,
+                        timestep,
+                        scenario,
+                        context,
+                    )
+                    coefficient = term.coefficient.loc[
+                        (
+                            timestep - block_timestep,
+                            scenario - current_scenario,
+                            block_timestep,
+                            current_scenario,
+                        ),
+                        "value",
+                    ] + solver_constraint.GetCoefficient(solver_var)
+                    solver_constraint.SetCoefficient(solver_var, coefficient)
 
-            constant += data.expression.constant.iloc[block_timestep, scenario]
+            constant = float(
+                data.expression.constant.loc[
+                    (block_timestep, current_scenario), "value"
+                ].iloc[0]
+            )
             solver_constraint.SetBounds(
-                data.lower_bound.iloc[block_timestep, scenario] - constant,
-                data.upper_bound.iloc[block_timestep, scenario] - constant,
+                lb.loc[(block_timestep, current_scenario), "value"] - constant,
+                ub.loc[(block_timestep, current_scenario), "value"] - constant,
             )
 
 
@@ -710,9 +772,19 @@ class OptimizationProblem:
                 else:
                     lower_bound = pd.DataFrame(
                         np.full(
-                            (len(time_indices), len(scenario_indices)),
+                            (len(time_indices) * len(scenario_indices), 1),
                             -self.solver.infinity(),
-                        )
+                        ),
+                        index=pd.MultiIndex.from_product(
+                            [[0], [0], time_indices, scenario_indices],
+                            names=[
+                                "timeshift",
+                                "scenarioshift",
+                                "timestep",
+                                "scenario",
+                            ],
+                        ),
+                        columns=["value"],
                     )
                 if instantiated_ub_expr:
                     upper_bound = _compute_expression_value(
@@ -724,16 +796,34 @@ class OptimizationProblem:
                 else:
                     upper_bound = pd.DataFrame(
                         np.full(
-                            (len(time_indices), len(scenario_indices)),
+                            (len(time_indices) * len(scenario_indices), 1),
                             self.solver.infinity(),
-                        )
+                        ),
+                        index=pd.MultiIndex.from_product(
+                            [[0], [0], time_indices, scenario_indices],
+                            names=[
+                                "timeshift",
+                                "scenarioshift",
+                                "timestep",
+                                "scenario",
+                            ],
+                        ),
+                        columns=["value"],
                     )
                 for t, s in itertools.product(time_indices, scenario_indices):
                     solver_var_name = self._solver_variable_name(
                         component.id, model_var.name, t, s
                     )
-                    lb = lower_bound.iloc[t, s]
-                    ub = upper_bound.iloc[t, s]
+                    lb = (
+                        lower_bound.groupby(level=["timeshift", "scenarioshift"])
+                        .sum()
+                        .loc[(t, s), "value"]
+                    )
+                    ub = (
+                        upper_bound.groupby(level=["timeshift", "scenarioshift"])
+                        .sum()
+                        .loc[(t, s), "value"]
+                    )
 
                     if lb > ub:
                         raise ValueError(

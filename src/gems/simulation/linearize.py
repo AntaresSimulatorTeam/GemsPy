@@ -154,9 +154,16 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
     def addition(self, node: AdditionNode) -> LinearExpressionData:
         operands = [visit(o, self) for o in node.operands]
         terms = []
-        constant: float = 0
+        constant = pd.DataFrame(
+            index=pd.MultiIndex.from_product(
+                [[], [], [], []],
+                names=["timeshift", "scenarioshift", "timestep", "scenario"],
+            )
+        )
         for o in operands:
-            constant += o.constant
+            # constant += o.constant
+            # Creates a copy of the dataframe and reassign
+            constant = constant.add(o.constant, fill_value=0)
             terms.extend(o.terms)
         return LinearExpressionData(terms=terms, constant=constant)
 

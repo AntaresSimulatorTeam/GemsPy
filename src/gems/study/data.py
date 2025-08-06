@@ -123,9 +123,12 @@ class TimeSeriesData(AbstractDataStructure):
             pd.concat([timeseries] * value_count(scenarios), ignore_index=True),
             columns=["value"],
         )
+        # Product in the sense scenario x timestep as we manipulate a scenario series
         df.index = pd.MultiIndex.from_product(
             [scenarios, timesteps], names=["scenario", "timestep"]
         )
+        # Reorder levels so that get_value always returns a df with index in the same order
+        df.index = df.index.reorder_levels(["timestep", "scenario"])
         return df
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
