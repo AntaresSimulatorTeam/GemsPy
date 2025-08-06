@@ -19,6 +19,7 @@ import itertools
 import math
 from dataclasses import dataclass
 from enum import Enum
+from itertools import product
 from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
@@ -83,11 +84,16 @@ def _get_parameter_value(
     df = data.get_value(absolute_timesteps, eval_scenarios, context.tree_node)
     index_map_keys = [
         (timestep, scenario)
-        for timestep, scenario in zip(absolute_timesteps, eval_scenarios)
+        for timestep, scenario in product(absolute_timesteps, eval_scenarios)
     ]
     index_map_values = [
-        (timeshift, scenarioshift, timestep, scenario)
-        for (timestep, timeshift), (scenario, scenarioshift) in zip(
+        (
+            timeshift if timeshift is not None else 0,
+            scenarioshift if scenarioshift is not None else 0,
+            timestep,
+            scenario,
+        )
+        for (timestep, timeshift), (scenario, scenarioshift) in product(
             block_timesteps, scenarios
         )
     ]
@@ -609,11 +615,9 @@ def make_constraint(
     """
     Adds constraint to the solver.
     """
-    constant = data.expression.constant.groupby(
-        level=["timeshift", "scenarioshift"]
-    ).sum()
-    lb = data.lower_bound.groupby(level=["timeshift", "scenarioshift"]).sum()
-    ub = data.upper_bound.groupby(level=["timeshift", "scenarioshift"]).sum()
+    constant = data.expression.constant.groupby(level=["timestep", "scenario"]).sum()
+    lb = data.lower_bound.groupby(level=["timestep", "scenario"]).sum()
+    ub = data.upper_bound.groupby(level=["timestep", "scenario"]).sum()
     for block_timestep in block_timesteps:
         for current_scenario in scenarios:
             constraint_name = f"{data.name}_t{block_timestep}_s{current_scenario}"
@@ -621,17 +625,14 @@ def make_constraint(
             solver_constraint: lp.Constraint = solver.Constraint(constraint_name)
             for term in data.expression.terms.values():
                 var_timesteps_and_scenarios = [
-                    (
-                        (block_timestep + timeshift, current_scenario + scenarioshift)
-                        if timestep == block_timestep and scenario == current_scenario
-                        else None
-                    )
+                    ((block_timestep + timeshift, current_scenario + scenarioshift))
                     for (
                         timeshift,
                         scenarioshift,
                         timestep,
                         scenario,
                     ) in term.coefficient.index
+                    if timestep == block_timestep and scenario == current_scenario
                 ]
                 for timestep, scenario in var_timesteps_and_scenarios:
                     solver_var = _get_solver_var(
@@ -815,12 +816,12 @@ class OptimizationProblem:
                         component.id, model_var.name, t, s
                     )
                     lb = (
-                        lower_bound.groupby(level=["timeshift", "scenarioshift"])
+                        lower_bound.groupby(level=["timestep", "scenario"])
                         .sum()
                         .loc[(t, s), "value"]
                     )
                     ub = (
-                        upper_bound.groupby(level=["timeshift", "scenarioshift"])
+                        upper_bound.groupby(level=["timestep", "scenario"])
                         .sum()
                         .loc[(t, s), "value"]
                     )

@@ -54,6 +54,7 @@ from gems.study.resolve_components import (
     consistency_check,
     resolve_system,
 )
+from gems.utils import serialize
 
 
 def test_basic_balance_using_yaml(
@@ -68,6 +69,8 @@ def test_basic_balance_using_yaml(
 
     scenarios = 1
     problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
+    serialize("test.lp", problem.export_as_lp(), Path("."))
+    serialize("test.mps", problem.export_as_mps(), Path("."))
     status = problem.solver.Solve()
     assert status == problem.solver.OPTIMAL
     assert problem.solver.Objective().Value() == 3000
@@ -114,6 +117,7 @@ def test_basic_balance_scenario_only_series(
     scenarios = 2
     problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
     status = problem.solver.Solve()
+    serialize("test.lp", problem.export_as_lp(), Path("."))
     assert status == problem.solver.OPTIMAL
     assert problem.solver.Objective().Value() == 0.5 * 5000 + 0.5 * 10000
 
