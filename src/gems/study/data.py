@@ -12,7 +12,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Mapping, Optional
+from typing import Dict, Iterable, Mapping, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -57,7 +57,7 @@ class AbstractDataStructure(ABC):
         timesteps: Optional[Iterable[int]],
         scenarios: Optional[Iterable[int]],
         node_id: str = "",
-    ) -> pd.DataFrame:
+    ) -> Union[float, pd.DataFrame]:
         raise NotImplementedError()
 
     @abstractmethod
@@ -82,14 +82,8 @@ class ConstantData(AbstractDataStructure):
         timesteps: Optional[Iterable[int]],
         scenarios: Optional[Iterable[int]],
         node_id: str = "",
-    ) -> pd.DataFrame:
-        return pd.DataFrame(
-            np.full((value_count(timesteps) * value_count(scenarios), 1), self.value),
-            index=pd.MultiIndex.from_product(
-                [timesteps, scenarios], names=["timestep", "scenario"]
-            ),
-            columns=["value"],
-        )
+    ) -> Union[float, pd.DataFrame]:
+        return self.value
 
     # ConstantData can be used for time varying or constant models
     def check_requirement(self, time: bool, scenario: bool) -> bool:
@@ -113,7 +107,7 @@ class TimeSeriesData(AbstractDataStructure):
         timesteps: Optional[Iterable[int]],
         scenarios: Optional[Iterable[int]],
         node_id: str = "",
-    ) -> pd.DataFrame:
+    ) -> Union[float, pd.DataFrame]:
         if timesteps is None:
             raise KeyError("Time series data requires a time index.")
         timeseries = pd.Series(
@@ -154,7 +148,7 @@ class ScenarioSeriesData(AbstractDataStructure):
         timesteps: Optional[Iterable[int]],
         scenarios: Optional[Iterable[int]],
         node_id: str = "",
-    ) -> pd.DataFrame:
+    ) -> Union[float, pd.DataFrame]:
         if scenarios is None:
             raise KeyError("Scenario series data requires a scenario index.")
         if self.scenarization:
@@ -183,7 +177,7 @@ class ScenarioSeriesData(AbstractDataStructure):
 
 def load_ts_from_txt(
     timeseries_name: Optional[str], path_to_file: Optional[Path]
-) -> pd.DataFrame:
+) -> Union[float, pd.DataFrame]:
     if path_to_file is not None and timeseries_name is not None:
         timeseries_with_extension = timeseries_name + ".txt"
         ts_path = path_to_file / timeseries_with_extension
@@ -240,7 +234,7 @@ class TimeScenarioSeriesData(AbstractDataStructure):
         timesteps: Optional[Iterable[int]],
         scenarios: Optional[Iterable[int]],
         node_id: str = "",
-    ) -> pd.DataFrame:
+    ) -> Union[float, pd.DataFrame]:
         if timesteps is None:
             raise KeyError("Time scenario data requires a time index.")
         if scenarios is None:
@@ -250,7 +244,7 @@ class TimeScenarioSeriesData(AbstractDataStructure):
                 self.scenarization.get_scenario_for_year(scenario)
                 for scenario in scenarios
             ]
-        value = self.time_scenario_series.iloc[timesteps, scenarios].applymap(float)
+        value = self.time_scenario_series.iloc[timesteps, scenarios].map(float)
         stacked = pd.DataFrame(value.stack(), columns=["value"])
         stacked.index.set_names(["timestep", "scenario"], inplace=True)
         return stacked
@@ -271,7 +265,7 @@ class TreeData(AbstractDataStructure):
         timesteps: Optional[Iterable[int]],
         scenarios: Optional[Iterable[int]],
         node_id: str = "",
-    ) -> pd.DataFrame:
+    ) -> Union[float, pd.DataFrame]:
         return self.data[node_id].get_value(timesteps, scenarios)
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:

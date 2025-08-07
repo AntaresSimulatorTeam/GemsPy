@@ -13,7 +13,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from itertools import product
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -71,7 +71,7 @@ class ParameterGetter(ABC):
 
 @dataclass
 class MutableTerm:
-    coefficient: pd.DataFrame
+    coefficient: Union[pd.DataFrame, float]
     component_id: str
     variable_name: str
     # time_index: Optional[int]
@@ -98,7 +98,7 @@ class MutableTerm:
 @dataclass
 class LinearExpressionData:
     terms: List[MutableTerm]
-    constant: pd.DataFrame
+    constant: Union[pd.DataFrame, float]
 
     def build(self) -> LinearExpression:
         res_terms: Dict[TermKey, Any] = {}
@@ -106,9 +106,14 @@ class LinearExpressionData:
             k = t.to_key()
             if k in res_terms:
                 current_t = res_terms[k]
-                current_t.coefficient = current_t.coefficient.add(
-                    t.coefficient, fill_value=0
-                )
+                if isinstance(current_t.coefficient, (int, float)) or isinstance(
+                    t.coefficient, (int, float)
+                ):
+                    current_t.coefficient += t.coefficient
+                else:
+                    current_t.coefficient = current_t.coefficient.add(
+                        t.coefficient, fill_value=0
+                    )
             else:
                 res_terms[k] = t
         for k, v in res_terms.items():
@@ -157,16 +162,15 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
     def addition(self, node: AdditionNode) -> LinearExpressionData:
         operands = [visit(o, self) for o in node.operands]
         terms = []
-        constant = pd.DataFrame(
-            index=pd.MultiIndex.from_product(
-                [[], [], [], []],
-                names=["timeshift", "scenarioshift", "timestep", "scenario"],
-            )
-        )
+        constant = 0
         for o in operands:
-            # constant += o.constant
-            # Creates a copy of the dataframe and reassign
-            constant = constant.add(o.constant, fill_value=0)
+            if isinstance(o.constant, (int, float)) or isinstance(
+                constant, (int, float)
+            ):
+                constant += o.constant
+            else:
+                # Creates a copy of the dataframe and reassign
+                constant = constant.add(o.constant, fill_value=0)
             terms.extend(o.terms)
         return LinearExpressionData(terms=terms, constant=constant)
 
@@ -183,40 +187,38 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
             raise ValueError(
                 "At least one operand of a multiplication must be a constant expression."
             )
-        # if "NoTimeIndex" in multiplier.index.get_level_values("timeshift"):
-        #     multiplier.set_index(
-        #         multiplier.index.droplevel("timeshift"),
-        #         inplace=True,
-        #     )
-        # if "NoScenarioIndex" in multiplier.index.get_level_values("scenarioshift"):
-        #     multiplier.set_index(
-        #         multiplier.index.droplevel("scenarioshift"),
-        #         inplace=True,
-        #     )
-        # The shift dimensions are useless for constant as the value provider that has beforehand evaluated it has taken shifts into account to put the correct value for the expression indexed at (timestep, scenario).
-        multiplier.set_index(
+
+        if isinstance(multiplier, (int, float)):
+            actual_expr.constant *= multiplier
+            for t in actual_expr.terms:
+                t.coefficient *= multiplier
+        else:
+            # The shift dimensions are useless for constant as the value provider that has beforehand evaluated it has taken shifts into account to put the correct value for the expression indexed at (timestep, scenario).
+            multiplier.set_index(
                 multiplier.index.droplevel(["timeshift", "scenarioshift"]),
                 inplace=True,
             )
-        constant_df = multiplier.join(
-            actual_expr.constant, how="inner", lsuffix="_multiplier"
-        )
-        constant_df["value"] = constant_df["value"] * constant_df["value_multiplier"]
-        constant_df.drop("value_multiplier", axis=1, inplace=True)
-        constant_df.index = constant_df.index.reorder_levels(
-            ["timeshift", "scenarioshift", "timestep", "scenario"]
-        )
-        actual_expr.constant = constant_df
-        for t in actual_expr.terms:
-            coeff_df = multiplier.join(
-                t.coefficient, how="inner", lsuffix="_multiplier"
+            constant_df = multiplier.join(
+                actual_expr.constant, how="inner", lsuffix="_multiplier"
             )
-            coeff_df["value"] = coeff_df["value"] * coeff_df["value_multiplier"]
-            coeff_df.drop("value_multiplier", axis=1, inplace=True)
-            coeff_df = coeff_df.reorder_levels(
+            constant_df["value"] = (
+                constant_df["value"] * constant_df["value_multiplier"]
+            )
+            constant_df.drop("value_multiplier", axis=1, inplace=True)
+            constant_df.index = constant_df.index.reorder_levels(
                 ["timeshift", "scenarioshift", "timestep", "scenario"]
             )
-            t.coefficient = coeff_df
+            actual_expr.constant = constant_df
+            for t in actual_expr.terms:
+                coeff_df = multiplier.join(
+                    t.coefficient, how="inner", lsuffix="_multiplier"
+                )
+                coeff_df["value"] = coeff_df["value"] * coeff_df["value_multiplier"]
+                coeff_df.drop("value_multiplier", axis=1, inplace=True)
+                coeff_df = coeff_df.reorder_levels(
+                    ["timeshift", "scenarioshift", "timestep", "scenario"]
+                )
+                t.coefficient = coeff_df
         return actual_expr
 
     def division(self, node: DivisionNode) -> LinearExpressionData:
@@ -228,33 +230,31 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
             )
         divider = rhs.constant
         actual_expr = lhs
-
-        if "NoTimeIndex" in divider.index.get_level_values("timeshift"):
+        if isinstance(divider, (int, float)):
+            actual_expr.constant *= divider
+            for t in actual_expr.terms:
+                t.coefficient *= divider
+        else:
             divider.set_index(
-                divider.index.droplevel("timeshift"),
+                divider.index.droplevel(["timeshift", "scenarioshift"]),
                 inplace=True,
             )
-        if "NoScenarioIndex" in divider.index.get_level_values("scenarioshift"):
-            divider.set_index(
-                divider.index.droplevel("scenarioshift"),
-                inplace=True,
+            constant_df = divider.join(
+                actual_expr.constant, how="inner", lsuffix="_divider"
             )
-        constant_df = divider.join(
-            actual_expr.constant, how="inner", lsuffix="_divider"
-        )
-        constant_df["value"] = constant_df["value"] / constant_df["value_divider"]
-        constant_df.drop("value_divider", axis=1, inplace=True)
-        constant_df.index = constant_df.index.reorder_levels(
-            ["timeshift", "scenarioshift", "timestep", "scenario"]
-        )
-        actual_expr.constant = constant_df
-        for t in actual_expr.terms:
-            coeff_df = divider.join(t.coefficient, how="inner", lsuffix="_divider")
-            coeff_df["value"] = coeff_df["value"] / coeff_df["value_divider"]
-            coeff_df.drop("value_divider", axis=1, inplace=True)
-            coeff_df = coeff_df.reorder_levels(
+            constant_df["value"] = constant_df["value"] / constant_df["value_divider"]
+            constant_df.drop("value_divider", axis=1, inplace=True)
+            constant_df.index = constant_df.index.reorder_levels(
                 ["timeshift", "scenarioshift", "timestep", "scenario"]
             )
+            actual_expr.constant = constant_df
+            for t in actual_expr.terms:
+                coeff_df = divider.join(t.coefficient, how="inner", lsuffix="_divider")
+                coeff_df["value"] = coeff_df["value"] / coeff_df["value_divider"]
+                coeff_df.drop("value_divider", axis=1, inplace=True)
+                coeff_df = coeff_df.reorder_levels(
+                    ["timeshift", "scenarioshift", "timestep", "scenario"]
+                )
             t.coefficient = coeff_df
         return actual_expr
 
@@ -294,23 +294,8 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
 
     def constant_value_data(
         self, value: float, indexing: Optional[pd.MultiIndex] = None
-    ) -> pd.DataFrame:
-        if indexing is None:
-            # indexing is specified if we want to define a constant or coefficient  for a specific (timestep, scenario) a variable (i.e. when evaluating a ProblemvariableNode), it is None if we want to fill a dataframe with constant value over all timesteps and scenarios (ie. when evaluating a literal node)
-            indexing = pd.MultiIndex.from_product(
-                [
-                    ["NoTimeIndex"],
-                    ["NoScenarioIndex"],
-                    self.linear_expr_time_indexing(),
-                    self.linear_expr_scenario_indexing(),
-                ],
-                names=["timeshift", "scenarioshift", "timestep", "scenario"],
-            )
-        return pd.DataFrame(
-            np.full((len(indexing), 1), value),
-            index=indexing,
-            columns=["value"],
-        )
+    ) -> float:
+        return value
 
     def literal(self, node: LiteralNode) -> LinearExpressionData:
         return LinearExpressionData(
