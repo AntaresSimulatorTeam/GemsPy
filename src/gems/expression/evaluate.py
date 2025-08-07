@@ -108,7 +108,12 @@ class EvaluationVisitor(ExpressionVisitorOperations[pd.DataFrame]):
         return pd.DataFrame(
             np.full((self.timesteps_count * self.scenarios_count, 1), node.value),
             index=pd.MultiIndex.from_product(
-                [[0], [0], range(self.timesteps_count), range(self.scenarios_count)],
+                [
+                    ["NoTimeIndex"],
+                    ["NoScenarioIndex"],
+                    range(self.timesteps_count),
+                    range(self.scenarios_count),
+                ],
                 names=["timeshift", "scenarioshift", "timestep", "scenario"],
             ),
             columns=["value"],

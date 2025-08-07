@@ -69,18 +69,26 @@ def _get_parameter_value(
     name: str,
 ) -> pd.DataFrame:
     data = context.database.get_data(component_id, name)
-    eval_timesteps = [
-        (
-            block_timestep[0] + block_timestep[1]
-            if block_timestep[1] is not None
-            else "NoTimeIndex"
-        )
-        for block_timestep in block_timesteps
-    ]
-    eval_scenarios = [
-        scenario[0] + scenario[1] if scenario[1] is not None else "NoScenarioIndex"
-        for scenario in scenarios
-    ]
+    eval_timesteps = (
+        [
+            (
+                block_timestep[0] + block_timestep[1]
+                if block_timestep[1] is not None
+                else "NoTimeIndex"
+            )
+            for block_timestep in block_timesteps
+        ]
+        if block_timesteps is not None
+        else ["NoTimeIndex"]
+    )
+    eval_scenarios = (
+        [
+            scenario[0] + scenario[1] if scenario[1] is not None else "NoScenarioIndex"
+            for scenario in scenarios
+        ]
+        if scenarios is not None
+        else ["NoScenarioIndex"]
+    )
     absolute_timesteps = context.block_timestep_to_absolute_timestep(eval_timesteps)
     # Timesteps[0] in the indexing in the constraint
     # Timesteps[1] is the timeshift for timesteps[0]
@@ -90,21 +98,25 @@ def _get_parameter_value(
         (timestep, scenario)
         for timestep, scenario in product(absolute_timesteps, eval_scenarios)
     ]
-    index_map_values = [
-        (
-            timeshift if timeshift is not None else "NoTimeIndex",
-            scenarioshift if scenarioshift is not None else "NoScenarioIndex",
-            timestep,
-            scenario,
-        )
-        for (timestep, timeshift), (scenario, scenarioshift) in product(
-            block_timesteps, scenarios
-        )
-    ]
-    index_map = dict(zip(index_map_keys, index_map_values))
-    new_index = [index_map[idx] for idx in df.index]
+    index_map_values = (
+        [
+            (
+                timeshift if timeshift is not None else "NoTimeIndex",
+                scenarioshift if scenarioshift is not None else "NoScenarioIndex",
+                timestep,
+                scenario,
+            )
+            for (timestep, timeshift), (scenario, scenarioshift) in product(
+                block_timesteps, scenarios
+            )
+        ]
+        if block_timesteps is not None and scenarios is not None
+        else [("NoTimeIndex", "NoScenarioIndex", 0, 0)]
+    )
+    # index_map = dict(zip(index_map_keys, index_map_values))
+    # new_index = [index_map[idx] for idx in df.index]
     df.index = pd.MultiIndex.from_tuples(
-        new_index, names=["timeshift", "scenarioshift", "timestep", "scenario"]
+        index_map_values, names=["timeshift", "scenarioshift", "timestep", "scenario"]
     )
     return df
 
@@ -122,12 +134,12 @@ def _make_value_provider(
     """
     ### Convert block_timesteps and scenarios to tuple making shift appear for the ValueProvider
     block_timesteps_tuple = (
-        [(block_timestep, 0) for block_timestep in block_timesteps]
+        [(block_timestep, None) for block_timestep in block_timesteps]
         if block_timesteps is not None
         else None
     )
     scenarios_tuple = (
-        [(scenario, 0) for scenario in scenarios] if scenarios is not None else None
+        [(scenario, None) for scenario in scenarios] if scenarios is not None else None
     )
 
     class Impl(ValueProvider):
@@ -375,7 +387,8 @@ class OptimizationContext:
                 1,
             ),
         )
-        return res.astype(int, copy=False)
+        # With the constant value provider we are sure that the time bound is a constant value, stored at ("NoTimeIndex", "NoScenarioIndex", 0, 0)
+        return float_to_int(res.loc[("NoTimeIndex", "NoScenarioIndex", 0, 0), "value"])
 
     def _make_data_structure_provider(self) -> IndexingStructureProvider:
         """
@@ -466,26 +479,26 @@ class OptimizationContext:
         class Impl(ValueProvider):
             def get_component_variable_value(
                 self, component_id: str, name: str
-            ) -> float:
+            ) -> pd.DataFrame:
                 raise NotImplementedError(
                     "Cannot provide variable value at problem build time."
                 )
 
             def get_component_parameter_value(
                 self, component_id: str, name: str
-            ) -> float:
+            ) -> pd.DataFrame:
                 model = network.get_component(component_id).model
                 structure = model.parameters[name].structure
                 if structure.time or structure.scenario:
                     raise ValueError(f"Parameter {name} is not constant.")
                 return _get_parameter_value(context, None, None, component_id, name)
 
-            def get_variable_value(self, name: str) -> float:
+            def get_variable_value(self, name: str) -> pd.DataFrame:
                 raise NotImplementedError(
                     "Cannot provide variable value at problem build time."
                 )
 
-            def get_parameter_value(self, name: str) -> float:
+            def get_parameter_value(self, name: str) -> pd.DataFrame:
                 raise ValueError(
                     "Parameter must be associated to its component before resolution."
                 )
@@ -836,12 +849,12 @@ class OptimizationProblem:
                     solver_var_name = self._solver_variable_name(
                         component.id, model_var.name, t, s
                     )
-                    lb = (
+                    lb = float(
                         lower_bound.groupby(level=["timestep", "scenario"])
                         .sum()
                         .loc[(t, s), "value"]
                     )
-                    ub = (
+                    ub = float(
                         upper_bound.groupby(level=["timestep", "scenario"])
                         .sum()
                         .loc[(t, s), "value"]
