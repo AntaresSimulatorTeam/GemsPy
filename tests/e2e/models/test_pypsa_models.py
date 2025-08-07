@@ -21,6 +21,7 @@ from gems.simulation.optimization import build_problem
 from gems.simulation.time_block import TimeBlock
 from gems.study.parsing import parse_yaml_components
 from gems.study.resolve_components import build_data_base, build_network, resolve_system
+from gems.utils import serialize
 
 
 @pytest.fixture
@@ -76,6 +77,8 @@ def test_model_behaviour(
         scenarios,
     )
     status = problem.solver.Solve()
+    serialize("test.lp", problem.export_as_lp(), Path("."))
+    serialize("test.mps", problem.export_as_mps(), Path("."))
     print(problem.solver.Objective().Value())
     assert status == problem.solver.OPTIMAL
     assert math.isclose(

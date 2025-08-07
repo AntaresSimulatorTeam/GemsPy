@@ -179,7 +179,7 @@ def _compute_expression_value(
     value_provider = _make_value_provider(context, block_timesteps, scenarios)
     dimensions = ProblemDimensions(context.block_length(), context.scenarios)
     visitor = EvaluationVisitor(
-        value_provider, dimensions.timesteps_count, dimensions.scenarios_count
+        value_provider, dimensions.timesteps_count, max(dimensions.scenarios_count, 1) # For investment problems there is 0 scenario, but 1 needed for the return dimension of the visitor
     )
     return visit(expression, visitor)
 
@@ -657,10 +657,14 @@ def make_constraint(
     ub = data.upper_bound.groupby(level=["timestep", "scenario"]).sum()
     for block_timestep in block_timesteps:
         for current_scenario in scenarios:
+            # Set the constraint indexed by (block_timestep, current_scenario)
             constraint_name = f"{data.name}_t{block_timestep}_s{current_scenario}"
 
             solver_constraint: lp.Constraint = solver.Constraint(constraint_name)
             for term in data.expression.terms.values():
+                # Find terms that contribute to constraint (block_timestep, current_scenario) by looking at the shift dimensions of the coefficient at coordinate (block_timestep, current_scenario)
+
+                # For time and scenario independent variable, the coefficient dataframe must be constructed so that there is a term at (- block_timestep, - current_scenario, block_timestep, current_scenario) ie. representing the variable at (0,0)
                 var_timesteps_and_scenarios = [
                     ((block_timestep + timeshift, current_scenario + scenarioshift))
                     for (
@@ -789,11 +793,11 @@ class OptimizationProblem:
                         model_var.upper_bound, component.id, self.context
                     )
 
-                time_indices: Iterable[Optional[int]] = [None]
+                time_indices: Iterable[Optional[int]] = [0]
                 if var_indexing.is_time_varying():
                     time_indices = self.context.get_time_indices(var_indexing)
 
-                scenario_indices: Iterable[Optional[int]] = [None]
+                scenario_indices: Iterable[Optional[int]] = [0]
                 if var_indexing.is_scenario_varying():
                     scenario_indices = self.context.get_scenario_indices(var_indexing)
 

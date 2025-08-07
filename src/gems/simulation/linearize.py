@@ -343,17 +343,32 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
         )
 
     def pb_variable(self, node: ProblemVariableNode) -> LinearExpressionData:
-        time_indices = [
-            (current_timestep, self._get_timeshift(node.time_index, current_timestep))
-            for current_timestep in self.linear_expr_time_indexing()
-        ]
-        scenario_indices = [
-            (
-                current_scenario,
-                self._get_scenarioshift(node.scenario_index, current_scenario),
-            )
-            for current_scenario in self.linear_expr_scenario_indexing()
-        ]
+        if isinstance(node.time_index, NoTimeIndex):
+            time_indices = [
+                (current_timestep, -current_timestep)
+                for current_timestep in self.linear_expr_time_indexing()
+            ]
+        else:
+            time_indices = [
+                (
+                    current_timestep,
+                    self._get_timeshift(node.time_index, current_timestep),
+                )
+                for current_timestep in self.linear_expr_time_indexing()
+            ]
+        if isinstance(node.scenario_index, NoScenarioIndex):
+            scenario_indices = [
+                (current_scenario, -current_scenario)
+                for current_scenario in self.linear_expr_scenario_indexing()
+            ]
+        else:
+            scenario_indices = [
+                (
+                    current_scenario,
+                    self._get_scenarioshift(node.scenario_index, current_scenario),
+                )
+                for current_scenario in self.linear_expr_scenario_indexing()
+            ]
         index_map_values = [
             (
                 timeshift if timeshift is not None else 0,
