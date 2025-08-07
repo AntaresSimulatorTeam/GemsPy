@@ -20,7 +20,7 @@ import math
 from dataclasses import dataclass
 from enum import Enum
 from itertools import product
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import ortools.linear_solver.pywraplp as lp
@@ -67,7 +67,7 @@ def _get_parameter_value(
     scenarios: Optional[Iterable[Tuple[int, int]]],
     component_id: str,
     name: str,
-) -> pd.DataFrame:
+) -> Union[float, pd.DataFrame]:
     data = context.database.get_data(component_id, name)
     eval_timesteps = (
         [
@@ -90,35 +90,35 @@ def _get_parameter_value(
         else ["NoScenarioIndex"]
     )
     absolute_timesteps = context.block_timestep_to_absolute_timestep(eval_timesteps)
+
     # Timesteps[0] in the indexing in the constraint
     # Timesteps[1] is the timeshift for timesteps[0]
+
     # Data at (timeshift, scenarioshift, timestep, scenario) is evaluated at timestep + timeshift, scenario + scenarioshift
     df = data.get_value(absolute_timesteps, eval_scenarios, context.tree_node)
-    index_map_keys = [
-        (timestep, scenario)
-        for timestep, scenario in product(absolute_timesteps, eval_scenarios)
-    ]
-    index_map_values = (
-        [
-            (
-                timeshift if timeshift is not None else "NoTimeIndex",
-                scenarioshift if scenarioshift is not None else "NoScenarioIndex",
-                timestep,
-                scenario,
-            )
-            for (timestep, timeshift), (scenario, scenarioshift) in product(
-                block_timesteps, scenarios
-            )
-        ]
-        if block_timesteps is not None and scenarios is not None
-        else [("NoTimeIndex", "NoScenarioIndex", 0, 0)]
-    )
-    # index_map = dict(zip(index_map_keys, index_map_values))
-    # new_index = [index_map[idx] for idx in df.index]
-    # Probably returning a df with 4-level index is overkilling, in most case it is a constant and for sure the shift dimensions are not necessary.
-    df.index = pd.MultiIndex.from_tuples(
-        index_map_values, names=["timeshift", "scenarioshift", "timestep", "scenario"]
-    )
+    if isinstance(df, pd.DataFrame):
+        index_map_values = (
+            [
+                (
+                    timeshift if timeshift is not None else "NoTimeIndex",
+                    scenarioshift if scenarioshift is not None else "NoScenarioIndex",
+                    timestep,
+                    scenario,
+                )
+                for (timestep, timeshift), (scenario, scenarioshift) in product(
+                    block_timesteps, scenarios
+                )
+            ]
+            if block_timesteps is not None and scenarios is not None
+            else [("NoTimeIndex", "NoScenarioIndex", 0, 0)]
+        )
+        # index_map = dict(zip(index_map_keys, index_map_values))
+        # new_index = [index_map[idx] for idx in df.index]
+        # Probably returning a df with 4-level index is overkilling, in most case it is a constant and for sure the shift dimensions are not necessary.
+        df.index = pd.MultiIndex.from_tuples(
+            index_map_values,
+            names=["timeshift", "scenarioshift", "timestep", "scenario"],
+        )
     return df
 
 
@@ -592,16 +592,19 @@ def _create_objective(
 
     obj: lp.Objective = solver.Objective()
     for term in linear_expr.terms.values():
-        var_timesteps_and_scenarios = [
-            ((timeshift, scenarioshift))
-            for (
-                timeshift,
-                scenarioshift,
-                timestep,
-                scenario,
-            ) in term.coefficient.index
-            if timestep == 0 and scenario == 0
-        ]
+        if isinstance(term.coefficient, pd.DataFrame):
+            var_timesteps_and_scenarios = [
+                ((timeshift, scenarioshift))
+                for (
+                    timeshift,
+                    scenarioshift,
+                    timestep,
+                    scenario,
+                ) in term.coefficient.index
+                if timestep == 0 and scenario == 0
+            ]
+        else:
+            var_timesteps_and_scenarios = [(0, 0)]
         for timeshift, scenarioshift in var_timesteps_and_scenarios:
             solver_var = _get_solver_var(
                 term,
@@ -610,19 +613,28 @@ def _create_objective(
                 opt_context,
             )
             opt_context._solver_variables[solver_var.name()].is_in_objective = True
+            if isinstance(term.coefficient, pd.DataFrame):
+                coefficient = term.coefficient.loc[
+                    (timeshift, scenarioshift, 0, 0), "value"
+                ]
+            else:
+                coefficient = term.coefficient
             obj.SetCoefficient(
                 solver_var,
-                obj.GetCoefficient(solver_var)
-                + term.coefficient.loc[(timeshift, scenarioshift, 0, 0), "value"],
+                obj.GetCoefficient(solver_var) + coefficient,
             )
 
     # This should have no effect on the optimization
-    obj.SetOffset(
-        linear_expr.constant.groupby(level=["timestep", "scenario"])
-        .sum()
-        .loc[(0, 0), "value"]
-        + obj.offset()
-    )
+    if isinstance(linear_expr.constant, pd.DataFrame):
+        constant = (
+            linear_expr.constant.groupby(level=["timestep", "scenario"])
+            .sum()
+            .loc[(0, 0), "value"]
+        )
+    else:
+        constant = linear_expr.constant
+
+    obj.SetOffset(constant + obj.offset())
 
 
 @dataclass
@@ -657,9 +669,21 @@ def make_constraint(
     """
     Adds constraint to the solver.
     """
-    constant = data.expression.constant.groupby(level=["timestep", "scenario"]).sum()
-    lb = data.lower_bound.groupby(level=["timestep", "scenario"]).sum()
-    ub = data.upper_bound.groupby(level=["timestep", "scenario"]).sum()
+    if isinstance(data.expression.constant, pd.DataFrame):
+        constant = data.expression.constant.groupby(
+            level=["timestep", "scenario"]
+        ).sum()
+    else:
+        constant = data.expression.constant
+
+    if isinstance(data.lower_bound, pd.DataFrame):
+        lb = data.lower_bound.groupby(level=["timestep", "scenario"]).sum()
+    else:
+        lb = data.lower_bound
+    if isinstance(data.upper_bound, pd.DataFrame):
+        ub = data.upper_bound.groupby(level=["timestep", "scenario"]).sum()
+    else:
+        ub = data.upper_bound
     for block_timestep in block_timesteps:
         for current_scenario in scenarios:
             # Set the constraint indexed by (block_timestep, current_scenario)
@@ -667,19 +691,22 @@ def make_constraint(
 
             solver_constraint: lp.Constraint = solver.Constraint(constraint_name)
             for term in data.expression.terms.values():
-                # Find terms that contribute to constraint (block_timestep, current_scenario) by looking at the shift dimensions of the coefficient at coordinate (block_timestep, current_scenario)
+                if isinstance(term.coefficient, pd.DataFrame):
+                    # Find terms that contribute to constraint (block_timestep, current_scenario) by looking at the shift dimensions of the coefficient at coordinate (block_timestep, current_scenario)
 
-                # For time and scenario independent variable, the coefficient dataframe must be constructed so that there is a term at (- block_timestep, - current_scenario, block_timestep, current_scenario) ie. representing the variable at (0,0)
-                var_timesteps_and_scenarios = [
-                    ((block_timestep + timeshift, current_scenario + scenarioshift))
-                    for (
-                        timeshift,
-                        scenarioshift,
-                        timestep,
-                        scenario,
-                    ) in term.coefficient.index
-                    if timestep == block_timestep and scenario == current_scenario
-                ]
+                    # For time and scenario independent variable, the coefficient dataframe must be constructed so that there is a term at (- block_timestep, - current_scenario, block_timestep, current_scenario) ie. representing the variable at (0,0)
+                    var_timesteps_and_scenarios = [
+                        ((block_timestep + timeshift, current_scenario + scenarioshift))
+                        for (
+                            timeshift,
+                            scenarioshift,
+                            timestep,
+                            scenario,
+                        ) in term.coefficient.index
+                        if timestep == block_timestep and scenario == current_scenario
+                    ]
+                else:
+                    var_timesteps_and_scenarios = [(block_timestep, current_scenario)]
                 for timestep, scenario in var_timesteps_and_scenarios:
                     solver_var = _get_solver_var(
                         term,
@@ -687,22 +714,32 @@ def make_constraint(
                         scenario,
                         context,
                     )
-                    coefficient = term.coefficient.loc[
-                        (
-                            timestep - block_timestep,
-                            scenario - current_scenario,
-                            block_timestep,
-                            current_scenario,
-                        ),
-                        "value",
-                    ] + solver_constraint.GetCoefficient(solver_var)
+                    if isinstance(term.coefficient, pd.DataFrame):
+                        coefficient = term.coefficient.loc[
+                            (
+                                timestep - block_timestep,
+                                scenario - current_scenario,
+                                block_timestep,
+                                current_scenario,
+                            ),
+                            "value",
+                        ]
+                    else:
+                        coefficient = term.coefficient
+                    coefficient += solver_constraint.GetCoefficient(solver_var)
                     solver_constraint.SetCoefficient(solver_var, coefficient)
 
-            current_constant = constant.loc[(block_timestep, current_scenario), "value"]
-
+            if isinstance(constant, pd.DataFrame):
+                constant = float(
+                    constant.loc[(block_timestep, current_scenario), "value"]
+                )
+            if isinstance(lb, pd.DataFrame):
+                lb = float(lb.loc[(block_timestep, current_scenario), "value"])
+            if isinstance(ub, pd.DataFrame):
+                ub = float(ub.loc[(block_timestep, current_scenario), "value"])
             solver_constraint.SetBounds(
-                lb.loc[(block_timestep, current_scenario), "value"] - current_constant,
-                ub.loc[(block_timestep, current_scenario), "value"] - current_constant,
+                lb - constant,
+                ub - constant,
             )
 
 
@@ -814,22 +851,7 @@ class OptimizationProblem:
                         scenario_indices,
                     )
                 else:
-                    lower_bound = pd.DataFrame(
-                        np.full(
-                            (len(time_indices) * len(scenario_indices), 1),
-                            -self.solver.infinity(),
-                        ),
-                        index=pd.MultiIndex.from_product(
-                            [[0], [0], time_indices, scenario_indices],
-                            names=[
-                                "timeshift",
-                                "scenarioshift",
-                                "timestep",
-                                "scenario",
-                            ],
-                        ),
-                        columns=["value"],
-                    )
+                    lower_bound = -self.solver.infinity()
                 if instantiated_ub_expr:
                     upper_bound = _compute_expression_value(
                         instantiated_ub_expr,
@@ -838,22 +860,7 @@ class OptimizationProblem:
                         scenario_indices,
                     )
                 else:
-                    upper_bound = pd.DataFrame(
-                        np.full(
-                            (len(time_indices) * len(scenario_indices), 1),
-                            self.solver.infinity(),
-                        ),
-                        index=pd.MultiIndex.from_product(
-                            [[0], [0], time_indices, scenario_indices],
-                            names=[
-                                "timeshift",
-                                "scenarioshift",
-                                "timestep",
-                                "scenario",
-                            ],
-                        ),
-                        columns=["value"],
-                    )
+                    upper_bound = self.solver.infinity()
                 for t, s in itertools.product(time_indices, scenario_indices):
                     solver_var_name = self._solver_variable_name(
                         component.id,
@@ -861,20 +868,22 @@ class OptimizationProblem:
                         t if var_indexing.is_time_varying() else None,
                         s if var_indexing.is_scenario_varying() else None,
                     )
-                    lb = float(
-                        lower_bound.groupby(level=["timestep", "scenario"])
-                        .sum()
-                        .loc[(t, s), "value"]
-                    )
-                    ub = float(
-                        upper_bound.groupby(level=["timestep", "scenario"])
-                        .sum()
-                        .loc[(t, s), "value"]
-                    )
+                    if isinstance(lower_bound, pd.DataFrame):
+                        lower_bound = float(
+                            lower_bound.groupby(level=["timestep", "scenario"])
+                            .sum()
+                            .loc[(t, s), "value"]
+                        )
+                    if isinstance(upper_bound, pd.DataFrame):
+                        upper_bound = float(
+                            upper_bound.groupby(level=["timestep", "scenario"])
+                            .sum()
+                            .loc[(t, s), "value"]
+                        )
 
-                    if lb > ub:
+                    if lower_bound > upper_bound:
                         raise ValueError(
-                            f"Upper bound ({ub}) must be strictly greater than lower bound ({lb}) for variable {solver_var_name}"
+                            f"Upper bound ({upper_bound}) must be strictly greater than lower bound ({lower_bound}) for variable {solver_var_name}"
                         )
 
                     if model_var.data_type == ValueType.BOOLEAN:
@@ -883,14 +892,14 @@ class OptimizationProblem:
                         )
                     elif model_var.data_type == ValueType.INTEGER:
                         solver_var = self.solver.IntVar(
-                            lb,
-                            ub,
+                            lower_bound,
+                            upper_bound,
                             solver_var_name,
                         )
                     else:
                         solver_var = self.solver.NumVar(
-                            lb,
-                            ub,
+                            lower_bound,
+                            upper_bound,
                             solver_var_name,
                         )
                     self.context.register_component_variable(
