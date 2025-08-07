@@ -183,14 +183,19 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
             raise ValueError(
                 "At least one operand of a multiplication must be a constant expression."
             )
-        if "NoTimeIndex" in multiplier.index.get_level_values("timeshift"):
-            multiplier.set_index(
-                multiplier.index.droplevel("timeshift"),
-                inplace=True,
-            )
-        if "NoScenarioIndex" in multiplier.index.get_level_values("scenarioshift"):
-            multiplier.set_index(
-                multiplier.index.droplevel("scenarioshift"),
+        # if "NoTimeIndex" in multiplier.index.get_level_values("timeshift"):
+        #     multiplier.set_index(
+        #         multiplier.index.droplevel("timeshift"),
+        #         inplace=True,
+        #     )
+        # if "NoScenarioIndex" in multiplier.index.get_level_values("scenarioshift"):
+        #     multiplier.set_index(
+        #         multiplier.index.droplevel("scenarioshift"),
+        #         inplace=True,
+        #     )
+        # The shift dimensions are useless for constant as the value provider that has beforehand evaluated it has taken shifts into account to put the correct value for the expression indexed at (timestep, scenario).
+        multiplier.set_index(
+                multiplier.index.droplevel(["timeshift", "scenarioshift"]),
                 inplace=True,
             )
         constant_df = multiplier.join(

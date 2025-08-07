@@ -115,6 +115,7 @@ def _get_parameter_value(
     )
     # index_map = dict(zip(index_map_keys, index_map_values))
     # new_index = [index_map[idx] for idx in df.index]
+    # Probably returning a df with 4-level index is overkilling, in most case it is a constant and for sure the shift dimensions are not necessary.
     df.index = pd.MultiIndex.from_tuples(
         index_map_values, names=["timeshift", "scenarioshift", "timestep", "scenario"]
     )
@@ -179,7 +180,11 @@ def _compute_expression_value(
     value_provider = _make_value_provider(context, block_timesteps, scenarios)
     dimensions = ProblemDimensions(context.block_length(), context.scenarios)
     visitor = EvaluationVisitor(
-        value_provider, dimensions.timesteps_count, max(dimensions.scenarios_count, 1) # For investment problems there is 0 scenario, but 1 needed for the return dimension of the visitor
+        value_provider,
+        dimensions.timesteps_count,
+        max(
+            dimensions.scenarios_count, 1
+        ),  # For investment problems there is 0 scenario, but 1 needed for the return dimension of the visitor
     )
     return visit(expression, visitor)
 
@@ -851,7 +856,10 @@ class OptimizationProblem:
                     )
                 for t, s in itertools.product(time_indices, scenario_indices):
                     solver_var_name = self._solver_variable_name(
-                        component.id, model_var.name, t, s
+                        component.id,
+                        model_var.name,
+                        t if var_indexing.is_time_varying() else None,
+                        s if var_indexing.is_scenario_varying() else None,
                     )
                     lb = float(
                         lower_bound.groupby(level=["timestep", "scenario"])

@@ -235,7 +235,7 @@ def test_variable_bound() -> None:
     database = create_simple_database(max_generation=-10)
     with pytest.raises(
         ValueError,
-        match=r"Upper bound \(-10\) must be strictly greater than lower bound \(0\) for variable G_generation",
+        match=r"Upper bound \(-10.0\) must be strictly greater than lower bound \(0.0\) for variable G_generation",
     ):
         problem = build_problem(network, database, TimeBlock(1, [0]), 1)
 
