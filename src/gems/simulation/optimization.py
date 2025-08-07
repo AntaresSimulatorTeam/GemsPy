@@ -730,7 +730,7 @@ def make_constraint(
                     solver_constraint.SetCoefficient(solver_var, coefficient)
 
             if isinstance(constant, pd.DataFrame):
-                constant = float(
+                current_constant = float(
                     constant.loc[(block_timestep, current_scenario), "value"]
                 )
             if isinstance(lb, pd.DataFrame):
@@ -738,8 +738,8 @@ def make_constraint(
             if isinstance(ub, pd.DataFrame):
                 ub = float(ub.loc[(block_timestep, current_scenario), "value"])
             solver_constraint.SetBounds(
-                lb - constant,
-                ub - constant,
+                lb - current_constant,
+                ub - current_constant,
             )
 
 
