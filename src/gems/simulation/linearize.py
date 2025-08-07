@@ -231,9 +231,9 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
         divider = rhs.constant
         actual_expr = lhs
         if isinstance(divider, (int, float)):
-            actual_expr.constant *= divider
+            actual_expr.constant /= divider
             for t in actual_expr.terms:
-                t.coefficient *= divider
+                t.coefficient /= divider
         else:
             divider.set_index(
                 divider.index.droplevel(["timeshift", "scenarioshift"]),
@@ -295,7 +295,14 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
     def constant_value_data(
         self, value: float, indexing: Optional[pd.MultiIndex] = None
     ) -> float:
-        return value
+        if indexing is not None:
+            return pd.DataFrame(
+                np.full((len(indexing), 1), value),
+                index=indexing,
+                columns=["value"],
+            )
+        else:
+            return value
 
     def literal(self, node: LiteralNode) -> LinearExpressionData:
         return LinearExpressionData(
