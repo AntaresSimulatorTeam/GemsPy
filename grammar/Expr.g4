@@ -33,6 +33,7 @@ expr
     | IDENTIFIER '[' expr  ']'                 # timeIndex
     | '(' expr ')' '[' shift ']'               # timeShiftExpr
     | '(' expr ')' '[' expr ']'               # timeIndexExpr
+    | MAX '(' expr (',' expr)* ')'          # maxExpr
     ;
 
 atom
@@ -74,6 +75,7 @@ fragment CHAR          : [a-zA-Z_];
 fragment CHAR_OR_DIGIT : (CHAR | DIGIT);
 
 NUMBER        : DIGIT+ ('.' DIGIT+)?;
+MAX : 'max';
 TIME          : 't';
 IDENTIFIER    : CHAR CHAR_OR_DIGIT*;
 COMPARISON    : ( '=' | '>=' | '<=' );
