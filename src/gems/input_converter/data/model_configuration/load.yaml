@@ -18,7 +18,7 @@ template:
   template-parameters:
     - name: area
       description: "Area identifier for the load component"
-      exclude:
+      # exclude:
 
   component:
     id: load_${area}
@@ -27,7 +27,7 @@ template:
         time-dependent: true
         scenario-dependent: true
         value:
-          type: load
+          type: timeseries
           data:
             area: ${area}
             timeseries_file_type: load # Here we could directly use area.get_load_matrix() rather than use timeseries file type...

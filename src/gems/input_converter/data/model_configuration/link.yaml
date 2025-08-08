@@ -17,26 +17,31 @@ template:
   model: antares-historic.link
   template-parameters:
     - name: link
-      exclude:
-        # How to identify virtual links in Antares ?
+      # exclude:
+      #   # How to identify virtual links in Antares ?
 
   component:
-    id: ${link}.id # How to specify that we want to get the link_id ?
+    id: ${link} # How to specify that we want to get the link_id ?
     parameters:
       - id: capacity_direct
         time-dependent: true
         scenario-dependent: true
         value:
-          area_from: ${link}.area_from_id
-          area_to: ${link}.area_to_id
-          timeseries_file_type: links_capacities_direct
+          type: link
+          data:
+            area_from: area_from_id
+            area_to: area_to_id
+            timeseries_file_type: links_capacities_direct
       - id: capacity_indirect
         time-dependent: true
         scenario-dependent: true
         value:
-          area_from: ${link}.area_from_id
-          area_to: ${link}.area_to_id
-          timeseries_file_type: links_capacities_indirect
+          type: link
+          data:
+
+            area_from: area_from_id
+            area_to: area_to_id
+            timeseries_file_type: links_capacities_indirect
 
   # For full modeler mode
   connections:
