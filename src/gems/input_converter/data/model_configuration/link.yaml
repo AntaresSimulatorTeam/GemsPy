@@ -38,7 +38,6 @@ template:
         value:
           type: link
           data:
-
             area_from: area_from_id
             area_to: area_to_id
             timeseries_file_type: links_capacities_indirect
