@@ -18,7 +18,7 @@ template:
   template-parameters:
     - name: area
       description: "Area identifier for the wind component"
-      exclude:
+      # exclude:
 
   component:
     id: wind_${area}
@@ -26,16 +26,20 @@ template:
       - id: nominal_capacity
         time-dependent: false
         scenario-dependent: false
-        value: 1
+        value:
+          type: constant
+          data: 1
       - id: unit_count
         time-dependent: false
         scenario-dependent: false
-        value: 1
+        value:
+          type: constant
+          data: 1
       - id: generation
         time-dependent: true
         scenario-dependent: true
         value:
-          type: wind
+          type: timeseries
           data:
             area: ${area}
             timeseries_file_type: wind # We could use area.get_wind_matrix()
