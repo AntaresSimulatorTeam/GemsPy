@@ -1,0 +1,57 @@
+library:
+  id: basic
+  description: Basic library
+
+  port-types:
+    - id: flow
+      description: A port which transfers power flow
+      fields:
+        - id: flow
+
+  models:
+
+    - id: generator
+      description: A basic generator model
+      parameters:
+        - id: marginal_cost
+          time-dependent: false
+          scenario-dependent: false
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: generation
+          lower-bound: 0
+          upper-bound: p_max
+      ports:
+        - id: injection_port
+          type: flow
+      port-field-definitions:
+        - port: injection_port
+          field: flow
+          definition: generation
+      objective: expec(sum(marginal_cost * generation))
+
+    - id: node
+      description: A basic balancing node model
+      ports:
+        - id: injection_port
+          type: flow
+      binding-constraints:
+        - id: balance
+          expression:  sum_connections(injection_port.flow) = 0
+
+
+    - id: load
+      description: A basic fixed demand model
+      parameters:
+        - id: load
+          time-dependent: true
+          scenario-dependent: true
+      ports:
+        - id: injection_port
+          type: flow
+      port-field-definitions:
+        - port: injection_port
+          field: flow
+          definition: -load

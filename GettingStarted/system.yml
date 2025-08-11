@@ -1,0 +1,52 @@
+system:
+  model-libraries: basic
+  nodes:
+    - id: N
+      model: basic.node
+
+  components:
+    - id: G1
+      model: basic.generator
+      parameters:
+        - id: marginal_cost
+          time-dependent: false
+          scenario-dependent: false
+          value: 30
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+          value: 100
+    - id: G2
+      model: basic.generator
+      parameters:
+        - id: marginal_cost
+          time-dependent: false
+          scenario-dependent: false
+          value: 1
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+          value: 100
+    - id: D
+      model: basic.load
+      parameters:
+        - id: load
+          time-dependent: true
+          scenario-dependent: true
+          value: data
+
+  connections:
+    - component1: N
+      port1: injection_port
+      component2: D
+      port2: injection_port
+
+    - component1: N
+      port1: injection_port
+      component2: G1
+      port2: injection_port
+
+    - component1: N
+      port1: injection_port
+      component2: G2
+      port2: injection_port
