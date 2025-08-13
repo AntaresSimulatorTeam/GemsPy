@@ -41,8 +41,37 @@ class OutputValues:
         _name: str
         _value: Dict[TimeScenarioIndex, float] = field(init=False, default_factory=dict)
         _size: Tuple[int, int] = field(init=False, default=(0, 0))
+        _basis_status: Optional[str] = field(default=None, init=False)  # NEW Ali
         ignore: bool = field(default=False, init=False)
 
+
+        def __init__(
+                self,
+                name: str,
+                size: tuple[int, int] = (0, 0),  # (scenario_count, time_count)
+                value: dict = None,
+                solver_var=None  # optional OR-Tools variable object
+            ):
+                """
+                Initialize a variable in OutputValues.
+
+                Parameters
+                ----------
+                name : str
+                    The variable name.
+                size : tuple[int, int], optional
+                    Shape of the variable (scenarios, time steps).
+                value : dict, optional
+                    Dictionary storing variable values per TimeScenarioIndex.
+                solver_var : optional
+                    The solver variable object (pywraplp.Variable) if available.
+                """
+                self._name = name
+                self._size = size
+                self._value = value if value is not None else {}
+                # Initialize basis status as None; can be filled later
+                self._basis_status = None
+            
         def __eq__(self, other: object) -> bool:
             if not isinstance(other, OutputValues.Variable):
                 return NotImplemented
@@ -179,6 +208,7 @@ class OutputValues:
 
     def __post_init__(self) -> None:
         self._build_components()
+        self._set_basis()
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, OutputValues):
@@ -199,17 +229,24 @@ class OutputValues:
 
         return string
 
-    def _build_components(self) -> None:
+    def _build_components(self) -> None: # old build
         if self.problem is None:
             return
-
         for key, value in self.problem.context.get_all_component_variables().items():
-            (
-                self.component(key.component_id)
-                .var(str(key.variable_name))
-                ._set(key.block_timestep, key.scenario, value.solution_value())
-            )
+            self.component(key.component_id).var(str(key.variable_name))._set(key.block_timestep, key.scenario, value.solution_value())
+            
+    def _set_basis(self) -> None:  
+        if self.problem is None:
+            return
+        if self.problem.solver.IsMip():
+            return
+        for key, value in self.problem.context.get_all_component_variables().items():
+            var_obj = self.component(key.component_id).var(str(key.variable_name))
+            var_obj._basis_status = value.basis_status()
+            
 
+
+    
     def component(self, component_id: str) -> "OutputValues.Component":
         if component_id not in self._components:
             self._components[component_id] = OutputValues.Component(component_id)

@@ -14,13 +14,15 @@
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from andromede.model.library import Library
-from andromede.model.parsing import parse_yaml_library
-from andromede.model.resolve_library import resolve_library
-from andromede.simulation import TimeBlock, build_problem
-from andromede.study import DataBase
-from andromede.study.parsing import parse_cli, parse_yaml_components
-from andromede.study.resolve_components import (
+from gems.model.library import Library
+from gems.model.parsing import parse_yaml_library
+from gems.model.resolve_library import resolve_library
+from gems.simulation import TimeBlock, build_problem
+from gems.simulation.output_values import OutputValues
+from gems.simulation.simulation_table import SimulationTable
+from gems.study import DataBase
+from gems.study.parsing import parse_cli, parse_yaml_components
+from gems.study.resolve_components import (
     System,
     build_data_base,
     build_network,
@@ -100,6 +102,28 @@ def main_cli() -> None:
     print("status : ", status)
 
     print("final average cost : ", problem.solver.Objective().Value())
+    
+    
+    
+    
+    # --- Test SimulationTable ---
+    absolute_time_offset = 0
+    block_size = len([0, 1, 2])  # in your TimeBlock above
+    scenario_count = 1
+
+    simu_table = SimulationTable(simulation_id="test-sim-001")
+    simu_table.fill_from_output_values(
+        OutputValues(problem),
+        block=1,
+        absolute_time_offset=1,
+        block_size=block_size,
+        scenario_count=scenario_count
+    )
+    csv_path = simu_table.write_csv(Path("outputs"), optim_nb=1)
+
+    print(f"Simulation table saved at: {csv_path}")
+    print(simu_table.df.head())
+
 
 
 if __name__ == "__main__":
