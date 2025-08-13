@@ -16,8 +16,7 @@ from gems.study.resolve_components import build_data_base, build_network, resolv
 
 
 @pytest.mark.parametrize("scenario_count", [1, 3])
-def test_pypsa_model_simulation_table(tmp_path, scenario_count):
-    # --- Paths ---
+def test_pypsa_model_simulation_table(tmp_path: Path, scenario_count: int) -> None:
     pypsa_library_file = Path("src/gems/libs/pypsa_models/pypsa_models.yml")
     pypsa_model_file = Path("tests/pypsa_converter/systems/pypsa_study.yml")
     database_path = Path("tests/pypsa_converter/series")

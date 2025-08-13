@@ -48,8 +48,8 @@ class OutputValues:
             self,
             name: str,
             size: tuple[int, int] = (0, 0),  # (scenario_count, time_count)
-            value: dict = None,
-            solver_var=None,  # optional OR-Tools variable object
+            value: Optional[Dict[TimeScenarioIndex, float]] = None,
+            solver_var: Optional[Any] = None,  # add type annotation
         ):
             """
             Initialize a variable in OutputValues.

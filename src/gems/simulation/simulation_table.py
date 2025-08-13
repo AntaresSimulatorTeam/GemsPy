@@ -1,8 +1,7 @@
-import datetime
-import pandas as pd
 from pathlib import Path
 from typing import Optional, Union
 
+import pandas as pd
 from gems.simulation.output_values import OutputValues
 from gems.study.data import TimeScenarioIndex
 from datetime import datetime
@@ -12,7 +11,7 @@ class SimulationTable:
     simulation_id: str
     df: pd.DataFrame
 
-    def __init__(self, simulation_id: Optional[str] = None, mode: str = "eco"):
+    def __init__(self, simulation_id: Optional[str] = None, mode: str = "eco") -> None:
         # Unique simulation ID, from Antares logic or fallback to UUID
         if simulation_id:
             self.simulation_id = simulation_id
@@ -22,14 +21,15 @@ class SimulationTable:
 
         self.df = pd.DataFrame(
             columns=[
+                "simulation_id",
                 "block",
                 "component",
                 "output",
-                "absolute-time-index",
-                "block-time-index",
-                "scenario-index",
+                "absolute_time_index",
+                "block_time_index",
+                "scenario_index",
                 "value",
-                "basis-status",
+                "basis_status",
             ]
         )
 
@@ -43,24 +43,9 @@ class SimulationTable:
         absolute_time_offset: int,
         block_size: int,
         scenario_count: int,
-    ):
+    ) -> None:
         """
         Populate the SimulationTable from solver output values and append the objective value.
-
-        Parameters
-        ----------
-        output_values : OutputValues
-            The object containing solver output results.
-        block : int
-            The simulation block index.
-        absolute_time_offset : int
-            Offset for the absolute time index.
-        block_size : int
-            Number of time steps in the block.
-        scenario_count : int
-            Number of scenarios.
-        objective_value : float
-            The value of the objective function at the end of optimization.
         """
         rows = []
 
@@ -97,7 +82,12 @@ class SimulationTable:
 
         # Store results as DataFrame
         self.df = pd.DataFrame(rows)
+
+        # Ensure problem is set before accessing solver
+        if output_values.problem is None:
+            raise ValueError("OutputValues problem is not set.")
         objective_value = output_values.problem.solver.Objective().Value()
+
         # Append the objective value as the last row
         obj_row = {
             "simulation_id": self.simulation_id,
@@ -106,20 +96,19 @@ class SimulationTable:
             "output": "OBJECTIVE_VALUE",
             "absolute_time_index": None,
             "block_time_index": None,
-            "scenario_index": None,  # Or set scenario index if needed
+            "scenario_index": None,
             "value": objective_value,
             "basis_status": None,
         }
-
         self.df.loc[len(self.df)] = [obj_row.get(col, None) for col in self.df.columns]
 
-    def extra_output_eval(self):
+    def extra_output_eval(self) -> None:
         raise NotImplementedError("extra_output_eval() is not yet implemented.")
 
-    def add_extra_output(self):
+    def add_extra_output(self) -> None:
         raise NotImplementedError("add_extra_output() is not yet implemented.")
 
-    def write_csv(self, output_dir: Union[str, Path], optim_nb: int):
+    def write_csv(self, output_dir: Union[str, Path], optim_nb: int) -> Path:
         """Write the simulation table to CSV."""
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
