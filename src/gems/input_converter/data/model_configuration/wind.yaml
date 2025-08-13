@@ -27,22 +27,19 @@ template:
         time-dependent: false
         scenario-dependent: false
         value:
-          type: constant
-          data: 1
+          constant: 1
       - id: unit_count
         time-dependent: false
         scenario-dependent: false
         value:
-          type: constant
-          data: 1
+          constant: 1
       - id: generation
         time-dependent: true
         scenario-dependent: true
         value:
-          type: timeseries
-          data:
+          object-properties:
+            type: wind
             area: ${area}
-            timeseries_file_type: wind # We could use area.get_wind_matrix()
 
   # For full modeler mode
   connections:
@@ -58,5 +55,7 @@ template:
       area: ${area}
 
   legacy-objects-to-delete:
-    loads:
-      - wind_${area} # area.set_wind() with an empty dataframe
+    - id: legacy_wind
+      object-properties:
+        type: wind
+        area: ${area}

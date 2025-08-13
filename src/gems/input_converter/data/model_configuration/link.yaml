@@ -27,26 +27,24 @@ template:
         time-dependent: true
         scenario-dependent: true
         value:
-          type: link
-          data:
-            area_from: area_from_id
-            area_to: area_to_id
-            timeseries_file_type: links_capacities_direct
+          object-properties:
+            type: link
+            link: ${link}
+          field: capacity_direct
       - id: capacity_indirect
         time-dependent: true
         scenario-dependent: true
         value:
-          type: link
-          data:
-            area_from: area_from_id
-            area_to: area_to_id
-            timeseries_file_type: links_capacities_indirect
+          object-properties:
+            type: link
+            link: ${link}
+          field: capacity_indirect
 
   # For full modeler mode
   connections:
     - component1: ${link}
       port1: in_port
-      component2: ${link}.area_from_id
+      component2: ${link}.area_from_id # We only want to retrieve an id
       port2: balance_port
 
     - component1: ${link}
@@ -65,5 +63,7 @@ template:
       area: ${link}.area_to_id
 
   legacy-objects-to-delete:
-    loads:
-      - ${link}
+    - id: legacy_links
+      object-properties:
+        type: link
+        link: ${link}
