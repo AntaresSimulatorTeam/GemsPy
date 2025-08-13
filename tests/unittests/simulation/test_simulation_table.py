@@ -19,8 +19,6 @@ from gems.study.resolve_components import (
     resolve_system,
 )
 
-
-
 @pytest.mark.parametrize("scenario_count", [1, 3])
 def test_pypsa_model_simulation_table(tmp_path, scenario_count):
     # --- Paths ---
