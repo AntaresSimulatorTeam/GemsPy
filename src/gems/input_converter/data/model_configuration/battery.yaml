@@ -36,7 +36,7 @@ template:
             type: thermal
             area: z_batteries
             cluster: z_batteries_batteries_${area}_1
-          field: nominal_capacity
+            field: nominal_capacity
 
       - id: injection_nominal_capacity
         time-dependent: false
@@ -45,7 +45,7 @@ template:
           object-properties:
             type: link
             link: ${area} / z_batteries
-          field: capacity_direct
+            field: capacity_direct
           column: 0
           operation:
             type: max
@@ -58,7 +58,7 @@ template:
             type: thermal
             area: ${area}
             cluster: ${area}_batteries_inj
-          field: nominal_capacity
+            field: nominal_capacity
 
       - id: efficiency_injection
         time-dependent: false
@@ -67,7 +67,7 @@ template:
           object-properties:
             type: binding_constraint
             binding-constraint-id: batteries_${area}
-          field: ${area}%z_batteries
+            field: ${area}%z_batteries
           operation:
             multiply_by: -1
 
@@ -78,7 +78,7 @@ template:
           object-properties:
             type: binding_constraint
             binding-constraint-id: batteries_${area}
-          field: ${area}.${area}_batteries_inj
+            field: ${area}.${area}_batteries_inj
 
       - id: lower_rule_curve
         time-dependent: false
@@ -94,7 +94,7 @@ template:
             type: thermal
             area: z_batteries
             cluster: z_batteries_batteries_${area}_1
-          field: thermal_series
+            field: thermal_series
           column: 0
           operation:
             divide_by: reservoir_capacity
@@ -106,7 +106,7 @@ template:
           object-properties:
             type: link
             link: ${area} / z_batteries
-          field: capacity_direct
+            field: capacity_direct
           column: 0
           operation:
             divide_by: injection_nominal_capacity
@@ -119,7 +119,7 @@ template:
             type: thermal
             area: ${area}
             cluster: ${area}_batteries_inj
-          field: thermal_series
+            field: thermal_series
           column: 0
           operation:
             divide_by: withdrawal_nominal_capacity
@@ -131,7 +131,7 @@ template:
           object-properties:
             type: link
             link: ${area} / z_batteries
-          field: links_parameters
+            field: links_parameters
           column: 0
 
   connections:

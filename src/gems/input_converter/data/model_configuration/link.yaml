@@ -30,7 +30,7 @@ template:
           object-properties:
             type: link
             link: ${link}
-          field: capacity_direct
+            field: capacity_direct
       - id: capacity_indirect
         time-dependent: true
         scenario-dependent: true
@@ -38,13 +38,13 @@ template:
           object-properties:
             type: link
             link: ${link}
-          field: capacity_indirect
+            field: capacity_indirect
 
   # For full modeler mode
   connections:
     - component1: ${link}
       port1: in_port
-      component2: ${link}.area_from_id # We only want to retrieve an id
+      component2: ${link}.area_from_id
       port2: balance_port
 
     - component1: ${link}

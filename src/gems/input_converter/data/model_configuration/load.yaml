@@ -28,8 +28,8 @@ template:
         scenario-dependent: true
         value:
           object-properties:
-          type: load
-          area: ${area}
+            type: load
+            area: ${area}
 
   # For full modeler mode
   connections:
