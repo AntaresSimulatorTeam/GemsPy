@@ -1,27 +1,17 @@
-
-# Standard library imports
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
-import yaml
 
 # Third-party imports
-import pandas as pd
 import pytest
 
 # Local application/library imports
-from gems.input_converter.src.converter import AntaresStudyConverter
-from gems.input_converter.src.logger import Logger
-from gems.model.parsing import InputLibrary, parse_yaml_library
+from gems.model.parsing import parse_yaml_library
 from gems.model.resolve_library import resolve_library
 from gems.simulation import TimeBlock, build_problem, OutputValues
 from gems.simulation.simulation_table import SimulationTable
-from gems.study.data import load_ts_from_txt
-from gems.study.parsing import InputSystem, parse_yaml_components
 from gems.study.resolve_components import (
     build_data_base,
     build_network,
-    consistency_check,
     resolve_system,
 )
 
