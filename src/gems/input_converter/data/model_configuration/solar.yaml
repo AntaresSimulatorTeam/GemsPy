@@ -27,22 +27,19 @@ template:
         time-dependent: false
         scenario-dependent: false
         value:
-          type: constant
-          data: 1
+          constant: 1
       - id: unit_count
         time-dependent: false
         scenario-dependent: false
         value:
-          type: constant
-          data: 1
+          constant: 1
       - id: generation
         time-dependent: true
         scenario-dependent: true
         value:
-          type: timeseries
-          data:
+          object-properties:
+            type: solar
             area: ${area}
-            timeseries_file_type: solar # We could use area.get_solar_matrix()
 
   # For full modeler mode
   connections:
@@ -58,5 +55,7 @@ template:
       area: ${area}
 
   legacy-objects-to-delete:
-    loads:
-      - solar_${area} # area.set_solar() with an empty dataframe
+    - id: legacy_solar
+      object-properties:
+        type: solar
+        area: ${area}
