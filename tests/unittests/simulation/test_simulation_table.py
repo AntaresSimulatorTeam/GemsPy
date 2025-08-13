@@ -10,7 +10,7 @@ import pytest
 # Local application/library imports
 from gems.model.parsing import parse_yaml_library
 from gems.model.resolve_library import resolve_library
-from gems.simulation import TimeBlock, build_problem, OutputValues
+from gems.simulation import OutputValues, TimeBlock, build_problem 
 from gems.simulation.simulation_table import SimulationTable
 from gems.study.parsing import parse_yaml_components
 from gems.study.resolve_components import (
