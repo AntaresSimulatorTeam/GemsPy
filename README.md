@@ -28,7 +28,7 @@ More specifically, [three main types of input files](https://gemspy.readthedocs.
 
 This Python package features a generic interpreter of **Gems** capable of generating optimisation problems from any library and system files that adhere to the modelling language syntax. It then employs off-the-shelf optimisation solvers to solve these problems. The Python API facilitates reading case studies stored in YAML format, modifying them, or creating new ones from scratch by scripting.
 
-The [Getting started](https://gemspy.readthedocs.io/en/latest/user-guide/getting-started/) page of the online documentation introduce you to the **Gems** input file format and the basics of the GemsPy API.
+The [Getting started](https://gemspy.readthedocs.io/en/latest/getting-started/) page of the online documentation introduce you to the **Gems** input file format and the basics of the GemsPy API.
 
 
 ### Input files and code examples
