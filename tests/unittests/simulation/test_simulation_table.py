@@ -1,4 +1,3 @@
-
 # Standard library imports
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,11 +12,8 @@ from gems.model.resolve_library import resolve_library
 from gems.simulation import OutputValues, TimeBlock, build_problem
 from gems.simulation.simulation_table import SimulationTable
 from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import (
-    build_data_base,
-    build_network,
-    resolve_system,
-)
+from gems.study.resolve_components import build_data_base, build_network, resolve_system
+
 
 @pytest.mark.parametrize("scenario_count", [1, 3])
 def test_pypsa_model_simulation_table(tmp_path, scenario_count):
@@ -60,7 +56,7 @@ def test_pypsa_model_simulation_table(tmp_path, scenario_count):
         block=1,
         absolute_time_offset=0,
         block_size=block_size,
-        scenario_count=scenario_count
+        scenario_count=scenario_count,
     )
 
     # --- Write CSV to temporary path ---
@@ -72,4 +68,3 @@ def test_pypsa_model_simulation_table(tmp_path, scenario_count):
 
     # Optional: print first few rows
     print(simu_table.df.head())
-
