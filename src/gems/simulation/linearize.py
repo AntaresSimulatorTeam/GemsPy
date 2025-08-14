@@ -12,6 +12,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from functools import reduce
 from itertools import product
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -162,16 +163,41 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
     def addition(self, node: AdditionNode) -> LinearExpressionData:
         operands = [visit(o, self) for o in node.operands]
         terms = []
-        constant = 0
+        # Try to correctly index dataframes
+        dfs = [o.constant for o in operands if isinstance(o.constant, pd.DataFrame)]
+        floats = [o.constant for o in operands if isinstance(o.constant, (int, float))]
+        constant = sum(floats)
+        if len(dfs):
+            # common_index = dfs[0].index
+            common_index = reduce(lambda x, y: x.union(y), (df.index for df in dfs))
+            # for df in dfs[1:]:
+            #     common_index = common_index.union(df.index)
+            for df in dfs:
+                df.reindex(index=common_index, fill_value=0)
+            df_constant = pd.concat(dfs, axis=1).sum(axis=1)
+            constant += df_constant
+            constant = pd.DataFrame(constant, columns=["value"])
+        # constant = sum(
+        #     [o.constant for o in operands if isinstance(o.constant, (int, float))]
+        # )
+        # dfs = [o.constant for o in operands if isinstance(o.constant, pd.DataFrame)]
+        # if len(dfs):
+        #     constant += dfs[0]
+        #     for df in dfs[1:]:
+        #         constant = constant.add(df, fill_value=0)
         for o in operands:
-            if isinstance(o.constant, (int, float)) or isinstance(
-                constant, (int, float)
-            ):
-                constant += o.constant
-            else:
-                # Creates a copy of the dataframe and reassign
-                constant = constant.add(o.constant, fill_value=0)
             terms.extend(o.terms)
+            # if isinstance(o.constant, pd.DataFrame):
+            #     constant = constant.add(o.constant, fill_value=0)
+
+        # for o in operands:
+        #     if isinstance(o.constant, (int, float)) or isinstance(
+        #         constant, (int, float)
+        #     ):
+        #         constant += o.constant
+        #     else:
+        #         # Creates a copy of the dataframe and reassign
+        #         constant = constant.add(o.constant, fill_value=0)
         return LinearExpressionData(terms=terms, constant=constant)
 
     def multiplication(self, node: MultiplicationNode) -> LinearExpressionData:
