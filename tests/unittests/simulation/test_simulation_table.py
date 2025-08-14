@@ -1,5 +1,4 @@
 # Standard library imports
-from dataclasses import dataclass
 from pathlib import Path
 
 # Third-party imports
@@ -10,7 +9,7 @@ import pytest
 from gems.model.parsing import parse_yaml_library
 from gems.model.resolve_library import resolve_library
 from gems.simulation import OutputValues, TimeBlock, build_problem
-from gems.simulation.simulation_table import SimulationTable
+from gems.simulation.simulation_table import SimulationTableBuilder, SimulationTableWriter
 from gems.study.parsing import parse_yaml_components
 from gems.study.resolve_components import build_data_base, build_network, resolve_system
 
@@ -47,23 +46,17 @@ def test_pypsa_model_simulation_table(tmp_path: Path, scenario_count: int) -> No
     # --- Extract output values ---
     results = OutputValues(problem)
 
-    # --- Fill simulation table ---
-    simu_table = SimulationTable()
-    block_size = len(time_block.timesteps)
-    simu_table.fill_from_output_values(
-        results,
-        block=1,
-        absolute_time_offset=0,
-        block_size=block_size,
-        scenario_count=scenario_count,
-    )
-
-    # --- Write CSV to temporary path ---
-    csv_path = simu_table.write_csv(tmp_path, optim_nb=1)
+    # --- Build simulation table ---
+    builder = SimulationTableBuilder()
+    sim_df = builder.build(results)
+    # --- Write CSV using writer ---
+    writer = SimulationTableWriter(sim_df)
+    
+    csv_path = writer.write_csv(tmp_path, simulation_id=builder.simulation_id, optim_nb=1)
 
     # --- Assertions ---
     assert csv_path.exists(), "Simulation table CSV not created"
-    assert not simu_table.simulation_table.empty, "Simulation table dataframe is empty"
+    assert not sim_df.empty, "Simulation table dataframe is empty"
 
     # Optional: print first few rows
-    print(simu_table.simulation_table.head())
+    print(sim_df.head())
