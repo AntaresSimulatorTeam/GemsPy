@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
-
 import pandas as pd
 
 
@@ -44,9 +43,8 @@ class Operation:
 
 @dataclass(frozen=True)
 class TimeseriesData:
-    path: Path
-    column: int
-    operation: Optional[Operation] = None
+    area: str
+    timeseries_file_type: str
 
 
 @dataclass(frozen=True)
@@ -69,8 +67,8 @@ class ThermalData:
 
 @dataclass(frozen=True)
 class LinkData:
-    column: int
     area_from: str
     area_to: str
     timeseries_file_type: str
     operation: Optional[Operation] = None
+    column: Optional[int] = None

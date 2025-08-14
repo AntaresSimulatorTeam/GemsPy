@@ -12,15 +12,15 @@
 import logging
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Callable
 
 from antares.craft.model.renewable import RenewableCluster
 from antares.craft.model.st_storage import STStorage
 from antares.craft.model.study import Study, read_study_local
 from antares.craft.model.thermal import ThermalCluster
 
-from gems.input_converter.src.data_preprocessing.binding_constraints import (
-    BindingConstraintsPreprocessing,
+from gems.input_converter.src.data_preprocessing.preprocessing import (
+    ModelsConfigurationPreprocessing,
 )
 from gems.input_converter.src.data_preprocessing.thermal import ThermalDataPreprocessing
 from gems.input_converter.src.utils import (
@@ -36,14 +36,11 @@ from gems.study.parsing import (
     InputSystem,
 )
 
-BC_FILENAME = "battery.yaml"
-BC_CONFIG_PATH = (
-    Path(__file__).resolve().parent.parent
+RESOURCES_FOLDER = (
+    Path(__file__).parents[1]
     / "data"
     / "model_configuration"
-    / BC_FILENAME
 )
-
 
 class AntaresStudyConverter:
     def __init__(
@@ -71,25 +68,25 @@ class AntaresStudyConverter:
             Path(output_path) if output_path else self.study_path / Path("output.yaml")
         )
         self.areas: MappingProxyType = self.study.get_areas()
-        self.bc_area_pattern: str = "${area}"
+        self.legacy_objects_for_bc = {}
 
-    def _match_area_pattern(self, object: Any, param_values: str) -> Any:
+    def _match_area_pattern(self, object: Any, param_value: str, model_area_pattern: str = "${area}") -> Any:
         if isinstance(object, dict):
             return {
-                self._match_area_pattern(k, param_values): self._match_area_pattern(
-                    v, param_values
+                self._match_area_pattern(k, param_value, model_area_pattern): self._match_area_pattern(
+                    v, param_value, model_area_pattern
                 )
                 for k, v in object.items()
             }
         elif isinstance(object, list):
-            return [self._match_area_pattern(elem, param_values) for elem in object]
+            return [self._match_area_pattern(elem, param_value, model_area_pattern) for elem in object]
         elif isinstance(object, str):
-            return object.replace(self.bc_area_pattern, param_values)
+            return object.replace(model_area_pattern, param_value)
         else:
             return object
 
     def _legacy_component_to_exclude(
-        self, legacy_objects_for_bc: dict, component_type: str
+        self, legacy_objects_for_bc: dict, component_type: str, model_area_pattern: str = "${area}"
     ) -> list:
         """This function aim at finding components that are only present for binding constraint model purpose
         and should be removed from other conversions"""
@@ -98,28 +95,29 @@ class AntaresStudyConverter:
         return [
             item
             for area in self.areas.values()
-            for item in self._match_area_pattern(components, area.id)  # type: ignore
+            for item in self._match_area_pattern(components, area.id, model_area_pattern)  # type: ignore
         ]
 
-    def _extract_legacy_objects_from_model_config(self, bc_data: dict) -> dict:
-        """This function aim at extracting components that are only present for binding constraint model."""
-        legacy = bc_data.get("legacy-objects-to-delete", {})
+    def _safe_extract_objects_to_delete(self, new_model_data: dict) -> dict:
+        """This function aim at extracting legacy components."""
+        legacy = new_model_data.get("legacy-objects-to-delete", {})
+        # TODO on doit rajouter tous les objets legacy dans le dictionnaire (wind, solar, etc.)
         return {
             "binding_constraints": legacy.get("binding_constraints", []),
             "links": legacy.get("links", []),
             "nodes": legacy.get("nodes", []),
             "thermals": legacy.get("thermal_clusters", []),
-        }
+        } if legacy else {}
 
     def _convert_area_to_component_list(
-        self, lib_id: str, legacy_objects_for_bc: dict
+        self, lib_id: str, list_valid_areas: list[MappingProxyType[str, Any]] = []
     ) -> list[InputComponent]:
         components = []
         self.logger.info("Converting areas to component list...")
-
         for area in self.areas.values():
-            if area.id in legacy_objects_for_bc.get("nodes", []):
+            if area.id not in list_valid_areas:
                 continue
+
             components.append(
                 InputComponent(
                     id=area.id,
@@ -143,7 +141,7 @@ class AntaresStudyConverter:
         return components
 
     def _convert_renewable_to_component_list(
-        self, lib_id: str, legacy_objects_for_bc: dict, valid_areas: dict
+        self, lib_id: str, valid_areas: dict
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
         components = []
         connections = []
@@ -198,14 +196,13 @@ class AntaresStudyConverter:
         return components, connections
 
     def _convert_thermal_to_component_list(
-        self, lib_id: str, legacy_objects_for_bc: dict, valid_areas: dict
+        self, lib_id: str, valid_areas: dict
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
         components = []
         connections = []
         self.logger.info("Converting thermals to component list...")
 
-        thermals_to_exclude: list = self._legacy_component_to_exclude(
-            legacy_objects_for_bc, component_type="thermals"
+        thermals_to_exclude: list = self._legacy_component_to_exclude(self.legacy_objects_for_bc, component_type="thermals"
         )
 
         # Add thermal components for each area
@@ -314,7 +311,7 @@ class AntaresStudyConverter:
         return components, connections
 
     def _convert_st_storage_to_component_list(
-        self, lib_id: str, legacy_objects_for_bc: dict, valid_areas: dict
+        self, lib_id: str, valid_areas: dict
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
         components = []
         connections = []
@@ -424,14 +421,14 @@ class AntaresStudyConverter:
         return components, connections
 
     def _convert_link_to_component_list(
-        self, lib_id: str, legacy_objects_for_bc: dict, valid_areas: dict
+        self, lib_id: str, valid_areas: dict
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
         components = []
         connections = []
         self.logger.info("Converting links to component list...")
 
         links_to_exclude: list = self._legacy_component_to_exclude(
-            legacy_objects_for_bc, component_type="links"
+            self.legacy_objects_for_bc, component_type="links"
         )
 
         # Add links components for each area
@@ -494,7 +491,7 @@ class AntaresStudyConverter:
         return components, connections
 
     def _convert_wind_to_component_list(
-        self, lib_id: str, legacy_objects_for_bc: dict, valid_areas: dict
+        self, lib_id: str, valid_areas: dict
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
         components = []
         connections = []
@@ -531,7 +528,7 @@ class AntaresStudyConverter:
         return components, connections
 
     def _convert_solar_to_component_list(
-        self, lib_id: str, legacy_objects_for_bc: dict, valid_areas: dict
+        self, lib_id: str, valid_areas: dict
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
         components = []
         connections = []
@@ -569,7 +566,7 @@ class AntaresStudyConverter:
         return components, connections
 
     def _convert_load_to_component_list(
-        self, lib_id: str, legacy_objects_for_bc: dict, valid_areas: dict
+        self, lib_id: str, valid_areas: dict
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
         components = []
         connections = []
@@ -605,96 +602,142 @@ class AntaresStudyConverter:
 
         return components, connections
 
-    def _convert_cc_to_component_list(
-        self, lib_id: str, legacy_objects_for_bc: dict, valid_areas: dict
+    def _iterate_through_model(self, valid_resources: dict, components: list, connections: list, mp: ModelsConfigurationPreprocessing):
+        components.append(
+            InputComponent(
+                id=valid_resources["component"]["id"],
+                model=valid_resources["model"],
+                parameters=[
+                    InputComponentParameter(
+                        id=str(param.get("id")),
+                        time_dependent=bool(param.get("time-dependent")),
+                        scenario_dependent=bool(
+                            param.get("scenario-dependent")
+                        ),
+                        value=mp.convert_param_value(
+                            param["id"], param["value"]
+                        ),
+                    )
+                    for param in valid_resources["component"]["parameters"]
+                ],
+            )
+        )
+        connections.append(
+            InputPortConnections(
+                component1=valid_resources["connections"][0]["component1"],
+                port1=valid_resources["connections"][0]["port1"],
+                component2=valid_resources["connections"][0]["component2"],
+                port2=valid_resources["connections"][0]["port2"],
+            )
+        )
+
+        objects_to_delete: dict = self._safe_extract_objects_to_delete(
+        valid_resources
+        )
+        if objects_to_delete:
+            pass # TODO We need to delete those objects
+    
+    def _convert_model_to_component_list(
+        self, valid_areas: dict, resource_content: dict
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
         components = []
         connections = []
-        self.logger.info("Converting binding constraints to component list...")
-
-        bc_data = read_yaml_file(BC_CONFIG_PATH).get("template")
+        self.logger.info("Converting models to component list...")
+        
+        model_area_pattern = f"${{{resource_content['template-parameters'][0]['name']}}}"
+        mp = ModelsConfigurationPreprocessing(self.study)
         try:
-            for area in valid_areas.values():
-                data_with_area: dict = self._match_area_pattern(bc_data, area.id)
-                bcp = BindingConstraintsPreprocessing(self.study)
+            if resource_content["name"] in ["link"]:
+                valid_resources: dict = self._check_resources_not_excluded(resource_content, "link")
+                for link in valid_resources.values():
+                    data_with_link: dict = self._match_area_pattern(resource_content, link.id, model_area_pattern)
 
-                components.append(
-                    InputComponent(
-                        id=data_with_area["component"]["id"],
-                        model=data_with_area["model"],
-                        parameters=[
-                            InputComponentParameter(
-                                id=str(param.get("id")),
-                                time_dependent=bool(param.get("time-dependent")),
-                                scenario_dependent=bool(
-                                    param.get("scenario-dependent")
-                                ),
-                                value=bcp.convert_param_value(
-                                    param.get("id"), param.get("value")
-                                ),
-                            )
-                            for param in data_with_area["component"]["parameters"]
-                        ],
-                    )
-                )
-                connections.append(
-                    InputPortConnections(
-                        component1=data_with_area["component"]["id"],
-                        port1="injection_port",
-                        component2=area.id,
-                        port2="balance_port",
-                    )
-                )
+                    self._iterate_through_model(data_with_link, components, connections, mp, link.id)
+
+            else:
+                for area in valid_areas.values():
+                    data_with_area: dict = self._match_area_pattern(resource_content, area.id, model_area_pattern)
+                    
+                    if resource_content["name"] in ["wind", "solar", "load", "renewables"]:
+                        if any(not mp.check_timeseries_validity(param["value"])
+                        for param in data_with_area["component"]["parameters"]):
+                            continue
+
+                    self._iterate_through_model(data_with_area, components, connections, mp)
+                    # Sortir le convert param value, ou bien executer une mthode préalable pour detecter que la TS
+                    # Est vide mp.detect_ts_validity_and_existence et si ce nest pas le cas, on append pas le
+                    # composant => pour ["wind", "solar", "load", "renewables"]
+
         except (KeyError, FileNotFoundError) as e:
+            self.logger.error(
+                f"Error while converting model to component list: {e}. "
+                "Please check the model configuration file."
+            )
             return components, connections
 
         return components, connections
 
-    def _extract_valid_areas_from_model_config(self, bc_data: dict) -> dict:
-        for template_param in bc_data["template-parameters"]:
-            if template_param.get("exclude"):
-                return {
-                    k: v
-                    for k, v in self.areas.items()
-                    if k not in template_param["exclude"]
-                }
-        return {}
+    def _check_resources_not_excluded(self, resource_content: dict, parameter: str) -> dict:
+        """
+        Args:
+            resource_content: Dictionary with template parameters.
+            parameter:  ("area", "link", "thermal", "renewable").
+
+        """
+        RESOURCE_MAP: dict[str, Callable[[], dict]] = {
+            "area": lambda self: self.areas,
+            "link": lambda self: self.study.get_links(),
+            "thermal": lambda self: {
+                thermal_id: thermal
+                for _, area in self.areas.items()
+                for thermal_id, thermal in area.get_thermals().items()
+            },
+            "renewable": lambda self: {
+                renewable_id: renewable
+                for _, area in self.areas.items()
+                for renewable_id, renewable in area.get_renewables().items()
+            }
+        }
+        if parameter not in RESOURCE_MAP:
+            raise ValueError(f"Unsupported parameter: {parameter}")
+
+        excluded = []
+        for param in resource_content.get("template-parameters", []):
+            if param.get("name") == parameter:
+                excluded = param.get("exclude", [])
+                break
+
+        items = RESOURCE_MAP[parameter](self)
+
+        return {
+            k: v
+            for k, v in items.items()
+            if k not in excluded
+        }
 
     def convert_study_to_input_study(self) -> InputSystem:
         antares_historic_lib_id = "antares-historic"
-        bc_data = read_yaml_file(BC_CONFIG_PATH).get("template", {})
-        # Get area pattern for binding constraint from model config
-        self.bc_area_pattern = f"${{{bc_data['template-parameters'][0]['name']}}}"
-
-        legacy_objects_for_bc: dict = self._extract_legacy_objects_from_model_config(
-            bc_data
-        )
-        valid_areas = self._extract_valid_areas_from_model_config(bc_data)
-        area_components = self._convert_area_to_component_list(
-            antares_historic_lib_id, legacy_objects_for_bc
-        )
 
         list_components: list[InputComponent] = []
         list_connections: list[InputPortConnections] = []
+        list_valid_areas = set()
+        for file in RESOURCES_FOLDER.iterdir():
+            if file.is_file() and file.name.endswith(".yaml"):
+                resource_content = read_yaml_file(file).get("template", {})
 
-        conversion_methods = [
-            self._convert_renewable_to_component_list,
-            self._convert_thermal_to_component_list,
-            self._convert_st_storage_to_component_list,
-            self._convert_load_to_component_list,
-            self._convert_wind_to_component_list,
-            self._convert_solar_to_component_list,
-            self._convert_link_to_component_list,
-            self._convert_cc_to_component_list,
-        ]
+                valid_areas: dict = self._check_resources_not_excluded(resource_content, "area")
+                
+                components, connections = self._convert_model_to_component_list(
+                valid_areas, resource_content
+                )
+                list_components.extend(components)
+                list_connections.extend(connections)
 
-        for method in conversion_methods:
-            components, connections = method(
-                antares_historic_lib_id, legacy_objects_for_bc, valid_areas
-            )
-            list_components.extend(components)
-            list_connections.extend(connections)
+                list_valid_areas.update(valid_areas.keys())
 
+        area_components = self._convert_area_to_component_list(
+            antares_historic_lib_id, list_valid_areas
+        )
         self.logger.info(
             "Converting node, components and connections into Input study..."
         )

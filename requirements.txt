@@ -8,7 +8,7 @@ absl-py==2.2.2
     # via ortools
 annotated-types==0.7.0
     # via pydantic
-antares-craft==0.2.7
+antares-craft==0.2.9
     # via -r requirements.in
 antares-study-version==1.0.15
     # via antares-craft
@@ -128,11 +128,11 @@ protobuf==6.30.2
     # via ortools
 psutil==7.0.0
     # via antares-craft
-pydantic==2.10.6
+pydantic==2.11.7
     # via
     #   -r requirements.in
     #   antares-craft
-pydantic-core==2.27.2
+pydantic-core==2.33.2
     # via pydantic
 pyogrio==0.10.0
     # via geopandas
@@ -181,6 +181,9 @@ typing-extensions==4.13.2
     # via
     #   pydantic
     #   pydantic-core
+    #   typing-inspection
+typing-inspection==0.4.1
+    # via pydantic
 tzdata==2025.2
     # via pandas
 urllib3==2.4.0
