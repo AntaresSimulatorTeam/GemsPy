@@ -41,35 +41,10 @@ class OutputValues:
         _name: str
         _value: Dict[TimeScenarioIndex, float] = field(init=False, default_factory=dict)
         _size: Tuple[int, int] = field(init=False, default=(0, 0))
-        _basis_status: Optional[str] = field(default=None, init=False)  # NEW Ali
+        _basis_status: Dict[TimeScenarioIndex, str] = field(
+            init=False, default_factory=dict
+        )
         ignore: bool = field(default=False, init=False)
-
-        def __init__(
-            self,
-            name: str,
-            size: tuple[int, int] = (0, 0),  # (scenario_count, time_count)
-            value: Optional[Dict[TimeScenarioIndex, float]] = None,
-            solver_var: Optional[Any] = None,  # add type annotation
-        ):
-            """
-            Initialize a variable in OutputValues.
-
-            Parameters
-            ----------
-            name : str
-                The variable name.
-            size : tuple[int, int], optional
-                Shape of the variable (scenarios, time steps).
-            value : dict, optional
-                Dictionary storing variable values per TimeScenarioIndex.
-            solver_var : optional
-                The solver variable object (pywraplp.Variable) if available.
-            """
-            self._name = name
-            self._size = size
-            self._value = value if value is not None else {}
-            # Initialize basis status as None; can be filled later
-            self._basis_status = None
 
         def __eq__(self, other: object) -> bool:
             if not isinstance(other, OutputValues.Variable):
@@ -162,6 +137,18 @@ class OutputValues:
 
             self._value[key] = value
 
+        def _set_basis_status(
+            self, timestep: Optional[int], scenario: Optional[int], status: str
+        ) -> None:
+            timestep = 0 if timestep is None else timestep
+            scenario = 0 if scenario is None else scenario
+            key = TimeScenarioIndex(timestep, scenario)
+            if key not in self._value:
+                size_s = max(self._size[0], scenario + 1)
+                size_t = max(self._size[1], timestep + 1)
+                self._size = (size_s, size_t)
+            self._basis_status[key] = status
+
     @dataclass
     class Component:
         _id: str
@@ -207,7 +194,6 @@ class OutputValues:
 
     def __post_init__(self) -> None:
         self._build_components()
-        self._set_basis()
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, OutputValues):
@@ -228,22 +214,21 @@ class OutputValues:
 
         return string
 
-    def _build_components(self) -> None:  # old build
+    def _build_components(self) -> None:
         if self.problem is None:
             return
+        is_mip = self.problem.solver.IsMip()
+
         for key, value in self.problem.context.get_all_component_variables().items():
             self.component(key.component_id).var(str(key.variable_name))._set(
                 key.block_timestep, key.scenario, value.solution_value()
             )
-
-    def _set_basis(self) -> None:
-        if self.problem is None:
-            return
-        if self.problem.solver.IsMip():
-            return
-        for key, value in self.problem.context.get_all_component_variables().items():
-            var_obj = self.component(key.component_id).var(str(key.variable_name))
-            var_obj._basis_status = value.basis_status()
+            if not is_mip:
+                self.component(key.component_id).var(
+                    str(key.variable_name)
+                )._set_basis_status(
+                    key.block_timestep, key.scenario, value.basis_status()
+                )
 
     def component(self, component_id: str) -> "OutputValues.Component":
         if component_id not in self._components:

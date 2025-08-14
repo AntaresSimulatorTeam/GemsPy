@@ -63,7 +63,7 @@ def test_pypsa_model_simulation_table(tmp_path: Path, scenario_count: int) -> No
 
     # --- Assertions ---
     assert csv_path.exists(), "Simulation table CSV not created"
-    assert not simu_table.df.empty, "Simulation table dataframe is empty"
+    assert not simu_table.simulation_table.empty, "Simulation table dataframe is empty"
 
     # Optional: print first few rows
-    print(simu_table.df.head())
+    print(simu_table.simulation_table.head())

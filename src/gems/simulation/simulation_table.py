@@ -1,106 +1,80 @@
+from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
 
 import pandas as pd
+
 from gems.simulation.output_values import OutputValues
-from gems.study.data import TimeScenarioIndex
-from datetime import datetime
 
 
-class SimulationTable:
-    simulation_id: str
-    df: pd.DataFrame
+class SimulationColumns(str, Enum):
+    BLOCK = "block"
+    COMPONENT = "component"
+    OUTPUT = "output"
+    ABSOLUTE_TIME_INDEX = "absolute-time-index"
+    BLOCK_TIME_INDEX = "block-time-index"
+    SCENARIO_INDEX = "scenario-index"
+    VALUE = "value"
+    BASIS_STATUS = "basis-status"
 
-    def __init__(self, simulation_id: Optional[str] = None, mode: str = "eco") -> None:
-        # Unique simulation ID, from Antares logic or fallback to UUID
-        if simulation_id:
-            self.simulation_id = simulation_id
-        else:
-            now = datetime.now()
-            self.simulation_id = now.strftime("%Y%m%d-%H%M") + mode
 
-        self.df = pd.DataFrame(
-            columns=[
-                "simulation_id",
-                "block",
-                "component",
-                "output",
-                "absolute_time_index",
-                "block_time_index",
-                "scenario_index",
-                "value",
-                "basis_status",
-            ]
-        )
+class SimulationTableBuilder:
+    """Builds simulation tables from solver output values."""
 
-    def get_simulation_table(self) -> pd.DataFrame:
-        return self.df
+    def __init__(self, simulation_id: Optional[str] = None) -> None:
+        self.simulation_id = simulation_id or datetime.now().strftime("%Y%m%d-%H%M")
 
-    def fill_from_output_values(
-        self,
-        output_values: OutputValues,
-        block: int,
-        absolute_time_offset: int,
-        block_size: int,
-        scenario_count: int,
-    ) -> None:
-        """
-        Populate the SimulationTable from solver output values and append the objective value.
-        """
-        rows = []
-
-        # Loop over components in OutputValues
-        for comp_id, comp_obj in output_values._components.items():
-            # Loop over variables for the component
-            for var_name, var in comp_obj._variables.items():
-                size_s, size_t = var._size  # (scenario_count, time_count)
-
-                # Fallback if sizes don't match provided scenario_count/block_size
-                if size_s == 0:
-                    size_s = scenario_count
-                if size_t == 0:
-                    size_t = block_size
-
-                for s in range(size_s):
-                    for t in range(size_t):
-                        value = var._value.get(TimeScenarioIndex(t, s), None)
-                        basis_status = var._basis_status
-
-                        rows.append(
-                            {
-                                "simulation_id": self.simulation_id,
-                                "block": block,
-                                "component": comp_id,
-                                "output": var._name,
-                                "absolute_time_index": absolute_time_offset + t,
-                                "block_time_index": t + 1,
-                                "scenario_index": s,
-                                "value": value,
-                                "basis_status": basis_status,
-                            }
-                        )
-
-        # Store results as DataFrame
-        self.df = pd.DataFrame(rows)
-
-        # Ensure problem is set before accessing solver
+    def build(self, output_values: OutputValues) -> pd.DataFrame:
+        """Populate a DataFrame from OutputValues."""
         if output_values.problem is None:
             raise ValueError("OutputValues problem is not set.")
-        objective_value = output_values.problem.solver.Objective().Value()
 
-        # Append the objective value as the last row
+        context = output_values.problem.context
+        block = context._block.id
+        block_size = context.block_length()
+        absolute_time_offset = (block - 1) * block_size
+
+        rows = []
+
+        for component_id, output_component in output_values._components.items():
+            for _, var in output_component._variables.items():
+                for ts_index, value in var._value.items():
+                    basis_status = (
+                        var._basis_status
+                        if isinstance(var._basis_status, str)
+                        else var._basis_status.get(ts_index)
+                    )
+                    row = {
+                        SimulationColumns.BLOCK.value: block,
+                        SimulationColumns.COMPONENT.value: component_id,
+                        SimulationColumns.OUTPUT.value: var._name,
+                        SimulationColumns.ABSOLUTE_TIME_INDEX.value: absolute_time_offset
+                        + ts_index.time,
+                        SimulationColumns.BLOCK_TIME_INDEX.value: ts_index.time,
+                        SimulationColumns.SCENARIO_INDEX.value: ts_index.scenario,
+                        SimulationColumns.VALUE.value: value,
+                        SimulationColumns.BASIS_STATUS.value: basis_status,
+                    }
+                    rows.append(row)
+
+        df = pd.DataFrame(rows, columns=[col.value for col in SimulationColumns])
+
+        # Append objective value
+        objective_value = output_values.problem.solver.Objective().Value()
         obj_row = {
-            "simulation_id": self.simulation_id,
-            "block": block,
-            "component": None,
-            "output": "OBJECTIVE_VALUE",
-            "absolute_time_index": None,
-            "block_time_index": None,
-            "scenario_index": None,
-            "value": objective_value,
-            "basis_status": None,
+            SimulationColumns.BLOCK.value: block,
+            SimulationColumns.COMPONENT.value: None,
+            SimulationColumns.OUTPUT.value: "objective-value",
+            SimulationColumns.ABSOLUTE_TIME_INDEX.value: None,
+            SimulationColumns.BLOCK_TIME_INDEX.value: None,
+            SimulationColumns.SCENARIO_INDEX.value: None,
+            SimulationColumns.VALUE.value: objective_value,
+            SimulationColumns.BASIS_STATUS.value: None,
         }
-        self.df.loc[len(self.df)] = [obj_row.get(col, None) for col in self.df.columns]
+        df.loc[len(df)] = [obj_row.get(col.value, None) for col in SimulationColumns]
+
+        return df
 
     def extra_output_eval(self) -> None:
         raise NotImplementedError("extra_output_eval() is not yet implemented.")
@@ -108,11 +82,23 @@ class SimulationTable:
     def add_extra_output(self) -> None:
         raise NotImplementedError("add_extra_output() is not yet implemented.")
 
-    def write_csv(self, output_dir: Union[str, Path], optim_nb: int) -> Path:
+
+class SimulationTableWriter:
+    """Handles writing simulation tables to CSV."""
+
+    def __init__(self, simulation_table: pd.DataFrame) -> None:
+        self.simulation_table = simulation_table
+
+    def write_csv(
+        self,
+        output_dir: Union[str, Path],
+        simulation_id: str,
+        optim_nb: int,
+    ) -> Path:
         """Write the simulation table to CSV."""
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"simulation_table_{self.simulation_id}_{optim_nb}.csv"
+        filename = f"simulation_table_{simulation_id}_{optim_nb}.csv"
         filepath = output_dir / filename
-        self.df.to_csv(filepath, index=False)
+        self.simulation_table.to_csv(filepath, index=False)
         return filepath
