@@ -9,7 +9,10 @@ import pytest
 from gems.model.parsing import parse_yaml_library
 from gems.model.resolve_library import resolve_library
 from gems.simulation import OutputValues, TimeBlock, build_problem
-from gems.simulation.simulation_table import SimulationTableBuilder, SimulationTableWriter
+from gems.simulation.simulation_table import (
+    SimulationTableBuilder,
+    SimulationTableWriter,
+)
 from gems.study.parsing import parse_yaml_components
 from gems.study.resolve_components import build_data_base, build_network, resolve_system
 
@@ -51,8 +54,10 @@ def test_pypsa_model_simulation_table(tmp_path: Path, scenario_count: int) -> No
     sim_df = builder.build(results)
     # --- Write CSV using writer ---
     writer = SimulationTableWriter(sim_df)
-    
-    csv_path = writer.write_csv(tmp_path, simulation_id=builder.simulation_id, optim_nb=1)
+
+    csv_path = writer.write_csv(
+        tmp_path, simulation_id=builder.simulation_id, optim_nb=1
+    )
 
     # --- Assertions ---
     assert csv_path.exists(), "Simulation table CSV not created"
