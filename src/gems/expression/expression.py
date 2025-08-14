@@ -13,6 +13,7 @@
 """
 Defines the model for generic expressions.
 """
+
 import enum
 import inspect
 from dataclasses import dataclass
@@ -148,6 +149,81 @@ class VariableNode(ExpressionNode):
 
 def var(name: str) -> VariableNode:
     return VariableNode(name)
+
+
+@dataclass(frozen=True, eq=False)
+class MaxNode(ExpressionNode):
+    operands: List[ExpressionNode]
+
+    def __post_init__(self) -> None:
+        if len(self.operands) < 2:
+            raise ValueError("MaxNode requires at least two operands")
+        for operand in self.operands:
+            if self._contains_forbidden_node(operand):
+                raise ValueError(f"Node {operand} is not allowed in this structure.")
+
+    def _contains_forbidden_node(self, node: ExpressionNode) -> bool:
+        match node:
+            case (
+                VariableNode()
+                | ComponentVariableNode()
+                | ProblemVariableNode()
+                | ComparisonNode()
+                | PortFieldNode()
+                | PortFieldAggregatorNode()
+            ):
+                return True
+
+            case MaxNode(operands=ops):
+                return any(self._contains_forbidden_node(op) for op in ops)
+
+            case TimeShiftNode(operand=op, time_shift=ts):
+                return self._contains_forbidden_node(
+                    op
+                ) or self._contains_forbidden_node(ts)
+
+            case AdditionNode(operands=ops):
+                return any(self._contains_forbidden_node(op) for op in ops)
+
+            case DivisionNode(left=l, right=r) | MultiplicationNode(left=l, right=r):
+                return self._contains_forbidden_node(
+                    l
+                ) or self._contains_forbidden_node(r)
+
+            case (
+                AllTimeSumNode(operand=op)
+                | NegationNode(operand=op)
+                | ScenarioOperatorNode(operand=op)
+            ):
+                return self._contains_forbidden_node(op)
+
+            case TimeEvalNode(operand=op, eval_time=et):
+                return self._contains_forbidden_node(
+                    op
+                ) or self._contains_forbidden_node(et)
+
+            case TimeSumNode(operand=op, from_time=ft, to_time=tt):
+                return (
+                    self._contains_forbidden_node(op)
+                    or self._contains_forbidden_node(ft)
+                    or self._contains_forbidden_node(tt)
+                )
+
+            case (
+                ComponentParameterNode()
+                | ProblemParameterNode()
+                | ParameterNode()
+                | LiteralNode()
+            ):
+                return False
+
+            case _:
+                # By default for each new Node, we reject the "max" operation
+                return True
+
+
+def max_expr(*operands: Any) -> MaxNode:
+    return MaxNode(operands=[_wrap_in_node(op) for op in operands])
 
 
 @dataclass(frozen=True, eq=False)

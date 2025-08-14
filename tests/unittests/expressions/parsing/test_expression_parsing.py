@@ -13,7 +13,7 @@ from typing import Set
 
 import pytest
 
-from gems.expression import ExpressionNode, literal, param, print_expr, var
+from gems.expression import ExpressionNode, literal, max_expr, param, print_expr, var
 from gems.expression.equality import expressions_equal
 from gems.expression.expression import port_field
 from gems.expression.parsing.parse_expression import (
@@ -119,6 +119,12 @@ from gems.expression.parsing.parse_expression import (
             "expec(sum(cost * generation))",
             (param("cost") * var("generation")).time_sum().expec(),
         ),
+        (
+            {},
+            {},
+            "max(1, 2)",
+            max_expr(literal(1), literal(2)),
+        ),
     ],
 )
 def test_parsing_visitor(
@@ -154,5 +160,26 @@ def test_parse_cancellation_should_throw(expression_str: str) -> None:
     with pytest.raises(
         AntaresParseException,
         match=r"An error occurred during parsing: ParseCancellationException",
+    ):
+        parse_expression(expression_str, identifiers)
+
+
+@pytest.mark.parametrize(
+    "expression_str",
+    [
+        "max(1 3)",
+        "max(x, y)",
+    ],
+)
+def test_parse_max_errors(expression_str: str) -> None:
+    # Console log error is displayed !
+    identifiers = ModelIdentifiers(
+        variables={"x"},
+        parameters=set(),
+    )
+
+    with pytest.raises(
+        AntaresParseException,
+        match=r"An error occurred during parsing:*",
     ):
         parse_expression(expression_str, identifiers)

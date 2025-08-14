@@ -21,6 +21,7 @@ from gems.expression.expression import (
     TimeShift,
     comp_param,
     comp_var,
+    max_expr,
     problem_var,
 )
 from gems.expression.indexing import IndexingStructureProvider
@@ -128,6 +129,7 @@ def _expand_and_linearize(
         ((X + 2).time_sum(), X_at(t=0) + X_at(t=1) + constant(4)),
         ((X + 2).time_sum(-1, 0), X_at(t=-1) + X_at(t=0) + constant(4)),
         ((X + 2).time_sum(-1, 0), X_at(t=-1) + X_at(t=0) + constant(4)),
+        (max_expr(LiteralNode(2) + LiteralNode(1), LiteralNode(0)), constant(3)),
     ],
 )
 def test_linearization_of_nested_time_operations(

@@ -12,7 +12,14 @@
 
 import pytest
 
-from gems.expression import ExpressionDegreeVisitor, LiteralNode, param, var, visit
+from gems.expression import (
+    ExpressionDegreeVisitor,
+    LiteralNode,
+    max_expr,
+    param,
+    var,
+    visit,
+)
 
 
 def test_degree() -> None:
@@ -33,4 +40,9 @@ def test_degree_computation_should_take_into_account_simplifications() -> None:
     assert visit(expr, ExpressionDegreeVisitor()) == 0
 
     expr = LiteralNode(0) * x
+    assert visit(expr, ExpressionDegreeVisitor()) == 0
+
+
+def test_max_degree() -> None:
+    expr = max_expr((5 * 3 + 3) / 1, 4)
     assert visit(expr, ExpressionDegreeVisitor()) == 0
