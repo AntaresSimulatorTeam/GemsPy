@@ -41,6 +41,9 @@ class OutputValues:
         _name: str
         _value: Dict[TimeScenarioIndex, float] = field(init=False, default_factory=dict)
         _size: Tuple[int, int] = field(init=False, default=(0, 0))
+        _basis_status: Dict[TimeScenarioIndex, str] = field(
+            init=False, default_factory=dict
+        )
         ignore: bool = field(default=False, init=False)
 
         def __eq__(self, other: object) -> bool:
@@ -134,6 +137,18 @@ class OutputValues:
 
             self._value[key] = value
 
+        def _set_basis_status(
+            self, timestep: Optional[int], scenario: Optional[int], status: str
+        ) -> None:
+            timestep = 0 if timestep is None else timestep
+            scenario = 0 if scenario is None else scenario
+            key = TimeScenarioIndex(timestep, scenario)
+            if key not in self._value:
+                size_s = max(self._size[0], scenario + 1)
+                size_t = max(self._size[1], timestep + 1)
+                self._size = (size_s, size_t)
+            self._basis_status[key] = status
+
     @dataclass
     class Component:
         _id: str
@@ -202,13 +217,18 @@ class OutputValues:
     def _build_components(self) -> None:
         if self.problem is None:
             return
+        is_mip = self.problem.solver.IsMip()
 
         for key, value in self.problem.context.get_all_component_variables().items():
-            (
-                self.component(key.component_id)
-                .var(str(key.variable_name))
-                ._set(key.block_timestep, key.scenario, value.solution_value())
+            self.component(key.component_id).var(str(key.variable_name))._set(
+                key.block_timestep, key.scenario, value.solution_value()
             )
+            if not is_mip:
+                self.component(key.component_id).var(
+                    str(key.variable_name)
+                )._set_basis_status(
+                    key.block_timestep, key.scenario, value.basis_status()
+                )
 
     def component(self, component_id: str) -> "OutputValues.Component":
         if component_id not in self._components:

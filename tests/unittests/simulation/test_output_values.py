@@ -47,6 +47,9 @@ def test_component_and_flow_output_object() -> None:
     opt_context.block_length.return_value = 1
 
     mock_problem.context = opt_context
+    mock_solver = Mock()
+    mock_solver.IsMip.return_value = False
+    mock_problem.solver = mock_solver
     output = OutputValues(mock_problem)
 
     test_output = OutputValues()
