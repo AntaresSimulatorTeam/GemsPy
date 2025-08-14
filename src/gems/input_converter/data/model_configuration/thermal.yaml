@@ -1,0 +1,135 @@
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# Configuration file to convert a complex modelling artefact in an Antares study into an Andromede model.
+
+template:
+  name: thermal
+  generator-version-compatibility: X.Y #TODO: find this information
+  model: antares-historic.thermal
+  template-parameters:
+    - name: area
+      cluster-type: thermal
+      # exclude:
+
+  component:
+    id: ${area}_${thermal}
+    parameters:
+      # should disappear from model
+      # - id: p_min_cluster
+      #   time-dependent: true
+      #   scenario-dependent: true
+      #   value:
+      - id: p_max_cluster
+        scenario-dependent: true
+        time-dependent: true
+        value:
+          object-properties:
+            type: thermal
+            area: ${area}
+            cluster: ${thermal}
+            field: thermal_series
+      - id: p_min_unit
+        scenario-dependent: false
+        time-dependent: false
+        value:
+          object-properties:
+            type: thermal
+            area: ${area}
+            cluster: ${thermal}
+            field: min_stable_power
+      - id: p_max_unit
+        scenario-dependent: false
+        time-dependent: false
+        value:
+          object-properties:
+            type: thermal
+            area: ${area}
+            cluster: ${thermal}
+            field: nominal_capacity
+      - id: generation_cost
+        scenario-dependent: false
+        time-dependent: false
+        value:
+          object-properties:
+            type: thermal
+            area: ${area}
+            cluster: ${thermal}
+            field: marginal_cost
+      - id: startup_cost
+        scenario-dependent: false
+        time-dependent: false
+        value:
+          object-properties:
+            type: thermal
+            area: ${area}
+            cluster: ${thermal}
+            field: startup_cost
+      - id: fixed_cost
+        scenario-dependent: false
+        time-dependent: false
+        value:
+          object-properties:
+            type: thermal
+            area: ${area}
+            cluster: ${thermal}
+            field: fixed_cost
+      - id: d_min_up
+        scenario-dependent: false
+        time-dependent: false
+        value:
+          object-properties:
+            type: thermal
+            area: ${area}
+            cluster: ${thermal}
+            field: min_up_time
+      - id: d_min_down
+        scenario-dependent: false
+        time-dependent: false
+        value:
+          object-properties:
+            type: thermal
+            area: ${area}
+            cluster: ${thermal}
+            field: min_down_time
+      # Should disappear from model with min / max / ceil operators
+      # - id: nb_units_min
+      #   scenario-dependent: true
+      #   time-dependent: true
+      # - id: nb_units_max
+      #   scenario-dependent: true
+      #   time-dependent: true
+      # - id: nb_units_max_variation_forward
+      #   scenario-dependent: true
+      #   time-dependent: true
+      # - id: nb_units_max_variation_backward
+      #   scenario-dependent: true
+      #   time-dependent: true
+
+  # For full modeler mode
+  connections:
+    - component1: ${area}_${thermal}
+      port1: balance_port
+      component2: ${area}
+      port2: balance_port
+
+  # For hybrid mode
+  area-connections:
+    - component: ${area}_${thermal}
+      port: balance_port
+      area: ${area}
+
+  legacy-objects-to-delete:
+    - id: legacy_thermal_cluster
+      object-properties:
+        type: thermal
+        area: ${area}
+        cluster: ${thermal}

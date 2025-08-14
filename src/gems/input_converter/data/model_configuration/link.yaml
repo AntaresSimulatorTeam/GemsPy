@@ -1,0 +1,69 @@
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# Configuration file to convert a complex modelling artefact in an Antares study into an Andromede model.
+
+template:
+  name: link
+  generator-version-compatibility: X.Y #TODO: find this information
+  model: antares-historic.link
+  template-parameters:
+    - name: link
+      # exclude:
+      #   # How to identify virtual links in Antares ?
+
+  component:
+    id: ${link} # How to specify that we want to get the link_id ?
+    parameters:
+      - id: capacity_direct
+        time-dependent: true
+        scenario-dependent: true
+        value:
+          object-properties:
+            type: link
+            link: ${link}
+            field: capacity_direct
+      - id: capacity_indirect
+        time-dependent: true
+        scenario-dependent: true
+        value:
+          object-properties:
+            type: link
+            link: ${link}
+            field: capacity_indirect
+
+  # For full modeler mode
+  connections:
+    - component1: ${link}
+      port1: in_port
+      component2: ${link}.area_from_id
+      port2: balance_port
+
+    - component1: ${link}
+      port1: out_port
+      component2: ${link}.area_to_id
+      port2: balance_port
+
+  # For hybrid mode
+  area-connections:
+    - component: ${link}
+      port: in_port
+      area: ${link}.area_from_id
+
+    - component: ${link}
+      port: out_port
+      area: ${link}.area_to_id
+
+  legacy-objects-to-delete:
+    - id: legacy_links
+      object-properties:
+        type: link
+        link: ${link}

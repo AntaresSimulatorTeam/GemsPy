@@ -1,0 +1,51 @@
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# Configuration file to convert a complex modelling artefact in an Antares study into an Andromede model.
+
+template:
+  name: load
+  generator-version-compatibility: X.Y #TODO: find this information
+  model: antares-historic.load
+  template-parameters:
+    - name: area
+      description: "Area identifier for the load component"
+      # exclude:
+
+  component:
+    id: load_${area}
+    parameters:
+      - id: load
+        time-dependent: true
+        scenario-dependent: true
+        value:
+          object-properties:
+            type: load
+            area: ${area}
+
+  # For full modeler mode
+  connections:
+    - component1: load_${area}
+      port1: balance_port
+      component2: ${area}
+      port2: balance_port
+
+  # For hybrid mode
+  area-connections:
+    - component: load_${area}
+      port: balance_port
+      area: ${area}
+
+  legacy-objects-to-delete:
+    - id: legacy_loads
+      object-properties:
+        type: load
+        area: ${area}
