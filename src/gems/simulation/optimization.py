@@ -306,7 +306,7 @@ class OptimizationContext:
         return [
             (
                 self._block.timesteps[self.get_actual_block_timestep(block_timestep)]
-                if block_timestep is not "NoTimeIndex"
+                if block_timestep != "NoTimeIndex"
                 else "NoTimeIndex"
             )
             for block_timestep in block_timesteps
@@ -393,7 +393,7 @@ class OptimizationContext:
             ),
         )
         # With the constant value provider we are sure that the time bound is a constant value, stored at ("NoTimeIndex", "NoScenarioIndex", 0, 0)
-        return float_to_int(res.loc[("NoTimeIndex", "NoScenarioIndex", 0, 0), "value"])
+        return float_to_int(res)
 
     def _make_data_structure_provider(self) -> IndexingStructureProvider:
         """
@@ -484,26 +484,26 @@ class OptimizationContext:
         class Impl(ValueProvider):
             def get_component_variable_value(
                 self, component_id: str, name: str
-            ) -> pd.DataFrame:
+            ) -> Union[float, pd.DataFrame]:
                 raise NotImplementedError(
                     "Cannot provide variable value at problem build time."
                 )
 
             def get_component_parameter_value(
                 self, component_id: str, name: str
-            ) -> pd.DataFrame:
+            ) -> Union[float, pd.DataFrame]:
                 model = network.get_component(component_id).model
                 structure = model.parameters[name].structure
                 if structure.time or structure.scenario:
                     raise ValueError(f"Parameter {name} is not constant.")
                 return _get_parameter_value(context, None, None, component_id, name)
 
-            def get_variable_value(self, name: str) -> pd.DataFrame:
+            def get_variable_value(self, name: str) -> Union[float, pd.DataFrame]:
                 raise NotImplementedError(
                     "Cannot provide variable value at problem build time."
                 )
 
-            def get_parameter_value(self, name: str) -> pd.DataFrame:
+            def get_parameter_value(self, name: str) -> Union[float, pd.DataFrame]:
                 raise ValueError(
                     "Parameter must be associated to its component before resolution."
                 )
@@ -733,13 +733,19 @@ def make_constraint(
                 current_constant = float(
                     constant.loc[(block_timestep, current_scenario), "value"]
                 )
+            else:
+                current_constant = constant
             if isinstance(lb, pd.DataFrame):
-                lb = float(lb.loc[(block_timestep, current_scenario), "value"])
+                current_lb = float(lb.loc[(block_timestep, current_scenario), "value"])
+            else:
+                current_lb = lb
             if isinstance(ub, pd.DataFrame):
-                ub = float(ub.loc[(block_timestep, current_scenario), "value"])
+                current_ub = float(ub.loc[(block_timestep, current_scenario), "value"])
+            else:
+                current_ub = ub
             solver_constraint.SetBounds(
-                lb - current_constant,
-                ub - current_constant,
+                current_lb - current_constant,
+                current_ub - current_constant,
             )
 
 

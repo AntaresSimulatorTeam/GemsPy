@@ -12,7 +12,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Union
 
 import numpy as np
 import pandas as pd
@@ -50,20 +50,20 @@ class ValueProvider(ABC):
     """
 
     @abstractmethod
-    def get_variable_value(self, name: str) -> pd.DataFrame: ...
+    def get_variable_value(self, name: str) -> Union[float, pd.DataFrame]: ...
 
     @abstractmethod
-    def get_parameter_value(self, name: str) -> pd.DataFrame: ...
+    def get_parameter_value(self, name: str) -> Union[float, pd.DataFrame]: ...
 
     @abstractmethod
     def get_component_variable_value(
         self, component_id: str, name: str
-    ) -> pd.DataFrame: ...
+    ) -> Union[float, pd.DataFrame]: ...
 
     @abstractmethod
     def get_component_parameter_value(
         self, component_id: str, name: str
-    ) -> pd.DataFrame: ...
+    ) -> Union[float, pd.DataFrame]: ...
 
 
 @dataclass(frozen=True)
@@ -76,20 +76,16 @@ class EvaluationContext(ValueProvider):
     variables: Dict[str, float] = field(default_factory=dict)
     parameters: Dict[str, float] = field(default_factory=dict)
 
-    def get_variable_value(self, name: str) -> pd.DataFrame:
+    def get_variable_value(self, name: str) -> float:
         return self.variables[name]
 
-    def get_parameter_value(self, name: str) -> pd.DataFrame:
+    def get_parameter_value(self, name: str) -> float:
         return self.parameters[name]
 
-    def get_component_variable_value(
-        self, component_id: str, name: str
-    ) -> pd.DataFrame:
+    def get_component_variable_value(self, component_id: str, name: str) -> float:
         raise NotImplementedError()
 
-    def get_component_parameter_value(
-        self, component_id: str, name: str
-    ) -> pd.DataFrame:
+    def get_component_parameter_value(self, component_id: str, name: str) -> float:
         raise NotImplementedError()
 
 
@@ -104,58 +100,65 @@ class EvaluationVisitor(ExpressionVisitorOperations[pd.DataFrame]):
     timesteps_count: int
     scenarios_count: int
 
-    def literal(self, node: LiteralNode) -> pd.DataFrame:
-        return pd.DataFrame(
-            np.full((self.timesteps_count * self.scenarios_count, 1), node.value),
-            index=pd.MultiIndex.from_product(
-                [
-                    ["NoTimeIndex"],
-                    ["NoScenarioIndex"],
-                    range(self.timesteps_count),
-                    range(self.scenarios_count),
-                ],
-                names=["timeshift", "scenarioshift", "timestep", "scenario"],
-            ),
-            columns=["value"],
-        )
+    def literal(self, node: LiteralNode) -> Union[float, pd.DataFrame]:
+        if self.timesteps_count == 1 and self.scenarios_count == 1:
+            return node.value
+        else:
+            return pd.DataFrame(
+                np.full((self.timesteps_count * self.scenarios_count, 1), node.value),
+                index=pd.MultiIndex.from_product(
+                    [
+                        ["NoTimeIndex"],
+                        ["NoScenarioIndex"],
+                        range(self.timesteps_count),
+                        range(self.scenarios_count),
+                    ],
+                    names=["timeshift", "scenarioshift", "timestep", "scenario"],
+                ),
+                columns=["value"],
+            )
 
-    def comparison(self, node: ComparisonNode) -> pd.DataFrame:
+    def comparison(self, node: ComparisonNode) -> Union[float, pd.DataFrame]:
         raise ValueError("Cannot evaluate comparison operator.")
 
-    def variable(self, node: VariableNode) -> pd.DataFrame:
+    def variable(self, node: VariableNode) -> Union[float, pd.DataFrame]:
         return self.context.get_variable_value(node.name)
 
-    def parameter(self, node: ParameterNode) -> pd.DataFrame:
+    def parameter(self, node: ParameterNode) -> Union[float, pd.DataFrame]:
         return self.context.get_parameter_value(node.name)
 
-    def comp_parameter(self, node: ComponentParameterNode) -> pd.DataFrame:
+    def comp_parameter(
+        self, node: ComponentParameterNode
+    ) -> Union[float, pd.DataFrame]:
         return self.context.get_component_parameter_value(node.component_id, node.name)
 
-    def comp_variable(self, node: ComponentVariableNode) -> pd.DataFrame:
+    def comp_variable(self, node: ComponentVariableNode) -> Union[float, pd.DataFrame]:
         return self.context.get_component_variable_value(node.component_id, node.name)
 
-    def pb_parameter(self, node: ProblemParameterNode) -> pd.DataFrame:
+    def pb_parameter(self, node: ProblemParameterNode) -> Union[float, pd.DataFrame]:
         raise ValueError("Should not reach here.")
 
-    def pb_variable(self, node: ProblemVariableNode) -> pd.DataFrame:
+    def pb_variable(self, node: ProblemVariableNode) -> Union[float, pd.DataFrame]:
         raise ValueError("Should not reach here.")
 
-    def time_shift(self, node: TimeShiftNode) -> pd.DataFrame:
+    def time_shift(self, node: TimeShiftNode) -> Union[float, pd.DataFrame]:
         raise NotImplementedError()
 
-    def time_eval(self, node: TimeEvalNode) -> pd.DataFrame:
+    def time_eval(self, node: TimeEvalNode) -> Union[float, pd.DataFrame]:
         raise NotImplementedError()
 
-    def time_sum(self, node: TimeSumNode) -> pd.DataFrame:
+    def time_sum(self, node: TimeSumNode) -> Union[float, pd.DataFrame]:
         raise NotImplementedError()
 
-    def all_time_sum(self, node: AllTimeSumNode) -> pd.DataFrame:
+    def all_time_sum(self, node: AllTimeSumNode) -> Union[float, pd.DataFrame]:
         raise NotImplementedError()
 
-    def scenario_operator(self, node: ScenarioOperatorNode) -> pd.DataFrame:
+    def scenario_operator(
+        self, node: ScenarioOperatorNode
+    ) -> Union[float, pd.DataFrame]:
         raise NotImplementedError()
 
-    def port_field(self, node: PortFieldNode) -> pd.DataFrame:
+    def port_field(self, node: PortFieldNode) -> Union[float, pd.DataFrame]:
         raise NotImplementedError()
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> pd.DataFrame:
@@ -166,7 +169,7 @@ def evaluate(
     expression: ExpressionNode,
     value_provider: ValueProvider,
     dimensions: ProblemDimensions,
-) -> pd.DataFrame:
+) -> Union[pd.DataFrame, float]:
     return visit(
         expression,
         EvaluationVisitor(
