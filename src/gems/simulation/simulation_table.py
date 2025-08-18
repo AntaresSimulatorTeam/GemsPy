@@ -29,6 +29,7 @@ class SimulationTableBuilder:
     def build(
         self, output_values: OutputValues, absolute_time_offset: Optional[int] = None
     ) -> pd.DataFrame:
+      
         """Populate a DataFrame from OutputValues."""
         if output_values.problem is None:
             raise ValueError("OutputValues problem is not set.")
@@ -76,6 +77,7 @@ class SimulationTableBuilder:
             SimulationColumns.BASIS_STATUS: None,
         }
         df.loc[len(df)] = [obj_row.get(col, None) for col in SimulationColumns]
+
         return df
 
     def extra_output_eval(self) -> None:
