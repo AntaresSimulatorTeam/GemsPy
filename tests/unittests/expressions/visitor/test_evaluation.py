@@ -22,6 +22,7 @@ from gems.expression import (
     EvaluationVisitor,
     ExpressionNode,
     LiteralNode,
+    MaxNode,
     ParameterNode,
     PrinterVisitor,
     ValueProvider,
@@ -89,6 +90,12 @@ def test_ast() -> None:
 
     context = EvaluationContext(variables={"x": 3}, parameters={"p": 4})
     assert visit(expr, EvaluationVisitor(context)) == 1
+
+    expr = MaxNode(operands=[LiteralNode(1), ParameterNode("a")])
+    assert visit(expr, PrinterVisitor()) == "max(1, a)"
+
+    context = EvaluationContext(parameters={"a": 4})
+    assert visit(expr, EvaluationVisitor(context)) == 4
 
 
 def test_operators() -> None:

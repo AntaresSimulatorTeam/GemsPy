@@ -13,7 +13,7 @@
 """
 Defines abstract base class for visitors of expressions.
 """
-import typing
+
 from abc import ABC, abstractmethod
 from typing import Generic, Protocol, TypeVar
 
@@ -26,6 +26,7 @@ from gems.expression.expression import (
     DivisionNode,
     ExpressionNode,
     LiteralNode,
+    MaxNode,
     MultiplicationNode,
     NegationNode,
     ParameterNode,
@@ -128,6 +129,10 @@ class ExpressionVisitor(ABC, Generic[T]):
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> T:
         ...
 
+    @abstractmethod
+    def max_node(self, node: MaxNode) -> T:
+        ...
+
 
 def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
     """
@@ -171,6 +176,8 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
         return visitor.port_field(root)
     elif isinstance(root, PortFieldAggregatorNode):
         return visitor.port_field_aggregator(root)
+    elif isinstance(root, MaxNode):
+        return visitor.max_node(root)
     raise ValueError(f"Unknown expression node type {root.__class__}")
 
 
@@ -228,3 +235,6 @@ class ExpressionVisitorOperations(ExpressionVisitor[T_op], ABC):
         left_value = visit(node.left, self)
         right_value = visit(node.right, self)
         return left_value / right_value
+
+    def max_node(self, node: MaxNode) -> ExpressionNode:  # type: ignore
+        return MaxNode(operands=[visit(op, self) for op in node.operands])  # type: ignore

@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 
+import pytest
 
 from gems.expression import (
     AdditionNode,
@@ -23,23 +24,31 @@ from gems.expression.equality import expressions_equal
 from gems.expression.expression import (
     AllTimeSumNode,
     ComponentParameterNode,
+    MaxNode,
     MultiplicationNode,
     TimeEvalNode,
     TimeShiftNode,
 )
 
 
-def test_copy_ast() -> None:
-    ast = AllTimeSumNode(
-        DivisionNode(
-            TimeEvalNode(
-                AdditionNode([LiteralNode(1), VariableNode("x")]), ParameterNode("p")
-            ),
-            TimeShiftNode(
-                MultiplicationNode(LiteralNode(1), VariableNode("x")),
-                ComponentParameterNode("comp1", "p"),
+@pytest.mark.parametrize(
+    "ast",
+    [
+        AllTimeSumNode(
+            DivisionNode(
+                TimeEvalNode(
+                    AdditionNode([LiteralNode(1), VariableNode("x")]),
+                    ParameterNode("p"),
+                ),
+                TimeShiftNode(
+                    MultiplicationNode(LiteralNode(1), VariableNode("x")),
+                    ComponentParameterNode("comp1", "p"),
+                ),
             ),
         ),
-    )
+        MaxNode([LiteralNode(5), LiteralNode(10)]),
+    ],
+)
+def test_copy_ast(ast) -> None:
     copy = copy_expression(ast)
     assert expressions_equal(ast, copy)

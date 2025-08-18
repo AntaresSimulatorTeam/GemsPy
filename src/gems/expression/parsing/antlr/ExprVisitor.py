@@ -66,6 +66,10 @@ class ExprVisitor(ParseTreeVisitor):
     def visitTimeSum(self, ctx: ExprParser.TimeSumContext):
         return self.visitChildren(ctx)
 
+    # Visit a parse tree produced by ExprParser#maxExpr.
+    def visitMaxExpr(self, ctx: ExprParser.MaxExprContext):
+        return self.visitChildren(ctx)
+
     # Visit a parse tree produced by ExprParser#timeIndex.
     def visitTimeIndex(self, ctx: ExprParser.TimeIndexContext):
         return self.visitChildren(ctx)

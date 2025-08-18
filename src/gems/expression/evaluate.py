@@ -18,6 +18,7 @@ from gems.expression.expression import (
     AllTimeSumNode,
     ComponentParameterNode,
     ComponentVariableNode,
+    MaxNode,
     PortFieldAggregatorNode,
     PortFieldNode,
     ProblemParameterNode,
@@ -138,6 +139,9 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> float:
         raise NotImplementedError()
+
+    def max_node(self, node: MaxNode) -> float:  # type: ignore
+        return max(visit(op, self) for op in node.operands)
 
 
 def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:
