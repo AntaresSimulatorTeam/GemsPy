@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import pandas as pd
+from attr import dataclass
 
 from gems.simulation.output_values import OutputValues
 
@@ -25,7 +26,9 @@ class SimulationTableBuilder:
     def __init__(self, simulation_id: Optional[str] = None) -> None:
         self.simulation_id = simulation_id or datetime.now().strftime("%Y%m%d-%H%M")
 
-    def build(self, output_values: OutputValues) -> pd.DataFrame:
+    def build(
+        self, output_values: OutputValues, absolute_time_offset: Optional[int] = None
+    ) -> pd.DataFrame:
         """Populate a DataFrame from OutputValues."""
         if output_values.problem is None:
             raise ValueError("OutputValues problem is not set.")
@@ -33,7 +36,7 @@ class SimulationTableBuilder:
         context = output_values.problem.context
         block = context._block.id
         block_size = context.block_length()
-        absolute_time_offset = (block - 1) * block_size
+        absolute_time_offset = absolute_time_offset or (block - 1) * block_size
 
         rows = []
 
@@ -46,33 +49,33 @@ class SimulationTableBuilder:
                         else var._basis_status.get(ts_index)
                     )
                     row = {
-                        SimulationColumns.BLOCK.value: block,
-                        SimulationColumns.COMPONENT.value: component_id,
-                        SimulationColumns.OUTPUT.value: var._name,
-                        SimulationColumns.ABSOLUTE_TIME_INDEX.value: absolute_time_offset
+                        SimulationColumns.BLOCK: block,
+                        SimulationColumns.COMPONENT: component_id,
+                        SimulationColumns.OUTPUT: var._name,
+                        SimulationColumns.ABSOLUTE_TIME_INDEX: absolute_time_offset
                         + ts_index.time,
-                        SimulationColumns.BLOCK_TIME_INDEX.value: ts_index.time,
-                        SimulationColumns.SCENARIO_INDEX.value: ts_index.scenario,
-                        SimulationColumns.VALUE.value: value,
-                        SimulationColumns.BASIS_STATUS.value: basis_status,
+                        SimulationColumns.BLOCK_TIME_INDEX: ts_index.time,
+                        SimulationColumns.SCENARIO_INDEX: ts_index.scenario,
+                        SimulationColumns.VALUE: value,
+                        SimulationColumns.BASIS_STATUS: basis_status,
                     }
                     rows.append(row)
 
-        df = pd.DataFrame(rows, columns=[col.value for col in SimulationColumns])
+        df = pd.DataFrame(rows, columns=list(SimulationColumns))
 
         # Append objective value
         objective_value = output_values.problem.solver.Objective().Value()
         obj_row = {
-            SimulationColumns.BLOCK.value: block,
-            SimulationColumns.COMPONENT.value: None,
-            SimulationColumns.OUTPUT.value: "objective-value",
-            SimulationColumns.ABSOLUTE_TIME_INDEX.value: None,
-            SimulationColumns.BLOCK_TIME_INDEX.value: None,
-            SimulationColumns.SCENARIO_INDEX.value: None,
-            SimulationColumns.VALUE.value: objective_value,
-            SimulationColumns.BASIS_STATUS.value: None,
+            SimulationColumns.BLOCK: block,
+            SimulationColumns.COMPONENT: None,
+            SimulationColumns.OUTPUT: "objective-value",
+            SimulationColumns.ABSOLUTE_TIME_INDEX: None,
+            SimulationColumns.BLOCK_TIME_INDEX: None,
+            SimulationColumns.SCENARIO_INDEX: None,
+            SimulationColumns.VALUE: objective_value,
+            SimulationColumns.BASIS_STATUS: None,
         }
-        df.loc[len(df)] = [obj_row.get(col.value, None) for col in SimulationColumns]
+        df.loc[len(df)] = [obj_row.get(col, None) for col in SimulationColumns]
 
         return df
 
@@ -83,11 +86,11 @@ class SimulationTableBuilder:
         raise NotImplementedError("add_extra_output() is not yet implemented.")
 
 
+@dataclass
 class SimulationTableWriter:
     """Handles writing simulation tables to CSV."""
 
-    def __init__(self, simulation_table: pd.DataFrame) -> None:
-        self.simulation_table = simulation_table
+    simulation_table: pd.DataFrame
 
     def write_csv(
         self,
