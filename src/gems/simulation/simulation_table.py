@@ -29,7 +29,6 @@ class SimulationTableBuilder:
     def build(
         self, output_values: OutputValues, absolute_time_offset: Optional[int] = None
     ) -> pd.DataFrame:
-      
         """Populate a DataFrame from OutputValues."""
         if output_values.problem is None:
             raise ValueError("OutputValues problem is not set.")
