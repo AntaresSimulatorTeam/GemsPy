@@ -18,7 +18,6 @@ from gems.study.parsing import parse_yaml_components
 from gems.study.resolve_components import build_data_base, build_network, resolve_system
 
 
-
 class FakeTimeIndex:
     def __init__(self, time: int, scenario: int):
         self.time = time
@@ -30,6 +29,7 @@ class FakeSolver:
         class Obj:
             def Value(self) -> float:
                 return 42.0
+
         return Obj()
 
 
@@ -37,6 +37,7 @@ class FakeContext:
     def __init__(self):
         class Block:
             id = 1
+
         self._block = Block()
 
     def block_length(self):
@@ -63,15 +64,13 @@ class FakeComponent:
 
 class FakeOutputValues(OutputValues):
     def __init__(self, problem, components):
-        # on ne veut pas appeler super().__init__ avec un vrai problème compliqué
         self.problem = problem
         self._components = components
 
-def test_simulation_table_builder_manual():
-    # --- Prepare fake objects ---
+
+def test_simulation_table_builder_manual(tmp_path):
     problem = FakeProblem()
 
-    # Two timesteps, one scenario
     ts0 = FakeTimeIndex(time=0, scenario=0)
     ts1 = FakeTimeIndex(time=1, scenario=0)
 
@@ -88,7 +87,6 @@ def test_simulation_table_builder_manual():
     builder = SimulationTableBuilder(simulation_id="test")
     df = builder.build(output_values)
 
-    # --- Expected DataFrame ---
     expected_rows = [
         {
             SimulationColumns.BLOCK: 1,
@@ -112,16 +110,29 @@ def test_simulation_table_builder_manual():
         },
         {
             SimulationColumns.BLOCK: 1,
-            SimulationColumns.COMPONENT: None,
+            SimulationColumns.COMPONENT: pd.NA,
             SimulationColumns.OUTPUT: "objective-value",
-            SimulationColumns.ABSOLUTE_TIME_INDEX: None,
-            SimulationColumns.BLOCK_TIME_INDEX: None,
-            SimulationColumns.SCENARIO_INDEX: None,
+            SimulationColumns.ABSOLUTE_TIME_INDEX: pd.NA,
+            SimulationColumns.BLOCK_TIME_INDEX: pd.NA,
+            SimulationColumns.SCENARIO_INDEX: pd.NA,
             SimulationColumns.VALUE: 42.0,
-            SimulationColumns.BASIS_STATUS: None,
+            SimulationColumns.BASIS_STATUS: pd.NA,
         },
     ]
-    expected_df = pd.DataFrame(expected_rows)
+    expected_df = pd.DataFrame(expected_rows).fillna(pd.NA)
 
-    # --- Assertion ---
-    pd.testing.assert_frame_equal(df.reset_index(drop=True), expected_df, check_dtype=False)
+    pd.testing.assert_frame_equal(
+        df.reset_index(drop=True).fillna(pd.NA), expected_df, check_dtype=False
+    )
+
+    writer = SimulationTableWriter(df)
+    csv_path = writer.write_csv(tmp_path, simulation_id="test", optim_nb=1)
+
+    assert csv_path.exists(), "CSV file was not created"
+
+    with csv_path.open("r") as f:
+        first_line = f.readline().strip()
+
+    expected_header = ",".join(col.value for col in SimulationColumns)
+    assert first_line == expected_header, "CSV header does not match expected columns"
+    csv_path.unlink()

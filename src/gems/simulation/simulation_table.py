@@ -3,8 +3,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
 
-from attr import dataclass
 import pandas as pd
+from attr import dataclass
 
 from gems.simulation.output_values import OutputValues
 
@@ -26,7 +26,9 @@ class SimulationTableBuilder:
     def __init__(self, simulation_id: Optional[str] = None) -> None:
         self.simulation_id = simulation_id or datetime.now().strftime("%Y%m%d-%H%M")
 
-    def build(self, output_values: OutputValues, absolute_time_offset: Optional[int] = None) -> pd.DataFrame:
+    def build(
+        self, output_values: OutputValues, absolute_time_offset: Optional[int] = None
+    ) -> pd.DataFrame:
         """Populate a DataFrame from OutputValues."""
         if output_values.problem is None:
             raise ValueError("OutputValues problem is not set.")
@@ -86,9 +88,9 @@ class SimulationTableBuilder:
 @dataclass
 class SimulationTableWriter:
     """Handles writing simulation tables to CSV."""
-    
+
     simulation_table: pd.DataFrame
-    
+
     def write_csv(
         self,
         output_dir: Union[str, Path],

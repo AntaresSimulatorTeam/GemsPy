@@ -130,7 +130,7 @@ class OutputValues:
             scenario: Optional[int],
             value: float,
             status: Optional[str] = None,
-            is_mip: bool=True,
+            is_mip: bool = True,
         ) -> None:
             timestep = 0 if timestep is None else timestep
             scenario = 0 if scenario is None else scenario
@@ -233,7 +233,7 @@ class OutputValues:
                 key.scenario,
                 value.solution_value(),
                 status=status,
-                is_mip=is_mip
+                is_mip=is_mip,
             )
 
     def component(self, component_id: str) -> "OutputValues.Component":
