@@ -32,7 +32,7 @@ def local_study(tmp_path) -> Study:
     Create an empty study
     """
     study_name = "studyTest"
-    study_version = "880"
+    study_version = "920"
     return create_study_local(study_name, study_version, tmp_path.absolute())
 
 
@@ -145,6 +145,7 @@ def default_storage_cluster_properties() -> STStorageProperties:
         initial_level=0.5,
         initial_level_optim=False,
         enabled=True,
+        efficiency_withdrawal=1.0,
     )
 
 
@@ -160,7 +161,7 @@ def local_study_with_st_storage(
     Create a renewable cluster
     Create a short term storage
     """
-    storage_name = "battery"
+    storage_name = "storage_1"
     local_study_with_renewable.get_areas()["fr"].create_st_storage(
         storage_name, properties=default_storage_cluster_properties
     )

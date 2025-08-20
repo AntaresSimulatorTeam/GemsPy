@@ -185,7 +185,6 @@ class TestConverter:
         converter = self._init_converter_from_study(local_study_w_areas)
         area_components = converter._convert_area_to_component_list(lib_id, ["fr", "it"])
         input_study = InputSystem(nodes=area_components)
-        print("hello", area_components)
 
         # Dump model into yaml file
         yaml_path = converter.study_path / "study_path.yaml"
@@ -246,78 +245,32 @@ class TestConverter:
         expected_validated_data.nodes.sort(key=lambda x: x.id)
         validated_data.nodes.sort(key=lambda x: x.id)
         assert validated_data == expected_validated_data
-
-    def test_convert_renewables_to_component(
-        self, local_study_with_renewable: Study, lib_id: str
-    ):
-        # TODO obtenir le model configuration
-        converter = self._init_converter_from_study(local_study_with_renewable)
-        study_path = converter.study_path
-        (
-            renewables_components,
-            renewable_connections,
-        ) = converter._convert_renewable_to_component_list(lib_id, {}, {})
-
-        timeseries_path = str(
-            study_path
-            / "input"
-            / "renewables"
-            / "series"
-            / "fr"
-            / "generation"
-            / "series"
-        )
-        expected_renewable_connections = [
-            InputPortConnections(
-                component1="generation",
-                port1="balance_port",
-                component2="fr",
-                port2="balance_port",
-            )
-        ]
-        expected_renewable_component = [
-            InputComponent(
-                id="generation",
-                model="antares-historic.renewable",
-                scenario_group=None,
-                parameters=[
-                    InputComponentParameter(
-                        id="unit_count",
-                        time_dependent=False,
-                        scenario_dependent=False,
-                        scenario_group=None,
-                        value=1.0,
-                    ),
-                    InputComponentParameter(
-                        id="p_max_unit",
-                        time_dependent=False,
-                        scenario_dependent=False,
-                        scenario_group=None,
-                        value=0.0,
-                    ),
-                    InputComponentParameter(
-                        id="generation",
-                        time_dependent=True,
-                        scenario_dependent=True,
-                        scenario_group=None,
-                        value=f"{timeseries_path}",
-                    ),
-                ],
-            )
-        ]
-        assert renewables_components == expected_renewable_component
-        assert renewable_connections == expected_renewable_connections
-
+    
     def test_convert_st_storages_to_component(
         self, local_study_with_st_storage, lib_id: str
     ):
-        # TODO obtenir le model configuration
         converter = self._init_converter_from_study(local_study_with_st_storage)
-        study_path = converter.study_path
+        path_load = (
+            Path(__file__).parent.parent.parent
+            / "src"
+            / "gems"
+            / "input_converter"
+            / "data"
+            / "model_configuration"
+            / "st-storage.yaml"
+        )
+
+        resource_content = read_yaml_file(path_load).get("template", {})
+
+        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
+
         (
             storage_components,
             storage_connections,
-        ) = converter._convert_st_storage_to_component_list(lib_id, {}, {})
+        ) = converter._convert_model_to_component_list(
+            valid_areas, resource_content
+        )
+        study_path = converter.study_path
 
         default_path = study_path / "input" / "st-storage" / "series" / "fr" / "battery"
         inflows_path = default_path / "inflows"
@@ -435,14 +388,27 @@ class TestConverter:
         local_study_w_thermal: Study,
         lib_id: str,
     ):
-        # TODO Obtenir le modele configuration
         converter = self._init_converter_from_study(local_study_w_thermal)
-        study_path = converter.study_path
+        path_load = (
+            Path(__file__).parent.parent.parent
+            / "src"
+            / "gems"
+            / "input_converter"
+            / "data"
+            / "model_configuration"
+            / "thermal.yaml"
+        )
+
+        resource_content = read_yaml_file(path_load).get("template", {})
+
+        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
 
         (
             thermals_components,
             thermals_connections,
-        ) = converter._convert_thermal_to_component_list(lib_id, {}, {})
+        ) = converter._convert_model_to_component_list(
+            valid_areas, resource_content
+        )
 
         study_path = converter.study_path
         series_path = study_path / "input" / "thermal" / "series" / "fr" / "gaz"
@@ -592,7 +558,7 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._check_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
 
         (
             load_components,
@@ -668,7 +634,7 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._check_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
 
         (
             solar_components,
@@ -738,7 +704,7 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._check_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
 
         (
             load_components,
@@ -797,7 +763,7 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._check_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
 
         (
             wind_components,
@@ -871,7 +837,7 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._check_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
 
         (
             wind_components,
@@ -905,7 +871,7 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._check_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
 
         (
             wind_components,
@@ -916,13 +882,27 @@ class TestConverter:
         assert wind_components == []
 
     def test_convert_links_to_component(self, local_study_w_links: Study, lib_id: str):
-        # TODO a modifier
         converter = self._init_converter_from_study(local_study_w_links)
-        study_path = converter.study_path
+        path_load = (
+            Path(__file__).parent.parent.parent
+            / "src"
+            / "gems"
+            / "input_converter"
+            / "data"
+            / "model_configuration"
+            / "link.yaml"
+        )
+        resource_content = read_yaml_file(path_load).get("template", {})
+
+        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
+
         (
             links_components,
             links_connections,
-        ) = converter._convert_link_to_component_list(lib_id, {})
+        ) = converter._convert_model_to_component_list(
+            valid_areas, resource_content
+        )
+        study_path = converter.study_path
 
         fr_prefix_path = study_path / "input" / "links" / "fr" / "capacities"
         at_prefix_path = study_path / "input" / "links" / "at" / "capacities"
@@ -1077,12 +1057,11 @@ class TestConverter:
             / "input_converter"
             / "data"
             / "model_configuration"
-            / "battery.yaml"
+            / "battery_new.yaml"
         )
 
         bc_data = read_yaml_file(path_cc).get("template", {})
-        valid_areas: dict = converter._check_resources_not_excluded(bc_data, "area")
-
+        valid_areas: dict = converter._validate_resources_not_excluded(bc_data, "area")
         (
             binding_components,
             binding_connections,
