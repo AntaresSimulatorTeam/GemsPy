@@ -12,10 +12,8 @@
 import logging
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Optional, Union, Callable
+from typing import Any, Optional, Union
 import pandas as pd
-from antares.craft.model.renewable import RenewableCluster
-from antares.craft.model.st_storage import STStorage
 from antares.craft.model.study import Study, read_study_local
 from antares.craft.model.thermal import ThermalCluster
 from antares.craft.exceptions.exceptions import (
@@ -313,10 +311,10 @@ class AntaresStudyConverter:
                 port2=valid_resources["connections"][0]["port2"],
             )
         )
-        # TODO dictionary changed size during iteration, a modifier
-        # En mode hybride
-        # self._delete_legacy_objects(valid_resources)
 
+        # En mode hybride
+        # TODO dictionary changed size during iteration, a modifier
+        # self._delete_legacy_objects(valid_resources)
     def _convert_model_to_component_list(
         self, valid_areas: dict, resource_content: dict
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
@@ -347,7 +345,7 @@ class AntaresStudyConverter:
                     data_consolidated: dict = self._match_area_pattern(
                         resource_content, area.id, model_area_pattern
                     )
-                    if resource_name in ["wind", "solar", "load", "renewables"]:
+                    if resource_name in ["wind", "solar", "load"]:
                         if any(
                             not mp.check_timeseries_validity(param["value"])
                             for param in data_consolidated["component"]["parameters"]
@@ -363,6 +361,7 @@ class AntaresStudyConverter:
                         None,
                     )
                     if cluster_type:
+                        
                         for cluster_id in getattr(
                             area, TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[cluster_type]
                         )():
@@ -414,11 +413,9 @@ class AntaresStudyConverter:
         for file in RESOURCES_FOLDER.iterdir():
             if file.is_file() and file.name.endswith(".yaml"):
                 resource_content = read_yaml_file(file).get("template", {})
-
                 valid_areas: dict = self._validate_resources_not_excluded(
                     resource_content, "area"
                 )
-
                 components, connections = self._convert_model_to_component_list(
                     valid_areas, resource_content
                 )

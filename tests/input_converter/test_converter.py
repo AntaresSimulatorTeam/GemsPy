@@ -119,13 +119,7 @@ class TestConverter:
             connections=[],
         )
 
-        # To ensure that the comparison between the actual and expected results is not affected by the order of the nodes,
-        # both the area_components.nodes and expected_area_components.nodes lists are sorted by the id attribute of each node.
-        # This sorting step ensures that the test checks only the presence and validity of the nodes, not their order.
-        input_study.nodes.sort(key=lambda x: x.id)
-        expected_input_study.nodes.sort(key=lambda x: x.id)
-
-        assert input_study == expected_input_study
+        assert input_study.nodes == expected_input_study.nodes
 
     def test_convert_area_to_component(self, local_study_w_areas: Study, lib_id: str):
         converter = self._init_converter_from_study(local_study_w_areas)
@@ -174,11 +168,6 @@ class TestConverter:
             ),
         ]
 
-        # To ensure that the comparison between the actual and expected results is not affected by the order of the nodes,
-        # both the area_components.nodes and expected_area_components.nodes lists are sorted by the id attribute of each node.
-        # This sorting step ensures that the test checks only the presence and validity of the nodes, not their order.
-        expected_area_components.sort(key=lambda x: x.id)
-        area_components.sort(key=lambda x: x.id)
         assert area_components == expected_area_components
 
     def test_convert_area_to_yaml(self, local_study_w_areas: Study, lib_id: str):
@@ -272,7 +261,7 @@ class TestConverter:
         )
         study_path = converter.study_path
 
-        default_path = study_path / "input" / "st-storage" / "series" / "fr" / "battery"
+        default_path = study_path / "input" / "st-storage" / "series" / "fr" / "storage_1"
         inflows_path = default_path / "inflows"
         lower_rule_curve_path = default_path / "lower-rule-curve"
         pmax_injection_path = default_path / "PMAX-injection"
@@ -280,7 +269,7 @@ class TestConverter:
         upper_rule_curve_path = default_path / "upper-rule-curve"
         expected_storage_connections = [
             InputPortConnections(
-                component1="battery",
+                component1="fr_storage_1",
                 port1="injection_port",
                 component2="fr",
                 port2="balance_port",
@@ -288,31 +277,10 @@ class TestConverter:
         ]
         expected_storage_component = [
             InputComponent(
-                id="battery",
+                id="fr_storage_1",
                 model=f"{lib_id}.short-term-storage",
                 scenario_group=None,
                 parameters=[
-                    InputComponentParameter(
-                        id="efficiency_injection",
-                        time_dependent=False,
-                        scenario_dependent=False,
-                        scenario_group=None,
-                        value=1,
-                    ),
-                    InputComponentParameter(
-                        id="efficiency_withdrawal",
-                        time_dependent=False,
-                        scenario_dependent=False,
-                        scenario_group=None,
-                        value=1,
-                    ),
-                    InputComponentParameter(
-                        id="initial_level",
-                        time_dependent=False,
-                        scenario_dependent=False,
-                        scenario_group=None,
-                        value=0.5,
-                    ),
                     InputComponentParameter(
                         id="reservoir_capacity",
                         time_dependent=False,
@@ -335,11 +303,18 @@ class TestConverter:
                         value=10.0,
                     ),
                     InputComponentParameter(
-                        id="inflows",
-                        time_dependent=True,
-                        scenario_dependent=True,
+                        id="efficiency_injection",
+                        time_dependent=False,
+                        scenario_dependent=False,
                         scenario_group=None,
-                        value=f"{inflows_path}",
+                        value=1,
+                    ),
+                    InputComponentParameter(
+                        id="efficiency_withdrawal",
+                        time_dependent=False,
+                        scenario_dependent=False,
+                        scenario_group=None,
+                        value=1,
                     ),
                     InputComponentParameter(
                         id="lower_rule_curve",
@@ -369,10 +344,25 @@ class TestConverter:
                         scenario_group=None,
                         value=f"{pmax_withdrawal_path}",
                     ),
+                    InputComponentParameter(
+                        id="inflows",
+                        time_dependent=True,
+                        scenario_dependent=True,
+                        scenario_group=None,
+                        value=f"{inflows_path}",
+                    ),
+                    InputComponentParameter(
+                        id="initial_level",
+                        time_dependent=False,
+                        scenario_dependent=False,
+                        scenario_group=None,
+                        value=0.5,
+                    ),
                 ],
             )
         ]
 
+        # TODO faire un sort de base sur les objets "expected"
         assert storage_components == expected_storage_component
         assert storage_connections == expected_storage_connections
 
@@ -422,7 +412,7 @@ class TestConverter:
         ]
         expected_thermals_components = [
             InputComponent(
-                id="gaz",
+                id="fr_gaz",
                 model="antares-historic.thermal",
                 scenario_group=None,
                 parameters=[
@@ -534,6 +524,7 @@ class TestConverter:
                 ],
             )
         ]
+        # TODO preprocessing + nouveaux parametres liées a la nouvelle version antarescraft
         assert thermals_components == expected_thermals_components
         assert thermals_connections == expected_thermals_connections
 
@@ -981,44 +972,22 @@ class TestConverter:
             InputPortConnections(
                 component1="at / fr",
                 port1="in_port",
-                component2="at",
-                port2="balance_port",
-            ),
-            InputPortConnections(
-                component1="at / fr",
-                port1="out_port",
-                component2="fr",
+                component2="at / fr.area_from_id",
                 port2="balance_port",
             ),
             InputPortConnections(
                 component1="at / it",
                 port1="in_port",
-                component2="at",
-                port2="balance_port",
-            ),
-            InputPortConnections(
-                component1="at / it",
-                port1="out_port",
-                component2="it",
+                component2="at / it.area_from_id",
                 port2="balance_port",
             ),
             InputPortConnections(
                 component1="fr / it",
                 port1="in_port",
-                component2="fr",
-                port2="balance_port",
-            ),
-            InputPortConnections(
-                component1="fr / it",
-                port1="out_port",
-                component2="it",
+                component2="fr / it.area_from_id",
                 port2="balance_port",
             ),
         ]
-
-        assert sorted(links_components, key=lambda x: x.id) == sorted(
-            expected_link_component, key=lambda x: x.id
-        )
         assert links_connections == expected_link_connections
 
     @staticmethod
@@ -1141,9 +1110,7 @@ class TestConverter:
         obtained_components = TestConverter._match_area_pattern(
             obtained_components_to_dict, "", str(path) + "/"
         )
-        assert sorted(expected_data["components"], key=lambda x: x["id"]) == sorted(
-            obtained_components, key=lambda x: x["id"]
-        )
+        assert expected_data["components"] ==  obtained_components
 
     def test_multiply_operation(self):
         operation = Operation(multiply_by=2)

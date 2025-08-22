@@ -1,5 +1,152 @@
 system:
   components:
+  - id: fr_fr_batteries_inj
+    model: antares-historic.thermal
+    parameters:
+    - id: p_max_cluster
+      scenario-dependent: true
+      time-dependent: true
+      value: input/thermal/series/fr/fr_batteries_inj/series
+    - id: p_min_unit
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: p_max_unit
+      scenario-dependent: false
+      time-dependent: false
+      value: 1000.0
+    - id: generation_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: startup_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: fixed_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: d_min_up
+      scenario-dependent: false
+      time-dependent: false
+      value: 1.0
+    - id: d_min_down
+      scenario-dependent: false
+      time-dependent: false
+      value: 1.0
+  - id: fr_fr_batteries_inj
+    model: antares-historic.thermal
+    parameters:
+    - id: p_max_cluster
+      scenario-dependent: true
+      time-dependent: true
+      value: input/thermal/series/fr/fr_batteries_inj/series
+    - id: p_min_unit
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: p_max_unit
+      scenario-dependent: false
+      time-dependent: false
+      value: 1000.0
+    - id: generation_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: startup_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: fixed_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: d_min_up
+      scenario-dependent: false
+      time-dependent: false
+      value: 1.0
+    - id: d_min_down
+      scenario-dependent: false
+      time-dependent: false
+      value: 1.0
+  - id: z_batteries_z_batteries_batteries_fr_1
+    model: antares-historic.thermal
+    parameters:
+    - id: p_max_cluster
+      scenario-dependent: true
+      time-dependent: true
+      value: input/thermal/series/z_batteries/z_batteries_batteries_fr_1/series
+    - id: p_min_unit
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: p_max_unit
+      scenario-dependent: false
+      time-dependent: false
+      value: 2000.0
+    - id: generation_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: startup_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: fixed_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: d_min_up
+      scenario-dependent: false
+      time-dependent: false
+      value: 1.0
+    - id: d_min_down
+      scenario-dependent: false
+      time-dependent: false
+      value: 1.0
+  - id: z_batteries_z_batteries_batteries_fr_1
+    model: antares-historic.thermal
+    parameters:
+    - id: p_max_cluster
+      scenario-dependent: true
+      time-dependent: true
+      value: input/thermal/series/z_batteries/z_batteries_batteries_fr_1/series
+    - id: p_min_unit
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: p_max_unit
+      scenario-dependent: false
+      time-dependent: false
+      value: 2000.0
+    - id: generation_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: startup_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: fixed_cost
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: d_min_up
+      scenario-dependent: false
+      time-dependent: false
+      value: 1.0
+    - id: d_min_down
+      scenario-dependent: false
+      time-dependent: false
+      value: 1.0
+  - id: load_fr
+    model: antares-historic.load
+    parameters:
+    - id: load
+      scenario-dependent: true
+      time-dependent: true
+      value: input/load/series/load_fr
   - id: battery_fr
     model: andromede-v1-models.battery
     parameters:
@@ -10,7 +157,7 @@ system:
     - id: injection_nominal_capacity
       scenario-dependent: false
       time-dependent: false
-      value: 1100.0
+      value: 1.0
     - id: withdrawal_nominal_capacity
       scenario-dependent: false
       time-dependent: false
@@ -30,121 +177,58 @@ system:
     - id: upper_rule_curve
       scenario-dependent: false
       time-dependent: true
-      value: /home/wsl/PlaneTerr/andromede-modeling-prototype/tests/input_converter/resources/mini_test_batterie_BP23/input/thermal/series/z_batteries/z_batteries_batteries_fr_1/upper_rule_curve_z_batteries
+      value: input/thermal/series/z_batteries/z_batteries_batteries_fr_1/series
     - id: p_max_injection_modulation
       scenario-dependent: false
       time-dependent: true
-      value: /home/wsl/PlaneTerr/andromede-modeling-prototype/tests/input_converter/resources/mini_test_batterie_BP23/input/links/fr/capacities/p_max_injection_modulation_fr
+      value: input/links/fr/capacities/z_batteries_direct
     - id: p_max_withdrawal_modulation
       scenario-dependent: false
       time-dependent: true
-      value: /home/wsl/PlaneTerr/andromede-modeling-prototype/tests/input_converter/resources/mini_test_batterie_BP23/input/thermal/series/fr/fr_batteries_inj/p_max_withdrawal_modulation_fr
+      value: input/thermal/series/fr/fr_batteries_inj/series
     - id: marginal_cost
       scenario-dependent: false
       time-dependent: true
-      value: /home/wsl/PlaneTerr/andromede-modeling-prototype/tests/input_converter/resources/mini_test_batterie_BP23/input/links/fr/marginal_cost_fr
-  - id: load_fr
-    model: antares-historic.load
+      value: input/links/fr/z_batteries_parameters
+  - id: fr / z_batteries
+    model: antares-historic.link
     parameters:
-    - id: load
+    - id: capacity_direct
       scenario-dependent: true
       time-dependent: true
-      value: /home/wsl/PlaneTerr/andromede-modeling-prototype/tests/input_converter/resources/mini_test_batterie_BP23/input/load/series/load_fr
-  - id: load_z_batteries
-    model: antares-historic.load
-    parameters:
-    - id: load
+      value: input/links/fr/capacities/z_batteries_direct
+    - id: capacity_indirect
       scenario-dependent: true
       time-dependent: true
-      value: /home/wsl/PlaneTerr/andromede-modeling-prototype/tests/input_converter/resources/mini_test_batterie_BP23/input/load/series/load_z_batteries
-  - id: solar_fr
-    model: antares-historic.renewable
-    parameters:
-    - id: nominal_capacity
-      scenario-dependent: false
-      time-dependent: false
-      value: 1.0
-    - id: unit_count
-      scenario-dependent: false
-      time-dependent: false
-      value: 1.0
-    - id: solar
-      scenario-dependent: true
-      time-dependent: true
-      value: /home/wsl/PlaneTerr/andromede-modeling-prototype/tests/input_converter/resources/mini_test_batterie_BP23/input/solar/series/solar_fr
-  - id: solar_z_batteries
-    model: antares-historic.renewable
-    parameters:
-    - id: nominal_capacity
-      scenario-dependent: false
-      time-dependent: false
-      value: 1.0
-    - id: unit_count
-      scenario-dependent: false
-      time-dependent: false
-      value: 1.0
-    - id: solar
-      scenario-dependent: true
-      time-dependent: true
-      value: /home/wsl/PlaneTerr/andromede-modeling-prototype/tests/input_converter/resources/mini_test_batterie_BP23/input/solar/series/solar_z_batteries
-  - id: wind_fr
-    model: antares-historic.renewable
-    parameters:
-    - id: nominal_capacity
-      scenario-dependent: false
-      time-dependent: false
-      value: 1.0
-    - id: unit_count
-      scenario-dependent: false
-      time-dependent: false
-      value: 1.0
-    - id: wind
-      scenario-dependent: true
-      time-dependent: true
-      value: /home/wsl/PlaneTerr/andromede-modeling-prototype/tests/input_converter/resources/mini_test_batterie_BP23/input/wind/series/wind_fr
-  - id: wind_z_batteries
-    model: antares-historic.renewable
-    parameters:
-    - id: nominal_capacity
-      scenario-dependent: false
-      time-dependent: false
-      value: 1.0
-    - id: unit_count
-      scenario-dependent: false
-      time-dependent: false
-      value: 1.0
-    - id: wind
-      scenario-dependent: true
-      time-dependent: true
-      value: /home/wsl/PlaneTerr/andromede-modeling-prototype/tests/input_converter/resources/mini_test_batterie_BP23/input/wind/series/wind_z_batteries
+      value: input/links/fr/capacities/z_batteries_indirect
   connections:
-  - component1: battery_fr
+  - component1: fr_fr_batteries_inj
     component2: fr
-    port1: injection_port
+    port1: balance_port
+    port2: balance_port
+  - component1: fr_fr_batteries_inj
+    component2: fr
+    port1: balance_port
+    port2: balance_port
+  - component1: z_batteries_z_batteries_batteries_fr_1
+    component2: z_batteries
+    port1: balance_port
+    port2: balance_port
+  - component1: z_batteries_z_batteries_batteries_fr_1
+    component2: z_batteries
+    port1: balance_port
     port2: balance_port
   - component1: load_fr
     component2: fr
     port1: balance_port
     port2: balance_port
-  - component1: load_z_batteries
-    component2: z_batteries
-    port1: balance_port
-    port2: balance_port
-  - component1: solar_fr
+  - component1: battery_fr
     component2: fr
-    port1: balance_port
+    port1: injection_port
     port2: balance_port
-  - component1: solar_z_batteries
-    component2: z_batteries
-    port1: balance_port
-    port2: balance_port
-  - component1: wind_fr
-    component2: fr
-    port1: balance_port
-    port2: balance_port
-  - component1: wind_z_batteries
-    component2: z_batteries
-    port1: balance_port
+  - component1: fr / z_batteries
+    component2: fr / z_batteries.area_from_id
+    port1: in_port
     port2: balance_port
   nodes:
   - id: fr

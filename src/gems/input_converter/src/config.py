@@ -59,7 +59,7 @@ TEMPLATE_LINK_TO_TIMESERIES_FILE_TYPE = {
     "capacity_direct": "LINKS_CAPACITIES_DIRECT",
     "capacity_indirect": "LINKS_CAPACITIES_INDIRECT",
 }
-TEMPLATE_ST_STORAGE_TO_TIMESERIES_FILE_TYPE = {
+TEMPLATE_TO_TIMESERIES_FILE_TYPE = {
     "pmax_injection": "ST_STORAGE_PMAX_INJECTION",
     "pmax_withdrawal": "ST_STORAGE_PMAX_WITHDRAWAL",
     "lower_rule_curve": "ST_STORAGE_LOWER_RULE_CURVE",
@@ -70,9 +70,8 @@ TEMPLATE_ST_STORAGE_TO_TIMESERIES_FILE_TYPE = {
     "cost_level": "ST_STORAGE_COST_LEVEL",
     "cost_variation_injection": "ST_STORAGE_COST_VARIATION_INJECTION",
     "cost_variation_withdrawal": "ST_STORAGE_COST_VARIATION_WITHDRAWAL",
-}
-TEMPLATE_THERMAL_TO_TIMESERIES_FILE_TYPE = {
     "thermal_series": "THERMAL_SERIES",
     "series_co2_cost": "THERMAL_CO2",
     "series_fuel_cost": "THERMAL_FUEL",
+    "renewable_series": "RENEWABLE_SERIES",
 }
