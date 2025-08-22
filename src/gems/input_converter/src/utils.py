@@ -9,10 +9,12 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
+
 from pathlib import Path
 from typing import Any
-
+import os
 import yaml
+import pandas as pd
 from pandas import DataFrame
 from pydantic import BaseModel
 
@@ -63,3 +65,11 @@ def read_yaml_file(file_path: Path) -> dict[str, Any]:
             return yaml.safe_load(file)
         except yaml.YAMLError as e:
             raise yaml.YAMLError(f"Error trying to read yaml file {file_path}: {e}")
+
+
+def save_to_csv(series: pd.Series, output_file):
+    output_dir = os.path.dirname(output_file)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    series.to_csv(output_file, sep="\t", index=False, header=False)
