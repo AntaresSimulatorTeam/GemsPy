@@ -9,16 +9,23 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
-import logging
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Optional, Union
+
 import pandas as pd
+from antares.craft.exceptions.exceptions import ReferencedObjectDeletionNotAllowed
 from antares.craft.model.study import Study, read_study_local
 from antares.craft.model.thermal import ThermalCluster
-from antares.craft.exceptions.exceptions import (
-    ReferencedObjectDeletionNotAllowed,
+
+from gems.input_converter.src.config import (
+    MATRIX_TYPES_TO_SET_METHOD,
+    STUDY_LEVEL_DELETION,
+    STUDY_LEVEL_GET,
+    TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD,
+    TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD,
 )
+from gems.input_converter.src.data_preprocessing.dataclasses import ConversionMode
 from gems.input_converter.src.data_preprocessing.preprocessing import (
     ModelsConfigurationProcessing,
 )
@@ -28,19 +35,15 @@ from gems.input_converter.src.utils import (
     resolve_path,
     transform_to_yaml,
 )
-from gems.input_converter.src.config import (
-    TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD,
-    MATRIX_TYPES_TO_SET_METHOD,
-    TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD,
-    STUDY_LEVEL_DELETION,
-    STUDY_LEVEL_GET,
-)
 from gems.study.parsing import (
+    InputAreaConnections,
     InputComponent,
     InputComponentParameter,
     InputPortConnections,
     InputSystem,
 )
+
+from .logger import Logger
 
 RESOURCES_FOLDER = Path(__file__).parents[1] / "data" / "model_configuration"
 
@@ -49,7 +52,8 @@ class AntaresStudyConverter:
     def __init__(
         self,
         study_input: Union[Path, Study],
-        logger: logging.Logger,
+        logger: Logger,
+        mode: ConversionMode = "full",
         output_path: Optional[Path] = None,
         period: Optional[int] = None,
     ):
@@ -57,6 +61,7 @@ class AntaresStudyConverter:
         Initialize processor
         """
         self.logger = logger
+        self.mode = mode
         self.period: int = period if period else 168
 
         if isinstance(study_input, Study):
@@ -71,122 +76,116 @@ class AntaresStudyConverter:
             Path(output_path) if output_path else self.study_path / Path("output.yaml")
         )
         self.areas: MappingProxyType = self.study.get_areas()
-        # self.legacy_objects_for_bc = {}
+        self.legacy_objects = []
 
-    # def _convert_thermal_to_component_list(
-    #     self, lib_id: str, valid_areas: dict
-    # ) -> tuple[list[InputComponent], list[InputPortConnections]]:
-    #     components = []
-    #     connections = []
-    #     self.logger.info("Converting thermals to component list...")
+    def _convert_thermal_to_component_list(
+        self, valid_areas: dict, components: list, connections: list
+    ) -> tuple[list[InputComponent], list[InputPortConnections]]:
+        self.logger.info("Converting thermals to component list...")
+        lib_id = "antares-historic"
 
-    #     thermals_to_exclude: list = self._legacy_component_to_exclude(self.legacy_objects_for_bc, component_type="thermals"
-    #     )
-
-    #     # Add thermal components for each area
-    #     for area in self.areas.values():
-    #         thermals: dict[str, ThermalCluster] = area.get_thermals()
-    #         for thermal in thermals.values():
-    #             if f"{area.id}.{thermal.id}" in thermals_to_exclude:
-    #                 continue
-
-    #             series_path = (
-    #                 self.study_path
-    #                 / "input"
-    #                 / "thermal"
-    #                 / "series"
-    #                 / Path(thermal.area_id)
-    #                 / Path(thermal.id)
-    #                 / "series.txt"
-    #             )
-    #             tdp = ThermalDataPreprocessing(thermal, self.study_path)
-    #             components.append(
-    #                 InputComponent(
-    #                     id=thermal.id,
-    #                     model=f"{lib_id}.thermal",
-    #                     parameters=[
-    #                         tdp.generate_component_parameter("p_min_cluster"),
-    #                         tdp.generate_component_parameter("nb_units_min"),
-    #                         tdp.generate_component_parameter("nb_units_max"),
-    #                         tdp.generate_component_parameter(
-    #                             "nb_units_max_variation_forward", self.period
-    #                         ),
-    #                         tdp.generate_component_parameter(
-    #                             "nb_units_max_variation_backward", self.period
-    #                         ),
-    #                         InputComponentParameter(
-    #                             id="unit_count",
-    #                             time_dependent=False,
-    #                             scenario_dependent=False,
-    #                             value=thermal.properties.unit_count,
-    #                         ),
-    #                         InputComponentParameter(
-    #                             id="p_min_unit",
-    #                             time_dependent=False,
-    #                             scenario_dependent=False,
-    #                             value=thermal.properties.min_stable_power,
-    #                         ),
-    #                         InputComponentParameter(
-    #                             id="efficiency",
-    #                             time_dependent=False,
-    #                             scenario_dependent=False,
-    #                             value=thermal.properties.efficiency,
-    #                         ),
-    #                         InputComponentParameter(
-    #                             id="p_max_unit",
-    #                             time_dependent=False,
-    #                             scenario_dependent=False,
-    #                             value=thermal.properties.nominal_capacity,
-    #                         ),
-    #                         InputComponentParameter(
-    #                             id="generation_cost",
-    #                             time_dependent=False,
-    #                             scenario_dependent=False,
-    #                             value=thermal.properties.marginal_cost,
-    #                         ),
-    #                         InputComponentParameter(
-    #                             id="fixed_cost",
-    #                             time_dependent=False,
-    #                             scenario_dependent=False,
-    #                             value=thermal.properties.fixed_cost,
-    #                         ),
-    #                         InputComponentParameter(
-    #                             id="startup_cost",
-    #                             time_dependent=False,
-    #                             scenario_dependent=False,
-    #                             value=thermal.properties.startup_cost,
-    #                         ),
-    #                         InputComponentParameter(
-    #                             id="d_min_up",
-    #                             time_dependent=False,
-    #                             scenario_dependent=False,
-    #                             value=thermal.properties.min_up_time,
-    #                         ),
-    #                         InputComponentParameter(
-    #                             id="d_min_down",
-    #                             time_dependent=False,
-    #                             scenario_dependent=False,
-    #                             value=thermal.properties.min_down_time,
-    #                         ),
-    #                         InputComponentParameter(
-    #                             id="p_max_cluster",
-    #                             time_dependent=True,
-    #                             scenario_dependent=True,
-    #                             value=str(series_path).removesuffix(".txt"),
-    #                         ),
-    #                     ],
-    #                 )
-    #             )
-
-    #             connections.append(
-    #                 InputPortConnections(
-    #                     component1=thermal.id,
-    #                     port1="balance_port",
-    #                     component2=area.id,
-    #                     port2="balance_port",
-    #                 )
-    #             )
-    #     return components, connections
+        # Add thermal components for each area
+        for area in self.areas.values():
+            if area.id not in valid_areas:
+                continue
+            thermals: dict[str, ThermalCluster] = area.get_thermals()
+            for thermal in thermals.values():
+                series_path = (
+                    self.study_path
+                    / "input"
+                    / "thermal"
+                    / "series"
+                    / Path(thermal.area_id)
+                    / Path(thermal.id)
+                    / "series.txt"
+                )
+                tdp = ThermalDataPreprocessing(thermal, self.study_path)
+                components.append(
+                    InputComponent(
+                        id=thermal.id,
+                        model=f"{lib_id}.thermal",
+                        parameters=[
+                            tdp.generate_component_parameter("p_min_cluster"),
+                            tdp.generate_component_parameter("nb_units_min"),
+                            tdp.generate_component_parameter("nb_units_max"),
+                            tdp.generate_component_parameter(
+                                "nb_units_max_variation_forward", self.period
+                            ),
+                            tdp.generate_component_parameter(
+                                "nb_units_max_variation_backward", self.period
+                            ),
+                            InputComponentParameter(
+                                id="unit_count",
+                                time_dependent=False,
+                                scenario_dependent=False,
+                                value=thermal.properties.unit_count,
+                            ),
+                            InputComponentParameter(
+                                id="p_min_unit",
+                                time_dependent=False,
+                                scenario_dependent=False,
+                                value=thermal.properties.min_stable_power,
+                            ),
+                            InputComponentParameter(
+                                id="efficiency",
+                                time_dependent=False,
+                                scenario_dependent=False,
+                                value=thermal.properties.efficiency,
+                            ),
+                            InputComponentParameter(
+                                id="p_max_unit",
+                                time_dependent=False,
+                                scenario_dependent=False,
+                                value=thermal.properties.nominal_capacity,
+                            ),
+                            InputComponentParameter(
+                                id="generation_cost",
+                                time_dependent=False,
+                                scenario_dependent=False,
+                                value=thermal.properties.marginal_cost,
+                            ),
+                            InputComponentParameter(
+                                id="fixed_cost",
+                                time_dependent=False,
+                                scenario_dependent=False,
+                                value=thermal.properties.fixed_cost,
+                            ),
+                            InputComponentParameter(
+                                id="startup_cost",
+                                time_dependent=False,
+                                scenario_dependent=False,
+                                value=thermal.properties.startup_cost,
+                            ),
+                            InputComponentParameter(
+                                id="d_min_up",
+                                time_dependent=False,
+                                scenario_dependent=False,
+                                value=thermal.properties.min_up_time,
+                            ),
+                            InputComponentParameter(
+                                id="d_min_down",
+                                time_dependent=False,
+                                scenario_dependent=False,
+                                value=thermal.properties.min_down_time,
+                            ),
+                            InputComponentParameter(
+                                id="p_max_cluster",
+                                time_dependent=True,
+                                scenario_dependent=True,
+                                value=str(series_path).removesuffix(".txt"),
+                            ),
+                        ],
+                    )
+                )
+                connections.append(
+                    InputPortConnections(
+                        component1=thermal.id,
+                        port1="balance_port",
+                        component2=area.id,
+                        port2="balance_port",
+                    )
+                )
+        return components, connections
 
     def _match_area_pattern(
         self, object: Any, param_value: str, model_area_pattern: str = "${area}"
@@ -239,13 +238,8 @@ class AntaresStudyConverter:
             )
         return components
 
-    def _delete_legacy_objects(self, new_model_data: dict) -> dict:
-        legacy = new_model_data.get("legacy-objects-to-delete", [])
-
-        for item in legacy:
-            item = item.get("object-properties")
-            if not isinstance(item, dict):
-                continue
+    def _delete_legacy_objects(self) -> dict:
+        for item in self.legacy_objects:
             item_type = item.get("type")
             try:
                 if item_type in STUDY_LEVEL_DELETION:
@@ -258,6 +252,12 @@ class AntaresStudyConverter:
                         getattr(self.study, STUDY_LEVEL_GET[item_type])()[id]
                     )
                 elif item_type in TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD:
+                    print(
+                        "deleting",
+                        TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD[item_type],
+                        TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[item_type],
+                        [item.get("cluster")],
+                    )
                     getattr(
                         self.areas[item.get("area")],
                         TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD[item_type],
@@ -280,6 +280,8 @@ class AntaresStudyConverter:
                 self.logger.warning(
                     f"Failure to delete {item} because the method is not implemented yet on antares craft"
                 )
+
+        self.legacy_objects[:] = []
 
     def _iterate_through_model(
         self,
@@ -311,10 +313,19 @@ class AntaresStudyConverter:
                 port2=valid_resources["connections"][0]["port2"],
             )
         )
+        if self.mode == ConversionMode.HYBRID:
+            # TODO area-connections
+            area_connections = []
+            area_connections.append(InputAreaConnections())
 
-        # En mode hybride
-        # TODO dictionary changed size during iteration, a modifier
-        # self._delete_legacy_objects(valid_resources)
+        if self.mode == ConversionMode.HYBRID:
+            for item in valid_resources.get("legacy-objects-to-delete", []):
+                item = item.get("object-properties")
+                if not isinstance(item, dict):
+                    continue
+                self.legacy_objects.append(item)
+
+
     def _convert_model_to_component_list(
         self, valid_areas: dict, resource_content: dict
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
@@ -341,6 +352,12 @@ class AntaresStudyConverter:
                     )
 
             else:
+                if resource_name == "thermal":
+                    # Legacy conversion for thermal cluster
+                    self._convert_thermal_to_component_list(
+                        valid_areas, components, connections
+                    )
+                    return components, connections
                 for area in valid_areas.values():
                     data_consolidated: dict = self._match_area_pattern(
                         resource_content, area.id, model_area_pattern
@@ -361,7 +378,6 @@ class AntaresStudyConverter:
                         None,
                     )
                     if cluster_type:
-                        
                         for cluster_id in getattr(
                             area, TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[cluster_type]
                         )():
@@ -409,24 +425,33 @@ class AntaresStudyConverter:
 
         list_components: list[InputComponent] = []
         list_connections: list[InputPortConnections] = []
-        list_valid_areas = set()
+        list_valid_areas = set(self.areas.keys())
+        all_excluded_areas = set()
         for file in RESOURCES_FOLDER.iterdir():
             if file.is_file() and file.name.endswith(".yaml"):
                 resource_content = read_yaml_file(file).get("template", {})
                 valid_areas: dict = self._validate_resources_not_excluded(
                     resource_content, "area"
                 )
+
                 components, connections = self._convert_model_to_component_list(
                     valid_areas, resource_content
                 )
                 list_components.extend(components)
                 list_connections.extend(connections)
 
-                list_valid_areas.update(valid_areas.keys())
+                for param in resource_content.get("template-parameters", []):
+                    if param.get("name") == "area":
+                        all_excluded_areas.update(
+                            item["id"] for item in param.get("exclude", [])
+                        )
+
+                list_valid_areas.difference_update(all_excluded_areas)
 
         area_components = self._convert_area_to_component_list(
             antares_historic_lib_id, list_valid_areas
         )
+
         self.logger.info(
             "Converting node, components and connections into Input study..."
         )
@@ -440,3 +465,9 @@ class AntaresStudyConverter:
         study = self.convert_study_to_input_study()
         self.logger.info("Converting input study into yaml file...")
         transform_to_yaml(model=study, output_path=self.output_path)
+
+
+@staticmethod
+def count_objects_in_yaml_file(objet: Study):
+    pass
+    # TODO faire un compteur delements

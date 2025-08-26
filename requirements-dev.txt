@@ -12,7 +12,7 @@ annotated-types==0.7.0
     # via
     #   -r requirements.txt
     #   pydantic
-antares-craft==0.2.10
+antares-craft==0.2.9
     # via -r requirements.txt
 antares-study-version==1.0.15
     # via

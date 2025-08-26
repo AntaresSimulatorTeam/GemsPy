@@ -1,8 +1,14 @@
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
 
 import pandas as pd
+
+
+class ConversionMode(Enum):
+    HYBRID = "hybrid"
+    FULL = "full"
 
 
 @dataclass(frozen=True)

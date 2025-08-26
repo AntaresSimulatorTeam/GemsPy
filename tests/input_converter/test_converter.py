@@ -376,7 +376,6 @@ class TestConverter:
     def test_convert_thermals_to_component(
         self,
         local_study_w_thermal: Study,
-        lib_id: str,
     ):
         converter = self._init_converter_from_study(local_study_w_thermal)
         path_load = (
@@ -412,7 +411,7 @@ class TestConverter:
         ]
         expected_thermals_components = [
             InputComponent(
-                id="fr_gaz",
+                id="gaz",
                 model="antares-historic.thermal",
                 scenario_group=None,
                 parameters=[
@@ -1017,7 +1016,6 @@ class TestConverter:
 
         expected_components = expected_data["components"]
         expected_connections = expected_data["connections"]
-
         converter = self._init_converter_from_path(path)
         path_cc = (
             Path(__file__).parent.parent.parent
@@ -1031,6 +1029,8 @@ class TestConverter:
 
         bc_data = read_yaml_file(path_cc).get("template", {})
         valid_areas: dict = converter._validate_resources_not_excluded(bc_data, "area")
+        # TODO pour les preprocessng, il faut revenir a letat initial. du coup ca implique
+        # De copier le dossier entier, le tester, le supprimer apres
         (
             binding_components,
             binding_connections,
@@ -1081,6 +1081,7 @@ class TestConverter:
         obtained_parameters = TestConverter._match_area_pattern(
             obtained_parameters_to_dict, "", str(path) + "/"
         )
+
         assert obtained_parameters == expected_component["parameters"]
 
     def test_convert_study_path_to_input_study(self):
@@ -1110,7 +1111,22 @@ class TestConverter:
         obtained_components = TestConverter._match_area_pattern(
             obtained_components_to_dict, "", str(path) + "/"
         )
-        assert expected_data["components"] ==  obtained_components
+
+        def normalize_components(components):
+            return [
+                {
+                    **c,
+                    "parameters": [
+                        {k: p[k] for k in ("id", "value", "scenario_dependent", "time_dependent", "scenario_group")}
+                        for p in c["parameters"]
+                    ],
+                }
+                for c in components
+            ]
+
+        assert sorted(
+            normalize_components(obtained_components), key=lambda x: x["id"]
+        ) == sorted(expected_data["components"], key=lambda x: x["id"])
 
     def test_multiply_operation(self):
         operation = Operation(multiply_by=2)

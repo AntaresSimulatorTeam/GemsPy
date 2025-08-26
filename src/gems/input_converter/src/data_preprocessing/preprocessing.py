@@ -1,25 +1,28 @@
-from pathlib import Path
 import copy
+from pathlib import Path
 from typing import Optional, Union
+
 import pandas as pd
-from antares.craft.model.link import Link
 from antares.craft.model.binding_constraint import BindingConstraint, ConstraintTerm
-from antares.craft.tools.time_series_tool import TimeSeriesFileType
+from antares.craft.model.link import Link
 from antares.craft.model.study import Study
-from gems.input_converter.src.utils import check_dataframe_validity, save_to_csv
-from gems.input_converter.src.data_preprocessing.dataclasses import (
-    Operation,
-    ComplexData,
-    ObjectProperties,
-    MatrixData,
-)
+from antares.craft.tools.time_series_tool import TimeSeriesFileType
+
 from gems.input_converter.src.config import (
     MATRIX_TYPES_TO_GET_METHOD,
-    TIMESERIES_NAME_TO_METHOD,
     TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD,
     TEMPLATE_LINK_TO_TIMESERIES_FILE_TYPE,
     TEMPLATE_TO_TIMESERIES_FILE_TYPE,
+    TIMESERIES_NAME_TO_METHOD,
 )
+from gems.input_converter.src.data_preprocessing.dataclasses import (
+    ComplexData,
+    ConversionMode,
+    MatrixData,
+    ObjectProperties,
+    Operation,
+)
+from gems.input_converter.src.utils import check_dataframe_validity, save_to_csv
 
 DataType = Union[ComplexData, MatrixData]
 
@@ -37,6 +40,7 @@ TYPE_TO_DC = {
 class ModelsConfigurationProcessing:
     preprocessed_values: dict[str, float] = {}
     param_id: Optional[str] = None
+    mode: ConversionMode = ConversionMode.FULL
 
     def __init__(self, study: Study):
         self.study = study
@@ -49,29 +53,44 @@ class ModelsConfigurationProcessing:
             time_series: pd.DataFrame = getattr(
                 self.study.get_areas()[area], MATRIX_TYPES_TO_GET_METHOD[type]
             )()
-            output_file = (
-                self.study.path
-                / "input"
-                / type
-                / "series"
-                / f"{self.param_id}_{area}.txt"
-            )
-            # Mode hybride
-            # output_file = self.study.path / "input" / "data-series" / f"{self.param_id}_{area}.txt"
+            if self.mode == ConversionMode.HYBRID:
+                output_file = (
+                    self.study.path
+                    / "input"
+                    / "data-series"
+                    / f"{self.param_id}_{area}.txt"
+                )
+            else:
+                output_file = (
+                    self.study.path
+                    / "input"
+                    / type
+                    / "series"
+                    / f"{self.param_id}_{area}.txt"
+                )
+
         elif type == "link":
             link: Link = self.study.get_links()[obj.object_properties.link]
             time_series: pd.DataFrame = getattr(
                 link, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field]
             )()
-            file_path = getattr(
-                TimeSeriesFileType,
-                TEMPLATE_LINK_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
-            ).value.format(area_id=link.area_from_id, second_area_id=link.area_to_id)
-            output_file = self.study.path / file_path
-            # Mode hybride
-            # output_file = self.study.path / "input" / "data-series" / f"{self.param_id}_{link.area_from_id}_{link.area_to_id}.txt"
+            if self.mode == ConversionMode.HYBRID:
+                output_file = (
+                    self.study.path
+                    / "input"
+                    / "data-series"
+                    / f"{self.param_id}_{link.area_from_id}_{link.area_to_id}.txt"
+                )
+            else:
+                file_path = getattr(
+                    TimeSeriesFileType,
+                    TEMPLATE_LINK_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
+                ).value.format(
+                    area_id=link.area_from_id, second_area_id=link.area_to_id
+                )
+                output_file = self.study.path / file_path
         elif type in ["st_storage", "thermal", "renewable"]:
-            # TODO Thermal preprocessing not handled for the moment
+            # TODO Thermal preprocessing not handled for the moment in generic mode
             cluster = getattr(
                 self.study.get_areas()[area], TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[type]
             )()[obj.object_properties.cluster]
@@ -86,18 +105,23 @@ class ModelsConfigurationProcessing:
                 if type == "thermal":
                     self.preprocessed_values[self.param_id] = value
                 return value
-            file_path = getattr(
-                TimeSeriesFileType,
-                TEMPLATE_TO_TIMESERIES_FILE_TYPE[
-                    obj.object_properties.field
-                ],
-            ).value.format(area_id=cluster.area_id, cluster_id=cluster.id)
+            if self.mode == ConversionMode.HYBRID:
+                output_file = (
+                    self.study.path
+                    / "input"
+                    / "data-series"
+                    / f"{self.param_id}_{area}_{obj.object_properties.cluster}.txt"
+                )
+            else:
+                file_path = getattr(
+                    TimeSeriesFileType,
+                    TEMPLATE_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
+                ).value.format(area_id=cluster.area_id, cluster_id=cluster.id)
 
-            output_file = self.study.path / file_path
-            # Mode hybride
-            # output_file = self.study.path / "input" / "data-series" / f"{self.param_id}_{area}_{obj.object_properties.cluster}.txt"
+                output_file = self.study.path / file_path
+
         elif type == "binding_constraint":
-            # TODO Add timeseries linked to binding constraints? 
+            # TODO Add timeseries linked to binding constraints?
             bindings: BindingConstraint = self.study.get_binding_constraints()[
                 obj.object_properties.binding_constraint_id
             ]

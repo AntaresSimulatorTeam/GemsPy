@@ -10,11 +10,12 @@
 #
 # This file is part of the Antares project.
 
+import os
 from pathlib import Path
 from typing import Any
-import os
-import yaml
+
 import pandas as pd
+import yaml
 from pandas import DataFrame
 from pydantic import BaseModel
 

@@ -16,6 +16,8 @@ from argparse import ArgumentParser, ArgumentTypeError, Namespace
 from configparser import ConfigParser
 from pathlib import Path
 
+from gems.input_converter.src.data_preprocessing.dataclasses import ConversionMode
+
 from .converter import AntaresStudyConverter
 from .logger import Logger
 
@@ -122,6 +124,12 @@ def parse_commandline() -> Namespace:
         type=PathType(exists=True, dir_ok=True),
         help="Give the path of the output path",
     )
+    parser.add_argument(
+        "-m",
+        "--mode",
+        type=ConversionMode,
+        help="Select the mode",
+    )
     return parser.parse_args()
 
 
@@ -150,10 +158,14 @@ if __name__ == "__main__":
 
     if args.study_path:
         config_parser.set("study", "study_path", str(args.study_path))
-    if args.output_path:
-        config_parser.set("study", "output_path", str(args.output_path))
+    # if args.output_path:
+    #     config_parser.set("study", "output_path", str(args.output_path))
+
+    mode = args.mode.value if args.mode else ConversionMode.FULL.value
 
     converter = AntaresStudyConverter(
-        study_input=Path(config_parser["study"].get("study_path")), logger=logger
+        study_input=Path(config_parser["study"].get("study_path")),
+        logger=logger,
+        mode=mode,
     )
     converter.process_all()
