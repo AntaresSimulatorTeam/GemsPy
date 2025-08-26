@@ -40,20 +40,21 @@ TYPE_TO_DC = {
 class ModelsConfigurationProcessing:
     preprocessed_values: dict[str, float] = {}
     param_id: Optional[str] = None
-    mode: ConversionMode = ConversionMode.FULL
 
-    def __init__(self, study: Study):
+    def __init__(self, study: Study, mode: ConversionMode):
         self.study = study
+        self.mode = mode
         self.study_path: Path = study.service.config.study_path  # type: ignore
 
     def calculate_value(self, obj: DataType) -> Union[float, str]:
         area: str = obj.object_properties.area
         type: str = obj.object_properties.type
+        print("coucou", area, type, self.mode, ConversionMode.HYBRID.value)
         if type in ["load", "wind", "solar"]:
             time_series: pd.DataFrame = getattr(
                 self.study.get_areas()[area], MATRIX_TYPES_TO_GET_METHOD[type]
             )()
-            if self.mode == ConversionMode.HYBRID:
+            if self.mode == ConversionMode.HYBRID.value:
                 output_file = (
                     self.study.path
                     / "input"
@@ -74,7 +75,7 @@ class ModelsConfigurationProcessing:
             time_series: pd.DataFrame = getattr(
                 link, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field]
             )()
-            if self.mode == ConversionMode.HYBRID:
+            if self.mode == ConversionMode.HYBRID.value:
                 output_file = (
                     self.study.path
                     / "input"
@@ -105,7 +106,7 @@ class ModelsConfigurationProcessing:
                 if type == "thermal":
                     self.preprocessed_values[self.param_id] = value
                 return value
-            if self.mode == ConversionMode.HYBRID:
+            if self.mode == ConversionMode.HYBRID.value:
                 output_file = (
                     self.study.path
                     / "input"
@@ -144,6 +145,7 @@ class ModelsConfigurationProcessing:
                 save_to_csv(parameter_value, output_file)
         else:
             # On réécrit par defaut les fichiers, même les wind/solar/load meme si ils ne sont pas modifiés
+            print("yo", output_file)
             save_to_csv(time_series, output_file)
 
         return str(output_file).removesuffix(".txt")

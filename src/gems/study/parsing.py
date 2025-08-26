@@ -66,6 +66,7 @@ class InputSystem(ModifiedBaseModel):
     nodes: List[InputComponent] = Field(default_factory=list)
     components: List[InputComponent] = Field(default_factory=list)
     connections: List[InputPortConnections] = Field(default_factory=list)
+    area_connections: Optional[List[InputAreaConnections]] = None
 
 
 @dataclass(frozen=True)

@@ -256,6 +256,7 @@ class TestConverter:
         (
             storage_components,
             storage_connections,
+            _,
         ) = converter._convert_model_to_component_list(
             valid_areas, resource_content
         )
@@ -362,7 +363,6 @@ class TestConverter:
             )
         ]
 
-        # TODO faire un sort de base sur les objets "expected"
         assert storage_components == expected_storage_component
         assert storage_connections == expected_storage_connections
 
@@ -395,6 +395,7 @@ class TestConverter:
         (
             thermals_components,
             thermals_connections,
+            _,
         ) = converter._convert_model_to_component_list(
             valid_areas, resource_content
         )
@@ -553,6 +554,7 @@ class TestConverter:
         (
             load_components,
             load_connections,
+            _,
         ) = converter._convert_model_to_component_list(
             valid_areas, resource_content
         )
@@ -629,6 +631,7 @@ class TestConverter:
         (
             solar_components,
             solar_connections,
+            _,
         ) = converter._convert_model_to_component_list(
             valid_areas, resource_content
         )
@@ -699,6 +702,7 @@ class TestConverter:
         (
             load_components,
             load_connections,
+            _,
         ) = converter._convert_model_to_component_list(
             valid_areas, resource_content
         )
@@ -758,6 +762,7 @@ class TestConverter:
         (
             wind_components,
             wind_connections,
+            _,
         ) = converter._convert_model_to_component_list(
             valid_areas, resource_content
         )
@@ -832,6 +837,7 @@ class TestConverter:
         (
             wind_components,
             _,
+            _,
         ) = converter._convert_model_to_component_list(
             valid_areas, resource_content
         )
@@ -866,6 +872,7 @@ class TestConverter:
         (
             wind_components,
             _,
+            _,
         ) = converter._convert_model_to_component_list(
             valid_areas, resource_content
         )
@@ -889,6 +896,7 @@ class TestConverter:
         (
             links_components,
             links_connections,
+            _,
         ) = converter._convert_model_to_component_list(
             valid_areas, resource_content
         )
@@ -1034,6 +1042,7 @@ class TestConverter:
         (
             binding_components,
             binding_connections,
+            _,
         ) = converter._convert_model_to_component_list(
             valid_areas, bc_data
         )
