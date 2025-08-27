@@ -1,0 +1,145 @@
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# Configuration file to convert a complex modelling artefact in an Antares study into an Andromede model.
+
+template:
+  name: st-storage
+  generator-version-compatibility: X.Y #TODO: find this information
+  model: antares-historic.short-term-storage
+  template-parameters:
+    - name: area
+      cluster_type: st_storage
+      description: "Area identifier for the load component"
+      # exclude:
+
+  component:
+    id: ${area}_${st_storage}
+    parameters:
+      - id: reservoir_capacity
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: st_storage
+            area: ${area}
+            cluster: ${st_storage}
+            field: reservoir_capacity
+      - id: injection_nominal_capacity
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: st_storage
+            area: ${area}
+            cluster: ${st_storage}
+            field: injection_nominal_capacity
+      - id: withdrawal_nominal_capacity
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: st_storage
+            area: ${area}
+            cluster: ${st_storage}
+            field: withdrawal_nominal_capacity
+      - id: efficiency_injection
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: st_storage
+            area: ${area}
+            cluster: ${st_storage}
+            field: efficiency
+      - id: efficiency_withdrawal
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: st_storage
+            area: ${area}
+            cluster: ${st_storage}
+            field: efficiency_withdrawal
+      - id: lower_rule_curve
+        time-dependent: true
+        scenario-dependent: true
+        value:
+          object-properties:
+            type: st_storage
+            area: ${area}
+            cluster: ${st_storage}
+            field: lower_rule_curve
+      - id: upper_rule_curve
+        time-dependent: true
+        scenario-dependent: true
+        value:
+          object-properties:
+            type: st_storage
+            area: ${area}
+            cluster: ${st_storage}
+            field: upper_rule_curve
+      - id: p_max_injection_modulation
+        time-dependent: true
+        scenario-dependent: true
+        value:
+          object-properties:
+            type: st_storage
+            area: ${area}
+            cluster: ${st_storage}
+            field: p_max_injection
+      - id: p_max_withdrawal_modulation
+        time-dependent: true
+        scenario-dependent: true
+        value:
+          object-properties:
+            type: st_storage
+            area: ${area}
+            cluster: ${st_storage}
+            field: p_max_withdrawal
+      - id: inflows
+        time-dependent: true
+        scenario-dependent: true
+        value:
+          object-properties:
+            type: st_storage
+            area: ${area}
+            cluster: ${st_storage}
+            field: storage_inflows
+      - id: initial_level
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: st_storage
+            area: ${area}
+            cluster: ${st_storage}
+            field: initial_level
+
+  # For full modeler mode
+  connections:
+    - component1: ${area}_${st_storage}
+      port1: injection_port
+      component2: ${area}
+      port2: balance_port
+
+  # For hybrid mode
+  area-connections:
+    - component: ${area}_${st_storage}
+      port: injection_port
+      area: ${area}
+
+  legacy-objects-to-delete:
+    - id: legacy_st_storages
+      object-properties:
+        type: st_storage
+        area: ${area}
+        cluster: ${st_storage}
