@@ -49,7 +49,7 @@ class ModelsConfigurationProcessing:
     def calculate_value(self, obj: DataType) -> Union[float, str]:
         area: str = obj.object_properties.area
         type: str = obj.object_properties.type
-        print("coucou", area, type, self.mode, ConversionMode.HYBRID.value)
+
         if type in ["load", "wind", "solar"]:
             time_series: pd.DataFrame = getattr(
                 self.study.get_areas()[area], MATRIX_TYPES_TO_GET_METHOD[type]
@@ -92,6 +92,8 @@ class ModelsConfigurationProcessing:
                 output_file = self.study.path / file_path
         elif type in ["st_storage", "thermal", "renewable"]:
             # TODO Thermal preprocessing not handled for the moment in generic mode
+            if area not in self.study.get_areas():
+                raise KeyError(f"Area {area} is not found in the study")
             cluster = getattr(
                 self.study.get_areas()[area], TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[type]
             )()[obj.object_properties.cluster]
@@ -145,14 +147,13 @@ class ModelsConfigurationProcessing:
                 save_to_csv(parameter_value, output_file)
         else:
             # On réécrit par defaut les fichiers, même les wind/solar/load meme si ils ne sont pas modifiés
-            print("yo", output_file)
             save_to_csv(time_series, output_file)
-
         return str(output_file).removesuffix(".txt")
 
     def _process_value_content(self, value_content: dict) -> tuple[DataType, dict]:
         local_content = copy.deepcopy(value_content)
         value_type = local_content["object-properties"]["type"]
+
         cls: DataType = TYPE_TO_DC.get(value_type)
 
         if not cls:

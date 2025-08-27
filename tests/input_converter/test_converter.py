@@ -11,6 +11,7 @@
 # This file is part of the Antares project.
 import os
 from pathlib import Path
+
 import pandas as pd
 import pytest
 from antares.craft.model.study import Study
@@ -123,7 +124,9 @@ class TestConverter:
 
     def test_convert_area_to_component(self, local_study_w_areas: Study, lib_id: str):
         converter = self._init_converter_from_study(local_study_w_areas)
-        area_components = converter._convert_area_to_component_list(lib_id, ["fr", "it"])
+        area_components = converter._convert_area_to_component_list(
+            lib_id, ["fr", "it"]
+        )
 
         expected_area_components = [
             InputComponent(
@@ -172,7 +175,9 @@ class TestConverter:
 
     def test_convert_area_to_yaml(self, local_study_w_areas: Study, lib_id: str):
         converter = self._init_converter_from_study(local_study_w_areas)
-        area_components = converter._convert_area_to_component_list(lib_id, ["fr", "it"])
+        area_components = converter._convert_area_to_component_list(
+            lib_id, ["fr", "it"]
+        )
         input_study = InputSystem(nodes=area_components)
 
         # Dump model into yaml file
@@ -234,7 +239,7 @@ class TestConverter:
         expected_validated_data.nodes.sort(key=lambda x: x.id)
         validated_data.nodes.sort(key=lambda x: x.id)
         assert validated_data == expected_validated_data
-    
+
     def test_convert_st_storages_to_component(
         self, local_study_with_st_storage, lib_id: str
     ):
@@ -251,18 +256,20 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(
+            resource_content, "area"
+        )
 
         (
             storage_components,
             storage_connections,
             _,
-        ) = converter._convert_model_to_component_list(
-            valid_areas, resource_content
-        )
+        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
         study_path = converter.study_path
 
-        default_path = study_path / "input" / "st-storage" / "series" / "fr" / "storage_1"
+        default_path = (
+            study_path / "input" / "st-storage" / "series" / "fr" / "storage_1"
+        )
         inflows_path = default_path / "inflows"
         lower_rule_curve_path = default_path / "lower-rule-curve"
         pmax_injection_path = default_path / "PMAX-injection"
@@ -390,15 +397,15 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(
+            resource_content, "area"
+        )
 
         (
             thermals_components,
             thermals_connections,
             _,
-        ) = converter._convert_model_to_component_list(
-            valid_areas, resource_content
-        )
+        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
 
         study_path = converter.study_path
         series_path = study_path / "input" / "thermal" / "series" / "fr" / "gaz"
@@ -549,15 +556,15 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(
+            resource_content, "area"
+        )
 
         (
             load_components,
             load_connections,
             _,
-        ) = converter._convert_model_to_component_list(
-            valid_areas, resource_content
-        )
+        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
 
         ### Compare connections
         connection = load_connections[0]
@@ -609,9 +616,7 @@ class TestConverter:
         [DATAFRAME_PREPRO_SERIES],
         indirect=True,
     )
-    def test_convert_solar_to_component_from_study(
-        self, fr_solar: None
-    ):
+    def test_convert_solar_to_component_from_study(self, fr_solar: None):
         converter = self._init_converter_from_study(fr_solar)
 
         path_load = (
@@ -626,26 +631,30 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(
+            resource_content, "area"
+        )
 
         (
             solar_components,
             solar_connections,
             _,
-        ) = converter._convert_model_to_component_list(
-            valid_areas, resource_content
+        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        solar_fr_component = next(
+            (comp for comp in solar_components if comp.id == "solar_fr"), None
         )
-        solar_fr_component = next((comp for comp in solar_components if comp.id == "solar_fr"), None)
-        solar_fr_connection = next((conn for conn in solar_connections if conn.component1 == "solar_fr"), None)
+        solar_fr_connection = next(
+            (conn for conn in solar_connections if conn.component1 == "solar_fr"), None
+        )
         solar_timeseries = str(
             converter.study_path / "input" / "solar" / "series" / "generation_fr"
         )
         expected_solar_connection = InputPortConnections(
-                component1="solar_fr",
-                port1="balance_port",
-                component2="fr",
-                port2="balance_port",
-            )
+            component1="solar_fr",
+            port1="balance_port",
+            component2="fr",
+            port2="balance_port",
+        )
 
         expected_solar_components = InputComponent(
             id="solar_fr",
@@ -653,17 +662,19 @@ class TestConverter:
             scenario_group=None,
             parameters=[
                 InputComponentParameter(
-                    id='nominal_capacity',
+                    id="nominal_capacity",
                     time_dependent=False,
                     scenario_dependent=False,
                     value=1.0,
-                    scenario_group=None),
+                    scenario_group=None,
+                ),
                 InputComponentParameter(
-                    id='unit_count',
+                    id="unit_count",
                     time_dependent=False,
                     scenario_dependent=False,
                     value=1.0,
-                    scenario_group=None),
+                    scenario_group=None,
+                ),
                 InputComponentParameter(
                     id="generation",
                     time_dependent=True,
@@ -675,15 +686,13 @@ class TestConverter:
         )
         assert solar_fr_connection == expected_solar_connection
         assert solar_fr_component.model_dump() == expected_solar_components.model_dump()
-        
+
     @pytest.mark.parametrize(
         "fr_load",
         [DATAFRAME_PREPRO_SERIES],
         indirect=True,
     )
-    def test_convert_load_to_component_from_study(
-        self, fr_load: None
-    ):
+    def test_convert_load_to_component_from_study(self, fr_load: None):
         converter = self._init_converter_from_study(fr_load)
         path_load = (
             Path(__file__).parent.parent.parent
@@ -697,27 +706,31 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(
+            resource_content, "area"
+        )
 
         (
             load_components,
             load_connections,
             _,
-        ) = converter._convert_model_to_component_list(
-            valid_areas, resource_content
+        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        load_fr_component = next(
+            (comp for comp in load_components if comp.id == "load_fr"), None
         )
-        load_fr_component = next((comp for comp in load_components if comp.id == "load_fr"), None)
-        load_fr_connection = next((conn for conn in load_connections if conn.component1 == "load_fr"), None)
+        load_fr_connection = next(
+            (conn for conn in load_connections if conn.component1 == "load_fr"), None
+        )
 
         load_timeseries = str(
             converter.study_path / "input" / "load" / "series" / "load_fr"
         )
-        expected_load_connection =InputPortConnections(
-                component1="load_fr",
-                port1="balance_port",
-                component2="fr",
-                port2="balance_port",
-            )
+        expected_load_connection = InputPortConnections(
+            component1="load_fr",
+            port1="balance_port",
+            component2="fr",
+            port2="balance_port",
+        )
         expected_load_components = InputComponent(
             id="load_fr",
             model="antares-historic.load",
@@ -740,9 +753,7 @@ class TestConverter:
         [DATAFRAME_PREPRO_SERIES],
         indirect=True,
     )
-    def test_convert_wind_to_component_from_study(
-        self, fr_wind: Study
-    ):
+    def test_convert_wind_to_component_from_study(self, fr_wind: Study):
         converter = self._init_converter_from_study(fr_wind)
 
         path_load = (
@@ -757,27 +768,31 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(
+            resource_content, "area"
+        )
 
         (
             wind_components,
             wind_connections,
             _,
-        ) = converter._convert_model_to_component_list(
-            valid_areas, resource_content
+        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        wind_fr_component = next(
+            (comp for comp in wind_components if comp.id == "wind_fr"), None
         )
-        wind_fr_component = next((comp for comp in wind_components if comp.id == "wind_fr"), None)
-        wind_fr_connection = next((conn for conn in wind_connections if conn.component1 == "wind_fr"), None)
+        wind_fr_connection = next(
+            (conn for conn in wind_connections if conn.component1 == "wind_fr"), None
+        )
 
         wind_timeseries = str(
             converter.study_path / "input" / "wind" / "series" / "generation_fr"
         )
         expected_wind_connection = InputPortConnections(
-                component1="wind_fr",
-                port1="balance_port",
-                component2="fr",
-                port2="balance_port",
-            )
+            component1="wind_fr",
+            port1="balance_port",
+            component2="fr",
+            port2="balance_port",
+        )
         # ON touche plus
         expected_wind_components = InputComponent(
             id="wind_fr",
@@ -785,17 +800,19 @@ class TestConverter:
             scenario_group=None,
             parameters=[
                 InputComponentParameter(
-                    id='nominal_capacity',
+                    id="nominal_capacity",
                     time_dependent=False,
                     scenario_dependent=False,
                     value=1.0,
-                    scenario_group=None),
+                    scenario_group=None,
+                ),
                 InputComponentParameter(
-                    id='unit_count',
+                    id="unit_count",
                     time_dependent=False,
                     scenario_dependent=False,
                     value=1.0,
-                    scenario_group=None),
+                    scenario_group=None,
+                ),
                 InputComponentParameter(
                     id="generation",
                     time_dependent=True,
@@ -807,7 +824,7 @@ class TestConverter:
         )
         assert wind_fr_connection == expected_wind_connection
         assert wind_fr_component.model_dump() == expected_wind_components.model_dump()
-    
+
     @pytest.mark.parametrize(
         "fr_wind",
         [
@@ -816,7 +833,8 @@ class TestConverter:
         indirect=True,
     )
     def test_convert_wind_to_component_empty_file(
-        self, fr_wind: object,
+        self,
+        fr_wind: object,
     ):
         converter = self._init_converter_from_study(fr_wind)
 
@@ -832,15 +850,15 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(
+            resource_content, "area"
+        )
 
         (
             wind_components,
             _,
             _,
-        ) = converter._convert_model_to_component_list(
-            valid_areas, resource_content
-        )
+        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
         assert wind_components == []
 
     @pytest.mark.parametrize(
@@ -850,9 +868,7 @@ class TestConverter:
         ],
         indirect=True,
     )
-    def test_convert_wind_to_component_zero_values(
-        self, fr_wind: int
-    ):
+    def test_convert_wind_to_component_zero_values(self, fr_wind: int):
         converter = self._init_converter_from_study(fr_wind)
 
         path_load = (
@@ -867,15 +883,15 @@ class TestConverter:
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(
+            resource_content, "area"
+        )
 
         (
             wind_components,
             _,
             _,
-        ) = converter._convert_model_to_component_list(
-            valid_areas, resource_content
-        )
+        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
         assert wind_components == []
 
     def test_convert_links_to_component(self, local_study_w_links: Study, lib_id: str):
@@ -891,15 +907,15 @@ class TestConverter:
         )
         resource_content = read_yaml_file(path_load).get("template", {})
 
-        valid_areas: dict = converter._validate_resources_not_excluded(resource_content, "area")
+        valid_areas: dict = converter._validate_resources_not_excluded(
+            resource_content, "area"
+        )
 
         (
             links_components,
             links_connections,
             _,
-        ) = converter._convert_model_to_component_list(
-            valid_areas, resource_content
-        )
+        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
         study_path = converter.study_path
 
         fr_prefix_path = study_path / "input" / "links" / "fr" / "capacities"
@@ -1043,9 +1059,7 @@ class TestConverter:
             binding_components,
             binding_connections,
             _,
-        ) = converter._convert_model_to_component_list(
-            valid_areas, bc_data
-        )
+        ) = converter._convert_model_to_component_list(valid_areas, bc_data)
         connection = binding_connections[0]
 
         # Compare connections
@@ -1126,7 +1140,16 @@ class TestConverter:
                 {
                     **c,
                     "parameters": [
-                        {k: p[k] for k in ("id", "value", "scenario_dependent", "time_dependent", "scenario_group")}
+                        {
+                            k: p[k]
+                            for k in (
+                                "id",
+                                "value",
+                                "scenario_dependent",
+                                "time_dependent",
+                                "scenario_group",
+                            )
+                        }
                         for p in c["parameters"]
                     ],
                 }

@@ -158,8 +158,8 @@ if __name__ == "__main__":
 
     if args.study_path:
         config_parser.set("study", "study_path", str(args.study_path))
-    # if args.output_path:
-    #     config_parser.set("study", "output_path", str(args.output_path))
+    if args.output_path:
+        config_parser.set("study", "output_path", str(args.output_path))
 
     mode = args.mode.value if args.mode else ConversionMode.FULL.value
 
@@ -167,5 +167,6 @@ if __name__ == "__main__":
         study_input=Path(config_parser["study"].get("study_path")),
         logger=logger,
         mode=mode,
+        output_path=Path(config_parser["study"].get("output_path")),
     )
     converter.process_all()

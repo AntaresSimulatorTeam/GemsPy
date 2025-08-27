@@ -306,6 +306,7 @@ class AntaresStudyConverter:
                 ],
             )
         )
+
         connections.append(
             InputPortConnections(
                 component1=valid_resources["connections"][0]["component1"],
@@ -321,13 +322,13 @@ class AntaresStudyConverter:
                     component=valid_resources["area-connections"][0]["component"],
                     port=valid_resources["area-connections"][0]["port"],
                     area=valid_resources["area-connections"][0]["area"],
-                ))
+                )
+            )
             for item in valid_resources.get("legacy-objects-to-delete", []):
                 item = item.get("object-properties")
                 if not isinstance(item, dict):
                     continue
                 self.legacy_objects.append(item)
-
 
     def _convert_model_to_component_list(
         self, valid_areas: dict, resource_content: dict
@@ -389,13 +390,20 @@ class AntaresStudyConverter:
                                 data_consolidated, cluster_id, f"${{{cluster_type}}}"
                             )
                             self._iterate_through_model(
-                                data_consolidated, components, connections, area_connections, mp
+                                data_consolidated,
+                                components,
+                                connections,
+                                area_connections,
+                                mp,
                             )
                     else:
                         self._iterate_through_model(
-                            data_consolidated, components, connections, area_connections, mp
+                            data_consolidated,
+                            components,
+                            connections,
+                            area_connections,
+                            mp,
                         )
-
         except (KeyError, FileNotFoundError) as e:
             self.logger.error(
                 f"Error while converting model to component list: {e}. "
@@ -430,7 +438,7 @@ class AntaresStudyConverter:
         list_components: list[InputComponent] = []
         list_connections: list[InputPortConnections] = []
         list_area_connections: list[InputAreaConnections] = []
-    
+
         list_valid_areas = set(self.areas.keys())
         all_excluded_areas = set()
         for file in RESOURCES_FOLDER.iterdir():
@@ -440,8 +448,8 @@ class AntaresStudyConverter:
                     resource_content, "area"
                 )
 
-                components, connections, area_connections = self._convert_model_to_component_list(
-                    valid_areas, resource_content
+                components, connections, area_connections = (
+                    self._convert_model_to_component_list(valid_areas, resource_content)
                 )
                 list_components.extend(components)
                 list_connections.extend(connections)
@@ -464,11 +472,11 @@ class AntaresStudyConverter:
         )
 
         system = InputSystem(
-                nodes=area_components,
-                components=list_components,
-                connections=list_connections,
-                area_connections=list_area_connections,
-            )
+            nodes=area_components,
+            components=list_components,
+            connections=list_connections,
+            area_connections=list_area_connections or None,
+        )
         data = system.model_dump(exclude_none=True)
         return InputSystem(**data)
 

@@ -9,9 +9,10 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
+from typing import Union
+
 import pandas as pd
 import pytest
-from typing import Union
 from antares.craft.model.area import Area, AreaProperties
 from antares.craft.model.hydro import HydroProperties
 from antares.craft.model.link import Link
@@ -100,11 +101,14 @@ def local_study_w_thermal(
     if hasattr(request, "param"):
         modulation_df, series_df = request.param
         local_study_w_links.get_areas()["fr"].create_thermal_cluster(
-            thermal_name,
-            ThermalClusterProperties(unit_count=1, nominal_capacity=2.0)
+            thermal_name, ThermalClusterProperties(unit_count=1, nominal_capacity=2.0)
         )
-        local_study_w_links.get_areas()["fr"].get_thermals()[thermal_name].set_prepro_modulation(modulation_df)
-        local_study_w_links.get_areas()["fr"].get_thermals()[thermal_name].set_series(series_df)
+        local_study_w_links.get_areas()["fr"].get_thermals()[
+            thermal_name
+        ].set_prepro_modulation(modulation_df)
+        local_study_w_links.get_areas()["fr"].get_thermals()[thermal_name].set_series(
+            series_df
+        )
 
     else:
         local_study_w_links.get_areas()["fr"].create_thermal_cluster(
@@ -112,11 +116,14 @@ def local_study_w_thermal(
         )
     return local_study_w_links
 
-DEFAULT_SERIES_CONFIG = (
-    create_dataframe_from_constant(lines=8760),
-)
+
+DEFAULT_SERIES_CONFIG = (create_dataframe_from_constant(lines=8760),)
+
+
 @pytest.fixture
-def local_study_with_renewable(local_study_w_thermal, request: pytest.FixtureRequest) -> Study:
+def local_study_with_renewable(
+    local_study_w_thermal, request: pytest.FixtureRequest
+) -> Study:
     """
     Create an empty study
     Create 2 areas with custom area properties
@@ -130,7 +137,9 @@ def local_study_with_renewable(local_study_w_thermal, request: pytest.FixtureReq
     local_study_w_thermal.get_areas()["fr"].create_renewable_cluster(
         renewable_cluster_name, RenewableClusterProperties()
     )
-    local_study_w_thermal.get_areas()["fr"].get_renewables()[renewable_cluster_name].set_series(series_df)
+    local_study_w_thermal.get_areas()["fr"].get_renewables()[
+        renewable_cluster_name
+    ].set_series(series_df)
 
     return local_study_w_thermal
 
@@ -186,7 +195,6 @@ def local_study_with_hydro(local_study_with_st_storage) -> Study:
     return local_study_with_st_storage
 
 
-
 @pytest.fixture
 def area_fr(local_study_with_hydro) -> Union[Area, Study]:
     """
@@ -201,7 +209,6 @@ def fr_solar(local_study_with_hydro, request: pytest.FixtureRequest) -> Study:
     series_df = command[0] if isinstance(command, tuple) else command
     local_study_with_hydro.get_areas()["fr"].set_solar(series_df)
     return local_study_with_hydro
-
 
 
 @pytest.fixture
