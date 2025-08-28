@@ -39,6 +39,7 @@ class InputAreaConnections(ModifiedBaseModel):
     port: str
     area: str
 
+
 class InputPortConnections(ModifiedBaseModel):
     component1: str
     port1: str

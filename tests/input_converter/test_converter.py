@@ -42,9 +42,7 @@ RESOURCES_FOLDER = (
     / "data"
     / "model_configuration"
 )
-DATAFRAME_PREPRO_SERIES = (
-    create_dataframe_from_constant(lines=8760),  # series
-)
+DATAFRAME_PREPRO_SERIES = (create_dataframe_from_constant(lines=8760),)  # series
 
 DATAFRAME_PREPRO_THERMAL_CONFIG = (
     create_dataframe_from_constant(lines=8760, columns=4),  # modulation
@@ -996,7 +994,7 @@ class TestConverter:
                 ],
             ),
         ]
-        
+
         expected_link_connections = [
             InputPortConnections(
                 component1="at / fr",
@@ -1035,7 +1033,9 @@ class TestConverter:
                 port2="balance_port",
             ),
         ]
-        assert sorted(links_components, key=lambda x: x.id) == sorted(expected_link_component, key=lambda x: x.id)
+        assert sorted(links_components, key=lambda x: x.id) == sorted(
+            expected_link_component, key=lambda x: x.id
+        )
         assert links_connections == expected_link_connections
 
     @staticmethod
@@ -1158,16 +1158,29 @@ class TestConverter:
         ) = converter._convert_model_to_component_list(valid_areas, bc_data)
         path1 = path / "input" / "data-series" / "marginal_cost_fr_z_batteries.txt"
         path2 = path / "input" / "data-series" / "marginal_cost_fr_z_batteries.txt"
-        path3 = path / "input" / "data-series" / "p_max_withdrawal_modulation_fr_fr_batteries_inj.txt"
-        path4 = path / "input" / "data-series" / "upper_rule_curve_z_batteries_z_batteries_batteries_fr_1.txt"
+        path3 = (
+            path
+            / "input"
+            / "data-series"
+            / "p_max_withdrawal_modulation_fr_fr_batteries_inj.txt"
+        )
+        path4 = (
+            path
+            / "input"
+            / "data-series"
+            / "upper_rule_curve_z_batteries_z_batteries_batteries_fr_1.txt"
+        )
         assert check_file_exists(path1)
         assert check_file_exists(path2)
         assert check_file_exists(path3)
         assert check_file_exists(path4)
         ### Compare area connections
-        expected_area_connections = [InputAreaConnections(component='battery_fr', port='injection_port', area='fr')]
+        expected_area_connections = [
+            InputAreaConnections(
+                component="battery_fr", port="injection_port", area="fr"
+            )
+        ]
         assert area_connections == expected_area_connections
-
 
     def test_convert_study_path_to_input_study(self):
         path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"

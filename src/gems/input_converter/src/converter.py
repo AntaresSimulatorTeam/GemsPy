@@ -455,9 +455,11 @@ class AntaresStudyConverter:
                     resource_content, "area"
                 )
 
-                components, connections, area_connections = (
-                    self._convert_model_to_component_list(valid_areas, resource_content)
-                )
+                (
+                    components,
+                    connections,
+                    area_connections,
+                ) = self._convert_model_to_component_list(valid_areas, resource_content)
                 list_components.extend(components)
                 list_connections.extend(connections)
                 list_area_connections.extend(area_connections)
