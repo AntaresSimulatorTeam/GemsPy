@@ -306,15 +306,22 @@ class AntaresStudyConverter:
                 ],
             )
         )
-
-        connections.append(
-            InputPortConnections(
-                component1=valid_resources["connections"][0]["component1"],
-                port1=valid_resources["connections"][0]["port1"],
-                component2=valid_resources["connections"][0]["component2"],
-                port2=valid_resources["connections"][0]["port2"],
+        for resource_connection in valid_resources["connections"]:
+            if "." in resource_connection["component2"]:
+                component2_parts = resource_connection["component2"].split(".")
+                component2_value = getattr(
+                    self.study.get_links()[component2_parts[0]], component2_parts[1]
+                )
+            else:
+                component2_value = resource_connection["component2"]
+            connections.append(
+                InputPortConnections(
+                    component1=resource_connection["component1"],
+                    port1=resource_connection["port1"],
+                    component2=component2_value,
+                    port2=resource_connection["port2"],
+                )
             )
-        )
 
         if self.mode == ConversionMode.HYBRID.value:
             area_connections.append(

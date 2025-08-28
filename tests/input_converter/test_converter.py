@@ -991,26 +991,46 @@ class TestConverter:
                 ],
             ),
         ]
+        
         expected_link_connections = [
             InputPortConnections(
                 component1="at / fr",
                 port1="in_port",
-                component2="at / fr.area_from_id",
+                component2="at",
+                port2="balance_port",
+            ),
+            InputPortConnections(
+                component1="at / fr",
+                port1="out_port",
+                component2="fr",
                 port2="balance_port",
             ),
             InputPortConnections(
                 component1="at / it",
                 port1="in_port",
-                component2="at / it.area_from_id",
+                component2="at",
+                port2="balance_port",
+            ),
+            InputPortConnections(
+                component1="at / it",
+                port1="out_port",
+                component2="it",
                 port2="balance_port",
             ),
             InputPortConnections(
                 component1="fr / it",
                 port1="in_port",
-                component2="fr / it.area_from_id",
+                component2="fr",
+                port2="balance_port",
+            ),
+            InputPortConnections(
+                component1="fr / it",
+                port1="out_port",
+                component2="it",
                 port2="balance_port",
             ),
         ]
+        assert sorted(links_components, key=lambda x: x.id) == sorted(expected_link_component, key=lambda x: x.id)
         assert links_connections == expected_link_connections
 
     @staticmethod
