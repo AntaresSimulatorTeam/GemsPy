@@ -11,7 +11,7 @@
 # This file is part of the Antares project.
 import os
 from pathlib import Path
-
+from gems.input_converter.src.utils import check_file_exists
 import pandas as pd
 import pytest
 from antares.craft.model.study import Study
@@ -25,6 +25,7 @@ from gems.study.parsing import (
     InputComponentParameter,
     InputPortConnections,
     InputSystem,
+    InputAreaConnections,
     parse_yaml_components,
 )
 from tests.input_converter.conftest import create_dataframe_from_constant
@@ -60,10 +61,10 @@ class TestConverter:
         )
         return converter
 
-    def _init_converter_from_path(self, local_path: Path):
+    def _init_converter_from_path(self, local_path: Path, mode: str = "full"):
         logger = Logger(__name__, str(local_path))
         converter: AntaresStudyConverter = AntaresStudyConverter(
-            study_input=local_path, logger=logger
+            study_input=local_path, logger=logger, mode=mode
         )
         return converter
 
@@ -1078,10 +1079,11 @@ class TestConverter:
         (
             binding_components,
             binding_connections,
-            _,
+            area_connections,
         ) = converter._convert_model_to_component_list(valid_areas, bc_data)
         connection = binding_connections[0]
-
+        ### Compare area connections
+        assert area_connections == []
         # Compare connections
         expected_connection: InputPortConnections = InputPortConnections(
             **next(
@@ -1126,6 +1128,42 @@ class TestConverter:
         )
 
         assert obtained_parameters == expected_component["parameters"]
+
+    def test_hybrid_mode_from_path(self):
+        path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
+
+        converter = self._init_converter_from_path(path, "hybrid")
+        path_cc = (
+            Path(__file__).parent.parent.parent
+            / "src"
+            / "gems"
+            / "input_converter"
+            / "data"
+            / "model_configuration"
+            / "battery_new.yaml"
+        )
+
+        bc_data = read_yaml_file(path_cc).get("template", {})
+        valid_areas: dict = converter._validate_resources_not_excluded(bc_data, "area")
+        # TODO pour les preprocessng, il faut revenir a letat initial. du coup ca implique
+        # De copier le dossier entier, le tester, le supprimer apres
+        (
+            _,
+            _,
+            area_connections,
+        ) = converter._convert_model_to_component_list(valid_areas, bc_data)
+        path1 = path / "input" / "data-series" / "marginal_cost_fr_z_batteries.txt"
+        path2 = path / "input" / "data-series" / "marginal_cost_fr_z_batteries.txt"
+        path3 = path / "input" / "data-series" / "p_max_withdrawal_modulation_fr_fr_batteries_inj.txt"
+        path4 = path / "input" / "data-series" / "upper_rule_curve_z_batteries_z_batteries_batteries_fr_1.txt"
+        assert check_file_exists(path1)
+        assert check_file_exists(path2)
+        assert check_file_exists(path3)
+        assert check_file_exists(path4)
+        ### Compare area connections
+        expected_area_connections = [InputAreaConnections(component='battery_fr', port='injection_port', area='fr')]
+        assert area_connections == expected_area_connections
+
 
     def test_convert_study_path_to_input_study(self):
         path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"

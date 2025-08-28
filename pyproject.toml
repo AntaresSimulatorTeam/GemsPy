@@ -18,7 +18,7 @@ andromede-simulator = "andromede.main.main:main_cli"
 where = ["src"]
 
 [tool.black]
-line-length = 120
+line-length = 88
 include = '\.pyi?$'
 exclude = '''
 /(
