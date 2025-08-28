@@ -11,7 +11,7 @@
 # This file is part of the Antares project.
 import os
 from pathlib import Path
-from gems.input_converter.src.utils import check_file_exists
+
 import pandas as pd
 import pytest
 from antares.craft.model.study import Study
@@ -19,13 +19,17 @@ from antares.craft.model.study import Study
 from gems.input_converter.src.converter import AntaresStudyConverter
 from gems.input_converter.src.data_preprocessing.dataclasses import Operation
 from gems.input_converter.src.logger import Logger
-from gems.input_converter.src.utils import read_yaml_file, transform_to_yaml
+from gems.input_converter.src.utils import (
+    check_file_exists,
+    read_yaml_file,
+    transform_to_yaml,
+)
 from gems.study.parsing import (
+    InputAreaConnections,
     InputComponent,
     InputComponentParameter,
     InputPortConnections,
     InputSystem,
-    InputAreaConnections,
     parse_yaml_components,
 )
 from tests.input_converter.conftest import create_dataframe_from_constant
