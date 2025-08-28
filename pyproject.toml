@@ -20,6 +20,11 @@ where = ["src"]
 [tool.black]
 line-length = 88
 include = '\.pyi?$'
+exclude = '''
+/(
+  ^(?!(src)).*
+)/
+'''
 
 [tool.isort]
 profile = "black"

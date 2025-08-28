@@ -1,8 +1,14 @@
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
 
 import pandas as pd
+
+
+class ConversionMode(Enum):
+    HYBRID = "hybrid"
+    FULL = "full"
 
 
 @dataclass(frozen=True)
@@ -43,34 +49,43 @@ class Operation:
 
 
 @dataclass(frozen=True)
-class TimeseriesData:
-    path: Path
-    column: int
-    operation: Optional[Operation] = None
-
-
-@dataclass(frozen=True)
-class BindingConstraintData:
-    id: str
-    field: str
-    operation: Optional[Operation] = None
-    timeseries_file_type: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class ThermalData:
-    area: str
-    cluster: str
-    column: Optional[int] = None
+class ObjectProperties:
+    type: str
+    area: Optional[str] = None
+    binding_constraint_id: Optional[str] = None
+    cluster: Optional[str] = None
+    link: Optional[str] = None
     field: Optional[str] = None
-    operation: Optional[Operation] = None
-    timeseries_file_type: Optional[str] = None
+
+    @classmethod
+    def from_yaml(cls, yaml_data: dict):
+        yaml_data = yaml_data.copy()
+        if "binding-constraint-id" in yaml_data:
+            yaml_data["binding_constraint_id"] = yaml_data.pop("binding-constraint-id")
+        return cls(**yaml_data)
 
 
 @dataclass(frozen=True)
-class LinkData:
-    column: int
-    area_from: str
-    area_to: str
-    timeseries_file_type: str
+class MatrixData:
+    object_properties: Optional[ObjectProperties] = None
+
+    @classmethod
+    def from_yaml(cls, yaml_data: dict):
+        yaml_data = yaml_data.copy()
+        if "object-properties" in yaml_data:
+            yaml_data["object_properties"] = yaml_data.pop("object-properties")
+        return cls(**yaml_data)
+
+
+@dataclass(frozen=True)
+class ComplexData:
+    object_properties: Optional[ObjectProperties] = None
     operation: Optional[Operation] = None
+    column: Optional[int] = None
+
+    @classmethod
+    def from_yaml(cls, yaml_data: dict):
+        yaml_data = yaml_data.copy()
+        if "object-properties" in yaml_data:
+            yaml_data["object_properties"] = yaml_data.pop("object-properties")
+        return cls(**yaml_data)
