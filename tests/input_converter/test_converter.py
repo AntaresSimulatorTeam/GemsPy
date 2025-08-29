@@ -580,14 +580,14 @@ class TestConverter:
         )
         expected_solar_connection = [
             InputPortConnections(
-                component1="solar",
+                component1="solar_fr",
                 port1="balance_port",
                 component2="fr",
                 port2="balance_port",
             )
         ]
         expected_solar_components = InputComponent(
-            id="fr",
+            id="solar_fr",
             model="antares-historic.solar",
             scenario_group=None,
             parameters=[
@@ -618,14 +618,14 @@ class TestConverter:
         )
         expected_load_connection = [
             InputPortConnections(
-                component1="load",
+                component1="load_fr",
                 port1="balance_port",
                 component2="fr",
                 port2="balance_port",
             )
         ]
         expected_load_components = InputComponent(
-            id="load",
+            id="load_fr",
             model="antares-historic.load",
             scenario_group=None,
             parameters=[
@@ -663,14 +663,14 @@ class TestConverter:
         )
         expected_wind_connection = [
             InputPortConnections(
-                component1="wind",
+                component1="wind_fr",
                 port1="balance_port",
                 component2="fr",
                 port2="balance_port",
             )
         ]
         expected_wind_components = InputComponent(
-            id="fr",
+            id="wind_fr",
             model="antares-historic.wind",
             scenario_group=None,
             parameters=[
