@@ -63,7 +63,7 @@ system:
       scenario-dependent: true
       time-dependent: true
       value:  input/thermal/series/fr/fr_nuclear_epr/series
-  - id: load
+  - id: load_fr
     model: antares-historic.load
     parameters:
     - id: load
