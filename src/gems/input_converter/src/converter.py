@@ -507,7 +507,7 @@ class AntaresStudyConverter:
                 if check_dataframe_validity(area.get_wind_matrix()):
                     components.append(
                         InputComponent(
-                            id=area.id,
+                            id=f"wind_{area.id}",
                             model=f"{lib_id}.wind",
                             parameters=[
                                 InputComponentParameter(
@@ -545,7 +545,7 @@ class AntaresStudyConverter:
                 if check_dataframe_validity(area.get_solar_matrix()):
                     components.append(
                         InputComponent(
-                            id=area.id,
+                            id=f"solar_{area.id}",
                             model=f"{lib_id}.solar",
                             parameters=[
                                 InputComponentParameter(
@@ -582,7 +582,7 @@ class AntaresStudyConverter:
                 if check_dataframe_validity(area.get_load_matrix()):
                     components.append(
                         InputComponent(
-                            id="load",
+                            id=f"load_{area.id}",
                             model=f"{lib_id}.load",
                             parameters=[
                                 InputComponentParameter(
