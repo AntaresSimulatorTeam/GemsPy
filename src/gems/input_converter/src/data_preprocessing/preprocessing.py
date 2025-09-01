@@ -1,6 +1,6 @@
 import copy
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 import pandas as pd
 from antares.craft.model.binding_constraint import BindingConstraint, ConstraintTerm

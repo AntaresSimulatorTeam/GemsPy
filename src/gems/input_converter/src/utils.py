@@ -11,7 +11,7 @@
 # This file is part of the Antares project.
 
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, Union
 
 import pandas as pd
@@ -68,7 +68,7 @@ def read_yaml_file(file_path: Path) -> dict[str, Any]:
             raise yaml.YAMLError(f"Error trying to read yaml file {file_path}: {e}")
 
 
-def save_to_csv(series: Union[pd.DataFrame, pd.Series], output_file):
+def save_to_csv(series: Union[pd.DataFrame, pd.Series], output_file: PurePath) -> None:
     output_dir = os.path.dirname(output_file)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)

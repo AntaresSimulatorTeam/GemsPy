@@ -289,7 +289,7 @@ class AntaresStudyConverter:
         connections: list,
         area_connections: list,
         mp: ModelsConfigurationProcessing,
-    ):
+    ) -> None:
         components.append(
             InputComponent(
                 id=valid_resources["component"]["id"],

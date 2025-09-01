@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, Any
 
 import pandas as pd
 
@@ -58,7 +57,7 @@ class ObjectProperties:
     field: Optional[str] = None
 
     @classmethod
-    def from_yaml(cls, yaml_data: dict):
+    def from_yaml(cls, yaml_data: dict) -> Any:
         yaml_data = yaml_data.copy()
         if "binding-constraint-id" in yaml_data:
             yaml_data["binding_constraint_id"] = yaml_data.pop("binding-constraint-id")
@@ -70,7 +69,7 @@ class MatrixData:
     object_properties: Optional[ObjectProperties] = None
 
     @classmethod
-    def from_yaml(cls, yaml_data: dict):
+    def from_yaml(cls, yaml_data: dict) -> Any:
         yaml_data = yaml_data.copy()
         if "object-properties" in yaml_data:
             yaml_data["object_properties"] = yaml_data.pop("object-properties")
@@ -84,7 +83,7 @@ class ComplexData:
     column: Optional[int] = None
 
     @classmethod
-    def from_yaml(cls, yaml_data: dict):
+    def from_yaml(cls, yaml_data: dict) -> Any:
         yaml_data = yaml_data.copy()
         if "object-properties" in yaml_data:
             yaml_data["object_properties"] = yaml_data.pop("object-properties")
