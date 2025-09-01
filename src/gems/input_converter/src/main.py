@@ -16,7 +16,7 @@ from argparse import ArgumentParser, ArgumentTypeError, Namespace
 from configparser import ConfigParser
 from pathlib import Path
 
-from gems.input_converter.src.data_preprocessing.dataclasses import ConversionMode
+from gems.input_converter.src.data_preprocessing.data_classes import ConversionMode
 
 from .converter import AntaresStudyConverter
 from .logger import Logger

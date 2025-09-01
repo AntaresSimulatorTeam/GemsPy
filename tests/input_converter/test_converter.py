@@ -17,7 +17,7 @@ import pytest
 from antares.craft.model.study import Study
 
 from gems.input_converter.src.converter import AntaresStudyConverter
-from gems.input_converter.src.data_preprocessing.dataclasses import Operation
+from gems.input_converter.src.data_preprocessing.data_classes import Operation
 from gems.input_converter.src.logger import Logger
 from gems.input_converter.src.utils import (
     check_file_exists,

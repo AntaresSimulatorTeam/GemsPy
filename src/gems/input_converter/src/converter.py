@@ -9,9 +9,10 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
+import logging
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Optional, Union
+from typing import Any, Never, Optional, Union
 
 import pandas as pd
 from antares.craft.exceptions.exceptions import ReferencedObjectDeletionNotAllowed
@@ -25,7 +26,7 @@ from gems.input_converter.src.config import (
     TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD,
     TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD,
 )
-from gems.input_converter.src.data_preprocessing.dataclasses import ConversionMode
+from gems.input_converter.src.data_preprocessing.data_classes import ConversionMode
 from gems.input_converter.src.data_preprocessing.preprocessing import (
     ModelsConfigurationProcessing,
 )
@@ -43,8 +44,6 @@ from gems.study.parsing import (
     InputSystem,
 )
 
-from .logger import Logger
-
 RESOURCES_FOLDER = Path(__file__).parents[1] / "data" / "model_configuration"
 
 
@@ -52,8 +51,8 @@ class AntaresStudyConverter:
     def __init__(
         self,
         study_input: Union[Path, Study],
-        logger: Logger,
-        mode: ConversionMode = "full",
+        logger: logging.Logger,
+        mode: str = "full",
         output_path: Optional[Path] = None,
         period: Optional[int] = None,
     ):
@@ -76,7 +75,7 @@ class AntaresStudyConverter:
             Path(output_path) if output_path else self.study_path / Path("output.yaml")
         )
         self.areas: MappingProxyType = self.study.get_areas()
-        self.legacy_objects = []
+        self.legacy_objects: list[dict] = []
 
     def _convert_thermal_to_component_list(
         self, valid_areas: dict, components: list, connections: list
@@ -208,7 +207,7 @@ class AntaresStudyConverter:
             return object
 
     def _convert_area_to_component_list(
-        self, lib_id: str, list_valid_areas: list[MappingProxyType[str, Any]] = []
+        self, lib_id: str, list_valid_areas: list[Never] = []
     ) -> list[InputComponent]:
         components = []
         self.logger.info("Converting areas to component list...")
@@ -238,7 +237,7 @@ class AntaresStudyConverter:
             )
         return components
 
-    def _delete_legacy_objects(self) -> dict:
+    def _delete_legacy_objects(self) -> None:
         for item in self.legacy_objects:
             item_type = item.get("type")
             try:
@@ -339,10 +338,12 @@ class AntaresStudyConverter:
 
     def _convert_model_to_component_list(
         self, valid_areas: dict, resource_content: dict
-    ) -> tuple[list[InputComponent], list[InputPortConnections]]:
-        components = []
-        connections = []
-        area_connections = []
+    ) -> tuple[
+        list[InputComponent], list[InputPortConnections], list[InputAreaConnections]
+    ]:
+        components: list[InputComponent] = []
+        connections: list[InputPortConnections] = []
+        area_connections: list[InputAreaConnections] = []
         self.logger.info("Converting models to component list...")
 
         model_area_pattern = (
@@ -393,7 +394,7 @@ class AntaresStudyConverter:
                         for cluster_id in getattr(
                             area, TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[cluster_type]
                         )():
-                            data_consolidated: dict = self._match_area_pattern(
+                            data_consolidated = self._match_area_pattern(
                                 data_consolidated, cluster_id, f"${{{cluster_type}}}"
                             )
                             self._iterate_through_model(
@@ -423,7 +424,7 @@ class AntaresStudyConverter:
     def _validate_resources_not_excluded(
         self, resource_content: dict, parameter: str
     ) -> dict:
-        excluded_ids = set()
+        excluded_ids: set[Any] = set()
         for param in resource_content.get("template-parameters", []):
             if param.get("name") == parameter:
                 excluded_ids.update(item["id"] for item in param.get("exclude", []))
@@ -446,8 +447,8 @@ class AntaresStudyConverter:
         list_connections: list[InputPortConnections] = []
         list_area_connections: list[InputAreaConnections] = []
 
-        list_valid_areas = set(self.areas.keys())
-        all_excluded_areas = set()
+        list_valid_areas: set[Any] = set(self.areas.keys())
+        all_excluded_areas: set[Any] = set()
         for file in RESOURCES_FOLDER.iterdir():
             if file.is_file() and file.name.endswith(".yaml"):
                 resource_content = read_yaml_file(file).get("template", {})
@@ -473,7 +474,7 @@ class AntaresStudyConverter:
                 list_valid_areas.difference_update(all_excluded_areas)
 
         area_components = self._convert_area_to_component_list(
-            antares_historic_lib_id, list_valid_areas
+            antares_historic_lib_id, list(list_valid_areas)
         )
 
         self.logger.info(
@@ -494,8 +495,15 @@ class AntaresStudyConverter:
         self.logger.info("Converting input study into yaml file...")
         transform_to_yaml(model=study, output_path=self.output_path)
 
+    def count_objects_in_yaml_file(self, output_path: Optional[Path]) -> dict[str, int]:
+        if output_path:
+            data = read_yaml_file(output_path)
+        else:
+            data = read_yaml_file(self.output_path)
 
-@staticmethod
-def count_objects_in_yaml_file(objet: Study):
-    pass
-    # TODO faire un compteur delements
+        return {
+            "components": len(data["system"].get("components", [])),
+            "connections": len(data["system"].get("connections", [])),
+            "nodes": len(data["system"].get("nodes", [])),
+            "area_connections": len(data["system"].get("area_connections", [])),
+        }

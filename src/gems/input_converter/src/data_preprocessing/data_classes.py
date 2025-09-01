@@ -19,9 +19,9 @@ class Operation:
 
     def execute(
         self,
-        initial_value: Union[pd.Series, float],
+        initial_value: Union[pd.DataFrame, pd.Series, float],
         preprocessed_values: Optional[Union[dict[str, float], float]] = None,
-    ) -> Union[float, pd.Series]:
+    ) -> Union[float, pd.Series, pd.DataFrame]:
         def resolve(value: Union[str, float]) -> Union[float, pd.Series]:
             if isinstance(value, str):
                 if (
