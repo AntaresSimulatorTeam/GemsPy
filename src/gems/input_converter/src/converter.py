@@ -442,6 +442,17 @@ class AntaresStudyConverter:
 
     def convert_study_to_input_study(self) -> InputSystem:
         antares_historic_lib_id = "antares-historic"
+        bc_data = read_yaml_file(BC_CONFIG_PATH).get("template", {})
+        # Get area pattern for binding constraint from model config
+        self.bc_area_pattern = f"${{{bc_data['template-parameters'][0]['name']}}}"
+
+        legacy_objects_for_bc: dict = self._extract_legacy_objects_from_model_config(
+            bc_data
+        )
+        valid_areas = self._extract_valid_areas_from_model_config(bc_data)
+        area_components = self._convert_area_to_component_list(
+            antares_historic_lib_id, legacy_objects_for_bc
+        )
 
         list_components: list[InputComponent] = []
         list_connections: list[InputPortConnections] = []

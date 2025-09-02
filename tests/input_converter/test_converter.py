@@ -45,8 +45,8 @@ RESOURCES_FOLDER = (
 DATAFRAME_PREPRO_SERIES = (create_dataframe_from_constant(lines=8760),)  # series
 
 DATAFRAME_PREPRO_THERMAL_CONFIG = (
-    create_dataframe_from_constant(lines=8760, columns=4),  # modulation
-    create_dataframe_from_constant(lines=8760),  # series
+    create_dataframe_from_constant(lines=840, columns=4),  # modulation
+    create_dataframe_from_constant(lines=840),  # series
 )
 
 DATAFRAME_PREPRO_BC_CONFIG = (
@@ -239,6 +239,7 @@ class TestConverter:
             components=[],
             connections=[],
         )
+
         expected_validated_data.nodes.sort(key=lambda x: x.id)
         validated_data.nodes.sort(key=lambda x: x.id)
         assert validated_data == expected_validated_data
@@ -650,7 +651,7 @@ class TestConverter:
             (conn for conn in solar_connections if conn.component1 == "solar_fr"), None
         )
         solar_timeseries = str(
-            converter.study_path / "input" / "solar" / "series" / "generation_fr"
+            converter.study_path / "input" / "solar" / "series" / "solar_fr"
         )
         expected_solar_connection = InputPortConnections(
             component1="solar_fr",
@@ -661,7 +662,7 @@ class TestConverter:
 
         expected_solar_components = InputComponent(
             id="solar_fr",
-            model="antares-historic.renewable",
+            model="antares-historic.solar",
             scenario_group=None,
             parameters=[
                 InputComponentParameter(
@@ -682,8 +683,8 @@ class TestConverter:
                     id="generation",
                     time_dependent=True,
                     scenario_dependent=True,
-                    value=f"{solar_timeseries}",
                     scenario_group=None,
+                    value=f"{solar_timeseries}",
                 ),
             ],
         )
@@ -743,17 +744,20 @@ class TestConverter:
                     id="load",
                     time_dependent=True,
                     scenario_dependent=True,
-                    value=f"{load_timeseries}",
                     scenario_group=None,
+                    value=f"{load_timeseries}",
                 ),
             ],
         )
-        assert load_fr_connection == expected_load_connection
-        assert load_fr_component.model_dump() == expected_load_components.model_dump()
+
+        assert load_components[0] == expected_load_components
+        assert load_connection == expected_load_connection
 
     @pytest.mark.parametrize(
         "fr_wind",
-        [DATAFRAME_PREPRO_SERIES],
+        [
+            [1, 1, 1],  # Dataframe filled with 1
+        ],
         indirect=True,
     )
     def test_convert_wind_to_component_from_study(self, fr_wind: Study):
@@ -788,7 +792,7 @@ class TestConverter:
         )
 
         wind_timeseries = str(
-            converter.study_path / "input" / "wind" / "series" / "generation_fr"
+            converter.study_path / "input" / "wind" / "series" / "wind_fr"
         )
         expected_wind_connection = InputPortConnections(
             component1="wind_fr",
@@ -799,7 +803,7 @@ class TestConverter:
         # ON touche plus
         expected_wind_components = InputComponent(
             id="wind_fr",
-            model="antares-historic.renewable",
+            model="antares-historic.wind",
             scenario_group=None,
             parameters=[
                 InputComponentParameter(
@@ -831,7 +835,7 @@ class TestConverter:
     @pytest.mark.parametrize(
         "fr_wind",
         [
-            pd.DataFrame(),  # DataFrame empty
+            [],  # DataFrame empty
         ],
         indirect=True,
     )
@@ -867,7 +871,7 @@ class TestConverter:
     @pytest.mark.parametrize(
         "fr_wind",
         [
-            pd.DataFrame([0, 0, 0]),  # DataFrame full of 0
+            [0, 0, 0],  # DataFrame full of 0
         ],
         indirect=True,
     )
@@ -1057,7 +1061,7 @@ class TestConverter:
         else:
             return object
 
-    def test_convert_bc_to_component_from_path(self):
+    def test_convert_binding_constraints_to_component(self, lib_id: str):
         path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
 
         output_path = path / "reference.yaml"
@@ -1089,6 +1093,7 @@ class TestConverter:
         ### Compare area connections
         assert area_connections == []
         # Compare connections
+
         expected_connection: InputPortConnections = InputPortConnections(
             **next(
                 (
@@ -1101,7 +1106,7 @@ class TestConverter:
         )
 
         assert connection == expected_connection
-        # Compare components
+
         expected_component = next(
             (
                 component
