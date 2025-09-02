@@ -110,7 +110,6 @@ class ModelsConfigurationProcessing:
                 raise ValueError(
                     f"Object properties  area from {area} must not be None"
                 )
-            # TODO Thermal preprocessing not handled for the moment in generic mode
             if area not in self.study.get_areas():
                 raise KeyError(f"Area {area} is not found in the study")
             cluster = getattr(

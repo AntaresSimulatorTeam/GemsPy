@@ -325,10 +325,7 @@ class AntaresStudyConverter:
                 )
             )
             for item in valid_resources.get("legacy-objects-to-delete", []):
-                item = item.get("object-properties")
-                if not isinstance(item, dict):
-                    continue
-                self.legacy_objects.append(item)
+                self.legacy_objects.append(item["object-properties"])
 
     def _convert_model_to_component_list(
         self, valid_areas: dict, resource_content: dict
@@ -466,7 +463,7 @@ class AntaresStudyConverter:
                         )
 
                 list_valid_areas.difference_update(all_excluded_areas)
-
+        # TODO _delete_legacy_objects
         area_components = self._convert_area_to_component_list(
             antares_historic_lib_id, list(list_valid_areas)
         )

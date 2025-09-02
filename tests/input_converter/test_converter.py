@@ -1080,8 +1080,6 @@ class TestConverter:
 
         bc_data = read_yaml_file(path_cc).get("template", {})
         valid_areas: dict = converter._validate_resources_not_excluded(bc_data, "area")
-        # TODO pour les preprocessng, il faut revenir a letat initial. du coup ca implique
-        # De copier le dossier entier, le tester, le supprimer apres
         (
             binding_components,
             binding_connections,
@@ -1151,8 +1149,7 @@ class TestConverter:
 
         bc_data = read_yaml_file(path_cc).get("template", {})
         valid_areas: dict = converter._validate_resources_not_excluded(bc_data, "area")
-        # TODO pour les preprocessng, il faut revenir a letat initial. du coup ca implique
-        # De copier le dossier entier, le tester, le supprimer apres
+
         (
             _,
             _,
@@ -1183,6 +1180,8 @@ class TestConverter:
         assert check_file_exists(path2)
         assert check_file_exists(path3)
         assert check_file_exists(path4)
+        #TODO check that objects are deleted
+        #TODO take into account that z_batteries is not present
         ### Compare area connections
         expected_area_connections = [
             InputAreaConnections(
@@ -1239,7 +1238,6 @@ class TestConverter:
                 }
                 for c in components
             ]
-
         assert sorted(
             normalize_components(obtained_components), key=lambda x: x["id"]
         ) == sorted(expected_data["components"], key=lambda x: x["id"])
