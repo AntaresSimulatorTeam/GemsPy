@@ -26,7 +26,6 @@ from gems.input_converter.src.utils import (
     transform_to_yaml,
 )
 from gems.study.parsing import (
-    InputAreaConnections,
     InputComponent,
     InputComponentParameter,
     InputPortConnections,
@@ -71,7 +70,7 @@ class TestConverter:
         shutil.copytree(local_path, test_path)
         logger = Logger(__name__, str(test_path))
         converter: AntaresStudyConverter = AntaresStudyConverter(
-            study_input=test_path, logger=logger, mode=mode
+            study_input=test_path, logger=logger
         )
         return converter
 
@@ -272,7 +271,6 @@ class TestConverter:
         (
             storage_components,
             storage_connections,
-            _,
         ) = converter._convert_model_to_component_list(valid_areas, resource_content)
         study_path = converter.study_path
 
@@ -413,7 +411,6 @@ class TestConverter:
         (
             thermals_components,
             thermals_connections,
-            _,
         ) = converter._convert_model_to_component_list(valid_areas, resource_content)
 
         study_path = converter.study_path
@@ -572,7 +569,6 @@ class TestConverter:
         (
             load_components,
             load_connections,
-            _,
         ) = converter._convert_model_to_component_list(valid_areas, resource_content)
 
         ### Compare connections
@@ -647,7 +643,6 @@ class TestConverter:
         (
             solar_components,
             solar_connections,
-            _,
         ) = converter._convert_model_to_component_list(valid_areas, resource_content)
         solar_fr_component = next(
             (comp for comp in solar_components if comp.id == "solar_fr"), None
@@ -717,7 +712,6 @@ class TestConverter:
         (
             load_components,
             load_connections,
-            _,
         ) = converter._convert_model_to_component_list(valid_areas, resource_content)
         load_fr_component = next(
             (comp for comp in load_components if comp.id == "load_fr"), None
@@ -779,7 +773,6 @@ class TestConverter:
         (
             wind_components,
             wind_connections,
-            _,
         ) = converter._convert_model_to_component_list(valid_areas, resource_content)
         wind_fr_component = next(
             (comp for comp in wind_components if comp.id == "wind_fr"), None
@@ -860,7 +853,6 @@ class TestConverter:
         (
             wind_components,
             _,
-            _,
         ) = converter._convert_model_to_component_list(valid_areas, resource_content)
         assert wind_components == []
 
@@ -893,7 +885,6 @@ class TestConverter:
         (
             wind_components,
             _,
-            _,
         ) = converter._convert_model_to_component_list(valid_areas, resource_content)
         assert wind_components == []
 
@@ -917,7 +908,6 @@ class TestConverter:
         (
             links_components,
             links_connections,
-            _,
         ) = converter._convert_model_to_component_list(valid_areas, resource_content)
         study_path = converter.study_path
 
@@ -1083,11 +1073,9 @@ class TestConverter:
         (
             binding_components,
             binding_connections,
-            area_connections,
         ) = converter._convert_model_to_component_list(valid_areas, bc_data)
         connection = binding_connections[0]
-        ### Compare area connections
-        assert area_connections == []
+
         # Compare connections
 
         expected_connection: InputPortConnections = InputPortConnections(
@@ -1132,63 +1120,6 @@ class TestConverter:
             obtained_parameters_to_dict, "", str(converter.study_path) + "/"
         )
         assert obtained_parameters == expected_component["parameters"]
-
-    def test_hybrid_mode_from_path(self, tmp_path: Path):
-        local_path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
-
-        converter = self._init_converter_from_path(local_path, tmp_path, "hybrid")
-        path_cc = (
-            Path(__file__).parent.parent.parent
-            / "src"
-            / "gems"
-            / "input_converter"
-            / "data"
-            / "model_configuration"
-            / "battery_new.yaml"
-        )
-
-        bc_data = read_yaml_file(path_cc).get("template", {})
-        valid_areas: dict = converter._validate_resources_not_excluded(bc_data, "area")
-
-        (
-            _,
-            _,
-            area_connections,
-        ) = converter._convert_model_to_component_list(valid_areas, bc_data)
-
-        test_path = converter.study_path
-        path1 = test_path / "input" / "data-series" / "marginal_cost_fr_z_batteries.txt"
-        path2 = (
-            test_path
-            / "input"
-            / "data-series"
-            / "p_max_injection_modulation_fr_z_batteries.txt"
-        )
-        path3 = (
-            test_path
-            / "input"
-            / "data-series"
-            / "p_max_withdrawal_modulation_fr_fr_batteries_inj.txt"
-        )
-        path4 = (
-            test_path
-            / "input"
-            / "data-series"
-            / "upper_rule_curve_z_batteries_z_batteries_batteries_fr_1.txt"
-        )
-        assert check_file_exists(path1)
-        assert check_file_exists(path2)
-        assert check_file_exists(path3)
-        assert check_file_exists(path4)
-        #TODO check that objects are deleted
-        #TODO take into account that z_batteries is not present
-        ### Compare area connections
-        expected_area_connections = [
-            InputAreaConnections(
-                component="battery_fr", port="injection_port", area="fr"
-            )
-        ]
-        assert area_connections == expected_area_connections
 
     def test_convert_study_path_to_input_study(self, tmp_path: Path):
         local_path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
@@ -1238,6 +1169,7 @@ class TestConverter:
                 }
                 for c in components
             ]
+
         assert sorted(
             normalize_components(obtained_components), key=lambda x: x["id"]
         ) == sorted(expected_data["components"], key=lambda x: x["id"])

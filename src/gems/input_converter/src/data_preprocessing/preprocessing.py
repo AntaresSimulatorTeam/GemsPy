@@ -17,7 +17,6 @@ from gems.input_converter.src.config import (
 )
 from gems.input_converter.src.data_preprocessing.data_classes import (
     ComplexData,
-    ConversionMode,
     MatrixData,
     ObjectProperties,
     Operation,
@@ -42,9 +41,8 @@ class ModelsConfigurationProcessing:
     preprocessed_values: dict[str, float] = {}
     param_id: str
 
-    def __init__(self, study: Study, mode: str):
+    def __init__(self, study: Study):
         self.study = study
-        self.mode = mode
         self.study_path: Path = study.service.config.study_path  # type: ignore
 
     def calculate_value(self, obj: DataType) -> Union[float, str]:
@@ -61,21 +59,14 @@ class ModelsConfigurationProcessing:
             time_series = getattr(
                 self.study.get_areas()[area], MATRIX_TYPES_TO_GET_METHOD[type_resource]
             )()
-            if self.mode == ConversionMode.HYBRID.value:
-                output_file = (
-                    self.study.path
-                    / "input"
-                    / "data-series"
-                    / f"{self.param_id}_{area}.txt"
-                )
-            else:
-                output_file = (
-                    self.study.path
-                    / "input"
-                    / type_resource
-                    / "series"
-                    / f"{self.param_id}_{area}.txt"
-                )
+
+            output_file = (
+                self.study.path
+                / "input"
+                / type_resource
+                / "series"
+                / f"{self.param_id}_{area}.txt"
+            )
         elif type_resource == "link":
             if (
                 obj.object_properties.link is None
@@ -90,21 +81,11 @@ class ModelsConfigurationProcessing:
             time_series = getattr(
                 link, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field]
             )()
-            if self.mode == ConversionMode.HYBRID.value:
-                output_file = (
-                    self.study.path
-                    / "input"
-                    / "data-series"
-                    / f"{self.param_id}_{link.area_from_id}_{link.area_to_id}.txt"
-                )
-            else:
-                file_path = getattr(
-                    TimeSeriesFileType,
-                    TEMPLATE_LINK_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
-                ).value.format(
-                    area_id=link.area_from_id, second_area_id=link.area_to_id
-                )
-                output_file = self.study.path / file_path
+            file_path = getattr(
+                TimeSeriesFileType,
+                TEMPLATE_LINK_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
+            ).value.format(area_id=link.area_from_id, second_area_id=link.area_to_id)
+            output_file = self.study.path / file_path
         elif type_resource in ["st_storage", "thermal", "renewable"]:
             if area is None:
                 raise ValueError(
@@ -131,20 +112,13 @@ class ModelsConfigurationProcessing:
                 if type_resource == "thermal":
                     self.preprocessed_values[self.param_id] = value
                 return value
-            if self.mode == ConversionMode.HYBRID.value:
-                output_file = (
-                    self.study.path
-                    / "input"
-                    / "data-series"
-                    / f"{self.param_id}_{area}_{obj.object_properties.cluster}.txt"
-                )
-            else:
-                file_path = getattr(
-                    TimeSeriesFileType,
-                    TEMPLATE_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
-                ).value.format(area_id=cluster.area_id, cluster_id=cluster.id)
 
-                output_file = self.study.path / file_path
+            file_path = getattr(
+                TimeSeriesFileType,
+                TEMPLATE_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
+            ).value.format(area_id=cluster.area_id, cluster_id=cluster.id)
+
+            output_file = self.study.path / file_path
         elif type_resource == "binding_constraint":
             if (
                 obj.object_properties.field is None

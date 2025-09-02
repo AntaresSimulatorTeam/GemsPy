@@ -34,11 +34,6 @@ def parse_scenario_builder(file: Path) -> pd.DataFrame:
     return sb
 
 
-class InputAreaConnections(ModifiedBaseModel):
-    component: str
-    port: str
-    area: str
-
 
 class InputPortConnections(ModifiedBaseModel):
     component1: str
@@ -67,7 +62,6 @@ class InputSystem(ModifiedBaseModel):
     nodes: List[InputComponent] = Field(default_factory=list)
     components: List[InputComponent] = Field(default_factory=list)
     connections: List[InputPortConnections] = Field(default_factory=list)
-    area_connections: Optional[List[InputAreaConnections]] = None
 
 
 @dataclass(frozen=True)
