@@ -53,7 +53,6 @@ class ModelsConfigurationProcessing:
         area: Union[str, None] = obj.object_properties.area
         type_resource: str = obj.object_properties.type
         time_series: pd.DataFrame = pd.DataFrame()
-
         if type_resource in ["load", "wind", "solar"]:
             if area is None:
                 raise ValueError(
@@ -172,6 +171,7 @@ class ModelsConfigurationProcessing:
         if isinstance(obj, ComplexData):
             if getattr(obj, "column", None) is not None:
                 time_series: pd.Series = time_series.iloc[:, obj.column]  # type: ignore
+
             if getattr(obj, "operation") and obj.operation is not None:
                 parameter_value: Union[
                     pd.Series, pd.DataFrame, float
@@ -181,6 +181,8 @@ class ModelsConfigurationProcessing:
                     return parameter_value
                 if isinstance(parameter_value, pd.Series):
                     save_to_csv(parameter_value, output_file)
+            else:
+                save_to_csv(time_series, output_file)
         else:
             # On réécrit par defaut les fichiers, même les wind/solar/load meme si ils ne sont pas modifiés
             save_to_csv(time_series, output_file)

@@ -207,12 +207,12 @@ class AntaresStudyConverter:
             return object
 
     def _convert_area_to_component_list(
-        self, lib_id: str, list_valid_areas: list[Never] = []
+        self, lib_id: str, list_valid_areas: Optional[list[str]] = None
     ) -> list[InputComponent]:
         components = []
         self.logger.info("Converting areas to component list...")
         for area in self.areas.values():
-            if area.id not in list_valid_areas:
+            if list_valid_areas and area.id not in list_valid_areas:
                 continue
 
             components.append(
@@ -251,12 +251,6 @@ class AntaresStudyConverter:
                         getattr(self.study, STUDY_LEVEL_GET[item_type])()[id]
                     )
                 elif item_type in TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD:
-                    print(
-                        "deleting",
-                        TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD[item_type],
-                        TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[item_type],
-                        [item.get("cluster")],
-                    )
                     getattr(
                         self.areas[item.get("area")],
                         TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD[item_type],
@@ -442,23 +436,12 @@ class AntaresStudyConverter:
 
     def convert_study_to_input_study(self) -> InputSystem:
         antares_historic_lib_id = "antares-historic"
-        bc_data = read_yaml_file(BC_CONFIG_PATH).get("template", {})
-        # Get area pattern for binding constraint from model config
-        self.bc_area_pattern = f"${{{bc_data['template-parameters'][0]['name']}}}"
-
-        legacy_objects_for_bc: dict = self._extract_legacy_objects_from_model_config(
-            bc_data
-        )
-        valid_areas = self._extract_valid_areas_from_model_config(bc_data)
-        area_components = self._convert_area_to_component_list(
-            antares_historic_lib_id, legacy_objects_for_bc
-        )
 
         list_components: list[InputComponent] = []
         list_connections: list[InputPortConnections] = []
         list_area_connections: list[InputAreaConnections] = []
 
-        list_valid_areas: set[Any] = set(self.areas.keys())
+        list_valid_areas: set[str] = set(self.areas.keys())
         all_excluded_areas: set[Any] = set()
         for file in RESOURCES_FOLDER.iterdir():
             if file.is_file() and file.name.endswith(".yaml"):

@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 import os
+import shutil
 from pathlib import Path
 
 import pandas as pd
@@ -45,8 +46,8 @@ RESOURCES_FOLDER = (
 DATAFRAME_PREPRO_SERIES = (create_dataframe_from_constant(lines=8760),)  # series
 
 DATAFRAME_PREPRO_THERMAL_CONFIG = (
-    create_dataframe_from_constant(lines=840, columns=4),  # modulation
-    create_dataframe_from_constant(lines=840),  # series
+    create_dataframe_from_constant(lines=8760, columns=4),  # modulation
+    create_dataframe_from_constant(lines=8760),  # series
 )
 
 DATAFRAME_PREPRO_BC_CONFIG = (
@@ -63,10 +64,14 @@ class TestConverter:
         )
         return converter
 
-    def _init_converter_from_path(self, local_path: Path, mode: str = "full"):
-        logger = Logger(__name__, str(local_path))
+    def _init_converter_from_path(
+        self, local_path: Path, tmp_path: Path, mode: str = "full"
+    ):
+        test_path = tmp_path / "mini_test_batterie_BP23"
+        shutil.copytree(local_path, test_path)
+        logger = Logger(__name__, str(test_path))
         converter: AntaresStudyConverter = AntaresStudyConverter(
-            study_input=local_path, logger=logger, mode=mode
+            study_input=test_path, logger=logger, mode=mode
         )
         return converter
 
@@ -539,15 +544,15 @@ class TestConverter:
         assert thermals_components == expected_thermals_components
         assert thermals_connections == expected_thermals_connections
 
-    def test_convert_load_to_component_from_path(self):
-        path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
+    def test_convert_load_to_component_from_path(self, tmp_path: Path):
+        local_path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
 
-        output_path = path / "reference.yaml"
+        output_path = local_path / "reference.yaml"
         expected_data = read_yaml_file(output_path)["system"]
         expected_components = expected_data["components"]
         expected_connections = expected_data["connections"]
 
-        converter = self._init_converter_from_path(path)
+        converter = self._init_converter_from_path(local_path, tmp_path, "full")
         path_load = (
             Path(__file__).parent.parent.parent
             / "src"
@@ -611,7 +616,7 @@ class TestConverter:
             for component in dict(load_components[0])["parameters"]
         ]
         obtained_parameters = TestConverter._match_area_pattern(
-            obtained_parameters_to_dict, "", str(path) + "/"
+            obtained_parameters_to_dict, "", str(converter.study_path) + "/"
         )
         assert obtained_parameters == expected_component["parameters"]
 
@@ -651,7 +656,7 @@ class TestConverter:
             (conn for conn in solar_connections if conn.component1 == "solar_fr"), None
         )
         solar_timeseries = str(
-            converter.study_path / "input" / "solar" / "series" / "solar_fr"
+            converter.study_path / "input" / "solar" / "series" / "generation_fr"
         )
         expected_solar_connection = InputPortConnections(
             component1="solar_fr",
@@ -662,7 +667,7 @@ class TestConverter:
 
         expected_solar_components = InputComponent(
             id="solar_fr",
-            model="antares-historic.solar",
+            model="antares-historic.renewable",
             scenario_group=None,
             parameters=[
                 InputComponentParameter(
@@ -683,19 +688,14 @@ class TestConverter:
                     id="generation",
                     time_dependent=True,
                     scenario_dependent=True,
-                    scenario_group=None,
                     value=f"{solar_timeseries}",
+                    scenario_group=None,
                 ),
             ],
         )
         assert solar_fr_connection == expected_solar_connection
         assert solar_fr_component.model_dump() == expected_solar_components.model_dump()
 
-    @pytest.mark.parametrize(
-        "fr_load",
-        [DATAFRAME_PREPRO_SERIES],
-        indirect=True,
-    )
     def test_convert_load_to_component_from_study(self, fr_load: None):
         converter = self._init_converter_from_study(fr_load)
         path_load = (
@@ -744,20 +744,17 @@ class TestConverter:
                     id="load",
                     time_dependent=True,
                     scenario_dependent=True,
-                    scenario_group=None,
                     value=f"{load_timeseries}",
+                    scenario_group=None,
                 ),
             ],
         )
-
-        assert load_components[0] == expected_load_components
-        assert load_connection == expected_load_connection
+        assert load_fr_connection == expected_load_connection
+        assert load_fr_component.model_dump() == expected_load_components.model_dump()
 
     @pytest.mark.parametrize(
         "fr_wind",
-        [
-            [1, 1, 1],  # Dataframe filled with 1
-        ],
+        [DATAFRAME_PREPRO_SERIES],
         indirect=True,
     )
     def test_convert_wind_to_component_from_study(self, fr_wind: Study):
@@ -792,7 +789,7 @@ class TestConverter:
         )
 
         wind_timeseries = str(
-            converter.study_path / "input" / "wind" / "series" / "wind_fr"
+            converter.study_path / "input" / "wind" / "series" / "generation_fr"
         )
         expected_wind_connection = InputPortConnections(
             component1="wind_fr",
@@ -800,10 +797,9 @@ class TestConverter:
             component2="fr",
             port2="balance_port",
         )
-        # ON touche plus
         expected_wind_components = InputComponent(
             id="wind_fr",
-            model="antares-historic.wind",
+            model="antares-historic.renewable",
             scenario_group=None,
             parameters=[
                 InputComponentParameter(
@@ -835,7 +831,7 @@ class TestConverter:
     @pytest.mark.parametrize(
         "fr_wind",
         [
-            [],  # DataFrame empty
+            pd.DataFrame(),  # DataFrame empty
         ],
         indirect=True,
     )
@@ -871,7 +867,7 @@ class TestConverter:
     @pytest.mark.parametrize(
         "fr_wind",
         [
-            [0, 0, 0],  # DataFrame full of 0
+            pd.DataFrame([0, 0, 0]),  # DataFrame full of 0
         ],
         indirect=True,
     )
@@ -1061,15 +1057,17 @@ class TestConverter:
         else:
             return object
 
-    def test_convert_binding_constraints_to_component(self, lib_id: str):
-        path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
+    def test_convert_binding_constraints_to_component(
+        self, lib_id: str, tmp_path: Path
+    ):
+        local_path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
 
-        output_path = path / "reference.yaml"
+        output_path = local_path / "reference.yaml"
         expected_data = read_yaml_file(output_path)["system"]
 
         expected_components = expected_data["components"]
         expected_connections = expected_data["connections"]
-        converter = self._init_converter_from_path(path)
+        converter = self._init_converter_from_path(local_path, tmp_path, "full")
         path_cc = (
             Path(__file__).parent.parent.parent
             / "src"
@@ -1133,15 +1131,14 @@ class TestConverter:
             for component in dict(binding_components[0])["parameters"]
         ]
         obtained_parameters = TestConverter._match_area_pattern(
-            obtained_parameters_to_dict, "", str(path) + "/"
+            obtained_parameters_to_dict, "", str(converter.study_path) + "/"
         )
-
         assert obtained_parameters == expected_component["parameters"]
 
-    def test_hybrid_mode_from_path(self):
-        path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
+    def test_hybrid_mode_from_path(self, tmp_path: Path):
+        local_path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
 
-        converter = self._init_converter_from_path(path, "hybrid")
+        converter = self._init_converter_from_path(local_path, tmp_path, "hybrid")
         path_cc = (
             Path(__file__).parent.parent.parent
             / "src"
@@ -1161,16 +1158,23 @@ class TestConverter:
             _,
             area_connections,
         ) = converter._convert_model_to_component_list(valid_areas, bc_data)
-        path1 = path / "input" / "data-series" / "marginal_cost_fr_z_batteries.txt"
-        path2 = path / "input" / "data-series" / "marginal_cost_fr_z_batteries.txt"
+
+        test_path = converter.study_path
+        path1 = test_path / "input" / "data-series" / "marginal_cost_fr_z_batteries.txt"
+        path2 = (
+            test_path
+            / "input"
+            / "data-series"
+            / "p_max_injection_modulation_fr_z_batteries.txt"
+        )
         path3 = (
-            path
+            test_path
             / "input"
             / "data-series"
             / "p_max_withdrawal_modulation_fr_fr_batteries_inj.txt"
         )
         path4 = (
-            path
+            test_path
             / "input"
             / "data-series"
             / "upper_rule_curve_z_batteries_z_batteries_batteries_fr_1.txt"
@@ -1187,11 +1191,11 @@ class TestConverter:
         ]
         assert area_connections == expected_area_connections
 
-    def test_convert_study_path_to_input_study(self):
-        path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
-        output_path = path / "reference.yaml"
+    def test_convert_study_path_to_input_study(self, tmp_path: Path):
+        local_path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
+        output_path = local_path / "reference.yaml"
         expected_data = read_yaml_file(output_path)["system"]
-        converter = self._init_converter_from_path(path)
+        converter = self._init_converter_from_path(local_path, tmp_path, "full")
         obtained_data = converter.convert_study_to_input_study()
 
         # A little formatting of expected parameters:
@@ -1212,7 +1216,7 @@ class TestConverter:
             component.model_dump() for component in dict(obtained_data)["components"]
         ]
         obtained_components = TestConverter._match_area_pattern(
-            obtained_components_to_dict, "", str(path) + "/"
+            obtained_components_to_dict, "", str(converter.study_path) + "/"
         )
 
         def normalize_components(components):

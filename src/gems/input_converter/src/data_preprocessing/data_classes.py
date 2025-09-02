@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Union, Any
+from typing import Any, Optional, Union
 
 import pandas as pd
 

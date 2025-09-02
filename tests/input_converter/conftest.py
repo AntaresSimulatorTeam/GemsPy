@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
+from pathlib import Path
 from typing import Union
 
 import pandas as pd
@@ -25,6 +26,11 @@ from antares.craft.model.thermal import ThermalClusterProperties
 @pytest.fixture
 def lib_id() -> str:
     return "antares-historic"
+
+
+@pytest.fixture
+def tmp_path(tmp_path) -> Path:
+    return tmp_path
 
 
 @pytest.fixture
@@ -132,15 +138,10 @@ def local_study_with_renewable(
     Create a renewable cluster
     """
     renewable_cluster_name = "generation"
-    timeseries = pd.DataFrame(
-        [
-            [-9999999980506447872, 0, 9999999980506447872],
-            [0, "fr", 0],
-        ],
-        dtype="object",
-    )
+    command = request.param if hasattr(request, "param") else DEFAULT_SERIES_CONFIG
+    series_df = command[0] if isinstance(command, tuple) else command
     local_study_w_thermal.get_areas()["fr"].create_renewable_cluster(
-        renewable_cluster_name, RenewableClusterProperties(), series=timeseries
+        renewable_cluster_name, RenewableClusterProperties()
     )
     local_study_w_thermal.get_areas()["fr"].get_renewables()[
         renewable_cluster_name
@@ -201,11 +202,11 @@ def local_study_with_hydro(local_study_with_st_storage) -> Study:
 
 
 @pytest.fixture
-def area_fr(local_study_with_hydro) -> Area:
+def area_fr(local_study_with_hydro) -> Union[Area, Study]:
     """
     return area object from the fixture local_study_with_hydro
     """
-    return local_study_with_hydro.get_areas()["fr"]
+    return local_study_with_hydro.get_areas()["fr"], local_study_with_hydro
 
 
 @pytest.fixture
@@ -217,21 +218,27 @@ def fr_solar(local_study_with_hydro, request: pytest.FixtureRequest) -> Study:
 
 
 @pytest.fixture
-def fr_wind(area_fr, request) -> None:
+def fr_wind(local_study_with_hydro, request) -> Study:
     """
-    return area object with a wind object that has custom parameters
+    return study object with a wind object that has custom parameters
     """
-    command = request.param if hasattr(request, "param") else [1, 1, 1]
-    data = pd.DataFrame(command)
-    return area_fr.set_wind(data)
+    command = request.param if hasattr(request, "param") else DEFAULT_SERIES_CONFIG
+    series_df = command[0] if isinstance(command, tuple) else command
+    if series_df.empty:
+        return local_study_with_hydro
+    local_study_with_hydro.get_areas()["fr"].set_wind(series_df)
+    return local_study_with_hydro
 
 
 @pytest.fixture
-def fr_load(area_fr) -> None:
+def fr_load(local_study_with_hydro, request: pytest.FixtureRequest) -> Study:
     """
-    return area object with a load object that has custom parameters
+    return a study object with a load object that has custom parameters
     """
-    return area_fr.set_load(pd.DataFrame([1, 1, 1]))
+    command = request.param if hasattr(request, "param") else DEFAULT_SERIES_CONFIG
+    series_df = command[0] if isinstance(command, tuple) else command
+    local_study_with_hydro.get_areas()["fr"].set_load(series_df)
+    return local_study_with_hydro
 
 
 @pytest.fixture
