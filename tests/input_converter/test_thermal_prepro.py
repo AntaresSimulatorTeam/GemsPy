@@ -101,7 +101,9 @@ class TestThermalPreprocessing:
         """Tests the p_min_cluster parameter processing."""
         tdp: ThermalDataPreprocessing = self._init_tdp(local_study_w_thermal)
 
-        expected_values = create_dataframe_from_constant(lines=8760, columns=1, value=6.0)  # min(min_gen_modulation * unit_count * nominal_capacity, p_max_cluster)
+        expected_values = create_dataframe_from_constant(
+            lines=8760, columns=1, value=6.0
+        )  # min(min_gen_modulation * unit_count * nominal_capacity, p_max_cluster)
         expected_values = expected_values.squeeze()
         expected_values.name = None
         component_parameter = tdp.generate_component_parameter("p_min_cluster")
@@ -118,7 +120,9 @@ class TestThermalPreprocessing:
         """Tests the nb_units_min parameter processing."""
         tdp: ThermalDataPreprocessing = self._init_tdp(local_study_w_thermal)
 
-        expected_values = create_dataframe_from_constant(lines=8760, columns=1, value=3.0)  # ceil(p_min_cluster / p_max_unit) en float
+        expected_values = create_dataframe_from_constant(
+            lines=8760, columns=1, value=3.0
+        )  # ceil(p_min_cluster / p_max_unit) en float
         expected_values = expected_values.squeeze()
         expected_values.name = None
         tdp.generate_component_parameter("p_min_cluster")
@@ -137,7 +141,9 @@ class TestThermalPreprocessing:
         """Tests the nb_units_max parameter processing."""
         tdp: ThermalDataPreprocessing = self._init_tdp(local_study_w_thermal)
 
-        expected_values = create_dataframe_from_constant(lines=8760, columns=1, value=3.0)  # ceil(p_max_cluster / p_max_unit) en float
+        expected_values = create_dataframe_from_constant(
+            lines=8760, columns=1, value=3.0
+        )  # ceil(p_max_cluster / p_max_unit) en float
         expected_values = expected_values.squeeze()
         expected_values.name = None
         tdp.generate_component_parameter("p_min_cluster")
