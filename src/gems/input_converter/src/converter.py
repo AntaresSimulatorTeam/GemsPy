@@ -507,7 +507,7 @@ class AntaresStudyConverter:
                 if check_dataframe_validity(area.get_wind_matrix()):
                     components.append(
                         InputComponent(
-                            id=area.id,
+                            id=f"wind_{area.id}",
                             model=f"{lib_id}.wind",
                             parameters=[
                                 InputComponentParameter(
@@ -521,7 +521,7 @@ class AntaresStudyConverter:
                     )
                     connections.append(
                         InputPortConnections(
-                            component1="wind",
+                            component1=f"wind_{area.id}",
                             port1="balance_port",
                             component2=area.id,
                             port2="balance_port",
@@ -545,7 +545,7 @@ class AntaresStudyConverter:
                 if check_dataframe_validity(area.get_solar_matrix()):
                     components.append(
                         InputComponent(
-                            id=area.id,
+                            id=f"solar_{area.id}",
                             model=f"{lib_id}.solar",
                             parameters=[
                                 InputComponentParameter(
@@ -559,7 +559,7 @@ class AntaresStudyConverter:
                     )
                     connections.append(
                         InputPortConnections(
-                            component1="solar",
+                            component1=f"solar_{area.id}",
                             port1="balance_port",
                             component2=area.id,
                             port2="balance_port",
@@ -582,7 +582,7 @@ class AntaresStudyConverter:
                 if check_dataframe_validity(area.get_load_matrix()):
                     components.append(
                         InputComponent(
-                            id="load",
+                            id=f"load_{area.id}",
                             model=f"{lib_id}.load",
                             parameters=[
                                 InputComponentParameter(
@@ -596,7 +596,7 @@ class AntaresStudyConverter:
                     )
                     connections.append(
                         InputPortConnections(
-                            component1="load",
+                            component1=f"load_{area.id}",
                             port1="balance_port",
                             component2=area.id,
                             port2="balance_port",
