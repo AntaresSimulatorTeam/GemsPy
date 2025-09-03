@@ -367,7 +367,6 @@ class AntaresStudyConverter:
 
         list_components: list[InputComponent] = []
         list_connections: list[InputPortConnections] = []
-        list_area_connections: list[InputAreaConnections] = []
 
         list_valid_areas: set[str] = set(self.areas.keys())
         all_excluded_areas: set[Any] = set()
