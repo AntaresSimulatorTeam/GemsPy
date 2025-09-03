@@ -34,7 +34,6 @@ def parse_scenario_builder(file: Path) -> pd.DataFrame:
     return sb
 
 
-
 class InputPortConnections(ModifiedBaseModel):
     component1: str
     port1: str
