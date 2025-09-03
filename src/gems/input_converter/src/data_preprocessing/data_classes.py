@@ -1,7 +1,13 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Optional, Union
 
 import pandas as pd
+
+
+class ConversionMode(Enum):
+    HYBRID = "hybrid"
+    FULL = "full"
 
 
 @dataclass(frozen=True)

@@ -12,12 +12,21 @@
 import logging
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Optional, Union
+from typing import Any, Never, Optional, Union
 
+import pandas as pd
+from antares.craft.exceptions.exceptions import ReferencedObjectDeletionNotAllowed
 from antares.craft.model.study import Study, read_study_local
 from antares.craft.model.thermal import ThermalCluster
 
-from gems.input_converter.src.config import TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD
+from gems.input_converter.src.config import (
+    MATRIX_TYPES_TO_SET_METHOD,
+    STUDY_LEVEL_DELETION,
+    STUDY_LEVEL_GET,
+    TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD,
+    TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD,
+)
+from gems.input_converter.src.data_preprocessing.data_classes import ConversionMode
 from gems.input_converter.src.data_preprocessing.preprocessing import (
     ModelsConfigurationProcessing,
 )
@@ -28,6 +37,7 @@ from gems.input_converter.src.utils import (
     transform_to_yaml,
 )
 from gems.study.parsing import (
+    InputAreaConnections,
     InputComponent,
     InputComponentParameter,
     InputPortConnections,
@@ -42,6 +52,7 @@ class AntaresStudyConverter:
         self,
         study_input: Union[Path, Study],
         logger: logging.Logger,
+        mode: str = "full",
         output_path: Optional[Path] = None,
         period: Optional[int] = None,
     ):
@@ -49,6 +60,7 @@ class AntaresStudyConverter:
         Initialize processor
         """
         self.logger = logger
+        self.mode = mode
         self.period: int = period if period else 168
 
         if isinstance(study_input, Study):
@@ -63,6 +75,7 @@ class AntaresStudyConverter:
             Path(output_path) if output_path else self.study_path / Path("output.yaml")
         )
         self.areas: MappingProxyType = self.study.get_areas()
+        self.legacy_objects: list[dict] = []
 
     def _convert_thermal_to_component_list(
         self, valid_areas: dict, components: list, connections: list
@@ -224,11 +237,51 @@ class AntaresStudyConverter:
             )
         return components
 
+    def _delete_legacy_objects(self) -> None:
+        for item in self.legacy_objects:
+            item_type = item.get("type")
+            try:
+                if item_type in STUDY_LEVEL_DELETION:
+                    id = (
+                        item["binding-constraint-id"]
+                        if item_type == "binding_constraint"
+                        else item[item_type]
+                    )
+                    getattr(self.study, STUDY_LEVEL_DELETION[item_type])(
+                        getattr(self.study, STUDY_LEVEL_GET[item_type])()[id]
+                    )
+                elif item_type in TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD:
+                    getattr(
+                        self.areas[item.get("area")],
+                        TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD[item_type],
+                    )(
+                        getattr(
+                            self.areas[item.get("area")],
+                            TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[item_type],
+                        )()[item.get("cluster")]
+                    )
+                elif item_type in MATRIX_TYPES_TO_SET_METHOD:
+                    getattr(
+                        self.areas[item.get("area")],
+                        MATRIX_TYPES_TO_SET_METHOD[item_type],
+                    )(pd.DataFrame())
+            except ReferencedObjectDeletionNotAllowed:
+                self.logger.warning(
+                    f"Item {item} will not be deleted because it reference an object from binding constraints"
+                )
+            except NotImplementedError as e:
+                self.logger.warning(
+                    f"Failure to delete {item} because the method is not implemented yet on antares craft"
+                )
+
+        self.legacy_objects[:] = []
+
     def _iterate_through_model(
         self,
         valid_resources: dict,
         components: list,
         connections: list,
+        area_connections: list,
         mp: ModelsConfigurationProcessing,
     ) -> None:
         components.append(
@@ -263,18 +316,32 @@ class AntaresStudyConverter:
                 )
             )
 
+        if self.mode == ConversionMode.HYBRID.value:
+            area_connections.append(
+                InputAreaConnections(
+                    component=valid_resources["area-connections"][0]["component"],
+                    port=valid_resources["area-connections"][0]["port"],
+                    area=valid_resources["area-connections"][0]["area"],
+                )
+            )
+            for item in valid_resources.get("legacy-objects-to-delete", []):
+                self.legacy_objects.append(item["object-properties"])
+
     def _convert_model_to_component_list(
         self, valid_areas: dict, resource_content: dict
-    ) -> tuple[list[InputComponent], list[InputPortConnections]]:
+    ) -> tuple[
+        list[InputComponent], list[InputPortConnections], list[InputAreaConnections]
+    ]:
         components: list[InputComponent] = []
         connections: list[InputPortConnections] = []
+        area_connections: list[InputAreaConnections] = []
         self.logger.info("Converting models to component list...")
 
         model_area_pattern = (
             f"${{{resource_content['template-parameters'][0]['name']}}}"
         )
         resource_name = resource_content["name"]
-        mp = ModelsConfigurationProcessing(self.study)
+        mp = ModelsConfigurationProcessing(self.study, self.mode)
         try:
             if resource_name in ["link"]:
                 valid_resources: dict = self._validate_resources_not_excluded(
@@ -285,7 +352,7 @@ class AntaresStudyConverter:
                         resource_content, link.id, model_area_pattern
                     )
                     self._iterate_through_model(
-                        data_with_link, components, connections, mp
+                        data_with_link, components, connections, area_connections, mp
                     )
 
             else:
@@ -294,7 +361,7 @@ class AntaresStudyConverter:
                     self._convert_thermal_to_component_list(
                         valid_areas, components, connections
                     )
-                    return components, connections
+                    return components, connections, area_connections
                 for area in valid_areas.values():
                     data_consolidated: dict = self._match_area_pattern(
                         resource_content, area.id, model_area_pattern
@@ -325,6 +392,7 @@ class AntaresStudyConverter:
                                 data_consolidated,
                                 components,
                                 connections,
+                                area_connections,
                                 mp,
                             )
                     else:
@@ -332,6 +400,7 @@ class AntaresStudyConverter:
                             data_consolidated,
                             components,
                             connections,
+                            area_connections,
                             mp,
                         )
         except (KeyError, FileNotFoundError) as e:
@@ -339,9 +408,9 @@ class AntaresStudyConverter:
                 f"Error while converting model to component list: {e}. "
                 "Please check the model configuration file."
             )
-            return components, connections
+            return components, connections, area_connections
 
-        return components, connections
+        return components, connections, area_connections
 
     def _validate_resources_not_excluded(
         self, resource_content: dict, parameter: str
@@ -381,9 +450,11 @@ class AntaresStudyConverter:
                 (
                     components,
                     connections,
+                    area_connections,
                 ) = self._convert_model_to_component_list(valid_areas, resource_content)
                 list_components.extend(components)
                 list_connections.extend(connections)
+                list_area_connections.extend(area_connections)
 
                 for param in resource_content.get("template-parameters", []):
                     if param.get("name") == "area":
@@ -405,6 +476,7 @@ class AntaresStudyConverter:
             nodes=area_components,
             components=list_components,
             connections=list_connections,
+            area_connections=list_area_connections or None,
         )
         data = system.model_dump(exclude_none=True)
         return InputSystem(**data)
