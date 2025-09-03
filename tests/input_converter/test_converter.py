@@ -21,7 +21,6 @@ from gems.input_converter.src.converter import AntaresStudyConverter
 from gems.input_converter.src.data_preprocessing.data_classes import Operation
 from gems.input_converter.src.logger import Logger
 from gems.input_converter.src.utils import (
-    check_file_exists,
     read_yaml_file,
     transform_to_yaml,
 )
