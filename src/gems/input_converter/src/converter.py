@@ -262,7 +262,6 @@ class AntaresStudyConverter:
                         if item_type == "binding_constraint"
                         else item[item_type]
                     )
-                    print("yo", item_type, id)
                     getattr(self.study, STUDY_LEVEL_DELETION[item_type])(
                         getattr(self.study, STUDY_LEVEL_GET[item_type])()[id]
                     )
@@ -277,12 +276,6 @@ class AntaresStudyConverter:
                         )()[item.get("cluster")]
                     )
                 elif item_type in MATRIX_TYPES_TO_SET_METHOD:
-                    print(
-                        "yo",
-                        item_type,
-                        self.areas[item.get("area")],
-                        MATRIX_TYPES_TO_SET_METHOD[item_type],
-                    )
                     getattr(
                         self.areas[item.get("area")],
                         MATRIX_TYPES_TO_SET_METHOD[item_type],

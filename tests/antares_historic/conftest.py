@@ -118,6 +118,7 @@ def default_st_storage_cluster_properties() -> STStorageProperties:
         initial_level=0.5,
         initial_level_optim=False,
         enabled=True,
+        efficiency_withdrawal=1,
     )
 
 
