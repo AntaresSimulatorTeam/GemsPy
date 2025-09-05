@@ -28,7 +28,7 @@ def local_study(tmp_path) -> Study:
     Create an empty study
     """
     study_name = "studyTest"
-    study_version = "880"
+    study_version = "920"
     return create_study_local(study_name, study_version, tmp_path.absolute())
 
 
