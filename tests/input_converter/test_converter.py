@@ -35,6 +35,10 @@ from gems.study.parsing import (
 )
 from tests.input_converter.conftest import create_dataframe_from_constant
 
+MODEL_LIST = [
+    "src/gems/libs/antares_historic/antares_historic.yml",
+    "src/gems/libs/reference_models/andromede_v1_models.yml",
+]
 RESOURCES_FOLDER = (
     Path(__file__).parents[2]
     / "src"
@@ -65,13 +69,23 @@ class TestConverter:
         return converter
 
     def _init_converter_from_path(
-        self, local_path: Path, tmp_path: Path, mode: str = "full"
+        self,
+        local_path: Path,
+        tmp_path: Path,
+        mode: str = "full",
+        lib_paths: list = None,
+        model_list: list = None,
     ):
         test_path = tmp_path / "mini_test_batterie_BP23"
         shutil.copytree(local_path, test_path)
         logger = Logger(__name__, str(test_path))
         converter: AntaresStudyConverter = AntaresStudyConverter(
-            study_input=test_path, logger=logger, mode=mode
+            study_input=test_path,
+            logger=logger,
+            mode=mode,
+            output_folder=tmp_path,
+            lib_paths=lib_paths,
+            model_list=model_list,
         )
         return converter
 
@@ -127,7 +141,6 @@ class TestConverter:
             components=[],
             connections=[],
         )
-
         assert input_study.nodes == expected_input_study.nodes
 
     def test_convert_area_to_component(self, local_study_w_areas: Study, lib_id: str):
@@ -562,7 +575,6 @@ class TestConverter:
             / "model_configuration"
             / "load.yaml"
         )
-
         resource_content = read_yaml_file(path_load).get("template", {})
 
         valid_areas: dict = converter._validate_resources_not_excluded(
@@ -1075,7 +1087,7 @@ class TestConverter:
             / "input_converter"
             / "data"
             / "model_configuration"
-            / "battery_new.yaml"
+            / "battery.yaml"
         )
 
         bc_data = read_yaml_file(path_cc).get("template", {})
@@ -1133,10 +1145,13 @@ class TestConverter:
         )
         assert obtained_parameters == expected_component["parameters"]
 
-    def test_hybrid_mode_from_path(self, tmp_path: Path):
+    def test_hybrid_data_series_presence(self, tmp_path: Path):
         local_path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
-
-        converter = self._init_converter_from_path(local_path, tmp_path, "hybrid")
+        lib_paths: list = MODEL_LIST
+        model_list: list = "battery"
+        converter = self._init_converter_from_path(
+            local_path, tmp_path, "hybrid", lib_paths, model_list
+        )
         path_cc = (
             Path(__file__).parent.parent.parent
             / "src"
@@ -1144,7 +1159,7 @@ class TestConverter:
             / "input_converter"
             / "data"
             / "model_configuration"
-            / "battery_new.yaml"
+            / "battery.yaml"
         )
 
         bc_data = read_yaml_file(path_cc).get("template", {})
@@ -1180,8 +1195,6 @@ class TestConverter:
         assert check_file_exists(path2)
         assert check_file_exists(path3)
         assert check_file_exists(path4)
-        #TODO check that objects are deleted
-        #TODO take into account that z_batteries is not present
         ### Compare area connections
         expected_area_connections = [
             InputAreaConnections(
@@ -1189,6 +1202,113 @@ class TestConverter:
             )
         ]
         assert area_connections == expected_area_connections
+
+    def test_hybrid_convert_study_path_to_input_study(self, tmp_path: Path):
+        local_path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
+
+        output_path = local_path / "reference_hybrid.yaml"
+        expected_data = read_yaml_file(output_path)["system"]
+
+        MODEL_LIST_WITH_BASE = [
+            str(Path(os.getcwd()) / suffix) for suffix in MODEL_LIST
+        ]
+        lib_paths: list = MODEL_LIST_WITH_BASE
+        model_list: list = ["battery"]
+        converter = self._init_converter_from_path(
+            local_path, tmp_path, "hybrid", lib_paths, model_list
+        )
+
+        thermal_cluster_filepath = (
+            converter.study_path
+            / "input"
+            / "thermal"
+            / "clusters"
+            / "z_batteries"
+            / "list.ini"
+        )
+        bc_filepath = (
+            converter.study_path
+            / "input"
+            / "bindingconstraints"
+            / "bindingconstraints.ini"
+        )
+        links_filepath = (
+            converter.study_path / "input" / "links" / "fr" / "properties.ini"
+        )
+
+        assert thermal_cluster_filepath.stat().st_size > 0
+        assert bc_filepath.stat().st_size > 0
+        assert links_filepath.stat().st_size > 0
+        obtained_data = converter.convert_study_to_input_study()
+
+        # Check files have been correctly deleted
+        thermal_cluster_filepath = (
+            converter.output_folder
+            / "input"
+            / "thermal"
+            / "clusters"
+            / "z_batteries"
+            / "list.ini"
+        )
+        bc_filepath = (
+            converter.output_folder
+            / "input"
+            / "bindingconstraints"
+            / "bindingconstraints.ini"
+        )
+        links_filepath = (
+            converter.output_folder / "input" / "links" / "fr" / "properties.ini"
+        )
+        assert thermal_cluster_filepath.stat().st_size == 0
+        assert bc_filepath.stat().st_size == 0
+        assert links_filepath.stat().st_size == 0
+        # TODO check folder data-models is present
+
+        # A little formatting of expected parameters:
+        # Convert tiret fields with snake_case version
+        # Add scenario group to None, if not present
+        for component in expected_data["components"]:
+            if not component.get("scenario_group"):
+                component["scenario_group"] = None
+            for item in component["parameters"]:
+                item["scenario_dependent"] = item.pop("scenario-dependent")
+                item["time_dependent"] = item.pop("time-dependent")
+                if not item.get("scenario_group"):
+                    item["scenario_group"] = None
+        # A little formatting of obtained parameters:
+        # Convert list of objects to list of dictionaries
+        # Replace absolute path with relative path
+        obtained_components_to_dict = [
+            component.model_dump() for component in dict(obtained_data)["components"]
+        ]
+        obtained_components = TestConverter._match_area_pattern(
+            obtained_components_to_dict, "", str(converter.study_path) + "/"
+        )
+
+        def normalize_components(components):
+            return [
+                {
+                    **c,
+                    "parameters": [
+                        {
+                            k: p[k]
+                            for k in (
+                                "id",
+                                "value",
+                                "scenario_dependent",
+                                "time_dependent",
+                                "scenario_group",
+                            )
+                        }
+                        for p in c["parameters"]
+                    ],
+                }
+                for c in components
+            ]
+
+        assert sorted(
+            normalize_components(obtained_components), key=lambda x: x["id"]
+        ) == sorted(expected_data["components"], key=lambda x: x["id"])
 
     def test_convert_study_path_to_input_study(self, tmp_path: Path):
         local_path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
@@ -1238,6 +1358,7 @@ class TestConverter:
                 }
                 for c in components
             ]
+
         assert sorted(
             normalize_components(obtained_components), key=lambda x: x["id"]
         ) == sorted(expected_data["components"], key=lambda x: x["id"])

@@ -22,7 +22,7 @@ from gems.input_converter.src.data_preprocessing.data_classes import (
     ObjectProperties,
     Operation,
 )
-from gems.input_converter.src.utils import check_dataframe_validity, save_to_csv
+from gems.input_converter.src.utils import check_dataframe_validity, save_to_file
 
 DataType = Union[ComplexData, MatrixData]
 DataClass = Union[type[ComplexData], type[MatrixData]]
@@ -42,10 +42,10 @@ class ModelsConfigurationProcessing:
     preprocessed_values: dict[str, float] = {}
     param_id: str
 
-    def __init__(self, study: Study, mode: str):
+    def __init__(self, study: Study, mode: ConversionMode):
         self.study = study
         self.mode = mode
-        self.study_path: Path = study.service.config.study_path  # type: ignore
+        self.study_path = Path(study.path)
 
     def calculate_value(self, obj: DataType) -> Union[float, str]:
         if obj.object_properties is None or obj.object_properties.type is None:
@@ -179,12 +179,12 @@ class ModelsConfigurationProcessing:
                     self.preprocessed_values[self.param_id] = parameter_value
                     return parameter_value
                 if isinstance(parameter_value, pd.Series):
-                    save_to_csv(parameter_value, output_file)
+                    save_to_file(parameter_value, output_file)
             else:
-                save_to_csv(time_series, output_file)
+                save_to_file(time_series, output_file)
         else:
             # On réécrit par defaut les fichiers, même les wind/solar/load meme si ils ne sont pas modifiés
-            save_to_csv(time_series, output_file)
+            save_to_file(time_series, output_file)
         return str(output_file).removesuffix(".txt")
 
     def _process_value_content(self, value_content: dict) -> tuple[DataClass, dict]:

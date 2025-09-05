@@ -112,24 +112,6 @@ def parse_commandline() -> Namespace:
         help="Give the path of the logger file",
         default=LOGGER_PATH,
     )
-    parser.add_argument(
-        "-i",
-        "--study_path",
-        type=PathType(exists=True, dir_ok=True),
-        help="Give the path of the study_path",
-    )
-    parser.add_argument(
-        "-o",
-        "--output_path",
-        type=PathType(exists=True, dir_ok=True),
-        help="Give the path of the output path",
-    )
-    parser.add_argument(
-        "-m",
-        "--mode",
-        type=ConversionMode,
-        help="Select the mode",
-    )
     return parser.parse_args()
 
 
@@ -147,26 +129,46 @@ if __name__ == "__main__":
     config_parser.read_dict(DEFAULT)
 
     if args.conf:
-        # Check if the specified config file exists, if not, exit with an error message.
-        if not os.path.exists(args.conf):
-            sys.exit(f"Aborting: missing config file at {args.conf}")
-        else:
-            config_parser.read(args.conf)
+        config_parser.read(args.conf)
 
     if not config_parser.has_section("study"):
-        config_parser.add_section("study")
+        sys.exit(f"Aborting: missing 'study' section in configuration")
 
-    if args.study_path:
-        config_parser.set("study", "study_path", str(args.study_path))
-    if args.output_path:
-        config_parser.set("study", "output_path", str(args.output_path))
+    try:
+        path_validator = PathType(exists=True, dir_ok=True)
+        study_path = path_validator(config_parser.get("study", "study_path"))
+        output_folder = path_validator(config_parser.get("study", "output_folder"))
+    except ArgumentTypeError as e:
+        sys.exit(f"Aborting: Invalid path in configuration file: {e}")
 
-    mode = args.mode.value if args.mode else ConversionMode.FULL.value
+    mode = config_parser.get("study", "mode", fallback=ConversionMode.FULL.value)
+    params = {
+        "study_input": study_path,
+        "logger": logger,
+        "mode": mode,
+        "output_folder": output_folder,
+    }
+    if mode == ConversionMode.HYBRID.value:
+        if not (
+            config_parser.get("hybrid", "lib_paths")
+            and config_parser.get("hybrid", "model_list")
+        ):
+            sys.exit(f"Aborting: 'hybrid' mode set but no config related")
 
-    converter = AntaresStudyConverter(
-        study_input=Path(config_parser["study"].get("study_path")),
-        logger=logger,
-        mode=mode,
-        output_path=Path(config_parser["study"].get("output_path")),
-    )
+        lib_paths = list(
+            filter(None, config_parser.get("hybrid", "lib_paths").split(","))
+        )
+        try:
+            for path in lib_paths:
+                PathType(exists=True, file_ok=True)(path)
+        except ArgumentTypeError as e:
+            sys.exit(f"Aborting: Invalid lib_paths in configuration file: {e}")
+        model_list = list(
+            filter(None, config_parser.get("hybrid", "model_list").split(","))
+        )
+
+        params["lib_paths"] = lib_paths
+        params["model_list"] = model_list
+
+    converter = AntaresStudyConverter(**params)  # type: ignore
     converter.process_all()

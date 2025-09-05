@@ -10,9 +10,10 @@
 #
 # This file is part of the Antares project.
 import logging
+import shutil
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Never, Optional, Union
+from typing import Any, Optional, Union
 
 import pandas as pd
 from antares.craft.exceptions.exceptions import ReferencedObjectDeletionNotAllowed
@@ -34,6 +35,7 @@ from gems.input_converter.src.data_preprocessing.thermal import ThermalDataPrepr
 from gems.input_converter.src.utils import (
     read_yaml_file,
     resolve_path,
+    save_to_file,
     transform_to_yaml,
 )
 from gems.study.parsing import (
@@ -52,28 +54,41 @@ class AntaresStudyConverter:
         self,
         study_input: Union[Path, Study],
         logger: logging.Logger,
-        mode: str = "full",
-        output_path: Optional[Path] = None,
+        mode: ConversionMode = ConversionMode.FULL,
+        output_folder: Path = Path("/tmp/"),
         period: Optional[int] = None,
+        **kwargs,
     ):
         """
         Initialize processor
         """
         self.logger = logger
         self.mode = mode
-        self.period: int = period if period else 168
+        self.output_folder = output_folder
+        if mode == ConversionMode.HYBRID.value:
+            self.lib_paths: list = kwargs["lib_paths"]
+            self.model_list: list = kwargs["model_list"]
+            self.output_folder = output_folder / "studyTest"
+            if isinstance(study_input, Study):
+                shutil.copytree(
+                    study_input.path, self.output_folder, dirs_exist_ok=True
+                )
+                study_input.path = self.output_folder
+            elif isinstance(study_input, Path):
+                shutil.copytree(study_input, self.output_folder, dirs_exist_ok=True)
+                study_input = self.output_folder
 
+        self.period: int = period if period else 168
         if isinstance(study_input, Study):
             self.study = study_input
-            self.study_path = study_input.service.config.study_path  # type: ignore
+            self.study_path = Path(study_input.path)
         elif isinstance(study_input, Path):
             self.study_path = resolve_path(study_input)
             self.study = read_study_local(self.study_path)
         else:
             raise TypeError("Invalid input type")
-        self.output_path = (
-            Path(output_path) if output_path else self.study_path / Path("output.yaml")
-        )
+        self.output_path = Path(self.output_folder) / "output.yaml"
+
         self.areas: MappingProxyType = self.study.get_areas()
         self.legacy_objects: list[dict] = []
 
@@ -247,6 +262,7 @@ class AntaresStudyConverter:
                         if item_type == "binding_constraint"
                         else item[item_type]
                     )
+                    print("yo", item_type, id)
                     getattr(self.study, STUDY_LEVEL_DELETION[item_type])(
                         getattr(self.study, STUDY_LEVEL_GET[item_type])()[id]
                     )
@@ -261,6 +277,12 @@ class AntaresStudyConverter:
                         )()[item.get("cluster")]
                     )
                 elif item_type in MATRIX_TYPES_TO_SET_METHOD:
+                    print(
+                        "yo",
+                        item_type,
+                        self.areas[item.get("area")],
+                        MATRIX_TYPES_TO_SET_METHOD[item_type],
+                    )
                     getattr(
                         self.areas[item.get("area")],
                         MATRIX_TYPES_TO_SET_METHOD[item_type],
@@ -431,17 +453,52 @@ class AntaresStudyConverter:
             key: value for key, value in resources.items() if key not in excluded_ids
         }
 
+    def _validate_model_in_libs(self):
+        def _is_model_in_libraries(model):
+            for lib_path in self.lib_paths:
+                try:
+                    lib_data = read_yaml_file(Path(lib_path))
+                    lib_models = lib_data.get("library", {}).get("models", [])
+                    if any(lib_model["id"] == model for lib_model in lib_models):
+                        return True
+                except (FileNotFoundError, KeyError, TypeError) as e:
+                    continue
+            return False
+
+        missing_models = []
+
+        for model in self.model_list:
+            if not _is_model_in_libraries(model):
+                missing_models.append(model)
+
+        if missing_models:
+            raise ValueError(
+                f"The follwing model are not found in the model libraries : {', '.join(missing_models)}"
+            )
+
+        for path in self.lib_paths:
+            dest_dir = self.output_folder / "input" / "model-libraries"
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, dest_dir)
+
     def convert_study_to_input_study(self) -> InputSystem:
-        antares_historic_lib_id = "antares-historic"
+        if self.mode == ConversionMode.HYBRID.value:
+            self._validate_model_in_libs()
 
         list_components: list[InputComponent] = []
         list_connections: list[InputPortConnections] = []
         list_area_connections: list[InputAreaConnections] = []
+        area_components: list[InputComponent] = []
 
         list_valid_areas: set[str] = set(self.areas.keys())
         all_excluded_areas: set[Any] = set()
         for file in RESOURCES_FOLDER.iterdir():
             if file.is_file() and file.name.endswith(".yaml"):
+                if (
+                    self.mode == ConversionMode.HYBRID.value
+                    and file.stem not in self.model_list
+                ):
+                    continue
                 resource_content = read_yaml_file(file).get("template", {})
                 valid_areas: dict = self._validate_resources_not_excluded(
                     resource_content, "area"
@@ -463,19 +520,22 @@ class AntaresStudyConverter:
                         )
 
                 list_valid_areas.difference_update(all_excluded_areas)
-        # TODO _delete_legacy_objects
-        area_components = self._convert_area_to_component_list(
-            antares_historic_lib_id, list(list_valid_areas)
-        )
+
+        if self.mode == ConversionMode.HYBRID.value:
+            self._delete_legacy_objects()
+        else:
+            area_components = self._convert_area_to_component_list(
+                "antares-historic", list(list_valid_areas)
+            )
 
         self.logger.info(
             "Converting node, components and connections into Input study..."
         )
 
         system = InputSystem(
-            nodes=area_components,
             components=list_components,
             connections=list_connections,
+            nodes=area_components or None,
             area_connections=list_area_connections or None,
         )
         data = system.model_dump(exclude_none=True)
@@ -486,7 +546,7 @@ class AntaresStudyConverter:
         self.logger.info("Converting input study into yaml file...")
         transform_to_yaml(model=study, output_path=self.output_path)
 
-    def count_objects_in_yaml_file(self, output_path: Optional[Path]) -> dict[str, int]:
+    def count_objects_in_yaml_file(self, output_path: Path) -> dict[str, int]:
         if output_path:
             data = read_yaml_file(output_path)
         else:
