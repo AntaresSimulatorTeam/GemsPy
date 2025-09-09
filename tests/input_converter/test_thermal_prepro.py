@@ -27,8 +27,8 @@ from gems.study.parsing import InputComponentParameter
 from tests.input_converter.conftest import create_dataframe_from_constant
 
 DATAFRAME_PREPRO_THERMAL_CONFIG = (
-    create_dataframe_from_constant(lines=840, columns=4),  # modulation
-    create_dataframe_from_constant(lines=840),  # series
+    create_dataframe_from_constant(lines=8760, columns=4, value=3),  # modulation
+    create_dataframe_from_constant(lines=8760, columns=1, value=6),  # series
 )
 
 
@@ -41,7 +41,7 @@ class TestThermalPreprocessing:
         Initializes test parameters and returns the instance and expected file path.
         """
 
-        logger = Logger(__name__, local_study_w_thermal.service.config.study_path)
+        logger = Logger(__name__, local_study_w_thermal.path)
         converter: AntaresStudyConverter = AntaresStudyConverter(
             study_input=local_study_w_thermal, logger=logger
         )
@@ -89,39 +89,23 @@ class TestThermalPreprocessing:
         current_df = pd.read_csv(current_path, header=None)
         expected_df = pd.DataFrame(expected_values)
         assert current_df.equals(expected_df)
+
         assert component_parameter == expected_component
 
     @pytest.mark.parametrize(
         "local_study_w_thermal",
-        [
-            (
-                pd.DataFrame(
-                    [
-                        [1, 1, 1, 2],
-                        [2, 2, 2, 6],
-                        [3, 3, 3, 1],
-                    ]
-                ),  # modulation
-                pd.DataFrame(
-                    [
-                        [8],
-                        [10],
-                        [2],
-                    ]
-                ),  # series
-            ),
-        ],
+        [DATAFRAME_PREPRO_THERMAL_CONFIG],
         indirect=True,
     )
     def test_p_min_cluster(self, local_study_w_thermal):
         """Tests the p_min_cluster parameter processing."""
         tdp: ThermalDataPreprocessing = self._init_tdp(local_study_w_thermal)
 
-        expected_values = [
-            [4.0],
-            [10.0],
-            [2.0],
-        ]  # min(min_gen_modulation * unit_count * nominal_capacity, p_max_cluster)
+        expected_values = create_dataframe_from_constant(
+            lines=8760, columns=1, value=6.0
+        )  # min(min_gen_modulation * unit_count * nominal_capacity, p_max_cluster)
+        expected_values = expected_values.squeeze()
+        expected_values.name = None
         component_parameter = tdp.generate_component_parameter("p_min_cluster")
         self._validate_component_parameter(
             component_parameter, "p_min_cluster", expected_values
@@ -129,32 +113,18 @@ class TestThermalPreprocessing:
 
     @pytest.mark.parametrize(
         "local_study_w_thermal",
-        [
-            (
-                pd.DataFrame(
-                    [
-                        [1, 1, 1, 2],
-                        [2, 2, 2, 6],
-                        [3, 3, 3, 1],
-                    ]
-                ),  # modulation
-                pd.DataFrame(
-                    [
-                        [8],
-                        [10],
-                        [2],
-                    ]
-                ),  # series
-            ),
-        ],
+        [DATAFRAME_PREPRO_THERMAL_CONFIG],
         indirect=True,
     )
     def test_nb_units_min(self, local_study_w_thermal: Study):
         """Tests the nb_units_min parameter processing."""
         tdp: ThermalDataPreprocessing = self._init_tdp(local_study_w_thermal)
 
-        expected_values = [[2.0], [5.0], [1.0]]  # ceil(p_min_cluster / p_max_unit)
-
+        expected_values = create_dataframe_from_constant(
+            lines=8760, columns=1, value=3.0
+        )  # ceil(p_min_cluster / p_max_unit) en float
+        expected_values = expected_values.squeeze()
+        expected_values.name = None
         tdp.generate_component_parameter("p_min_cluster")
         component_parameter = tdp.generate_component_parameter("nb_units_min")
 
@@ -164,32 +134,18 @@ class TestThermalPreprocessing:
 
     @pytest.mark.parametrize(
         "local_study_w_thermal",
-        [
-            (
-                pd.DataFrame(
-                    [
-                        [1, 1, 1, 2],
-                        [2, 2, 2, 6],
-                        [3, 3, 3, 1],
-                    ]
-                ),  # modulation
-                pd.DataFrame(
-                    [
-                        [8],
-                        [10],
-                        [2],
-                    ]
-                ),  # series
-            ),
-        ],
+        [DATAFRAME_PREPRO_THERMAL_CONFIG],
         indirect=True,
     )
     def test_nb_units_max(self, local_study_w_thermal: Study):
         """Tests the nb_units_max parameter processing."""
         tdp: ThermalDataPreprocessing = self._init_tdp(local_study_w_thermal)
 
-        expected_values = [[4.0], [5.0], [1.0]]  # ceil(p_max_cluster / p_max_unit)
-
+        expected_values = create_dataframe_from_constant(
+            lines=8760, columns=1, value=3.0
+        )  # ceil(p_max_cluster / p_max_unit) en float
+        expected_values = expected_values.squeeze()
+        expected_values.name = None
         tdp.generate_component_parameter("p_min_cluster")
         component_parameter = tdp.generate_component_parameter("nb_units_max")
 
@@ -209,7 +165,7 @@ class TestThermalPreprocessing:
         tdp: ThermalDataPreprocessing = self._init_tdp(local_study_w_thermal)
 
         expected_path = (
-            local_study_w_thermal.service.config.study_path
+            local_study_w_thermal.path
             / "input"
             / "thermal"
             / "series"

@@ -1,8 +1,19 @@
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional, Union
 
 import pandas as pd
+from pydantic import BaseModel, Field
+
+
+def _to_kebab(snake: str) -> str:
+    return snake.replace("_", "-")
+
+
+class ModifiedBaseModel(BaseModel):
+    class Config:
+        alias_generator = _to_kebab
+        extra = "forbid"
+        populate_by_name = True
 
 
 @dataclass(frozen=True)
@@ -13,9 +24,9 @@ class Operation:
 
     def execute(
         self,
-        initial_value: Union[pd.Series, float],
+        initial_value: Union[pd.DataFrame, pd.Series, float],
         preprocessed_values: Optional[Union[dict[str, float], float]] = None,
-    ) -> Union[float, pd.Series]:
+    ) -> Union[float, pd.Series, pd.DataFrame]:
         def resolve(value: Union[str, float]) -> Union[float, pd.Series]:
             if isinstance(value, str):
                 if (
@@ -42,35 +53,18 @@ class Operation:
         )
 
 
-@dataclass(frozen=True)
-class TimeseriesData:
-    path: Path
-    column: int
-    operation: Optional[Operation] = None
-
-
-@dataclass(frozen=True)
-class BindingConstraintData:
-    id: str
-    field: str
-    operation: Optional[Operation] = None
-    timeseries_file_type: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class ThermalData:
-    area: str
-    cluster: str
-    column: Optional[int] = None
+class ObjectProperties(ModifiedBaseModel):
+    type: str
+    area: Optional[str] = None
+    binding_constraint_id: Optional[str] = Field(None, alias="binding-constraint-id")
+    cluster: Optional[str] = None
+    link: Optional[str] = None
     field: Optional[str] = None
-    operation: Optional[Operation] = None
-    timeseries_file_type: Optional[str] = None
 
 
-@dataclass(frozen=True)
-class LinkData:
-    column: int
-    area_from: str
-    area_to: str
-    timeseries_file_type: str
+class ComplexData(ModifiedBaseModel):
+    object_properties: Optional[ObjectProperties] = Field(
+        None, alias="object-properties"
+    )
     operation: Optional[Operation] = None
+    column: Optional[int] = None

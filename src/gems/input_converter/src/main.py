@@ -154,6 +154,8 @@ if __name__ == "__main__":
         config_parser.set("study", "output_path", str(args.output_path))
 
     converter = AntaresStudyConverter(
-        study_input=Path(config_parser["study"].get("study_path")), logger=logger
+        study_input=Path(config_parser["study"].get("study_path")),
+        logger=logger,
+        output_path=Path(config_parser["study"].get("output_path")),
     )
     converter.process_all()
