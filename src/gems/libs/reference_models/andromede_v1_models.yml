@@ -40,8 +40,34 @@ library:
         - port: balance_port
           field: flow
           definition: -max_load + curtailment
-
-
+          
+    - id: dsr2
+      parameters:
+        - id: min_load
+          time-dependent: true
+          scenario-dependent: true
+        - id: max_load
+          time-dependent: true
+          scenario-dependent: true
+        - id: curtailment_price
+          time-dependent: false
+          scenario-dependent: false
+        - id: load_hurdle_cost # This parameter should be 0 in most of the cases. It is just added here to take into account the hurdle costs in the fivtive "p2g_base" links in the BP25 modelling
+          time-dependent: true
+          scenario-dependent: false
+      variables:
+        - id: curtailment
+          lower-bound: 0
+          upper-bound: max_load-min_load 
+      objective: expec(sum(curtailment * (curtailment_price - load_hurdle_cost)  + load_hurdle_cost*max_load))) 
+      ports:
+        - id: balance_port
+          type: flow
+      port-field-definitions:
+        - port: balance_port
+          field: flow
+          definition: -max_load + curtailment
+          
     - id: electrolyser
       parameters:
       - id: efficiency
