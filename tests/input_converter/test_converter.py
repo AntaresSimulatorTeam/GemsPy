@@ -1038,7 +1038,9 @@ class TestConverter:
         )
         assert obtained_parameters == expected_component["parameters"]
 
-    @pytest.mark.skip(reason="We disable this as the reference.yaml is not working with thermal/battery combination")
+    @pytest.mark.skip(
+        reason="We disable this as the reference.yaml is not working with thermal/battery combination"
+    )
     def test_convert_study_path_to_input_study(self, tmp_path: Path):
         local_path = Path(__file__).parent / "resources" / "mini_test_batterie_BP23"
         output_path = local_path / "reference.yaml"
