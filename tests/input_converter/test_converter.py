@@ -1232,7 +1232,7 @@ class TestConverter:
         assert sorted(
             normalize_components(obtained_components), key=lambda x: x["id"]
         ) == sorted(expected_data["components"], key=lambda x: x["id"])
-    
+
     @pytest.mark.skip(
         reason="We disable this as the reference.yaml is not working with thermal/battery combination"
     )

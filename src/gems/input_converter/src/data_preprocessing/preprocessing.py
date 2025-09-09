@@ -14,7 +14,10 @@ from gems.input_converter.src.config import (
     TEMPLATE_TO_TIMESERIES_FILE_TYPE,
     TIMESERIES_NAME_TO_METHOD,
 )
-from gems.input_converter.src.data_preprocessing.data_classes import ComplexData, ConversionMode
+from gems.input_converter.src.data_preprocessing.data_classes import (
+    ComplexData,
+    ConversionMode,
+)
 from gems.input_converter.src.utils import check_dataframe_validity, save_to_file
 
 ALLOWED_TYPES: list = [
@@ -55,12 +58,12 @@ class ModelsConfigurationProcessing:
             )
         else:
             self.output_file = (
-            self.study_path
-            / "input"
-            / type_resource
-            / "series"
-            / f"{self.param_id}_{area}.txt"
-        )
+                self.study_path
+                / "input"
+                / type_resource
+                / "series"
+                / f"{self.param_id}_{area}.txt"
+            )
         return getattr(
             self.study.get_areas()[area], MATRIX_TYPES_TO_GET_METHOD[type_resource]
         )()
@@ -92,7 +95,6 @@ class ModelsConfigurationProcessing:
             ).value.format(area_id=link.area_from_id, second_area_id=link.area_to_id)
             self.output_file = self.study.path / file_path
         return getattr(link, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field])()
-
 
     def calculate_cluster_data_values(
         self, type_resource: str, obj: ComplexData
@@ -140,7 +142,6 @@ class ModelsConfigurationProcessing:
             self.output_file = self.study.path / file_path
         return time_series
 
-
     def calculate_binding_constraint_data_values(
         self, obj: ComplexData
     ) -> Union[float, pd.Series, pd.DataFrame]:
@@ -161,7 +162,7 @@ class ModelsConfigurationProcessing:
             return obj.operation.execute(term.weight)
         else:
             return term.weight
-        
+
     def calculate_value(self, obj: ComplexData) -> Union[float, str]:
         if obj.object_properties is None or obj.object_properties.type is None:
             raise ValueError(f"Object properties {obj} must not be None")
