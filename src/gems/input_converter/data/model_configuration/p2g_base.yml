@@ -1,0 +1,106 @@
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# Configuration file to convert a complex modelling artefact in an Antares study into an Andromede model.
+
+# Description of the observed elements in BP25_AREF
+# z_P2G_base: UNSP = 4000 €/MWh, spillage cost = 0 €/MWh,
+# load with a time series (scenario-independent), 1 cluster "z_p2g_base_base"
+# Links: {area}/z_P2G_base. Hurdle cost = 0.1 in both directions,
+# direct capacity (time series, scenario-independent), no indirect capacity
+# Binding constraint: P2G_fatal_band_{area}. Hourly constraints,
+# lower bound on the supra flow (time series, scenario-independent)
+# For information, factor 2 between the two bounds.
+
+# Object to create: one P2G base object per area,
+# which consumes between the lower and upper bounds.
+# If consumption is not at the upper bound, a proportional shedding cost applies
+
+
+template:
+  name: p2g_base
+  generator-version-compatibility: X.Y #TODO: find this information
+  model: andromede_v1_models.dsr2 #DSR model, number 2 -> includes a parameter "min_load"
+  template-parameters:
+    - name: area
+      description: "Area identifier for the P2G_base component"
+      # exclude:
+
+  component:
+    id: p2g_base_${area}
+    parameters:
+      - id: max_load
+        time-dependent: true
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: link
+            link: ${area} / z_p2g_base
+            field: capacity_direct
+            column: 0
+      - id: min_load
+        time-dependent: true
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: binding_constraint
+            binding-constraint-id: P2G_fatalband_{area}
+            field: gt #TODO : check this syntax. What I mean here is the constant term of the binding-constraint, which is a "greater than" constraint here
+            #Readable in : \input\bindingconstraints\p2g_fatalband_{area}_gt.txt
+            column: 0
+      - id: curtailment_cost
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: thermal
+            area: z_P2G_base
+            cluster: z_p2g_base_base
+            field: marginal_cost
+      - id: load_hurdle_cost
+        time-dependent: true
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: link
+            link: ${area} / z_p2g_base
+            field: hurdle_cost_direct #To Do : check this syntax.
+            #This is the first column of the file: \input\links\{area}\z_p2g_base_parameters.txt
+
+
+  # For full modeler mode
+  connections:
+    - component1: p2g_base_${area}
+      port1: balance_port
+      component2: ${area}
+      port2: balance_port
+
+  # For hybrid mode
+  area-connections:
+    - component: p2g_base_${area}
+      port: balance_port
+      area: ${area}
+
+  legacy-objects-to-delete:
+    - id: virtual_nodes
+      object-properties:
+        type: area
+        area: z_P2G_base
+    - id: virtual_links
+      object-properties:
+        type: link
+        link: ${area} / z_P2G_base
+    - id: virtual_binding_constraint
+      object-properties:
+        type: binding_constraint
+        binding-constraint-id: P2G_fatalband_{area}
+
+#To Do : delete also cluster and load located in z_P2G_base?
