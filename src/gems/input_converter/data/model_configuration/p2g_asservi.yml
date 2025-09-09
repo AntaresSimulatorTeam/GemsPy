@@ -1,0 +1,88 @@
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# Configuration file to convert a complex modelling artefact in an Antares study into an Andromede model.
+# Description of the observed elements in BP25_AREF
+# area z_P2G_asservi: UNSP = €4,000,
+# load that is time- and scenario-dependent (pay attention to scenario group)
+# thermal cluster z_p2g_asservi_asservi (no availability variation, no cost variation)
+# linj {area}/z_P2G_asservi: no hurdle costs,
+# time- and scenario-dependent direct capacity (pay attention to scenario group), indirect capacity = 0
+
+
+template:
+  name: p2g_asservi
+  generator-version-compatibility: X.Y #TODO: find this information
+  model: andromede_v1_models.dsr2
+  template-parameters:
+    - name: area
+      description: "Area identifier for the P2G_asservi component"
+      # exclude:
+
+  component:
+    id: p2g_asservi_${area}
+    #TO DO :scenario-group = ... ?
+    parameters:
+      - id: max_load
+        time-dependent: true
+        scenario-dependent: true
+        value:
+          object-properties:
+            type: link
+            link: ${area} / z_P2G_asservi
+            field: capacity_direct
+      - id: min_load
+        time-dependent: false
+        scenario-dependent: false
+        value: 0.0
+         
+      - id: curtailment_cost
+        time-dependent: false
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: thermal
+            area: z_P2G_asservi
+            cluster: z_p2g_asservi_asservi
+            field: marginal_cost
+      
+      - id: load_hurdle_cost
+        time-dependent: true
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: link
+            link: ${area} / z_P2G_asservi
+            field: hurdle_cost_direct #To Do : check this syntax.
+            #This is the first column of the file: \input\links\{area}\z_p2g_asservi_parameters.txt
+            
+  # For full modeler mode
+  connections:
+    - component1: p2g_asservi_${area}
+      port1: balance_port
+      component2: ${area}
+      port2: balance_port
+
+  # For hybrid mode
+  area-connections:
+    - component: p2g_asservi_${area}
+      port: balance_port
+      area: ${area}
+
+  legacy-objects-to-delete:
+    - id: virtual_nodes
+      object-properties:
+        type: area
+        area: z_P2G_asservi
+    - id: virtual_links
+      object-properties:
+        type: link
+        link: ${area} / z_P2G_asservi
