@@ -1,7 +1,19 @@
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 import pandas as pd
+from pydantic import BaseModel, Field
+
+
+def _to_kebab(snake: str) -> str:
+    return snake.replace("_", "-")
+
+
+class ModifiedBaseModel(BaseModel):
+    class Config:
+        alias_generator = _to_kebab
+        extra = "forbid"
+        populate_by_name = True
 
 
 @dataclass(frozen=True)
@@ -41,44 +53,18 @@ class Operation:
         )
 
 
-@dataclass(frozen=True)
-class ObjectProperties:
+class ObjectProperties(ModifiedBaseModel):
     type: str
     area: Optional[str] = None
-    binding_constraint_id: Optional[str] = None
+    binding_constraint_id: Optional[str] = Field(None, alias="binding-constraint-id")
     cluster: Optional[str] = None
     link: Optional[str] = None
     field: Optional[str] = None
 
-    @classmethod
-    def from_yaml(cls, yaml_data: dict) -> Any:
-        yaml_data = yaml_data.copy()
-        if "binding-constraint-id" in yaml_data:
-            yaml_data["binding_constraint_id"] = yaml_data.pop("binding-constraint-id")
-        return cls(**yaml_data)
 
-
-@dataclass(frozen=True)
-class MatrixData:
-    object_properties: Optional[ObjectProperties] = None
-
-    @classmethod
-    def from_yaml(cls, yaml_data: dict) -> Any:
-        yaml_data = yaml_data.copy()
-        if "object-properties" in yaml_data:
-            yaml_data["object_properties"] = yaml_data.pop("object-properties")
-        return cls(**yaml_data)
-
-
-@dataclass(frozen=True)
-class ComplexData:
-    object_properties: Optional[ObjectProperties] = None
+class ComplexData(ModifiedBaseModel):
+    object_properties: Optional[ObjectProperties] = Field(
+        None, alias="object-properties"
+    )
     operation: Optional[Operation] = None
     column: Optional[int] = None
-
-    @classmethod
-    def from_yaml(cls, yaml_data: dict) -> Any:
-        yaml_data = yaml_data.copy()
-        if "object-properties" in yaml_data:
-            yaml_data["object_properties"] = yaml_data.pop("object-properties")
-        return cls(**yaml_data)

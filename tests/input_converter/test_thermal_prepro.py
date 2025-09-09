@@ -41,7 +41,7 @@ class TestThermalPreprocessing:
         Initializes test parameters and returns the instance and expected file path.
         """
 
-        logger = Logger(__name__, local_study_w_thermal.service.config.study_path)
+        logger = Logger(__name__, local_study_w_thermal.path)
         converter: AntaresStudyConverter = AntaresStudyConverter(
             study_input=local_study_w_thermal, logger=logger
         )
@@ -165,7 +165,7 @@ class TestThermalPreprocessing:
         tdp: ThermalDataPreprocessing = self._init_tdp(local_study_w_thermal)
 
         expected_path = (
-            local_study_w_thermal.service.config.study_path
+            local_study_w_thermal.path
             / "input"
             / "thermal"
             / "series"

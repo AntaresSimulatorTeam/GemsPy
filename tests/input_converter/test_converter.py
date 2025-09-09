@@ -20,10 +20,7 @@ from antares.craft.model.study import Study
 from gems.input_converter.src.converter import AntaresStudyConverter
 from gems.input_converter.src.data_preprocessing.data_classes import Operation
 from gems.input_converter.src.logger import Logger
-from gems.input_converter.src.utils import (
-    read_yaml_file,
-    transform_to_yaml,
-)
+from gems.input_converter.src.utils import read_yaml_file, transform_to_yaml
 from gems.study.parsing import (
     InputComponent,
     InputComponentParameter,
@@ -56,7 +53,7 @@ DATAFRAME_PREPRO_BC_CONFIG = (
 
 class TestConverter:
     def _init_converter_from_study(self, local_study):
-        logger = Logger(__name__, local_study.service.config.study_path)
+        logger = Logger(__name__, local_study.path)
         converter: AntaresStudyConverter = AntaresStudyConverter(
             study_input=local_study, logger=logger
         )
@@ -126,7 +123,7 @@ class TestConverter:
             connections=[],
         )
 
-        assert input_study.nodes == expected_input_study.nodes
+        assert input_study == expected_input_study
 
     def test_convert_area_to_component(self, local_study_w_areas: Study, lib_id: str):
         converter = self._init_converter_from_study(local_study_w_areas)
@@ -251,15 +248,7 @@ class TestConverter:
         self, local_study_with_st_storage, lib_id: str
     ):
         converter = self._init_converter_from_study(local_study_with_st_storage)
-        path_load = (
-            Path(__file__).parent.parent.parent
-            / "src"
-            / "gems"
-            / "input_converter"
-            / "data"
-            / "model_configuration"
-            / "st-storage.yaml"
-        )
+        path_load = RESOURCES_FOLDER / "st-storage.yaml"
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
@@ -391,15 +380,7 @@ class TestConverter:
         local_study_w_thermal: Study,
     ):
         converter = self._init_converter_from_study(local_study_w_thermal)
-        path_load = (
-            Path(__file__).parent.parent.parent
-            / "src"
-            / "gems"
-            / "input_converter"
-            / "data"
-            / "model_configuration"
-            / "thermal.yaml"
-        )
+        path_load = RESOURCES_FOLDER / "thermal.yaml"
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
@@ -549,15 +530,7 @@ class TestConverter:
         expected_connections = expected_data["connections"]
 
         converter = self._init_converter_from_path(local_path, tmp_path, "full")
-        path_load = (
-            Path(__file__).parent.parent.parent
-            / "src"
-            / "gems"
-            / "input_converter"
-            / "data"
-            / "model_configuration"
-            / "load.yaml"
-        )
+        path_load = RESOURCES_FOLDER / "load.yaml"
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
@@ -623,15 +596,7 @@ class TestConverter:
     def test_convert_solar_to_component_from_study(self, fr_solar: None):
         converter = self._init_converter_from_study(fr_solar)
 
-        path_load = (
-            Path(__file__).parent.parent.parent
-            / "src"
-            / "gems"
-            / "input_converter"
-            / "data"
-            / "model_configuration"
-            / "solar.yaml"
-        )
+        path_load = RESOURCES_FOLDER / "solar.yaml"
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
@@ -692,15 +657,7 @@ class TestConverter:
 
     def test_convert_load_to_component_from_study(self, fr_load: None):
         converter = self._init_converter_from_study(fr_load)
-        path_load = (
-            Path(__file__).parent.parent.parent
-            / "src"
-            / "gems"
-            / "input_converter"
-            / "data"
-            / "model_configuration"
-            / "load.yaml"
-        )
+        path_load = RESOURCES_FOLDER / "load.yaml"
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
@@ -753,15 +710,7 @@ class TestConverter:
     def test_convert_wind_to_component_from_study(self, fr_wind: Study):
         converter = self._init_converter_from_study(fr_wind)
 
-        path_load = (
-            Path(__file__).parent.parent.parent
-            / "src"
-            / "gems"
-            / "input_converter"
-            / "data"
-            / "model_configuration"
-            / "wind.yaml"
-        )
+        path_load = RESOURCES_FOLDER / "wind.yaml"
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
@@ -833,15 +782,7 @@ class TestConverter:
     ):
         converter = self._init_converter_from_study(fr_wind)
 
-        path_load = (
-            Path(__file__).parent.parent.parent
-            / "src"
-            / "gems"
-            / "input_converter"
-            / "data"
-            / "model_configuration"
-            / "wind.yaml"
-        )
+        path_load = RESOURCES_FOLDER / "wind.yaml"
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
@@ -865,15 +806,7 @@ class TestConverter:
     def test_convert_wind_to_component_zero_values(self, fr_wind: int):
         converter = self._init_converter_from_study(fr_wind)
 
-        path_load = (
-            Path(__file__).parent.parent.parent
-            / "src"
-            / "gems"
-            / "input_converter"
-            / "data"
-            / "model_configuration"
-            / "wind.yaml"
-        )
+        path_load = RESOURCES_FOLDER / "wind.yaml"
 
         resource_content = read_yaml_file(path_load).get("template", {})
 
@@ -889,15 +822,8 @@ class TestConverter:
 
     def test_convert_links_to_component(self, local_study_w_links: Study, lib_id: str):
         converter = self._init_converter_from_study(local_study_w_links)
-        path_load = (
-            Path(__file__).parent.parent.parent
-            / "src"
-            / "gems"
-            / "input_converter"
-            / "data"
-            / "model_configuration"
-            / "link.yaml"
-        )
+        path_load = RESOURCES_FOLDER / "link.yaml"
+
         resource_content = read_yaml_file(path_load).get("template", {})
 
         valid_areas: dict = converter._validate_resources_not_excluded(
@@ -1057,15 +983,7 @@ class TestConverter:
         expected_components = expected_data["components"]
         expected_connections = expected_data["connections"]
         converter = self._init_converter_from_path(local_path, tmp_path, "full")
-        path_cc = (
-            Path(__file__).parent.parent.parent
-            / "src"
-            / "gems"
-            / "input_converter"
-            / "data"
-            / "model_configuration"
-            / "battery_new.yaml"
-        )
+        path_cc = RESOURCES_FOLDER / "battery.yaml"
 
         bc_data = read_yaml_file(path_cc).get("template", {})
         valid_areas: dict = converter._validate_resources_not_excluded(bc_data, "area")

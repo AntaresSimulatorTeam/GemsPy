@@ -53,13 +53,13 @@ class AntaresStudyConverter:
 
         if isinstance(study_input, Study):
             self.study = study_input
-            self.study_path = study_input.service.config.study_path  # type: ignore
+            self.study_path = Path(study_input.path)
         elif isinstance(study_input, Path):
             self.study_path = resolve_path(study_input)
             self.study = read_study_local(self.study_path)
         else:
             raise TypeError("Invalid input type")
-        self.output_path = (
+        self.output_path: Path = (
             Path(output_path) if output_path else self.study_path / Path("output.yaml")
         )
         self.areas: MappingProxyType = self.study.get_areas()
