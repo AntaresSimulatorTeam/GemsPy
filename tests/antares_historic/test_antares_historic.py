@@ -122,7 +122,7 @@ def _setup_study_component(study, period=None) -> ToolTestStudy:
     """
     study_path = study.path
     logger = Logger(__name__, study_path)
-    
+
     fill_timeseries(study_path)
 
     area_fr = study.get_areas()["fr"]
