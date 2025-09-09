@@ -35,7 +35,6 @@ from gems.input_converter.src.data_preprocessing.thermal import ThermalDataPrepr
 from gems.input_converter.src.utils import (
     read_yaml_file,
     resolve_path,
-    save_to_file,
     transform_to_yaml,
 )
 from gems.study.parsing import (

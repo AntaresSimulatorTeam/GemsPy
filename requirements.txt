@@ -8,7 +8,7 @@ absl-py==2.3.1
     # via ortools
 annotated-types==0.7.0
     # via pydantic
-antares-craft==0.2.9
+antares-craft==0.3.0
     # via -r requirements.in
 antares-study-version==1.0.15
     # via antares-craft

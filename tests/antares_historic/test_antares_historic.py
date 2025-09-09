@@ -120,8 +120,9 @@ def _setup_study_component(study, period=None) -> ToolTestStudy:
     """
     Helper function to reduce redundancy in study component setup.
     """
-    logger = Logger(__name__, study.service.config.study_path)
-    study_path = study.service.config.study_path
+    study_path = study.path
+    logger = Logger(__name__, study_path)
+
     fill_timeseries(study_path)
 
     area_fr = study.get_areas()["fr"]

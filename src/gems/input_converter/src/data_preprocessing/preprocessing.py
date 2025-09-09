@@ -1,6 +1,5 @@
-import copy
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 import pandas as pd
 from antares.craft.model.binding_constraint import BindingConstraint, ConstraintTerm
@@ -15,27 +14,18 @@ from gems.input_converter.src.config import (
     TEMPLATE_TO_TIMESERIES_FILE_TYPE,
     TIMESERIES_NAME_TO_METHOD,
 )
-from gems.input_converter.src.data_preprocessing.data_classes import (
-    ComplexData,
-    ConversionMode,
-    MatrixData,
-    ObjectProperties,
-    Operation,
-)
+from gems.input_converter.src.data_preprocessing.data_classes import ComplexData, ConversionMode
 from gems.input_converter.src.utils import check_dataframe_validity, save_to_file
 
-DataType = Union[ComplexData, MatrixData]
-DataClass = Union[type[ComplexData], type[MatrixData]]
-
-TYPE_TO_DC: dict[str, DataClass] = {
-    "binding_constraint": ComplexData,
-    "thermal": ComplexData,
-    "link": ComplexData,
-    "st_storage": ComplexData,
-    "load": MatrixData,
-    "solar": MatrixData,
-    "wind": MatrixData,
-}
+ALLOWED_TYPES: list = [
+    "binding_constraint",
+    "thermal",
+    "link",
+    "st_storage",
+    "load",
+    "solar",
+    "wind",
+]
 
 
 class ModelsConfigurationProcessing:
@@ -46,130 +36,157 @@ class ModelsConfigurationProcessing:
         self.study = study
         self.mode = mode
         self.study_path = Path(study.path)
+        self.output_file = Path(".")
 
-    def calculate_value(self, obj: DataType) -> Union[float, str]:
+    def calculate_matrix_data_values(
+        self, obj: ComplexData, type_resource: str
+    ) -> pd.DataFrame:
+        if not obj.object_properties or not obj.object_properties.area:
+            raise ValueError(
+                f"Object properties and its area from {obj} must not be None"
+            )
+        area: str = obj.object_properties.area
+        if self.mode == ConversionMode.HYBRID.value:
+            self.output_file = (
+                self.study.path
+                / "input"
+                / "data-series"
+                / f"{self.param_id}_{area}.txt"
+            )
+        else:
+            self.output_file = (
+            self.study_path
+            / "input"
+            / type_resource
+            / "series"
+            / f"{self.param_id}_{area}.txt"
+        )
+        return getattr(
+            self.study.get_areas()[area], MATRIX_TYPES_TO_GET_METHOD[type_resource]
+        )()
+
+    def calculate_link_data_values(self, obj: ComplexData) -> pd.DataFrame:
+        if (
+            not obj.object_properties
+            or not obj.object_properties.link
+            or not obj.object_properties.field
+        ):
+            raise ValueError(
+                f"Object properties, its link, and field from {obj} must not be None"
+            )
+        link_id = obj.object_properties.link
+
+        link: Link = self.study.get_links()[link_id]
+
+        if self.mode == ConversionMode.HYBRID.value:
+            self.output_file = (
+                self.study.path
+                / "input"
+                / "data-series"
+                / f"{self.param_id}_{link.area_from_id}_{link.area_to_id}.txt"
+            )
+        else:
+            file_path = getattr(
+                TimeSeriesFileType,
+                TEMPLATE_LINK_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
+            ).value.format(area_id=link.area_from_id, second_area_id=link.area_to_id)
+            self.output_file = self.study.path / file_path
+        return getattr(link, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field])()
+
+
+    def calculate_cluster_data_values(
+        self, type_resource: str, obj: ComplexData
+    ) -> Union[Any, pd.DataFrame]:
+        if (
+            not obj.object_properties
+            or not obj.object_properties.area
+            or not obj.object_properties.field
+        ):
+            raise ValueError(
+                f"Object properties, its area, and field from {obj} must not be None"
+            )
+        area: str = obj.object_properties.area
+        if area not in self.study.get_areas():
+            raise KeyError(f"Area {area} is not found in the study")
+
+        cluster = getattr(
+            self.study.get_areas()[area],
+            TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[type_resource],
+        )()[obj.object_properties.cluster]
+        if obj.object_properties.field in TIMESERIES_NAME_TO_METHOD:
+            time_series = getattr(
+                cluster, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field]
+            )()
+        else:
+            cluster_properties = getattr(cluster, "properties")
+            field_name = obj.object_properties.field
+            value = getattr(cluster_properties, field_name)
+            if type_resource == "thermal":
+                self.preprocessed_values[self.param_id] = value
+            return value
+        if self.mode == ConversionMode.HYBRID.value:
+            self.output_file = (
+                self.study.path
+                / "input"
+                / "data-series"
+                / f"{self.param_id}_{area}_{obj.object_properties.cluster}.txt"
+            )
+        else:
+            file_path = getattr(
+                TimeSeriesFileType,
+                TEMPLATE_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
+            ).value.format(area_id=cluster.area_id, cluster_id=cluster.id)
+
+            self.output_file = self.study.path / file_path
+        return time_series
+
+
+    def calculate_binding_constraint_data_values(
+        self, obj: ComplexData
+    ) -> Union[float, pd.Series, pd.DataFrame]:
+        if (
+            not obj.object_properties
+            or not obj.object_properties.field
+            or not obj.object_properties.binding_constraint_id
+        ):
+            raise ValueError(
+                f"Object properties, its field, and binding constraint ID from {obj} must not be None"
+            )
+
+        binding: BindingConstraint = self.study.get_binding_constraints()[
+            obj.object_properties.binding_constraint_id
+        ]
+        term: ConstraintTerm = binding.get_terms()[obj.object_properties.field]
+        if obj.operation:
+            return obj.operation.execute(term.weight)
+        else:
+            return term.weight
+        
+    def calculate_value(self, obj: ComplexData) -> Union[float, str]:
         if obj.object_properties is None or obj.object_properties.type is None:
             raise ValueError(f"Object properties {obj} must not be None")
-        area: Union[str, None] = obj.object_properties.area
         type_resource: str = obj.object_properties.type
         time_series: pd.DataFrame = pd.DataFrame()
+
         if type_resource in ["load", "wind", "solar"]:
-            if area is None:
-                raise ValueError(
-                    f"Object properties  area from {area} must not be None"
-                )
-            time_series = getattr(
-                self.study.get_areas()[area], MATRIX_TYPES_TO_GET_METHOD[type_resource]
-            )()
-            if self.mode == ConversionMode.HYBRID.value:
-                output_file = (
-                    self.study.path
-                    / "input"
-                    / "data-series"
-                    / f"{self.param_id}_{area}.txt"
-                )
-            else:
-                output_file = (
-                    self.study.path
-                    / "input"
-                    / type_resource
-                    / "series"
-                    / f"{self.param_id}_{area}.txt"
-                )
-        elif type_resource == "link":
-            if (
-                obj.object_properties.link is None
-                or obj.object_properties.field is None
-            ):
-                raise ValueError(
-                    f"Link and field from object properties {obj.object_properties} must not be None"
-                )
-            link_id = obj.object_properties.link
-
-            link: Link = self.study.get_links()[link_id]
-            time_series = getattr(
-                link, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field]
-            )()
-            if self.mode == ConversionMode.HYBRID.value:
-                output_file = (
-                    self.study.path
-                    / "input"
-                    / "data-series"
-                    / f"{self.param_id}_{link.area_from_id}_{link.area_to_id}.txt"
-                )
-            else:
-                file_path = getattr(
-                    TimeSeriesFileType,
-                    TEMPLATE_LINK_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
-                ).value.format(
-                    area_id=link.area_from_id, second_area_id=link.area_to_id
-                )
-                output_file = self.study.path / file_path
-        elif type_resource in ["st_storage", "thermal", "renewable"]:
-            if area is None:
-                raise ValueError(
-                    f"Object properties  area from {area} must not be None"
-                )
-            if area not in self.study.get_areas():
-                raise KeyError(f"Area {area} is not found in the study")
-            cluster = getattr(
-                self.study.get_areas()[area],
-                TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[type_resource],
-            )()[obj.object_properties.cluster]
-            if obj.object_properties.field in TIMESERIES_NAME_TO_METHOD:
-                time_series = getattr(
-                    cluster, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field]
-                )()
-            else:
-                if obj.object_properties.field is None:
-                    raise ValueError(
-                        f"Field from object properties {obj.object_properties} must not be None"
-                    )
-                cluster_properties = getattr(cluster, "properties")
-                field_name = obj.object_properties.field
-                value = getattr(cluster_properties, field_name)
-                if type_resource == "thermal":
-                    self.preprocessed_values[self.param_id] = value
-                return value
-            if self.mode == ConversionMode.HYBRID.value:
-                output_file = (
-                    self.study.path
-                    / "input"
-                    / "data-series"
-                    / f"{self.param_id}_{area}_{obj.object_properties.cluster}.txt"
-                )
-            else:
-                file_path = getattr(
-                    TimeSeriesFileType,
-                    TEMPLATE_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
-                ).value.format(area_id=cluster.area_id, cluster_id=cluster.id)
-
-                output_file = self.study.path / file_path
+            time_series = self.calculate_matrix_data_values(obj, type_resource)
+            save_to_file(time_series, self.output_file)
+            return str(self.output_file).removesuffix(".txt")
         elif type_resource == "binding_constraint":
-            if (
-                obj.object_properties.field is None
-                or obj.object_properties.binding_constraint_id is None
-            ):
-                raise ValueError(
-                    f"Field and binding constraint id from object properties {obj.object_properties} must not be None"
-                )
-            if isinstance(obj, MatrixData):
-                raise ValueError(
-                    f"Object class {obj} must be ComplexData for binding_constraint type"
-                )
             # TODO Add timeseries linked to binding constraints?
-            bindings: BindingConstraint = self.study.get_binding_constraints()[
-                obj.object_properties.binding_constraint_id
-            ]
-            term: ConstraintTerm = bindings.get_terms()[obj.object_properties.field]
-            if obj.operation:
-                return obj.operation.execute(term.weight)  # type: ignore
+            # For the moment it is not handled
+            return self.calculate_binding_constraint_data_values(obj)  # type: ignore
+        elif type_resource == "link":
+            time_series = self.calculate_link_data_values(obj)
+        elif type_resource in ["st_storage", "thermal", "renewable"]:
+            data = self.calculate_cluster_data_values(type_resource, obj)
+            if isinstance(data, pd.DataFrame):
+                time_series = data
             else:
-                return term.weight  # type: ignore
+                return data
 
-        if isinstance(obj, ComplexData):
-            if getattr(obj, "column", None) is not None:
-                time_series: pd.Series = time_series.iloc[:, obj.column]  # type: ignore
+        if getattr(obj, "column", None) is not None:
+            time_series: pd.Series = time_series.iloc[:, obj.column]  # type: ignore
 
             if getattr(obj, "operation") and obj.operation is not None:
                 parameter_value: Union[
@@ -179,47 +196,41 @@ class ModelsConfigurationProcessing:
                     self.preprocessed_values[self.param_id] = parameter_value
                     return parameter_value
                 if isinstance(parameter_value, pd.Series):
-                    save_to_file(parameter_value, output_file)
+                    save_to_file(parameter_value, self.output_file)
             else:
-                save_to_file(time_series, output_file)
+                save_to_file(time_series, self.output_file)
         else:
-            # On réécrit par defaut les fichiers, même les wind/solar/load meme si ils ne sont pas modifiés
-            save_to_file(time_series, output_file)
-        return str(output_file).removesuffix(".txt")
+            save_to_file(time_series, self.output_file)
 
-    def _process_value_content(self, value_content: dict) -> tuple[DataClass, dict]:
-        local_content = copy.deepcopy(value_content)
-        value_type = local_content["object-properties"]["type"]
-
-        cls: DataClass | None = TYPE_TO_DC.get(value_type)
-
-        if not cls:
-            raise ValueError(f"Unknown value type: {value_type}")
-        if local_content.get("object-properties"):
-            local_content["object-properties"] = ObjectProperties.from_yaml(
-                local_content["object-properties"]
-            )
-        else:
-            raise KeyError(f"Object properties is not present: {local_content}")
-
-        return cls, local_content
+        return str(self.output_file).removesuffix(".txt")
 
     def convert_param_value(self, id: str, value_content: dict) -> Union[str, float]:
         self.param_id = id
         if value_content.get("constant") is not None:
             return float(value_content.get("constant", 0))
+        obj = ComplexData.model_validate(value_content)
 
-        cls, local_content = self._process_value_content(value_content)
-
-        if "operation" in local_content:
-            local_content["operation"] = Operation(**local_content["operation"])
-        return self.calculate_value(cls.from_yaml(local_content))
+        if not obj.object_properties:
+            raise ValueError(f"Object properties from {value_content} must not be None")
+        if obj.object_properties.type not in ALLOWED_TYPES:
+            raise ValueError(f"Unknown value type: {obj.object_properties.type}")
+        return self.calculate_value(obj)
 
     def check_timeseries_validity(self, value_content: dict) -> bool:
-        if value_content.get("constant"):
+        if value_content.get("constant") is not None:
             return True
-        cls, local_content = self._process_value_content(value_content)
-        obj = cls.from_yaml(local_content)
+
+        obj = ComplexData.model_validate(value_content)
+        if (
+            not obj.object_properties
+            or not obj.object_properties.area
+            or not obj.object_properties.type
+        ):
+            raise ValueError(
+                f"Object properties, its area, and type from {obj} must not be None"
+            )
+        if obj.object_properties.type not in ALLOWED_TYPES:
+            raise ValueError(f"Unknown value type: {obj.object_properties.type}")
         time_series: pd.DataFrame = getattr(
             self.study.get_areas()[obj.object_properties.area],
             MATRIX_TYPES_TO_GET_METHOD[obj.object_properties.type],
