@@ -17,7 +17,7 @@
 # Links: {area}/z_P2G_base. Hurdle cost = 0.1 in both directions,
 # direct capacity (time series, scenario-independent), no indirect capacity
 # Binding constraint: P2G_fatal_band_{area}. Hourly constraints,
-# lower bound on the supra flow (time series, scenario-independent)
+# lower bound on the flow on the aforementioned link (time series, scenario-independent)
 # For information, factor 2 between the two bounds.
 
 # Object to create: one P2G base object per area,
@@ -102,5 +102,3 @@ template:
       object-properties:
         type: binding_constraint
         binding-constraint-id: P2G_fatalband_{area}
-
-#To Do : delete also cluster and load located in z_P2G_base?
