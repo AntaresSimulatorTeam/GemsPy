@@ -61,8 +61,8 @@ template:
           object-properties:
             type: link
             link: ${area} / z_P2G_asservi
-            field: hurdle_cost_direct #To Do : check this syntax.
-            #This is the first column of the file: \input\links\{area}\z_p2g_asservi_parameters.txt
+            field: links_parameters
+          column: 0
             
   # For full modeler mode
   connections:
