@@ -45,7 +45,7 @@ template:
             type: link
             link: ${area} / z_p2g_base
             field: capacity_direct
-            column: 0
+          column: 0
       - id: min_load
         time-dependent: true
         scenario-dependent: false
@@ -55,7 +55,7 @@ template:
             binding-constraint-id: P2G_fatalband_{area}
             field: gt #TODO : check this syntax. What I mean here is the constant term of the binding-constraint, which is a "greater than" constraint here
             #Readable in : \input\bindingconstraints\p2g_fatalband_{area}_gt.txt
-            column: 0
+          column: 0
       - id: curtailment_cost
         time-dependent: false
         scenario-dependent: false
@@ -72,8 +72,8 @@ template:
           object-properties:
             type: link
             link: ${area} / z_p2g_base
-            field: hurdle_cost_direct #To Do : check this syntax.
-            #This is the first column of the file: \input\links\{area}\z_p2g_base_parameters.txt
+            field: links_parameters
+          column: 0
 
 
   # For full modeler mode
