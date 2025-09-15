@@ -75,3 +75,13 @@ TEMPLATE_TO_TIMESERIES_FILE_TYPE = {
     "series_fuel_cost": "THERMAL_FUEL",
     "renewable_series": "RENEWABLE_SERIES",
 }
+
+MODEL_NAME_TO_FILE_NAME = {
+    "battery": "battery.yaml",
+    "link": "link.yaml",
+    "load": "load.yaml",
+    "solar": "solar.yaml",
+    "short-term-storage": "st-storage.yaml",
+    "thermal": "thermal.yaml",
+    "wind": "wind.yaml",
+}

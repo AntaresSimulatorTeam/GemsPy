@@ -47,8 +47,4 @@ system:
       scenario-dependent: false
       time-dependent: true
       value: input/data-series/marginal_cost_fr_z_batteries
-  connections:
-  - component1: battery_fr
-    component2: fr
-    port1: injection_port
-    port2: balance_port
+  id: mini_test_batterie_BP23

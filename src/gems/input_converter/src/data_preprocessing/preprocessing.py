@@ -35,10 +35,10 @@ class ModelsConfigurationProcessing:
     preprocessed_values: dict[str, float] = {}
     param_id: str
 
-    def __init__(self, study: Study, mode: ConversionMode):
+    def __init__(self, study: Study, mode: ConversionMode, output_folder: Path):
         self.study = study
         self.mode = mode
-        self.study_path = Path(study.path)
+        self.output_folder = output_folder
         self.output_file = Path(".")
 
     def calculate_matrix_data_values(
@@ -49,21 +49,9 @@ class ModelsConfigurationProcessing:
                 f"Object properties and its area from {obj} must not be None"
             )
         area: str = obj.object_properties.area
-        if self.mode == ConversionMode.HYBRID.value:
-            self.output_file = (
-                self.study.path
-                / "input"
-                / "data-series"
-                / f"{self.param_id}_{area}.txt"
-            )
-        else:
-            self.output_file = (
-                self.study_path
-                / "input"
-                / type_resource
-                / "series"
-                / f"{self.param_id}_{area}.txt"
-            )
+        self.output_file = (
+            self.output_folder / "input" / "data-series" / f"{self.param_id}_{area}.txt"
+        )
         return getattr(
             self.study.get_areas()[area], MATRIX_TYPES_TO_GET_METHOD[type_resource]
         )()
@@ -81,19 +69,12 @@ class ModelsConfigurationProcessing:
 
         link: Link = self.study.get_links()[link_id]
 
-        if self.mode == ConversionMode.HYBRID.value:
-            self.output_file = (
-                self.study.path
-                / "input"
-                / "data-series"
-                / f"{self.param_id}_{link.area_from_id}_{link.area_to_id}.txt"
-            )
-        else:
-            file_path = getattr(
-                TimeSeriesFileType,
-                TEMPLATE_LINK_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
-            ).value.format(area_id=link.area_from_id, second_area_id=link.area_to_id)
-            self.output_file = self.study.path / file_path
+        self.output_file = (
+            self.output_folder
+            / "input"
+            / "data-series"
+            / f"{self.param_id}_{link.area_from_id}_{link.area_to_id}.txt"
+        )
         return getattr(link, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field])()
 
     def calculate_cluster_data_values(
@@ -110,7 +91,6 @@ class ModelsConfigurationProcessing:
         area: str = obj.object_properties.area
         if area not in self.study.get_areas():
             raise KeyError(f"Area {area} is not found in the study")
-
         cluster = getattr(
             self.study.get_areas()[area],
             TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[type_resource],
@@ -126,20 +106,12 @@ class ModelsConfigurationProcessing:
             if type_resource == "thermal":
                 self.preprocessed_values[self.param_id] = value
             return value
-        if self.mode == ConversionMode.HYBRID.value:
-            self.output_file = (
-                self.study.path
-                / "input"
-                / "data-series"
-                / f"{self.param_id}_{area}_{obj.object_properties.cluster}.txt"
-            )
-        else:
-            file_path = getattr(
-                TimeSeriesFileType,
-                TEMPLATE_TO_TIMESERIES_FILE_TYPE[obj.object_properties.field],
-            ).value.format(area_id=cluster.area_id, cluster_id=cluster.id)
-
-            self.output_file = self.study.path / file_path
+        self.output_file = (
+            self.output_folder
+            / "input"
+            / "data-series"
+            / f"{self.param_id}_{area}_{obj.object_properties.cluster}.txt"
+        )
         return time_series
 
     def calculate_binding_constraint_data_values(
@@ -153,7 +125,6 @@ class ModelsConfigurationProcessing:
             raise ValueError(
                 f"Object properties, its field, and binding constraint ID from {obj} must not be None"
             )
-
         binding: BindingConstraint = self.study.get_binding_constraints()[
             obj.object_properties.binding_constraint_id
         ]
@@ -168,7 +139,6 @@ class ModelsConfigurationProcessing:
             raise ValueError(f"Object properties {obj} must not be None")
         type_resource: str = obj.object_properties.type
         time_series: pd.DataFrame = pd.DataFrame()
-
         if type_resource in ["load", "wind", "solar"]:
             time_series = self.calculate_matrix_data_values(obj, type_resource)
             save_to_file(time_series, self.output_file)

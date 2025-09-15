@@ -12,7 +12,7 @@
 # Configuration file to convert a complex modelling artefact in an Antares study into an Andromede model.
 
 template:
-  name: st-storage
+  name: st_storage
   generator-version-compatibility: X.Y #TODO: find this information
   model: antares-historic.short-term-storage
   template-parameters:

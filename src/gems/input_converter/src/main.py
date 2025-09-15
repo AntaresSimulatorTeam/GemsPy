@@ -138,6 +138,14 @@ if __name__ == "__main__":
         path_validator = PathType(exists=True, dir_ok=True)
         study_path = path_validator(config_parser.get("study", "study_path"))
         output_folder = path_validator(config_parser.get("study", "output_folder"))
+        lib_paths = list(
+            filter(None, config_parser.get("study", "lib_paths").split(","))
+        )
+        try:
+            for path in lib_paths:
+                PathType(exists=True, file_ok=True)(path)
+        except ArgumentTypeError as e:
+            sys.exit(f"Aborting: Invalid lib_paths in configuration file: {e}")
     except ArgumentTypeError as e:
         sys.exit(f"Aborting: Invalid path in configuration file: {e}")
 
@@ -147,27 +155,18 @@ if __name__ == "__main__":
         "logger": logger,
         "mode": mode,
         "output_folder": output_folder,
+        "lib_paths": lib_paths,
     }
     if mode == ConversionMode.HYBRID.value:
-        if not (
-            config_parser.get("hybrid", "lib_paths")
-            and config_parser.get("hybrid", "model_list")
-        ):
+        if not config_parser.get("hybrid", "model_list"):
             sys.exit(f"Aborting: 'hybrid' mode set but no config related")
 
-        lib_paths = list(
-            filter(None, config_parser.get("hybrid", "lib_paths").split(","))
-        )
-        try:
-            for path in lib_paths:
-                PathType(exists=True, file_ok=True)(path)
-        except ArgumentTypeError as e:
-            sys.exit(f"Aborting: Invalid lib_paths in configuration file: {e}")
-        model_list = list(
-            filter(None, config_parser.get("hybrid", "model_list").split(","))
-        )
+        model_list = [
+            model.strip()
+            for model in config_parser.get("hybrid", "model_list").split(",")
+            if model.strip()
+        ]
 
-        params["lib_paths"] = lib_paths
         params["model_list"] = model_list
 
     converter = AntaresStudyConverter(**params)  # type: ignore

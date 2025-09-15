@@ -1,7 +1,7 @@
 from enum import Enum
 from pathlib import Path
 from typing import Callable
-
+import os
 import numpy as np
 import pandas as pd
 from antares.craft.model.thermal import ThermalCluster
@@ -111,6 +111,9 @@ class ThermalDataPreprocessing:
         df = self._prepro_parameter_functions[parameter_id](period)
         csv_path = self._build_csv_path(parameter_id)
 
+        output_dir = os.path.dirname(csv_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
         # This separator is chosen to comply with the antares_craft timeseries creation
         df.to_csv(csv_path, sep="\t", index=False, header=False)
 

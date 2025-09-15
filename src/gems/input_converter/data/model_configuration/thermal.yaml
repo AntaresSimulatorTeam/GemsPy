@@ -19,6 +19,16 @@ template:
     - name: area
       cluster-type: thermal
       # exclude:
+    # - exclude:
+    #   - id: z_batteries
+    #     object-properties:
+    #       type: area
+    #       area: z_batteries
+    #   - id: _batteries_inj
+    #     object-properties:
+    #       type: area
+    #       area: z_batteries
+    # TODO rajouter l'area z_battery
 
   component:
     id: ${area}_${thermal}
