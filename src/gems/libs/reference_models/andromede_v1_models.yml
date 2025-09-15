@@ -59,7 +59,7 @@ library:
         - id: curtailment
           lower-bound: 0
           upper-bound: max_load-min_load 
-      objective: expec(sum(curtailment * (curtailment_price - load_hurdle_cost)  + load_hurdle_cost*max_load))) 
+      objective: expec(sum(curtailment * (curtailment_price - load_hurdle_cost)  + load_hurdle_cost*max_load)) 
       ports:
         - id: balance_port
           type: flow
