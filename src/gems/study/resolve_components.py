@@ -66,10 +66,10 @@ def resolve_system(input_system: InputSystem, libraries: dict[str, Library]) -> 
     components_list = [
         _resolve_component(libraries, m) for m in input_system.components
     ]
-    nodes = [_resolve_component(libraries, n) for n in input_system.nodes]
+    nodes = [_resolve_component(libraries, n) for n in input_system.nodes] # type: ignore
     all_components: List[Component] = components_list + nodes
     connections = []
-    for cnx in input_system.connections:
+    for cnx in input_system.connections:# type: ignore
         resolved_cnx = _resolve_connections(cnx, all_components)
         connections.append(resolved_cnx)
 
@@ -150,7 +150,7 @@ def build_data_base(
     input_system: InputSystem, timeseries_dir: Optional[Path]
 ) -> DataBase:
     database = DataBase()
-    input_system_objects = input_system.components + input_system.nodes
+    input_system_objects = input_system.components + input_system.nodes # type: ignore
     for comp in input_system_objects:
         # This idiom allows mypy to 'ignore' the fact that comp.parameter can be None
         for param in comp.parameters or []:
