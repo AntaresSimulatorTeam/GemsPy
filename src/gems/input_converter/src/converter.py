@@ -13,7 +13,7 @@ import logging
 import shutil
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 import pandas as pd
 from antares.craft.exceptions.exceptions import ReferencedObjectDeletionNotAllowed
@@ -59,7 +59,7 @@ class AntaresStudyConverter:
         mode: ConversionMode = ConversionMode.FULL,
         output_folder: Path = Path("/tmp/"),
         period: Optional[int] = None,
-        **kwargs,
+        **kwargs: List[Any],
     ):
         """
         Initialize processor
@@ -67,7 +67,7 @@ class AntaresStudyConverter:
         self.logger = logger
         self.mode = mode
         self.period: int = period if period else 168
-        self.lib_paths: list = kwargs["lib_paths"]
+        self.lib_paths: List[str] = kwargs["lib_paths"]
         if isinstance(study_input, Study):
             self.output_folder = output_folder / study_input.path.stem
             study_input.path = self.output_folder
@@ -470,7 +470,7 @@ class AntaresStudyConverter:
             obj["id"] for obj in lib_models
         ]
 
-    def _validate_model_in_libs(self):
+    def _validate_model_in_libs(self) -> None:
         file_models = []
         lib_names = []
         for lib_path in self.lib_paths:
@@ -485,14 +485,16 @@ class AntaresStudyConverter:
                 )
             file_path = RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
             if not file_path.exists():
-                return
+                raise FileNotFoundError(
+                    f"No folder exists at the location specified: {file_path}"
+                )
             model_lib_name = read_yaml_file(file_path)["template"]["model"]
             if not model_lib_name.split(".")[0] in lib_names:
                 raise ValueError(
                     f"The follwing model lib from config do not match existing libraries: {model_lib_name}"
                 )
 
-    def _copy_libs_to_model_librairies(self):
+    def _copy_libs_to_model_librairies(self) -> None:
         dest_dir = self.output_folder / "input" / LIBS_FOLDER
         dest_dir.mkdir(parents=True, exist_ok=True)
         for path in self.lib_paths:
@@ -517,7 +519,7 @@ class AntaresStudyConverter:
         list_valid_areas: set[str] = set(self.areas.keys())
         all_excluded_areas: set[Any] = set()
 
-        def _conversion_loop(model):
+        def _conversion_loop(model: str) -> None:
             file_path = RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
             if not file_path.exists():
                 return
