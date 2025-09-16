@@ -5,13 +5,10 @@ import pandas as pd
 from antares.craft.model.binding_constraint import BindingConstraint, ConstraintTerm
 from antares.craft.model.link import Link
 from antares.craft.model.study import Study
-from antares.craft.tools.time_series_tool import TimeSeriesFileType
 
 from gems.input_converter.src.config import (
     MATRIX_TYPES_TO_GET_METHOD,
     TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD,
-    TEMPLATE_LINK_TO_TIMESERIES_FILE_TYPE,
-    TEMPLATE_TO_TIMESERIES_FILE_TYPE,
     TIMESERIES_NAME_TO_METHOD,
 )
 from gems.input_converter.src.data_preprocessing.data_classes import (
@@ -29,6 +26,7 @@ ALLOWED_TYPES: list = [
     "solar",
     "wind",
 ]
+SERIES_FOLDER = "data-series"
 
 
 class ModelsConfigurationProcessing:
@@ -40,6 +38,7 @@ class ModelsConfigurationProcessing:
         self.mode = mode
         self.output_folder = output_folder
         self.output_file = Path(".")
+        self.file_path = Path(".")
 
     def calculate_matrix_data_values(
         self, obj: ComplexData, type_resource: str
@@ -49,9 +48,8 @@ class ModelsConfigurationProcessing:
                 f"Object properties and its area from {obj} must not be None"
             )
         area: str = obj.object_properties.area
-        self.output_file = (
-            self.output_folder / "input" / "data-series" / f"{self.param_id}_{area}.txt"
-        )
+        self.file_path = Path(f"{self.param_id}_{area}.txt")
+        self.output_file = self.output_folder / "input" / SERIES_FOLDER / self.file_path
         return getattr(
             self.study.get_areas()[area], MATRIX_TYPES_TO_GET_METHOD[type_resource]
         )()
@@ -68,13 +66,10 @@ class ModelsConfigurationProcessing:
         link_id = obj.object_properties.link
 
         link: Link = self.study.get_links()[link_id]
-
-        self.output_file = (
-            self.output_folder
-            / "input"
-            / "data-series"
-            / f"{self.param_id}_{link.area_from_id}_{link.area_to_id}.txt"
+        self.file_path = Path(
+            f"{self.param_id}_{link.area_from_id}_{link.area_to_id}.txt"
         )
+        self.output_file = self.output_folder / "input" / SERIES_FOLDER / self.file_path
         return getattr(link, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field])()
 
     def calculate_cluster_data_values(
@@ -106,12 +101,10 @@ class ModelsConfigurationProcessing:
             if type_resource == "thermal":
                 self.preprocessed_values[self.param_id] = value
             return value
-        self.output_file = (
-            self.output_folder
-            / "input"
-            / "data-series"
-            / f"{self.param_id}_{area}_{obj.object_properties.cluster}.txt"
+        self.file_path = Path(
+            f"{self.param_id}_{area}_{obj.object_properties.cluster}.txt"
         )
+        self.output_file = self.output_folder / "input" / SERIES_FOLDER / self.file_path
         return time_series
 
     def calculate_binding_constraint_data_values(
@@ -142,10 +135,9 @@ class ModelsConfigurationProcessing:
         if type_resource in ["load", "wind", "solar"]:
             time_series = self.calculate_matrix_data_values(obj, type_resource)
             save_to_file(time_series, self.output_file)
-            return str(self.output_file).removesuffix(".txt")
+            return str(self.file_path).removesuffix(".txt")
         elif type_resource == "binding_constraint":
-            # TODO Add timeseries linked to binding constraints?
-            # For the moment it is not handled
+            # TODO No timeseries linked to binding constraints for the moment
             return self.calculate_binding_constraint_data_values(obj)  # type: ignore
         elif type_resource == "link":
             time_series = self.calculate_link_data_values(obj)
@@ -173,7 +165,7 @@ class ModelsConfigurationProcessing:
         else:
             save_to_file(time_series, self.output_file)
 
-        return str(self.output_file).removesuffix(".txt")
+        return str(self.file_path).removesuffix(".txt")
 
     def convert_param_value(self, id: str, value_content: dict) -> Union[str, float]:
         self.param_id = id

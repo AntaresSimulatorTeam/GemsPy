@@ -34,17 +34,17 @@ system:
     - id: upper_rule_curve
       scenario-dependent: false
       time-dependent: true
-      value: input/data-series/upper_rule_curve_z_batteries_z_batteries_batteries_fr_1
+      value: upper_rule_curve_z_batteries_z_batteries_batteries_fr_1
     - id: p_max_injection_modulation
       scenario-dependent: false
       time-dependent: true
-      value: input/data-series/p_max_injection_modulation_fr_z_batteries
+      value: p_max_injection_modulation_fr_z_batteries
     - id: p_max_withdrawal_modulation
       scenario-dependent: false
       time-dependent: true
-      value: input/data-series/p_max_withdrawal_modulation_fr_fr_batteries_inj
+      value: p_max_withdrawal_modulation_fr_fr_batteries_inj
     - id: marginal_cost
       scenario-dependent: false
       time-dependent: true
-      value: input/data-series/marginal_cost_fr_z_batteries
+      value: marginal_cost_fr_z_batteries
   id: mini_test_batterie_BP23

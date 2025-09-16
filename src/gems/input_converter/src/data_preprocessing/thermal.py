@@ -1,7 +1,8 @@
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Callable
-import os
+
 import numpy as np
 import pandas as pd
 from antares.craft.model.thermal import ThermalCluster
@@ -18,6 +19,7 @@ class ThermalDataPreprocessing:
     DEFAULT_PERIOD: int = 168
 
     def __init__(self, thermal: ThermalCluster, study_path: Path):
+        # TODO Do we move preprocessing files in data series folder ?
         self.thermal = thermal
         self.study_path = study_path
         self.series_path = (

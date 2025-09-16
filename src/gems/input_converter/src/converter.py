@@ -34,6 +34,7 @@ from gems.input_converter.src.data_preprocessing.preprocessing import (
 )
 from gems.input_converter.src.data_preprocessing.thermal import ThermalDataPreprocessing
 from gems.input_converter.src.utils import (
+    match_area_pattern,
     read_yaml_file,
     resolve_path,
     transform_to_yaml,
@@ -47,6 +48,7 @@ from gems.study.parsing import (
 )
 
 RESOURCES_FOLDER = Path(__file__).parents[1] / "data" / "model_configuration"
+LIBS_FOLDER = "model-libraries"
 
 
 class AntaresStudyConverter:
@@ -111,6 +113,7 @@ class AntaresStudyConverter:
         for area in (area for area in self.areas.values() if area.id in valid_areas):
             thermals: dict[str, ThermalCluster] = area.get_thermals()
             for thermal in thermals.values():
+                # TODO Do  we move preprocessing files in data series folder ?
                 series_path = (
                     self.study_path
                     / "input"
@@ -246,26 +249,6 @@ class AntaresStudyConverter:
                 )
         return components
 
-    def _match_area_pattern(
-        self, object: Any, param_value: str, model_area_pattern: str = "${area}"
-    ) -> Any:
-        if isinstance(object, dict):
-            return {
-                self._match_area_pattern(
-                    k, param_value, model_area_pattern
-                ): self._match_area_pattern(v, param_value, model_area_pattern)
-                for k, v in object.items()
-            }
-        elif isinstance(object, list):
-            return [
-                self._match_area_pattern(elem, param_value, model_area_pattern)
-                for elem in object
-            ]
-        elif isinstance(object, str):
-            return object.replace(model_area_pattern, param_value)
-        else:
-            return object
-
     def _delete_legacy_objects(self) -> None:
         for item in self.legacy_objects:
             item_type = item.get("type")
@@ -386,7 +369,7 @@ class AntaresStudyConverter:
                     resource_content, "link"
                 )
                 for link in valid_resources.values():
-                    data_with_link: dict = self._match_area_pattern(
+                    data_with_link: dict = match_area_pattern(
                         resource_content, link.id, model_area_pattern
                     )
                     self._iterate_through_model(
@@ -404,7 +387,7 @@ class AntaresStudyConverter:
                     )
                     return components, connections, area_connections
                 for area in valid_areas.values():
-                    data_consolidated: dict = self._match_area_pattern(
+                    data_consolidated: dict = match_area_pattern(
                         resource_content, area.id, model_area_pattern
                     )
                     cluster_type = next(
@@ -420,7 +403,7 @@ class AntaresStudyConverter:
                         for cluster_id in getattr(
                             area, TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[cluster_type]
                         )():
-                            data_consolidated = self._match_area_pattern(
+                            data_consolidated = match_area_pattern(
                                 data_consolidated, cluster_id, f"${{{cluster_type}}}"
                             )
                             self._iterate_through_model(
@@ -479,7 +462,8 @@ class AntaresStudyConverter:
             key: value for key, value in resources.items() if key not in excluded_ids
         }
 
-    def _extract_model_id_from_file(self, path) -> tuple[str, list]:
+    @staticmethod
+    def _extract_model_id_from_file(path: str) -> tuple[str, list]:
         lib_data = read_yaml_file(Path(path))
         lib_models = lib_data.get("library", {}).get("models", [])
         return lib_data.get("library", {}).get("id", []), [
@@ -509,7 +493,7 @@ class AntaresStudyConverter:
                 )
 
     def _copy_libs_to_model_librairies(self):
-        dest_dir = self.output_folder / "input" / "model-libraries"
+        dest_dir = self.output_folder / "input" / LIBS_FOLDER
         dest_dir.mkdir(parents=True, exist_ok=True)
         for path in self.lib_paths:
             shutil.copy2(path, dest_dir)
