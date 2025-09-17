@@ -68,11 +68,16 @@ class AntaresStudyConverter:
         self.mode = mode
         self.period: int = period if period else 168
         self.lib_paths: List[str] = kwargs["lib_paths"]
+
         if isinstance(study_input, Study):
+            # We have a different way of managing thermal preprocessing files, because in this case we want to modify the study_path.
+            # But in the same moment we dont want the preprocessing files in the modified study_path
+            self.thermal_input_path = Path(study_input.path)
             self.output_folder = output_folder / study_input.path.stem
             study_input.path = self.output_folder
         else:
             self.output_folder = output_folder / study_input.stem
+            self.thermal_input_path = Path(study_input)
 
         if mode == ConversionMode.HYBRID.value:
             self.model_list: list = kwargs["model_list"]
@@ -115,7 +120,7 @@ class AntaresStudyConverter:
             for thermal in thermals.values():
                 # TODO Do  we move preprocessing files in data series folder ?
                 series_path = (
-                    self.study_path
+                    self.thermal_input_path
                     / "input"
                     / "thermal"
                     / "series"
@@ -123,10 +128,10 @@ class AntaresStudyConverter:
                     / Path(thermal.id)
                     / "series.txt"
                 )
-                tdp = ThermalDataPreprocessing(thermal, self.study_path)
+                tdp = ThermalDataPreprocessing(thermal, self.thermal_input_path)
                 components.append(
                     InputComponent(
-                        id=f"{thermal.id}_{thermal.area_id}",
+                        id=f"{thermal.area_id}_{thermal.id}",
                         model=f"{lib_id}.thermal",
                         parameters=[
                             tdp.generate_component_parameter("p_min_cluster"),
@@ -204,18 +209,18 @@ class AntaresStudyConverter:
                 if self.mode == ConversionMode.FULL.value:
                     connections.append(
                         InputPortConnections(
-                            component1=thermal.id,
+                            component1=f"{thermal.area_id}_{thermal.id}",
                             port1="balance_port",
-                            component2=f"{thermal.id}_{thermal.area_id}",
+                            component2=f"{thermal.area_id}",
                             port2="balance_port",
                         )
                     )
                 else:
                     area_connections.append(
                         InputAreaConnections(
-                            component=thermal.id,
+                            component=f"{thermal.area_id}_{thermal.id}",
                             port="balance_port",
-                            area=f"{thermal.id}_{thermal.area_id}",
+                            area=f"{thermal.area_id}",
                         )
                     )
         return components, connections

@@ -198,7 +198,7 @@ class TestConverter:
         area_components = converter._convert_area_to_component_list(
             lib_id, ["fr", "it"]
         )
-        input_study = InputSystem(id=converter.study.name, nodes=area_components)
+        input_study = InputSystem(id=converter.study.name, components=area_components)
 
         # Dump model into yaml file
         yaml_path = converter.study_path / "study_path.yaml"
@@ -209,7 +209,7 @@ class TestConverter:
 
         expected_validated_data = InputSystem(
             id="studyTest",
-            nodes=[
+            components=[
                 InputComponent(
                     id="it",
                     model="antares-historic.area",
@@ -253,11 +253,10 @@ class TestConverter:
                     ],
                 ),
             ],
-            components=[],
         )
 
-        expected_validated_data.nodes.sort(key=lambda x: x.id)
-        validated_data.nodes.sort(key=lambda x: x.id)
+        expected_validated_data.components.sort(key=lambda x: x.id)
+        validated_data.components.sort(key=lambda x: x.id)
         assert validated_data == expected_validated_data
 
     def test_convert_st_storages_to_component(

@@ -30,6 +30,11 @@ class ThermalDataPreprocessing:
             / self.thermal.area_id
             / self.thermal.id
         )
+        # Write the series. It is necessary as the input folder may be different than the output folder
+        series_data: pd.DataFrame = self.thermal.get_series_matrix()
+        series_data.to_csv(
+            self.series_path / "series.txt", sep="\t", index=False, header=False
+        )
         self._prepro_parameter_functions: dict[str, Callable[[int], pd.DataFrame]] = {
             "p_min_cluster": lambda _: self._compute_p_min_cluster(),
             "nb_units_min": lambda _: self._compute_nb_units_min(),
