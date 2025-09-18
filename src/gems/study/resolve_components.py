@@ -223,4 +223,4 @@ def build_scenarized_data_base(
             )
             database.add_data(comp.id, param.id, param_value)
 
-    return databasefv
+    return database

@@ -451,9 +451,7 @@ class PyPSAStudyConverter:
             list_components.extend(components)
             list_connections.extend(connections)
 
-        return InputSystem(
-            nodes=[], components=list_components, connections=list_connections
-        )
+        return InputSystem(components=list_components, connections=list_connections)
 
     def _convert_pypsa_components_of_given_model(
         self, pypsa_components_data: PyPSAComponentData

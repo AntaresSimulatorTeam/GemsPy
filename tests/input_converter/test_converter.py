@@ -35,10 +35,7 @@ from gems.study.parsing import (
 )
 from tests.input_converter.conftest import create_dataframe_from_constant
 
-MODEL_LIST = [
-    "src/gems/libs/antares_historic/antares_historic.yml",
-    "src/gems/libs/reference_models/andromede_v1_models.yml",
-]
+
 RESOURCES_FOLDER = (
     Path(__file__).parents[2]
     / "src"
@@ -59,6 +56,10 @@ DATAFRAME_PREPRO_BC_CONFIG = (
     create_dataframe_from_constant(lines=8760, columns=6),  # modulation
     create_dataframe_from_constant(lines=8760, columns=4),  # series
 )
+MODEL_LIST = [
+    "src/gems/libs/antares_historic/antares_historic.yml",
+    "src/gems/libs/reference_models/andromede_v1_models.yml",
+]
 MODEL_LIST_WITH_BASE = [str(Path(os.getcwd()) / suffix) for suffix in MODEL_LIST]
 
 
@@ -405,20 +406,19 @@ class TestConverter:
             thermals_connections,
             _,
         ) = converter._convert_model_to_component_list(valid_areas, resource_content)
-
-        study_path = converter.study_path
+        study_path = converter.thermal_input_path
         series_path = study_path / "input" / "thermal" / "series" / "fr" / "gaz"
         expected_thermals_connections = [
             InputPortConnections(
-                component1="gaz",
+                component1="fr_gaz",
                 port1="balance_port",
-                component2="gaz_fr",
+                component2="fr",
                 port2="balance_port",
             )
         ]
         expected_thermals_components = [
             InputComponent(
-                id="gaz_fr",
+                id="fr_gaz",
                 model="antares-historic.thermal",
                 scenario_group=None,
                 parameters=[

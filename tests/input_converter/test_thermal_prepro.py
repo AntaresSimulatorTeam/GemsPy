@@ -10,7 +10,7 @@
 #
 # This file is part of the Antares project.
 from pathlib import Path
-
+import os
 import pandas as pd
 import pytest
 from antares.craft.model.area import Area
@@ -30,6 +30,11 @@ DATAFRAME_PREPRO_THERMAL_CONFIG = (
     create_dataframe_from_constant(lines=8760, columns=4, value=3),  # modulation
     create_dataframe_from_constant(lines=8760, columns=1, value=6),  # series
 )
+MODEL_LIST = [
+    "src/gems/libs/antares_historic/antares_historic.yml",
+    "src/gems/libs/reference_models/andromede_v1_models.yml",
+]
+MODEL_LIST_WITH_BASE = [str(Path(os.getcwd()) / suffix) for suffix in MODEL_LIST]
 
 
 class TestThermalPreprocessing:
@@ -43,8 +48,12 @@ class TestThermalPreprocessing:
 
         logger = Logger(__name__, local_study_w_thermal.path)
         converter: AntaresStudyConverter = AntaresStudyConverter(
-            study_input=local_study_w_thermal, logger=logger
+            study_input=local_study_w_thermal,
+            logger=logger,
+            mode="full",
+            lib_paths=MODEL_LIST,
         )
+
         return converter
 
     @staticmethod
@@ -67,7 +76,7 @@ class TestThermalPreprocessing:
     def _init_tdp(self, local_study_w_thermal: Study) -> ThermalDataPreprocessing:
         converter = self.setup_preprocessing_thermal(local_study_w_thermal)
         thermal: ThermalCluster = self.get_first_thermal_cluster_from_study(converter)
-        return ThermalDataPreprocessing(thermal, converter.study_path)
+        return ThermalDataPreprocessing(thermal, converter.thermal_input_path)
 
     def _validate_component_parameter(
         self,
@@ -165,7 +174,7 @@ class TestThermalPreprocessing:
         tdp: ThermalDataPreprocessing = self._init_tdp(local_study_w_thermal)
 
         expected_path = (
-            local_study_w_thermal.path
+            tdp.study_path
             / "input"
             / "thermal"
             / "series"
