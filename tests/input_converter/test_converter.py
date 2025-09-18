@@ -35,7 +35,6 @@ from gems.study.parsing import (
 )
 from tests.input_converter.conftest import create_dataframe_from_constant
 
-
 RESOURCES_FOLDER = (
     Path(__file__).parents[2]
     / "src"
