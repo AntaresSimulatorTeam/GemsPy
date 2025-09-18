@@ -42,15 +42,18 @@ from gems.study.parsing import InputComponent, InputPortConnections, InputSystem
 @dataclass(frozen=True)
 class System:
     components: Dict[str, Component]
+    nodes: Dict[str, Component]
     connections: List[PortsConnection]
 
 
 def system(
     components_list: Iterable[Component],
+    nodes: Iterable[Component],
     connections: Iterable[PortsConnection],
 ) -> System:
     return System(
         components=dict((m.id, m) for m in components_list),
+        nodes=dict((n.id, n) for n in nodes),
         connections=list(connections),
     )
 
@@ -63,13 +66,14 @@ def resolve_system(input_system: InputSystem, libraries: dict[str, Library]) -> 
     components_list = [
         _resolve_component(libraries, m) for m in input_system.components
     ]
-    all_components: List[Component] = components_list
+    nodes = [_resolve_component(libraries, n) for n in input_system.nodes]
+    all_components: List[Component] = components_list + nodes
     connections = []
-    for cnx in input_system.connections:  # type: ignore
+    for cnx in input_system.connections:
         resolved_cnx = _resolve_connections(cnx, all_components)
         connections.append(resolved_cnx)
 
-    return system(components_list, connections)
+    return system(components_list, nodes, connections)
 
 
 def _resolve_component(
@@ -129,6 +133,11 @@ def consistency_check(
 def build_network(system: System) -> Network:
     # It seems that System and Network are almost the same thing -> could be simplified ?
     network = Network("study")
+
+    for node_id, node in system.nodes.items():
+        node = Node(model=node.model, id=node_id)
+        network.add_node(node)
+
     for component in system.components.values():
         network.add_component(component)
 
@@ -141,9 +150,11 @@ def build_data_base(
     input_system: InputSystem, timeseries_dir: Optional[Path]
 ) -> DataBase:
     database = DataBase()
-    for comp in input_system.components:
+    input_system_objects = input_system.components + input_system.nodes
+    for comp in input_system_objects:
         # This idiom allows mypy to 'ignore' the fact that comp.parameter can be None
         for param in comp.parameters or []:
+            print("yo", param, timeseries_dir)
             param_value = _build_data(
                 param.time_dependent,
                 param.scenario_dependent,

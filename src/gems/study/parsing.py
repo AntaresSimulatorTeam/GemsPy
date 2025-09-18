@@ -63,12 +63,12 @@ class InputComponent(ModifiedBaseModel):
 
 
 class InputSystem(ModifiedBaseModel):
-    id: str
+    id: str = None
     model_libraries: Optional[str] = None  # Parsed but unused for now
     components: List[InputComponent] = Field(default_factory=list)
     connections: Optional[List[InputPortConnections]] = None
     area_connections: Optional[List[InputAreaConnections]] = None
-
+    nodes: Optional[List[InputComponent]] = Field(default_factory=list)
 
 @dataclass(frozen=True)
 class ParsedArguments:
