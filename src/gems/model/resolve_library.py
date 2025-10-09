@@ -39,6 +39,7 @@ from gems.model.parsing import (
     InputVariable,
 )
 from gems.model.port import PortFieldDefinition, port_field_def
+from gems.model.model import model
 
 
 def resolve_library(
@@ -168,6 +169,12 @@ def _resolve_model(input_model: InputModel, port_types: Dict[str, PortType]) -> 
         variables={v.id for v in input_model.variables},
         parameters={p.id for p in input_model.parameters},
     )
+        # Parse extra outputs if present
+    extra_outputs: Dict[str, ExpressionNode] = {}
+    extra_outputs_list = input_model.extra_outputs or []
+    for eo in extra_outputs_list:
+        extra_outputs[eo.id] = parse_expression(eo.expression, identifiers)
+
     return model(
         id=input_model.id,
         parameters=[_to_parameter(p) for p in input_model.parameters],
@@ -184,7 +191,11 @@ def _resolve_model(input_model: InputModel, port_types: Dict[str, PortType]) -> 
         objective_operational_contribution=_to_expression_if_present(
             input_model.objective, identifiers
         ),
+        extra_outputs=extra_outputs,
     )
+
+    return resolved_model
+
 
 
 def _resolve_model_port(

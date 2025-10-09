@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
+from dataclasses import dataclass
 import typing
 from typing import List, Optional
 
@@ -71,6 +72,11 @@ class InputPortFieldDefinition(ModifiedBaseModel):
     field: str
     definition: str
 
+@dataclass
+class InputExtraOutput:
+    id: str
+    expression: str
+
 
 class InputModel(ModifiedBaseModel):
     id: str
@@ -82,6 +88,7 @@ class InputModel(ModifiedBaseModel):
     constraints: List[InputConstraint] = Field(default_factory=list)
     objective: Optional[str] = None
     description: Optional[str] = None
+    extra_outputs: Optional[List[InputExtraOutput]] = None
 
 
 class InputLibrary(ModifiedBaseModel):
@@ -90,3 +97,4 @@ class InputLibrary(ModifiedBaseModel):
     port_types: List[InputPortType] = Field(default_factory=list)
     models: List[InputModel] = Field(default_factory=list)
     description: Optional[str] = None
+

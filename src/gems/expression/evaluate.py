@@ -142,3 +142,24 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
 
 def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:
     return visit(expression, EvaluationVisitor(value_provider))
+
+class EvaluationError(Exception):
+    """Raised when an expression cannot be evaluated due to missing context or math errors."""
+    pass
+
+
+def evaluate_expression(
+    expression: ExpressionNode,
+    context: Dict[str, float],
+) -> float:
+    """
+    Simplified entry point for evaluating an expression using a dict-based context.
+
+    Example:
+        val = evaluate_expression(expr_node, {"generation": 50})
+    """
+    try:
+        value_provider = EvaluationContext(variables=context, parameters=context)
+        return evaluate(expression, value_provider)
+    except Exception as e:
+        raise EvaluationError(str(e)) from e
