@@ -17,10 +17,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Tuple, TypeVar, Union, cast
 
-from gems.simulation.extra_output import (
-    ExtraOutput,
-    evaluate_all_extra_outputs,
-)
+from gems.simulation.extra_output import ExtraOutput, evaluate_all_extra_outputs
 from gems.simulation.optimization import OptimizationProblem
 from gems.study.data import TimeScenarioIndex
 

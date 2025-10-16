@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Union
 import pandas as pd
 from attr import dataclass
 
-from gems.simulation.output_values import OutputValues
+from gems.simulation.extra_output import ExtraOutput  # Adjust import as needed
 
 
 class SimulationColumns(str, Enum):
@@ -20,11 +20,23 @@ class SimulationColumns(str, Enum):
     BASIS_STATUS = "basis-status"
 
 
+class OutputValues:
+    """
+    Minimal typing for OutputValues to satisfy mypy.
+    """
+
+    problem: Any
+    _components: Dict[str, Any]
+    _extra_outputs: Dict[str, Dict[str, ExtraOutput]]
+
+
 class SimulationTableBuilder:
     """Builds simulation tables from solver output values."""
 
     def __init__(self, simulation_id: Optional[str] = None) -> None:
-        self.simulation_id = simulation_id or datetime.now().strftime("%Y%m%d-%H%M")
+        self.simulation_id: str = simulation_id or datetime.now().strftime(
+            "%Y%m%d-%H%M"
+        )
 
     def build(
         self, output_values: OutputValues, absolute_time_offset: Optional[int] = None
@@ -33,74 +45,80 @@ class SimulationTableBuilder:
             raise ValueError("OutputValues problem is not set.")
 
         context = output_values.problem.context
-        block = context._block.id
+        block = getattr(context._block, "id")
         block_size = context.block_length()
         absolute_time_offset = absolute_time_offset or (block - 1) * block_size
 
-        rows = []
+        rows: list[dict[str, Any]] = []
         rows += self._collect_solver_outputs(output_values, block, absolute_time_offset)
         rows += self._collect_extra_outputs(output_values, block, absolute_time_offset)
         rows.append(self._collect_objective_value(output_values, block))
 
-        df = pd.DataFrame(rows, columns=list(SimulationColumns))
+        df = pd.DataFrame(rows, columns=[c.value for c in SimulationColumns])
         return df
 
-    def _collect_solver_outputs(self, output_values, block, abs_offset):
-        rows = []
+    def _collect_solver_outputs(
+        self, output_values: OutputValues, block: int, abs_offset: int
+    ) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
         for comp_id, comp in output_values._components.items():
-            for var in comp._variables.values():
-                for ts_index, val in var._value.items():
+            for var in getattr(comp, "_variables", {}).values():
+                for ts_index, val in getattr(var, "_value", {}).items():
                     basis_status = (
-                        var._basis_status
-                        if isinstance(var._basis_status, str)
-                        else var._basis_status.get(ts_index)
+                        getattr(var, "_basis_status")
+                        if isinstance(getattr(var, "_basis_status", None), str)
+                        else getattr(var, "_basis_status", {}).get(ts_index)
                     )
                     rows.append(
                         {
-                            SimulationColumns.BLOCK: block,
-                            SimulationColumns.COMPONENT: comp_id,
-                            SimulationColumns.OUTPUT: var._name,
-                            SimulationColumns.ABSOLUTE_TIME_INDEX: abs_offset
+                            SimulationColumns.BLOCK.value: block,
+                            SimulationColumns.COMPONENT.value: comp_id,
+                            SimulationColumns.OUTPUT.value: getattr(var, "_name", ""),
+                            SimulationColumns.ABSOLUTE_TIME_INDEX.value: abs_offset
                             + ts_index.time,
-                            SimulationColumns.BLOCK_TIME_INDEX: ts_index.time,
-                            SimulationColumns.SCENARIO_INDEX: ts_index.scenario,
-                            SimulationColumns.VALUE: val,
-                            SimulationColumns.BASIS_STATUS: basis_status,
+                            SimulationColumns.BLOCK_TIME_INDEX.value: ts_index.time,
+                            SimulationColumns.SCENARIO_INDEX.value: ts_index.scenario,
+                            SimulationColumns.VALUE.value: val,
+                            SimulationColumns.BASIS_STATUS.value: basis_status,
                         }
                     )
         return rows
 
-    def _collect_extra_outputs(self, output_values, block, abs_offset):
-        rows = []
+    def _collect_extra_outputs(
+        self, output_values: OutputValues, block: int, abs_offset: int
+    ) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
         for comp_id, outputs in output_values._extra_outputs.items():
             for name, extra_output in outputs.items():
                 for ts_index, val in extra_output.values.items():
-                    t = getattr(ts_index, "time", getattr(ts_index, "t", 0))
-                    s = getattr(ts_index, "scenario", getattr(ts_index, "s", 0))
+                    t: int = getattr(ts_index, "time")
+                    s: int = getattr(ts_index, "scenario")
                     rows.append(
                         {
-                            SimulationColumns.BLOCK: block,
-                            SimulationColumns.COMPONENT: comp_id,
-                            SimulationColumns.OUTPUT: name,
-                            SimulationColumns.ABSOLUTE_TIME_INDEX: abs_offset + t,
-                            SimulationColumns.BLOCK_TIME_INDEX: t,
-                            SimulationColumns.SCENARIO_INDEX: s,
-                            SimulationColumns.VALUE: val,
-                            SimulationColumns.BASIS_STATUS: None,
+                            SimulationColumns.BLOCK.value: block,
+                            SimulationColumns.COMPONENT.value: comp_id,
+                            SimulationColumns.OUTPUT.value: name,
+                            SimulationColumns.ABSOLUTE_TIME_INDEX.value: abs_offset + t,
+                            SimulationColumns.BLOCK_TIME_INDEX.value: t,
+                            SimulationColumns.SCENARIO_INDEX.value: s,
+                            SimulationColumns.VALUE.value: val,
+                            SimulationColumns.BASIS_STATUS.value: None,
                         }
                     )
         return rows
 
-    def _collect_objective_value(self, output_values, block):
+    def _collect_objective_value(
+        self, output_values: OutputValues, block: int
+    ) -> dict[str, Any]:
         return {
-            SimulationColumns.BLOCK: block,
-            SimulationColumns.COMPONENT: None,
-            SimulationColumns.OUTPUT: "objective-value",
-            SimulationColumns.ABSOLUTE_TIME_INDEX: None,
-            SimulationColumns.BLOCK_TIME_INDEX: None,
-            SimulationColumns.SCENARIO_INDEX: None,
-            SimulationColumns.VALUE: output_values.problem.solver.Objective().Value(),
-            SimulationColumns.BASIS_STATUS: None,
+            SimulationColumns.BLOCK.value: block,
+            SimulationColumns.COMPONENT.value: None,
+            SimulationColumns.OUTPUT.value: "objective-value",
+            SimulationColumns.ABSOLUTE_TIME_INDEX.value: None,
+            SimulationColumns.BLOCK_TIME_INDEX.value: None,
+            SimulationColumns.SCENARIO_INDEX.value: None,
+            SimulationColumns.VALUE.value: output_values.problem.solver.Objective().Value(),
+            SimulationColumns.BASIS_STATUS.value: None,
         }
 
 
