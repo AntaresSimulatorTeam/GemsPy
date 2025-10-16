@@ -242,13 +242,13 @@ class OutputValues:
             self._components[component_id] = OutputValues.Component(component_id)
         return self._components[component_id]
 
-        
     def evaluate_extra_outputs(self) -> None:
         """Evaluate all model-defined extra outputs for all components."""
         self._extra_outputs.clear()
         self._extra_outputs.update(
             evaluate_all_extra_outputs(self.problem, self.component)
         )
+
 
 Comparable = TypeVar("Comparable", OutputValues.Component, OutputValues.Variable)
 
