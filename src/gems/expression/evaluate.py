@@ -148,18 +148,3 @@ class EvaluationError(Exception):
     pass
 
 
-def evaluate_expression(
-    expression: ExpressionNode,
-    context: Dict[str, float],
-) -> float:
-    """
-    Simplified entry point for evaluating an expression using a dict-based context.
-
-    Example:
-        val = evaluate_expression(expr_node, {"generation": 50})
-    """
-    try:
-        value_provider = EvaluationContext(variables=context, parameters=context)
-        return evaluate(expression, value_provider)
-    except Exception as e:
-        raise EvaluationError(str(e)) from e

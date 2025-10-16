@@ -18,10 +18,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Tuple, TypeVar, Union, cast
 
 from gems.simulation.optimization import OptimizationProblem
+from gems.simulation.extra_output import ExtraOutput, evaluate_extra_outputs_for_a_component
 from gems.study.data import TimeScenarioIndex
-
-from gems.expression.evaluate import evaluate_expression, EvaluationError
-from gems.expression import ExpressionNode
 
 
 @dataclass
@@ -153,6 +151,8 @@ class OutputValues:
         _variables: Dict[str, "OutputValues.Variable"] = field(
             init=False, default_factory=dict
         )
+        network_component: Optional[Any] = field(default=None, init=False)
+        model: Optional[Any] = field(default=None, init=False)
         ignore: bool = field(default=False, init=False)
 
         def __eq__(self, other: object) -> bool:
@@ -185,13 +185,19 @@ class OutputValues:
                 self._variables[variable_name] = OutputValues.Variable(variable_name)
             return self._variables[variable_name]
 
+
     problem: Optional[OptimizationProblem] = field(default=None)
     _components: Dict[str, "OutputValues.Component"] = field(
         init=False, default_factory=dict
     )
+    _extra_outputs: Dict[str, Dict[str, ExtraOutput]] = field(
+        init=False, default_factory=dict
+    )
+
 
     def __post_init__(self) -> None:
         self._build_components()
+        self.evaluate_extra_outputs()
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, OutputValues):
@@ -226,92 +232,46 @@ class OutputValues:
                 status=status,
                 is_mip=is_mip,
             )
+        for cmp in self.problem.context.network.all_components:
+            self.component(cmp.id).model = cmp.model
+            self.component(cmp.id).network_component = cmp
+            
 
     def component(self, component_id: str) -> "OutputValues.Component":
         if component_id not in self._components:
             self._components[component_id] = OutputValues.Component(component_id)
         return self._components[component_id]
-    
-    def evaluate_model_outputs(
-        self,
-        model_registry: Mapping[str, Any],
-        component_parameters: Optional[Mapping[str, Dict[str, float]]] = None,
-    ) -> None:
+        
+    def evaluate_extra_outputs(self) -> None:
         """
-        Evaluate extra outputs defined as ExpressionNode for each component.
-
-        model_registry: mapping model_id -> Model object, where model.extra_outputs
-                        is a dict {output_id: ExpressionNode}
-        component_parameters: optional mapping component_id -> {param_name: numeric_value}
+        Evaluate all model-defined extra outputs for each component.
+        Uses the solver results and the database to populate parameter values.
         """
-        from gems.study.data import TimeScenarioIndex
-        from gems.expression.evaluate import evaluate_expression, EvaluationError
+        if self.problem is None or self.problem.context is None:
+            return
 
-        component_parameters = component_parameters or {}
+        database = getattr(self.problem.context, "database", None)
+        if database is None:
+            print("[WARN] No database found in problem context; extra outputs skipped.")
+            return
 
-        def _get_time_scenario(idx):
-            """Return (timestep, scenario) from a TimeScenarioIndex object."""
-            if hasattr(idx, "t") and hasattr(idx, "s"):
-                return idx.t, idx.s
-            elif hasattr(idx, "timestep") and hasattr(idx, "scenario"):
-                return idx.timestep, idx.scenario
-            elif isinstance(idx, tuple) and len(idx) == 2:
-                return idx[0], idx[1]
-            else:
-                return 0, 0
+        self._extra_outputs.clear()
 
-        for comp_id, comp in self._components.items():
-            # find the model definition for this component
-            model_def = model_registry.get(comp_id) or model_registry.get(comp_id.split('.')[-1])
-            if not model_def:
+        # Iterate over all components in the network
+        for cmp in self.problem.context.network.all_components:
+            comp_obj = self.component(cmp.id)
+
+            model_def = cmp.model
+            if not getattr(model_def, "extra_outputs", None):
                 continue
 
-            # extra outputs defined in the Model object
-            outputs: Dict[str, ExpressionNode] = getattr(model_def, "extra_outputs", {}) or {}
-            if not outputs:
-                continue
+            extra_results = evaluate_extra_outputs_for_a_component(
+                comp_obj,
+                self.problem
+            )
 
-            # collect indices to evaluate (union of all variable keys)
-            indices = set()
-            for var in comp._variables.values():
-                indices.update(var._value.keys())
-            if not indices:
-                indices = {TimeScenarioIndex(0, 0)}
-
-            # sort indices safely
-            indices = sorted(indices, key=lambda k: _get_time_scenario(k))
-
-            # parameters for this component
-            params = component_parameters.get(comp_id, {})
-
-            for idx in indices:
-                t, s = _get_time_scenario(idx)
-
-                # build context with current variables and parameters
-                context: Dict[str, float] = {}
-                for vname, vobj in comp._variables.items():
-                    key = type(idx)(t, s) if hasattr(idx, "__class__") else (t, s)
-                    if key in vobj._value:
-                        context[vname] = vobj._value[key]
-
-                # add parameters
-                context.update(params)
-                # context["self"] = context  # convenience alias
-
-                # evaluate each extra output ExpressionNode
-                for out_id, expr_node in outputs.items():
-                    try:
-                        val = evaluate_expression(expr_node, context)
-                    except EvaluationError:
-                        val = float("nan")
-
-                    # store result
-                    self.component(comp_id).var(out_id)._set(
-                        t, s, float(val), status=None, is_mip=True
-                    )
-
-
-
+            if extra_results:
+                self._extra_outputs[cmp.id] = extra_results
 
 
 Comparable = TypeVar("Comparable", OutputValues.Component, OutputValues.Variable)
