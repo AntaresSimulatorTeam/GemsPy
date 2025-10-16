@@ -1,21 +1,16 @@
-# Standard library imports
 from pathlib import Path
 
-# Third-party imports
 import pandas as pd
 import pytest
 
-# Local application/library imports
-from gems.model.parsing import parse_yaml_library
-from gems.model.resolve_library import resolve_library
-from gems.simulation import OutputValues, TimeBlock, build_problem
+from gems.simulation.output_values import OutputValues
 from gems.simulation.simulation_table import (
     SimulationColumns,
     SimulationTableBuilder,
     SimulationTableWriter,
 )
-from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import build_data_base, build_network, resolve_system
+
+# --- Fake classes for isolated testing ---
 
 
 class FakeTimeIndex:
@@ -63,9 +58,13 @@ class FakeComponent:
 
 
 class FakeOutputValues(OutputValues):
-    def __init__(self, problem, components):
+    def __init__(self, problem, components, extra_outputs=None):
         self.problem = problem
         self._components = components
+        self._extra_outputs = extra_outputs or {}  # <- NEW: ensure it always exists
+
+
+# --- The actual test ---
 
 
 def test_simulation_table_builder_manual(tmp_path):
@@ -83,7 +82,7 @@ def test_simulation_table_builder_manual(tmp_path):
     component = FakeComponent({"var1": var})
     output_values = FakeOutputValues(problem, {"compA": component})
 
-    # --- Build table ---
+    # --- Build simulation table ---
     builder = SimulationTableBuilder(simulation_id="test")
     df = builder.build(output_values)
 
@@ -122,9 +121,12 @@ def test_simulation_table_builder_manual(tmp_path):
     expected_df = pd.DataFrame(expected_rows).fillna(pd.NA)
 
     pd.testing.assert_frame_equal(
-        df.reset_index(drop=True).fillna(pd.NA), expected_df, check_dtype=False
+        df.reset_index(drop=True).fillna(pd.NA),
+        expected_df,
+        check_dtype=False,
     )
 
+    # --- Test CSV writing ---
     writer = SimulationTableWriter(df)
     csv_path = writer.write_csv(tmp_path, simulation_id="test", optim_nb=1)
 
@@ -135,4 +137,5 @@ def test_simulation_table_builder_manual(tmp_path):
 
     expected_header = ",".join(col.value for col in SimulationColumns)
     assert first_line == expected_header, "CSV header does not match expected columns"
+
     csv_path.unlink()

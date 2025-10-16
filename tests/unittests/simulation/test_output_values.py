@@ -1,16 +1,7 @@
 # Copyright (c) 2024, RTE (https://www.rte-france.com)
-#
-# See AUTHORS.txt
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#
 # SPDX-License-Identifier: MPL-2.0
-#
-# This file is part of the Antares project.
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import ortools.linear_solver.pywraplp as lp
 
@@ -27,8 +18,10 @@ def test_component_and_flow_output_object() -> None:
     mock_problem = Mock(spec=OptimizationProblem)
     opt_context = Mock(spec=OptimizationContext)
 
+    # Fake solver variable value
     mock_variable_component.solution_value.side_effect = lambda: 1.0
 
+    # Fake component variable mapping
     opt_context.get_all_component_variables.return_value = {
         TimestepComponentVariableKey(
             component_id="component_id_test",
@@ -46,20 +39,32 @@ def test_component_and_flow_output_object() -> None:
 
     opt_context.block_length.return_value = 1
 
+    # ✅ Add minimal fake network to avoid AttributeError
+    opt_context.network = Mock()
+    opt_context.network.all_components = []  # no actual components needed
+
     mock_problem.context = opt_context
     mock_solver = Mock()
     mock_solver.IsMip.return_value = False
     mock_problem.solver = mock_solver
-    output = OutputValues(mock_problem)
 
+    # ✅ Patch evaluate_all_extra_outputs to avoid touching real simulation code
+    with patch(
+        "gems.simulation.output_values.evaluate_all_extra_outputs", return_value={}
+    ):
+        output = OutputValues(mock_problem)
+
+    # Create a comparison OutputValues instance with no problem (empty)
     test_output = OutputValues()
     assert output != test_output, f"Output is equal to empty output: {output}"
 
+    # Ignore the component entirely
     test_output.component("component_id_test").ignore = True
     assert (
         output == test_output
-    ), f"Output differs from the expected output after 'ignore': {output}"
+    ), f"Output differs from expected output after 'ignore': {output}"
 
+    # Re-enable component; add variable values and ignores
     test_output.component("component_id_test").ignore = False
     test_output.component("component_id_test").var("component_var_name").value = 1.0
     test_output.component("component_id_test").var(
@@ -68,8 +73,9 @@ def test_component_and_flow_output_object() -> None:
 
     assert (
         output == test_output
-    ), f"Output differs from the expected after 'var_name': {output}"
+    ), f"Output differs from expected output after setting variable values: {output}"
 
+    # Slight difference outside tolerance
     test_output.component("component_id_test").var(
         "component_approx_var_name"
     ).ignore = False
@@ -81,14 +87,16 @@ def test_component_and_flow_output_object() -> None:
         test_output
     ), f"Output is equal to expected outside tolerance: {output}"
 
+    # Within tolerance
     test_output.component("component_id_test").var(
         "component_approx_var_name"
     ).value = 1.000_000_000_1
 
     assert output != test_output and output.is_close(
         test_output
-    ), f"Output differs from the expected inside tolerance: {output}"
+    ), f"Output differs from expected inside tolerance: {output}"
 
+    # Add extra wrong variable and ignore it
     test_output.component("component_id_test").var(
         "component_approx_var_name"
     ).ignore = True
