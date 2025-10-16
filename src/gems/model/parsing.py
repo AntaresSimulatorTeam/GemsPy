@@ -9,8 +9,8 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
-from dataclasses import dataclass
 import typing
+from dataclasses import dataclass
 from typing import List, Optional
 
 from pydantic import Field, ValidationError
@@ -72,6 +72,7 @@ class InputPortFieldDefinition(ModifiedBaseModel):
     field: str
     definition: str
 
+
 @dataclass
 class InputExtraOutput:
     id: str
@@ -97,4 +98,3 @@ class InputLibrary(ModifiedBaseModel):
     port_types: List[InputPortType] = Field(default_factory=list)
     models: List[InputModel] = Field(default_factory=list)
     description: Optional[str] = None
-

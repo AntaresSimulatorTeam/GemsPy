@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Union, Any, Dict
+from typing import Any, Dict, Optional, Union
 
 import pandas as pd
 from attr import dataclass
@@ -26,8 +26,9 @@ class SimulationTableBuilder:
     def __init__(self, simulation_id: Optional[str] = None) -> None:
         self.simulation_id = simulation_id or datetime.now().strftime("%Y%m%d-%H%M")
 
-    
-    def build(self, output_values: OutputValues, absolute_time_offset: Optional[int] = None) -> pd.DataFrame:
+    def build(
+        self, output_values: OutputValues, absolute_time_offset: Optional[int] = None
+    ) -> pd.DataFrame:
         if output_values.problem is None:
             raise ValueError("OutputValues problem is not set.")
 
@@ -50,19 +51,23 @@ class SimulationTableBuilder:
             for var in comp._variables.values():
                 for ts_index, val in var._value.items():
                     basis_status = (
-                        var._basis_status if isinstance(var._basis_status, str)
+                        var._basis_status
+                        if isinstance(var._basis_status, str)
                         else var._basis_status.get(ts_index)
                     )
-                    rows.append({
-                        SimulationColumns.BLOCK: block,
-                        SimulationColumns.COMPONENT: comp_id,
-                        SimulationColumns.OUTPUT: var._name,
-                        SimulationColumns.ABSOLUTE_TIME_INDEX: abs_offset + ts_index.time,
-                        SimulationColumns.BLOCK_TIME_INDEX: ts_index.time,
-                        SimulationColumns.SCENARIO_INDEX: ts_index.scenario,
-                        SimulationColumns.VALUE: val,
-                        SimulationColumns.BASIS_STATUS: basis_status,
-                    })
+                    rows.append(
+                        {
+                            SimulationColumns.BLOCK: block,
+                            SimulationColumns.COMPONENT: comp_id,
+                            SimulationColumns.OUTPUT: var._name,
+                            SimulationColumns.ABSOLUTE_TIME_INDEX: abs_offset
+                            + ts_index.time,
+                            SimulationColumns.BLOCK_TIME_INDEX: ts_index.time,
+                            SimulationColumns.SCENARIO_INDEX: ts_index.scenario,
+                            SimulationColumns.VALUE: val,
+                            SimulationColumns.BASIS_STATUS: basis_status,
+                        }
+                    )
         return rows
 
     def _collect_extra_outputs(self, output_values, block, abs_offset):
@@ -72,16 +77,18 @@ class SimulationTableBuilder:
                 for ts_index, val in extra_output.values.items():
                     t = getattr(ts_index, "time", getattr(ts_index, "t", 0))
                     s = getattr(ts_index, "scenario", getattr(ts_index, "s", 0))
-                    rows.append({
-                        SimulationColumns.BLOCK: block,
-                        SimulationColumns.COMPONENT: comp_id,
-                        SimulationColumns.OUTPUT: name,
-                        SimulationColumns.ABSOLUTE_TIME_INDEX: abs_offset + t,
-                        SimulationColumns.BLOCK_TIME_INDEX: t,
-                        SimulationColumns.SCENARIO_INDEX: s,
-                        SimulationColumns.VALUE: val,
-                        SimulationColumns.BASIS_STATUS: None,
-                    })
+                    rows.append(
+                        {
+                            SimulationColumns.BLOCK: block,
+                            SimulationColumns.COMPONENT: comp_id,
+                            SimulationColumns.OUTPUT: name,
+                            SimulationColumns.ABSOLUTE_TIME_INDEX: abs_offset + t,
+                            SimulationColumns.BLOCK_TIME_INDEX: t,
+                            SimulationColumns.SCENARIO_INDEX: s,
+                            SimulationColumns.VALUE: val,
+                            SimulationColumns.BASIS_STATUS: None,
+                        }
+                    )
         return rows
 
     def _collect_objective_value(self, output_values, block):
@@ -94,8 +101,7 @@ class SimulationTableBuilder:
             SimulationColumns.SCENARIO_INDEX: None,
             SimulationColumns.VALUE: output_values.problem.solver.Objective().Value(),
             SimulationColumns.BASIS_STATUS: None,
-        }    
-  
+        }
 
 
 @dataclass

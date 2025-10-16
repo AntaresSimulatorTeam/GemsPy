@@ -1,8 +1,8 @@
-from typing import Dict
 from dataclasses import dataclass, field
+from typing import Dict
 
 from gems.expression import evaluate
-from gems.expression.evaluate import ValueProvider, EvaluationError
+from gems.expression.evaluate import EvaluationError, ValueProvider
 from gems.expression.expression import ExpressionNode
 from gems.study.data import ComponentParameterIndex, TimeScenarioIndex
 
@@ -10,6 +10,7 @@ from gems.study.data import ComponentParameterIndex, TimeScenarioIndex
 @dataclass
 class ExtraOutput:
     """Stores evaluated outputs (from ExpressionNodes), not solver variables."""
+
     name: str
     values: Dict[TimeScenarioIndex, float] = field(default_factory=dict)
 
@@ -20,8 +21,47 @@ class ExtraOutput:
         return self.values.get(TimeScenarioIndex(t, s))
 
 
+def evaluate_all_extra_outputs(
+    problem, component_lookup
+) -> Dict[str, Dict[str, ExtraOutput]]:
+    """
+    Evaluate all model-defined extra outputs for every component in the network.
 
-def evaluate_extra_outputs_for_a_component(component, problem) -> Dict[str, ExtraOutput]:
+    Args:
+        problem: The current optimization problem (must have context, database, and network).
+        component_lookup: Callable or mapping that returns the component output object given its ID.
+                          Typically this is OutputValues.component(id).
+
+    Returns:
+        Dict[component_id, Dict[output_name, ExtraOutput]]
+    """
+    if problem is None or problem.context is None:
+        return {}
+
+    database = getattr(problem.context, "database", None)
+    if database is None:
+        print("[WARN] No database found in problem context; extra outputs skipped.")
+        return {}
+
+    results: Dict[str, Dict[str, ExtraOutput]] = {}
+
+    for cmp in problem.context.network.all_components:
+        model_def = cmp.model
+        if not getattr(model_def, "extra_outputs", None):
+            continue
+
+        comp_obj = component_lookup(cmp.id)
+        extra_results = evaluate_extra_outputs_for_a_component(comp_obj, problem)
+
+        if extra_results:
+            results[cmp.id] = extra_results
+
+    return results
+
+
+def evaluate_extra_outputs_for_a_component(
+    component, problem
+) -> Dict[str, ExtraOutput]:
     """
     Evaluate one component's model-defined extra outputs using solver variables as context.
     """
@@ -32,7 +72,9 @@ def evaluate_extra_outputs_for_a_component(component, problem) -> Dict[str, Extr
         return results
 
     # Determine all time/scenario indices
-    all_indices = {idx for var in component._variables.values() for idx in var._value.keys()}
+    all_indices = {
+        idx for var in component._variables.values() for idx in var._value.keys()
+    }
     if not all_indices:
         all_indices = {TimeScenarioIndex(0, 0)}
     sorted_indices = sorted(all_indices, key=lambda k: (k.time, k.scenario))
@@ -45,12 +87,16 @@ def evaluate_extra_outputs_for_a_component(component, problem) -> Dict[str, Extr
                 value_provider = ExtraOutputValueProvider(component, problem, idx)
                 val = evaluate(expanded_expr, value_provider)
             except EvaluationError as e:
-                print(f"[ERROR] Failed to evaluate extra output '{out_id}' "
-                      f"for {component._id} at t={idx.time}, s={idx.scenario}: {e}")
+                print(
+                    f"[ERROR] Failed to evaluate extra output '{out_id}' "
+                    f"for {component._id} at t={idx.time}, s={idx.scenario}: {e}"
+                )
                 val = float("nan")
             except Exception as e:
-                print(f"[ERROR] Unexpected error evaluating '{out_id}' "
-                      f"for {component._id} at t={idx.time}, s={idx.scenario}: {e}")
+                print(
+                    f"[ERROR] Unexpected error evaluating '{out_id}' "
+                    f"for {component._id} at t={idx.time}, s={idx.scenario}: {e}"
+                )
                 val = float("nan")
 
             if out_id not in results:
@@ -60,12 +106,10 @@ def evaluate_extra_outputs_for_a_component(component, problem) -> Dict[str, Extr
     return results
 
 
-
-
 class ExtraOutputValueProvider(ValueProvider):
     """
     ValueProvider that automatically builds context from a component,
-    problem, and time/scenario index. 
+    problem, and time/scenario index.
     """
 
     def __init__(self, component, problem, idx: TimeScenarioIndex):

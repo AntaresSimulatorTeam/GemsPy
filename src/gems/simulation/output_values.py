@@ -17,8 +17,11 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Tuple, TypeVar, Union, cast
 
+from gems.simulation.extra_output import (
+    ExtraOutput,
+    evaluate_all_extra_outputs,
+)
 from gems.simulation.optimization import OptimizationProblem
-from gems.simulation.extra_output import ExtraOutput, evaluate_extra_outputs_for_a_component
 from gems.study.data import TimeScenarioIndex
 
 
@@ -185,7 +188,6 @@ class OutputValues:
                 self._variables[variable_name] = OutputValues.Variable(variable_name)
             return self._variables[variable_name]
 
-
     problem: Optional[OptimizationProblem] = field(default=None)
     _components: Dict[str, "OutputValues.Component"] = field(
         init=False, default_factory=dict
@@ -193,7 +195,6 @@ class OutputValues:
     _extra_outputs: Dict[str, Dict[str, ExtraOutput]] = field(
         init=False, default_factory=dict
     )
-
 
     def __post_init__(self) -> None:
         self._build_components()
@@ -235,44 +236,19 @@ class OutputValues:
         for cmp in self.problem.context.network.all_components:
             self.component(cmp.id).model = cmp.model
             self.component(cmp.id).network_component = cmp
-            
 
     def component(self, component_id: str) -> "OutputValues.Component":
         if component_id not in self._components:
             self._components[component_id] = OutputValues.Component(component_id)
         return self._components[component_id]
+
         
     def evaluate_extra_outputs(self) -> None:
-        """
-        Evaluate all model-defined extra outputs for each component.
-        Uses the solver results and the database to populate parameter values.
-        """
-        if self.problem is None or self.problem.context is None:
-            return
-
-        database = getattr(self.problem.context, "database", None)
-        if database is None:
-            print("[WARN] No database found in problem context; extra outputs skipped.")
-            return
-
+        """Evaluate all model-defined extra outputs for all components."""
         self._extra_outputs.clear()
-
-        # Iterate over all components in the network
-        for cmp in self.problem.context.network.all_components:
-            comp_obj = self.component(cmp.id)
-
-            model_def = cmp.model
-            if not getattr(model_def, "extra_outputs", None):
-                continue
-
-            extra_results = evaluate_extra_outputs_for_a_component(
-                comp_obj,
-                self.problem
-            )
-
-            if extra_results:
-                self._extra_outputs[cmp.id] = extra_results
-
+        self._extra_outputs.update(
+            evaluate_all_extra_outputs(self.problem, self.component)
+        )
 
 Comparable = TypeVar("Comparable", OutputValues.Component, OutputValues.Variable)
 
