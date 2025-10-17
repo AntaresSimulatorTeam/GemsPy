@@ -594,16 +594,3 @@ class AntaresStudyConverter:
         study = self.convert_study_to_input_study()
         self.logger.info("Converting input study into yaml file...")
         transform_to_yaml(model=study, output_path=self.output_path)
-
-    def count_objects_in_yaml_file(self, output_path: Path) -> dict[str, int]:
-        if output_path:
-            data = read_yaml_file(output_path)
-        else:
-            data = read_yaml_file(self.output_path)
-
-        return {
-            "components": len(data["system"].get("components", [])),
-            "connections": len(data["system"].get("connections", [])),
-            "nodes": len(data["system"].get("nodes", [])),
-            "area_connections": len(data["system"].get("area_connections", [])),
-        }
