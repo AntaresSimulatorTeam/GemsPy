@@ -59,7 +59,8 @@ class AntaresStudyConverter:
         mode: ConversionMode = ConversionMode.FULL,
         output_folder: Path = Path("/tmp/"),
         period: Optional[int] = None,
-        **kwargs: List[Any],
+        lib_paths: Optional[list[str]] = None,
+        model_list: Optional[list[str]] = None,
     ):
         """
         Initialize processor
@@ -67,7 +68,8 @@ class AntaresStudyConverter:
         self.logger = logger
         self.mode = mode
         self.period: int = period if period else 168
-        self.lib_paths: List[str] = kwargs["lib_paths"]
+        self.lib_paths: list[str] = lib_paths if lib_paths else []
+        self.model_list: list[str] = model_list if model_list else []
 
         if isinstance(study_input, Study):
             # We have a different way of managing thermal preprocessing files, because in this case we want to modify the study_path.
@@ -76,11 +78,11 @@ class AntaresStudyConverter:
             self.output_folder = output_folder / study_input.path.stem
             study_input.path = self.output_folder
         else:
-            self.output_folder = output_folder / study_input.stem
             self.thermal_input_path = Path(study_input)
+            self.output_folder = output_folder / study_input.stem
 
         if mode == ConversionMode.HYBRID.value:
-            self.model_list: list = kwargs["model_list"]
+            # In hybrid mode, the output is the input study from which we replace converted components by Gems ones, hence we copy the original study
             shutil.copytree(
                 study_input.path if isinstance(study_input, Study) else study_input,
                 self.output_folder,
@@ -89,6 +91,7 @@ class AntaresStudyConverter:
             if isinstance(study_input, Path):
                 study_input = self.output_folder
         else:
+            # In full mode, the output is a full Gems study so no need to copy the original study, we start "from scratch"
             self.output_folder.mkdir(parents=True, exist_ok=True)
 
         if isinstance(study_input, Study):

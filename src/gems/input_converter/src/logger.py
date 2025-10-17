@@ -10,7 +10,6 @@
 #
 # This file is part of the Antares project.
 import logging
-import logging.config
 import sys
 from typing import Optional
 

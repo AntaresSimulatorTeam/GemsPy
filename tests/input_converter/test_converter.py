@@ -55,18 +55,18 @@ DATAFRAME_PREPRO_BC_CONFIG = (
     create_dataframe_from_constant(lines=8760, columns=6),  # modulation
     create_dataframe_from_constant(lines=8760, columns=4),  # series
 )
-MODEL_LIST = [
+LIB_PATHS = [
     "src/gems/libs/antares_historic/antares_historic.yml",
     "src/gems/libs/reference_models/andromede_v1_models.yml",
 ]
-MODEL_LIST_WITH_BASE = [str(Path(os.getcwd()) / suffix) for suffix in MODEL_LIST]
+MODEL_LIST_WITH_BASE = [str(Path(os.getcwd()) / suffix) for suffix in LIB_PATHS]
 
 
 class TestConverter:
     def _init_converter_from_study(self, local_study, mode: str = "full"):
         logger = Logger(__name__, local_study.path)
         converter: AntaresStudyConverter = AntaresStudyConverter(
-            study_input=local_study, logger=logger, mode=mode, lib_paths=MODEL_LIST
+            study_input=local_study, logger=logger, mode=mode, lib_paths=LIB_PATHS
         )
         return converter
 
@@ -1064,7 +1064,7 @@ class TestConverter:
 
     def test_hybrid_data_series_presence(self, tmp_path: Path):
         local_path = Path(__file__).parent / "resources" / LOCAL_PATH
-        lib_paths: list = MODEL_LIST
+        lib_paths: list = LIB_PATHS
         model_list: list = "battery"
 
         input_path = tmp_path / "input" / LOCAL_PATH

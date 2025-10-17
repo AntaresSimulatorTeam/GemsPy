@@ -19,7 +19,7 @@ from gems.study.resolve_components import (
     resolve_system,
 )
 
-MODEL_LIST = [
+LIB_PATHS = [
     "src/gems/libs/antares_historic/antares_historic.yml",
     "src/gems/libs/reference_models/andromede_v1_models.yml",
 ]
@@ -134,7 +134,7 @@ def _setup_study_component(study, period=None) -> ToolTestStudy:
     timeseries = load_ts_from_txt("load_fr", path)
     area_fr.set_load(pd.DataFrame(timeseries))
     converter: AntaresStudyConverter = AntaresStudyConverter(
-        study_input=study, logger=logger, mode="full", lib_paths=MODEL_LIST
+        study_input=study, logger=logger, mode="full", lib_paths=LIB_PATHS
     )
     converter.process_all()
     compo_file = converter.output_path
