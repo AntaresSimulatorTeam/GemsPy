@@ -487,7 +487,7 @@ class AntaresStudyConverter:
         models = lib_data.get("models", [])
         return lib_data["id"], [model["id"] for model in models]
 
-    def _validate_model_in_libs(self) -> None:
+    def _check_converted_models_are_in_libs(self) -> None:
         lib_to_model_ids = {}
         for lib_path in self.lib_paths:
             lib_id, model_ids = self._extract_lib_and_model_ids(lib_path)
@@ -531,7 +531,7 @@ class AntaresStudyConverter:
     def convert_study_to_input_system(self) -> InputSystem:
         self._copy_libs_to_model_librairies()
         if self.mode == ConversionMode.HYBRID:
-            self._validate_model_in_libs()
+            self._check_converted_models_are_in_libs()
 
         list_components: list[InputComponent] = []
         list_connections: list[InputPortConnections] = []
