@@ -34,10 +34,10 @@ from gems.input_converter.src.data_preprocessing.preprocessing import (
 )
 from gems.input_converter.src.data_preprocessing.thermal import ThermalDataPreprocessing
 from gems.input_converter.src.utils import (
+    dump_to_yaml,
     match_area_pattern,
     read_yaml_file,
     resolve_path,
-    transform_to_yaml,
 )
 from gems.study.parsing import (
     InputAreaConnections,
@@ -591,6 +591,6 @@ class AntaresStudyConverter:
         return InputSystem(**data)
 
     def process_all(self) -> None:
-        study = self.convert_study_to_input_study()
-        self.logger.info("Converting input study into yaml file...")
-        transform_to_yaml(model=study, output_path=self.output_path)
+        system = self.convert_study_to_input_study()
+        self.logger.info("Dumping input system into yaml file...")
+        dump_to_yaml(model=system, output_path=self.output_path)

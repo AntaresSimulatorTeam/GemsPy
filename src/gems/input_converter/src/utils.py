@@ -68,7 +68,7 @@ def check_dataframe_validity(df: DataFrame) -> bool:
     return True
 
 
-def transform_to_yaml(model: BaseModel, output_path: Path) -> None:
+def dump_to_yaml(model: BaseModel, output_path: Path) -> None:
     with open(output_path, "w", encoding="utf-8") as yaml_file:
         yaml.dump(
             {

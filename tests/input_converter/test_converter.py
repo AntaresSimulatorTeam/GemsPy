@@ -22,8 +22,8 @@ from gems.input_converter.src.data_preprocessing.data_classes import Operation
 from gems.input_converter.src.logger import Logger
 from gems.input_converter.src.utils import (
     check_file_exists,
+    dump_to_yaml,
     read_yaml_file,
-    transform_to_yaml,
 )
 from gems.study.parsing import (
     InputAreaConnections,
@@ -202,7 +202,7 @@ class TestConverter:
 
         # Dump model into yaml file
         yaml_path = converter.output_folder / "study_path.yaml"
-        transform_to_yaml(model=input_study, output_path=yaml_path)
+        dump_to_yaml(model=input_study, output_path=yaml_path)
         # Open yaml file to validate
         with open(yaml_path, "r", encoding="utf-8") as yaml_file:
             validated_data = parse_yaml_components(yaml_file)
