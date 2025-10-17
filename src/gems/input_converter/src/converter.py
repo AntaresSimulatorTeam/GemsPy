@@ -482,33 +482,36 @@ class AntaresStudyConverter:
         }
 
     @staticmethod
-    def _extract_model_id_from_file(path: str) -> tuple[str, list]:
+    def _extract_lib_and_model_ids(path: str) -> tuple[str, list]:
         lib_data = read_yaml_file(Path(path))["library"]
         models = lib_data.get("models", [])
         return lib_data["id"], [model["id"] for model in models]
 
     def _validate_model_in_libs(self) -> None:
-        file_models = []
-        lib_names = []
+        lib_to_model_ids = {}
         for lib_path in self.lib_paths:
-            model_name, file_model = self._extract_model_id_from_file(lib_path)
-            lib_names.append(model_name)
-            file_models.extend(file_model)
+            lib_id, model_ids = self._extract_lib_and_model_ids(lib_path)
+            lib_to_model_ids[lib_id] = model_ids
 
         for model in self.model_list:
-            if model not in file_models:
-                raise ValueError(
-                    f"The follwing model is not found in the model libraries : {model}"
-                )
-            file_path = RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
-            if not file_path.exists():
+            model_conversion_config_file = (
+                RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
+            )
+            if not model_conversion_config_file.exists():
                 raise FileNotFoundError(
-                    f"No folder exists at the location specified: {file_path}"
+                    f"The model configuration file for {model} has not been found at the location {model_conversion_config_file}"
                 )
-            model_lib_name = read_yaml_file(file_path)["template"]["model"]
-            if not model_lib_name.split(".")[0] in lib_names:
+            lib_and_model_id = read_yaml_file(model_conversion_config_file)["template"][
+                "model"
+            ]
+            lib_id, model_id = lib_and_model_id.split(".")
+            if lib_id not in lib_to_model_ids:
                 raise ValueError(
-                    f"The follwing model lib from config do not match existing libraries: {model_lib_name}"
+                    "Library {lib_id} has not been found in provided libraries"
+                )
+            if model_id not in lib_to_model_ids[lib_id]:
+                raise ValueError(
+                    f"Model {model_id} has not been found in library {lib_id}"
                 )
 
     def _copy_libs_to_model_librairies(self) -> None:
@@ -520,7 +523,7 @@ class AntaresStudyConverter:
 
     def get_model_name_among_libs(self, model_name: str) -> str:
         for lib_path in self.lib_paths:
-            lib_name, file_model = self._extract_model_id_from_file(lib_path)
+            lib_name, file_model = self._extract_lib_and_model_ids(lib_path)
             if model_name in file_model:
                 return lib_name
         return "antares-historic"
