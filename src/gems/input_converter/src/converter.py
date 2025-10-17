@@ -78,6 +78,7 @@ class AntaresStudyConverter:
                 f"Invalid conversionmode: {mode}, possible values are {[conv_mode.value for conv_mode in ConversionMode]}"
             )
 
+        # TODO: The logic is still too complicated, needs more refacto / to understand why thermal preprocessing sometimes needs different paths
         study_input_path = (
             study_input.path.stem
             if isinstance(study_input, Study)
@@ -106,6 +107,7 @@ class AntaresStudyConverter:
             self.study = study_input
         else:
             self.thermal_input_path = Path(study_input)
+            # TODO: Check whether this dinstinction is needed
             if mode == ConversionMode.HYBRID:
                 self.study = read_study_local(resolve_path(self.output_folder))
             else:
