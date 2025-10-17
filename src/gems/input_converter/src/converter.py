@@ -532,6 +532,7 @@ class AntaresStudyConverter:
         self._copy_libs_to_model_librairies()
         if self.mode == ConversionMode.HYBRID:
             self._check_converted_models_are_in_libs()
+        # TODO : Needs to add a check that all legacy models are in provided libs in full mode
 
         list_components: list[InputComponent] = []
         list_connections: list[InputPortConnections] = []
