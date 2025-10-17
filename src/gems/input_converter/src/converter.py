@@ -483,11 +483,9 @@ class AntaresStudyConverter:
 
     @staticmethod
     def _extract_model_id_from_file(path: str) -> tuple[str, list]:
-        lib_data = read_yaml_file(Path(path))
-        lib_models = lib_data.get("library", {}).get("models", [])
-        return lib_data.get("library", {}).get("id", []), [
-            obj["id"] for obj in lib_models
-        ]
+        lib_data = read_yaml_file(Path(path))["library"]
+        models = lib_data.get("models", [])
+        return lib_data["id"], [model["id"] for model in models]
 
     def _validate_model_in_libs(self) -> None:
         file_models = []
@@ -514,6 +512,7 @@ class AntaresStudyConverter:
                 )
 
     def _copy_libs_to_model_librairies(self) -> None:
+        # Retrieve library files and put it in the output study (as fro now libs must be contained in modeler studies)
         dest_dir = self.output_folder / "input" / LIBS_FOLDER
         dest_dir.mkdir(parents=True, exist_ok=True)
         for path in self.lib_paths:
@@ -526,7 +525,7 @@ class AntaresStudyConverter:
                 return lib_name
         return "antares-historic"
 
-    def convert_study_to_input_study(self) -> InputSystem:
+    def convert_study_to_input_system(self) -> InputSystem:
         self._copy_libs_to_model_librairies()
         if self.mode == ConversionMode.HYBRID:
             self._validate_model_in_libs()
@@ -591,6 +590,6 @@ class AntaresStudyConverter:
         return InputSystem(**data)
 
     def process_all(self) -> None:
-        system = self.convert_study_to_input_study()
+        system = self.convert_study_to_input_system()
         self.logger.info("Dumping input system into yaml file...")
         dump_to_yaml(model=system, output_path=self.output_path)
