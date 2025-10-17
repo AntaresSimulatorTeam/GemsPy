@@ -56,7 +56,7 @@ class AntaresStudyConverter:
         self,
         study_input: Union[Path, Study],
         logger: logging.Logger,
-        mode: ConversionMode = ConversionMode.FULL,
+        mode: str = "full",
         output_folder: Path = Path("/tmp/"),
         period: Optional[int] = None,
         lib_paths: Optional[list[str]] = None,
@@ -66,22 +66,26 @@ class AntaresStudyConverter:
         Initialize processor
         """
         self.logger = logger
-        self.mode = mode
         self.period: int = period if period else 168
         self.lib_paths: list[str] = lib_paths if lib_paths else []
         self.model_list: list[str] = model_list if model_list else []
 
-        if isinstance(study_input, Study):
-            # We have a different way of managing thermal preprocessing files, because in this case we want to modify the study_path.
-            # But in the same moment we dont want the preprocessing files in the modified study_path
-            self.thermal_input_path = Path(study_input.path)
-            self.output_folder = output_folder / study_input.path.stem
-            study_input.path = self.output_folder
-        else:
-            self.thermal_input_path = Path(study_input)
-            self.output_folder = output_folder / study_input.stem
+        try:
+            self.mode = ConversionMode(mode)
+            print(self.mode)
+        except ValueError:
+            raise ValueError(
+                f"Invalid conversionmode: {mode}, possible values are {[conv_mode.value for conv_mode in ConversionMode]}"
+            )
 
-        if mode == ConversionMode.HYBRID.value:
+        study_input_path = (
+            study_input.path.stem
+            if isinstance(study_input, Study)
+            else study_input.stem
+        )
+        self.output_folder = output_folder / study_input_path
+
+        if self.mode == ConversionMode.HYBRID:
             # In hybrid mode, the output is the input study from which we replace converted components by Gems ones, hence we copy the original study
             shutil.copytree(
                 study_input.path if isinstance(study_input, Study) else study_input,
@@ -95,15 +99,19 @@ class AntaresStudyConverter:
             self.output_folder.mkdir(parents=True, exist_ok=True)
 
         if isinstance(study_input, Study):
+            # We have a different way of managing thermal preprocessing files, because in this case we want to modify the study_path.
+            # But in the same moment we dont want the preprocessing files in the modified study_path
+            self.thermal_input_path = Path(study_input.path)
+            study_input.path = self.output_folder
             self.study = study_input
-            self.study_path = Path(study_input.path)
-        elif isinstance(study_input, Path):
-            self.study_path = resolve_path(study_input)
-            self.study = read_study_local(self.study_path)
         else:
-            raise TypeError("Invalid input type")
+            self.thermal_input_path = Path(study_input)
+            if mode == ConversionMode.HYBRID:
+                self.study = read_study_local(resolve_path(self.output_folder))
+            else:
+                self.study = read_study_local(resolve_path(study_input))
 
-        self.output_path = Path(self.output_folder) / "input" / "system.yml"
+        self.output_path = self.output_folder / "input" / "system.yml"
 
         self.areas: MappingProxyType = self.study.get_areas()
         self.legacy_objects: list[dict] = []
@@ -209,7 +217,7 @@ class AntaresStudyConverter:
                         ],
                     )
                 )
-                if self.mode == ConversionMode.FULL.value:
+                if self.mode == ConversionMode.FULL:
                     connections.append(
                         InputPortConnections(
                             component1=f"{thermal.area_id}_{thermal.id}",
@@ -320,7 +328,7 @@ class AntaresStudyConverter:
             )
         )
 
-        if self.mode == ConversionMode.HYBRID.value:
+        if self.mode == ConversionMode.HYBRID:
             for resource_connection in valid_resources["area-connections"]:
                 if "." in resource_connection["component"]:
                     component_parts = resource_connection["component"].split(".")
@@ -517,7 +525,7 @@ class AntaresStudyConverter:
 
     def convert_study_to_input_study(self) -> InputSystem:
         self._copy_libs_to_model_librairies()
-        if self.mode == ConversionMode.HYBRID.value:
+        if self.mode == ConversionMode.HYBRID:
             self._validate_model_in_libs()
 
         list_components: list[InputComponent] = []
@@ -553,7 +561,7 @@ class AntaresStudyConverter:
 
             list_valid_areas.difference_update(all_excluded_areas)
 
-        if self.mode == ConversionMode.HYBRID.value:
+        if self.mode == ConversionMode.HYBRID:
             for model in self.model_list:
                 _conversion_loop(model)
                 self._delete_legacy_objects()

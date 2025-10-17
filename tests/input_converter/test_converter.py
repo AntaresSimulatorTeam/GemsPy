@@ -201,7 +201,7 @@ class TestConverter:
         input_study = InputSystem(id=converter.study.name, components=area_components)
 
         # Dump model into yaml file
-        yaml_path = converter.study_path / "study_path.yaml"
+        yaml_path = converter.output_folder / "study_path.yaml"
         transform_to_yaml(model=input_study, output_path=yaml_path)
         # Open yaml file to validate
         with open(yaml_path, "r", encoding="utf-8") as yaml_file:
@@ -1205,7 +1205,7 @@ class TestConverter:
             component.model_dump() for component in dict(obtained_data)["components"]
         ]
         obtained_components = TestConverter._match_area_pattern(
-            obtained_components_to_dict, "", str(converter.study_path) + "/"
+            obtained_components_to_dict, "", str(converter.output_folder) + "/"
         )
 
         def normalize_components(components):
@@ -1265,12 +1265,14 @@ class TestConverter:
         ]
         # Replace absolute path of preprocessing thermal with relative path
         # TODO keep it like that?
+        # TODO : Improve match area pattern function
+        # TODO : Add directly in the converter the relative path writing
         obtained_components = TestConverter._match_area_pattern(
-            obtained_components_to_dict, "", str(converter.study_path) + "/"
+            obtained_components_to_dict, "", str(input_path) + "/"
         )
         # Replace absolute path of data-series files with relative path
         obtained_components = TestConverter._match_area_pattern(
-            obtained_components, "", str(converter.output_folder) + "/"
+            obtained_components, "", str(input_path) + "/"
         )
 
         def normalize_components(components):
