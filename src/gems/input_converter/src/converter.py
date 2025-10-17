@@ -72,7 +72,6 @@ class AntaresStudyConverter:
 
         try:
             self.mode = ConversionMode(mode)
-            print(self.mode)
         except ValueError:
             raise ValueError(
                 f"Invalid conversionmode: {mode}, possible values are {[conv_mode.value for conv_mode in ConversionMode]}"
