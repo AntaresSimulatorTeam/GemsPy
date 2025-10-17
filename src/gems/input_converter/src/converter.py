@@ -290,20 +290,22 @@ class AntaresStudyConverter:
                         )()[item.get("cluster")]
                     )
                 elif item_type in MATRIX_TYPES_TO_SET_METHOD:
+                    # To "delete" legacy wind, solar or load object, we simply set an empty timeseries
                     getattr(
                         self.areas[item.get("area")],
                         MATRIX_TYPES_TO_SET_METHOD[item_type],
                     )(pd.DataFrame())
+
             except ReferencedObjectDeletionNotAllowed:
                 self.logger.warning(
-                    f"Item {item} will not be deleted because it reference an object from binding constraints"
+                    f"Item {item} will not be deleted because it is referenced in a binding constraint"
                 )
-            except NotImplementedError as e:
+            except NotImplementedError:
                 self.logger.warning(
                     f"Failure to delete {item} because the method is not implemented yet on antares craft"
                 )
 
-        self.legacy_objects[:] = []
+        self.legacy_objects = []
 
     def _iterate_through_model(
         self,
