@@ -153,9 +153,13 @@ def load_ts_from_file(
             break
 
     if last_exc is not None:
-        raise Exception(f"An error has arrived when processing '{candidate}': {last_exc}")
+        raise Exception(
+            f"An error has arrived when processing '{candidate}': {last_exc}"
+        )
 
-    raise FileNotFoundError(f"File '{timeseries_name}.txt' or '{timeseries_name}.tsv' does not exist")
+    raise FileNotFoundError(
+        f"File '{timeseries_name}.txt' or '{timeseries_name}.tsv' does not exist"
+    )
 def dataframe_to_time_series(ts_dataframe: pd.DataFrame) -> Dict[TimeIndex, float]:
     if ts_dataframe.shape[1] != 1:
         raise ValueError(
