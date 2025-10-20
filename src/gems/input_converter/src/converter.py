@@ -13,7 +13,7 @@ import logging
 import shutil
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, List, Optional, Union
+from typing import Any, Optional, Union
 
 import pandas as pd
 from antares.craft.exceptions.exceptions import ReferencedObjectDeletionNotAllowed
@@ -48,8 +48,9 @@ from gems.study.parsing import (
 )
 
 ANTARES_HISTORIC_LIB_ID = "antares-historic"
-RESOURCES_FOLDER = Path(__file__).parents[1] / "data" / "model_configuration"
+MODEL_TEMPLATE_FOLDER = Path(__file__).parents[1] / "data" / "model_configuration"
 LIBS_FOLDER = "model-libraries"
+
 
 # TODO: Move all global variables in a config class, that is used in AntaresStudyConverter constructor
 
@@ -469,10 +470,10 @@ class AntaresStudyConverter:
         return components, connections, area_connections
 
     def _validate_resources_not_excluded(
-        self, resource_content: dict, parameter: str
+        self, conversion_template: dict[str, Any], parameter: str
     ) -> dict:
         excluded_ids: set[Any] = set()
-        for param in resource_content.get("template-parameters", []):
+        for param in conversion_template.get("template-parameters", []):
             if param.get("name") == parameter:
                 excluded_ids.update(item["id"] for item in param.get("exclude", []))
 
@@ -515,7 +516,7 @@ class AntaresStudyConverter:
     # TODO: Does not depend on self for now, but will be once the config is a class attribute
     def _get_model_conversion_template(self, model: str) -> dict[str, Any]:
         model_conversion_template_file = (
-            RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
+            MODEL_TEMPLATE_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
         )
         if not model_conversion_template_file.exists():
             raise FileNotFoundError(
@@ -551,7 +552,7 @@ class AntaresStudyConverter:
         area_connections: list[InputAreaConnections],
         model_conversion_templates: dict[str, dict[str, Any]],
     ) -> None:
-        self.logger.info("Converting components of model {model}...")
+        self.logger.info(f"Converting components of model {model}...")
 
         conversion_template = model_conversion_templates[model]
         valid_areas = self._validate_resources_not_excluded(conversion_template, "area")
@@ -561,6 +562,7 @@ class AntaresStudyConverter:
             connections_from_model,
             area_connections_from_model,
         ) = self._convert_model_to_component_list(valid_areas, conversion_template)
+
         components.extend(components_from_model)
         connections.extend(connections_from_model)
         area_connections.extend(area_connections_from_model)
