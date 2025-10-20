@@ -528,54 +528,74 @@ class AntaresStudyConverter:
                 return lib_name
         return "antares-historic"
 
+    def _conversion_loop(
+        self,
+        model: str,
+        list_valid_areas: set[str],
+        all_excluded_areas: set[Any],
+        components: list[InputComponent],
+        connections: list[InputPortConnections],
+        area_connections: list[InputAreaConnections],
+    ) -> None:
+        file_path = RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
+        if not file_path.exists():
+            return
+        resource_content = read_yaml_file(file_path).get("template", {})
+        valid_areas = self._validate_resources_not_excluded(resource_content, "area")
+
+        (
+            components_from_model,
+            connections_from_model,
+            area_connections_from_model,
+        ) = self._convert_model_to_component_list(valid_areas, resource_content)
+        components.extend(components_from_model)
+        connections.extend(connections_from_model)
+        area_connections.extend(area_connections_from_model)
+
+        for param in resource_content.get("template-parameters", []):
+            if param.get("name") == "area":
+                all_excluded_areas.update(
+                    item["id"] for item in param.get("exclude", [])
+                )
+
+        list_valid_areas.difference_update(all_excluded_areas)
+
     def convert_study_to_input_system(self) -> InputSystem:
         self._copy_libs_to_model_librairies()
         if self.mode == ConversionMode.HYBRID:
             self._check_converted_models_are_in_libs()
         # TODO : Needs to add a check that all legacy models are in provided libs in full mode
 
-        list_components: list[InputComponent] = []
-        list_connections: list[InputPortConnections] = []
-        list_area_connections: list[InputAreaConnections] = []
+        components: list[InputComponent] = []
+        connections: list[InputPortConnections] = []
+        area_connections: list[InputAreaConnections] = []
 
         list_valid_areas: set[str] = set(self.areas.keys())
         all_excluded_areas: set[Any] = set()
 
-        def _conversion_loop(model: str) -> None:
-            file_path = RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
-            if not file_path.exists():
-                return
-            resource_content = read_yaml_file(file_path).get("template", {})
-            valid_areas = self._validate_resources_not_excluded(
-                resource_content, "area"
-            )
-
-            (
-                components,
-                connections,
-                area_connections,
-            ) = self._convert_model_to_component_list(valid_areas, resource_content)
-            list_components.extend(components)
-            list_connections.extend(connections)
-            list_area_connections.extend(area_connections)
-
-            for param in resource_content.get("template-parameters", []):
-                if param.get("name") == "area":
-                    all_excluded_areas.update(
-                        item["id"] for item in param.get("exclude", [])
-                    )
-
-            list_valid_areas.difference_update(all_excluded_areas)
-
         if self.mode == ConversionMode.HYBRID:
             for model in self.model_list:
-                _conversion_loop(model)
+                self._conversion_loop(
+                    model,
+                    list_valid_areas,
+                    all_excluded_areas,
+                    components,
+                    connections,
+                    area_connections,
+                )
                 self._delete_legacy_objects()
         else:
             for model in MODEL_NAME_TO_FILE_NAME:
-                _conversion_loop(model)
+                self._conversion_loop(
+                    model,
+                    list_valid_areas,
+                    all_excluded_areas,
+                    components,
+                    connections,
+                    area_connections,
+                )
 
-            list_components.extend(
+            components.extend(
                 self._convert_area_to_component_list(
                     self.get_model_name_among_libs("area"), list(list_valid_areas)
                 )
@@ -586,9 +606,9 @@ class AntaresStudyConverter:
         )
         system = InputSystem(
             id=self.study.name,
-            components=list_components,
-            connections=list_connections or None,
-            area_connections=list_area_connections or None,
+            components=components,
+            connections=connections or None,
+            area_connections=area_connections or None,
         )
         data = system.model_dump(exclude_none=True)
         return InputSystem(**data)
