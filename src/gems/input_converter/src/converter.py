@@ -68,13 +68,12 @@ class AntaresStudyConverter:
         self.logger = logger
         self.period: int = period if period else 168
         self.lib_paths: list[str] = lib_paths if lib_paths else []
-        self.model_list: list[str] = model_list if model_list else []
 
         try:
             self.mode = ConversionMode(mode)
         except ValueError:
             raise ValueError(
-                f"Invalid conversionmode: {mode}, possible values are {[conv_mode.value for conv_mode in ConversionMode]}"
+                f"Invalid conversion mode: {mode}, possible values are {[conv_mode.value for conv_mode in ConversionMode]}"
             )
 
         # TODO: The logic is still too complicated, needs more refacto / to understand why thermal preprocessing sometimes needs different paths
@@ -86,6 +85,7 @@ class AntaresStudyConverter:
         self.output_folder = output_folder / study_input_path
 
         if self.mode == ConversionMode.HYBRID:
+            self.model_list = model_list if model_list else []
             # In hybrid mode, the output is the input study from which we replace converted components by Gems ones, hence we copy the original study
             shutil.copytree(
                 study_input.path if isinstance(study_input, Study) else study_input,
@@ -95,6 +95,7 @@ class AntaresStudyConverter:
             if isinstance(study_input, Path):
                 study_input = self.output_folder
         else:
+            self.model_list = list(MODEL_NAME_TO_FILE_NAME.keys())
             # In full mode, the output is a full Gems study so no need to copy the original study, we start "from scratch"
             self.output_folder.mkdir(parents=True, exist_ok=True)
 
@@ -528,7 +529,7 @@ class AntaresStudyConverter:
                 return lib_name
         return "antares-historic"
 
-    def _conversion_loop(
+    def _convert_single_model(
         self,
         model: str,
         list_valid_areas: set[str],
@@ -573,28 +574,18 @@ class AntaresStudyConverter:
         list_valid_areas: set[str] = set(self.areas.keys())
         all_excluded_areas: set[Any] = set()
 
+        for model in self.model_list:
+            self._convert_single_model(
+                model,
+                list_valid_areas,
+                all_excluded_areas,
+                components,
+                connections,
+                area_connections,
+            )
         if self.mode == ConversionMode.HYBRID:
-            for model in self.model_list:
-                self._conversion_loop(
-                    model,
-                    list_valid_areas,
-                    all_excluded_areas,
-                    components,
-                    connections,
-                    area_connections,
-                )
-                self._delete_legacy_objects()
+            self._delete_legacy_objects()
         else:
-            for model in MODEL_NAME_TO_FILE_NAME:
-                self._conversion_loop(
-                    model,
-                    list_valid_areas,
-                    all_excluded_areas,
-                    components,
-                    connections,
-                    area_connections,
-                )
-
             components.extend(
                 self._convert_area_to_component_list(
                     self.get_model_name_among_libs("area"), list(list_valid_areas)
