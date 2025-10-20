@@ -51,6 +51,8 @@ ANTARES_HISTORIC_LIB_ID = "antares-historic"
 MODEL_TEMPLATE_FOLDER = Path(__file__).parents[1] / "data" / "model_configuration"
 LIBS_FOLDER = "model-libraries"
 
+# TODO: Move all global variables in a config class, that is used in AntaresStudyConverter constructor
+
 
 # TODO: Move all global variables in a config class, that is used in AntaresStudyConverter constructor
 
