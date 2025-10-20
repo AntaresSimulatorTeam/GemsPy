@@ -21,6 +21,8 @@ from antares.craft.model.study import Study, read_study_local
 from antares.craft.model.thermal import ThermalCluster
 
 from gems.input_converter.src.config import (
+    LINK_TYPES,
+    MATRIX_TYPES,
     MATRIX_TYPES_TO_SET_METHOD,
     MODEL_NAME_TO_FILE_NAME,
     STUDY_LEVEL_DELETION,
@@ -30,9 +32,13 @@ from gems.input_converter.src.config import (
 )
 from gems.input_converter.src.data_preprocessing.data_classes import ConversionMode
 from gems.input_converter.src.data_preprocessing.preprocessing import (
-    ModelsConfigurationProcessing,
+    ModelConversionPreprocessor,
 )
 from gems.input_converter.src.data_preprocessing.thermal import ThermalDataPreprocessing
+from gems.input_converter.src.parsing import (
+    ConversionTemplate,
+    parse_conversion_template,
+)
 from gems.input_converter.src.utils import (
     dump_to_yaml,
     match_area_pattern,
@@ -322,7 +328,7 @@ class AntaresStudyConverter:
         components: list,
         connections: list,
         area_connections: list,
-        mp: ModelsConfigurationProcessing,
+        mp: ModelConversionPreprocessor,
     ) -> None:
         components.append(
             InputComponent(
@@ -377,34 +383,46 @@ class AntaresStudyConverter:
                 )
 
     def _convert_model_to_component_list(
-        self, valid_areas: dict, resource_content: dict
+        self, conversion_template: ConversionTemplate
     ) -> tuple[
         list[InputComponent], list[InputPortConnections], list[InputAreaConnections]
     ]:
+
         components: list[InputComponent] = []
         connections: list[InputPortConnections] = []
         area_connections: list[InputAreaConnections] = []
         self.logger.info("Converting models to component list...")
 
-        model_area_pattern = (
-            f"${{{resource_content['template-parameters'][0]['name']}}}"
+        # Récupère le nom du pattern sur lequel itérer
+        # TODO: Do we really need a list for template parameters ?
+        model_area_pattern = f"${{{conversion_template.template_parameters[0].name}}}"
+
+        model_preprocessor = ModelConversionPreprocessor(
+            self.study, self.mode, self.output_folder
         )
-        resource_name = resource_content["name"]
-        mp = ModelsConfigurationProcessing(self.study, self.mode, self.output_folder)
+
         try:
-            if resource_name in ["link"]:
+            if conversion_template.name in LINK_TYPES:
                 valid_resources: dict = self._validate_resources_not_excluded(
-                    resource_content, "link"
+                    conversion_template, "link"
                 )
                 for link in valid_resources.values():
                     data_with_link: dict = match_area_pattern(
-                        resource_content, link.id, model_area_pattern
+                        conversion_template, link.id, model_area_pattern
                     )
                     self._iterate_through_model(
-                        data_with_link, components, connections, area_connections, mp
+                        data_with_link,
+                        components,
+                        connections,
+                        area_connections,
+                        model_preprocessor,
                     )
             else:
-                if resource_name == "thermal":
+                # Retourne un dict de zones sur lesquelles itérer
+                valid_areas = self._validate_resources_not_excluded(
+                    conversion_template, "area"
+                )
+                if conversion_template.name == "thermal":
                     # Legacy conversion for thermal cluster
                     self._convert_thermal_to_component_list(
                         self.get_model_name_among_libs("thermal"),
@@ -416,14 +434,12 @@ class AntaresStudyConverter:
                     return components, connections, area_connections
                 for area in valid_areas.values():
                     data_consolidated: dict = match_area_pattern(
-                        resource_content, area.id, model_area_pattern
+                        conversion_template, area.id, model_area_pattern
                     )
                     cluster_type = next(
                         (
                             template.get("cluster-type")
-                            for template in resource_content.get(
-                                "template-parameters", []
-                            )
+                            for template in conversion_template.template_parameters
                         ),
                         None,
                     )
@@ -439,12 +455,12 @@ class AntaresStudyConverter:
                                 components,
                                 connections,
                                 area_connections,
-                                mp,
+                                model_preprocessor,
                             )
 
-                    elif resource_name in ["wind", "solar", "load"]:
+                    elif conversion_template.name in MATRIX_TYPES:
                         if all(
-                            mp.check_timeseries_validity(param["value"])
+                            model_preprocessor.check_timeseries_validity(param["value"])
                             for param in data_consolidated["component"]["parameters"]
                         ):
                             self._iterate_through_model(
@@ -452,7 +468,7 @@ class AntaresStudyConverter:
                                 components,
                                 connections,
                                 area_connections,
-                                mp,
+                                model_preprocessor,
                             )
                     else:
                         self._iterate_through_model(
@@ -460,7 +476,7 @@ class AntaresStudyConverter:
                             components,
                             connections,
                             area_connections,
-                            mp,
+                            model_preprocessor,
                         )
         except (KeyError, FileNotFoundError) as e:
             self.logger.error(
@@ -472,10 +488,10 @@ class AntaresStudyConverter:
         return components, connections, area_connections
 
     def _validate_resources_not_excluded(
-        self, conversion_template: dict[str, Any], parameter: str
+        self, conversion_template: ConversionTemplate, parameter: str
     ) -> dict:
         excluded_ids: set[Any] = set()
-        for param in conversion_template.get("template-parameters", []):
+        for param in conversion_template.template_parameters:
             if param.get("name") == parameter:
                 excluded_ids.update(item["id"] for item in param.get("exclude", []))
 
@@ -497,7 +513,7 @@ class AntaresStudyConverter:
         return lib_data["id"], [model["id"] for model in models]
 
     def _check_converted_models_are_in_libs(
-        self, model_conversion_templates: dict[str, dict[str, Any]]
+        self, model_conversion_templates: dict[str, ConversionTemplate]
     ) -> None:
         lib_to_model_ids = {}
         for lib_path in self.lib_paths:
@@ -505,7 +521,7 @@ class AntaresStudyConverter:
             lib_to_model_ids[lib_id] = model_ids
 
         for model in self.model_list:
-            lib_id, model_id = model_conversion_templates[model]["model"].split(".")
+            lib_id, model_id = model_conversion_templates[model].model.split(".")
             if lib_id not in lib_to_model_ids:
                 raise ValueError(
                     "Library {lib_id} has not been found in provided libraries"
@@ -516,7 +532,7 @@ class AntaresStudyConverter:
                 )
 
     # TODO: Does not depend on self for now, but will be once the config is a class attribute
-    def _get_model_conversion_template(self, model: str) -> dict[str, Any]:
+    def _get_model_conversion_template(self, model: str) -> ConversionTemplate:
         model_conversion_template_file = (
             MODEL_TEMPLATE_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
         )
@@ -524,11 +540,9 @@ class AntaresStudyConverter:
             raise FileNotFoundError(
                 f"The model configuration file for {model} has not been found at the location {model_conversion_template_file}"
             )
-        model_conversion_template = read_yaml_file(model_conversion_template_file)[
-            "template"
-        ]
-
-        return model_conversion_template
+        # TODO: Parse yaml file with Pydantic to return a proper Python object rather than a generic dict
+        with model_conversion_template_file.open() as template:
+            return parse_conversion_template(template)
 
     def _copy_libs_to_model_librairies(self) -> None:
         # Retrieve library files and put it in the output study (as fro now libs must be contained in modeler studies)
@@ -552,18 +566,17 @@ class AntaresStudyConverter:
         components: list[InputComponent],
         connections: list[InputPortConnections],
         area_connections: list[InputAreaConnections],
-        model_conversion_templates: dict[str, dict[str, Any]],
+        model_conversion_templates: dict[str, ConversionTemplate],
     ) -> None:
-        self.logger.info(f"Converting components of model {model}...")
 
+        self.logger.info(f"Converting components of model {model}...")
         conversion_template = model_conversion_templates[model]
-        valid_areas = self._validate_resources_not_excluded(conversion_template, "area")
 
         (
             components_from_model,
             connections_from_model,
             area_connections_from_model,
-        ) = self._convert_model_to_component_list(valid_areas, conversion_template)
+        ) = self._convert_model_to_component_list(conversion_template)
 
         components.extend(components_from_model)
         connections.extend(connections_from_model)
@@ -580,7 +593,7 @@ class AntaresStudyConverter:
     def convert_study_to_input_system(self) -> InputSystem:
         self._copy_libs_to_model_librairies()
 
-        model_conversion_template = {}
+        model_conversion_template: dict[str, ConversionTemplate] = {}
         for model in self.model_list:
             model_conversion_template[model] = self._get_model_conversion_template(
                 model

@@ -275,7 +275,7 @@ class TestConverter:
             storage_components,
             storage_connections,
             _,
-        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        ) = converter._convert_model_to_component_list(resource_content)
 
         inflows_path = "inflows_fr_storage_1"
         lower_rule_curve_path = "lower_rule_curve_fr_storage_1"
@@ -404,7 +404,7 @@ class TestConverter:
             thermals_components,
             thermals_connections,
             _,
-        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        ) = converter._convert_model_to_component_list(resource_content)
         study_path = converter.thermal_input_path
         series_path = study_path / "input" / "thermal" / "series" / "fr" / "gaz"
         expected_thermals_connections = [
@@ -558,7 +558,7 @@ class TestConverter:
             load_components,
             load_connections,
             _,
-        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        ) = converter._convert_model_to_component_list(resource_content)
 
         ### Compare connections
         connection = load_connections[0]
@@ -627,7 +627,7 @@ class TestConverter:
             solar_components,
             solar_connections,
             _,
-        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        ) = converter._convert_model_to_component_list(resource_content)
         solar_fr_component = next(
             (comp for comp in solar_components if comp.id == "solar_fr"), None
         )
@@ -687,7 +687,7 @@ class TestConverter:
             load_components,
             load_connections,
             _,
-        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        ) = converter._convert_model_to_component_list(resource_content)
         load_fr_component = next(
             (comp for comp in load_components if comp.id == "load_fr"), None
         )
@@ -739,7 +739,7 @@ class TestConverter:
             wind_components,
             wind_connections,
             _,
-        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        ) = converter._convert_model_to_component_list(resource_content)
         wind_fr_component = next(
             (comp for comp in wind_components if comp.id == "wind_fr"), None
         )
@@ -809,7 +809,7 @@ class TestConverter:
             wind_components,
             _,
             _,
-        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        ) = converter._convert_model_to_component_list(resource_content)
         assert wind_components == []
 
     @pytest.mark.parametrize(
@@ -834,7 +834,7 @@ class TestConverter:
             wind_components,
             _,
             _,
-        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        ) = converter._convert_model_to_component_list(resource_content)
         assert wind_components == []
 
     def test_convert_links_to_component(self, local_study_w_links: Study, lib_id: str):
@@ -851,7 +851,7 @@ class TestConverter:
             links_components,
             links_connections,
             _,
-        ) = converter._convert_model_to_component_list(valid_areas, resource_content)
+        ) = converter._convert_model_to_component_list(resource_content)
 
         fr_it_direct_links_timeseries = "capacity_direct_fr_it"
         fr_it_indirect_links_timeseries = "capacity_indirect_fr_it"
@@ -1011,7 +1011,7 @@ class TestConverter:
             binding_components,
             binding_connections,
             area_connections,
-        ) = converter._convert_model_to_component_list(valid_areas, bc_data)
+        ) = converter._convert_model_to_component_list(bc_data)
 
         connection = binding_connections[0]
         ### Compare area connections
@@ -1091,7 +1091,7 @@ class TestConverter:
             _,
             _,
             area_connections,
-        ) = converter._convert_model_to_component_list(valid_areas, bc_data)
+        ) = converter._convert_model_to_component_list(bc_data)
 
         output_path = converter.output_folder
         path1 = (

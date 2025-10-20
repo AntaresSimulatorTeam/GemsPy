@@ -37,6 +37,7 @@ def check_file_exists(input_path: Path) -> bool:
 def match_area_pattern(
     object: Any, param_value: str, model_area_pattern: str = "${area}"
 ) -> Any:
+    # TODO: Handle the case ConversionTemplate
     if isinstance(object, dict):
         return {
             match_area_pattern(k, param_value, model_area_pattern): match_area_pattern(

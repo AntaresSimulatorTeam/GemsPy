@@ -29,7 +29,7 @@ ALLOWED_TYPES: list = [
 SERIES_FOLDER = "data-series"
 
 
-class ModelsConfigurationProcessing:
+class ModelConversionPreprocessor:
     preprocessed_values: dict[str, float] = {}
     param_id: str
 
@@ -152,9 +152,9 @@ class ModelsConfigurationProcessing:
             time_series: pd.Series = time_series.iloc[:, obj.column]  # type: ignore
 
             if getattr(obj, "operation") and obj.operation is not None:
-                parameter_value: Union[
-                    pd.Series, pd.DataFrame, float
-                ] = obj.operation.execute(time_series, self.preprocessed_values)
+                parameter_value: Union[pd.Series, pd.DataFrame, float] = (
+                    obj.operation.execute(time_series, self.preprocessed_values)
+                )
                 if isinstance(parameter_value, float):
                     self.preprocessed_values[self.param_id] = parameter_value
                     return parameter_value
