@@ -48,7 +48,7 @@ class ModelsConfigurationProcessing:
                 f"Object properties and its area from {obj} must not be None"
             )
         area: str = obj.object_properties.area
-        self.file_path = Path(f"{self.param_id}_{area}.txt")
+        self.file_path = Path(f"{self.param_id}_{area}.tsv")
         self.output_file = self.output_folder / "input" / SERIES_FOLDER / self.file_path
         return getattr(
             self.study.get_areas()[area], MATRIX_TYPES_TO_GET_METHOD[type_resource]
@@ -67,7 +67,7 @@ class ModelsConfigurationProcessing:
 
         link: Link = self.study.get_links()[link_id]
         self.file_path = Path(
-            f"{self.param_id}_{link.area_from_id}_{link.area_to_id}.txt"
+            f"{self.param_id}_{link.area_from_id}_{link.area_to_id}.tsv"
         )
         self.output_file = self.output_folder / "input" / SERIES_FOLDER / self.file_path
         return getattr(link, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field])()
@@ -102,7 +102,7 @@ class ModelsConfigurationProcessing:
                 self.preprocessed_values[self.param_id] = value
             return value
         self.file_path = Path(
-            f"{self.param_id}_{area}_{obj.object_properties.cluster}.txt"
+            f"{self.param_id}_{area}_{obj.object_properties.cluster}.tsv"
         )
         self.output_file = self.output_folder / "input" / SERIES_FOLDER / self.file_path
         return time_series
@@ -135,7 +135,7 @@ class ModelsConfigurationProcessing:
         if type_resource in ["load", "wind", "solar"]:
             time_series = self.calculate_matrix_data_values(obj, type_resource)
             save_to_file(time_series, self.output_file)
-            return str(self.file_path).removesuffix(".txt")
+            return str(self.file_path).removesuffix(".tsv")
         elif type_resource == "binding_constraint":
             # TODO No timeseries linked to binding constraints for the moment
             return self.calculate_binding_constraint_data_values(obj)  # type: ignore
@@ -165,7 +165,7 @@ class ModelsConfigurationProcessing:
         else:
             save_to_file(time_series, self.output_file)
 
-        return str(self.file_path).removesuffix(".txt")
+        return str(self.file_path).removesuffix(".tsv")
 
     def convert_param_value(self, id: str, value_content: dict) -> Union[str, float]:
         self.param_id = id
