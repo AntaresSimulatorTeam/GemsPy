@@ -488,24 +488,16 @@ class AntaresStudyConverter:
         models = lib_data.get("models", [])
         return lib_data["id"], [model["id"] for model in models]
 
-    def _check_converted_models_are_in_libs(self) -> None:
+    def _check_converted_models_are_in_libs(
+        self, model_conversion_configs: dict[str, dict[str, Any]]
+    ) -> None:
         lib_to_model_ids = {}
         for lib_path in self.lib_paths:
             lib_id, model_ids = self._extract_lib_and_model_ids(lib_path)
             lib_to_model_ids[lib_id] = model_ids
 
         for model in self.model_list:
-            model_conversion_config_file = (
-                RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
-            )
-            if not model_conversion_config_file.exists():
-                raise FileNotFoundError(
-                    f"The model configuration file for {model} has not been found at the location {model_conversion_config_file}"
-                )
-            lib_and_model_id = read_yaml_file(model_conversion_config_file)["template"][
-                "model"
-            ]
-            lib_id, model_id = lib_and_model_id.split(".")
+            lib_id, model_id = model_conversion_configs[model]["model"].split(".")
             if lib_id not in lib_to_model_ids:
                 raise ValueError(
                     "Library {lib_id} has not been found in provided libraries"
@@ -514,6 +506,18 @@ class AntaresStudyConverter:
                 raise ValueError(
                     f"Model {model_id} has not been found in library {lib_id}"
                 )
+
+    def _get_model_conversion_config(self, model: str) -> dict[str, Any]:
+        model_conversion_config_file = RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
+        if not model_conversion_config_file.exists():
+            raise FileNotFoundError(
+                f"The model configuration file for {model} has not been found at the location {model_conversion_config_file}"
+            )
+        model_conversion_config = read_yaml_file(model_conversion_config_file)[
+            "template"
+        ]
+
+        return model_conversion_config
 
     def _copy_libs_to_model_librairies(self) -> None:
         # Retrieve library files and put it in the output study (as fro now libs must be contained in modeler studies)
@@ -537,11 +541,9 @@ class AntaresStudyConverter:
         components: list[InputComponent],
         connections: list[InputPortConnections],
         area_connections: list[InputAreaConnections],
+        model_conversion_configs: dict[str, dict[str, Any]],
     ) -> None:
-        file_path = RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
-        if not file_path.exists():
-            return
-        resource_content = read_yaml_file(file_path).get("template", {})
+        resource_content = model_conversion_configs[model]
         valid_areas = self._validate_resources_not_excluded(resource_content, "area")
 
         (
@@ -563,9 +565,11 @@ class AntaresStudyConverter:
 
     def convert_study_to_input_system(self) -> InputSystem:
         self._copy_libs_to_model_librairies()
-        if self.mode == ConversionMode.HYBRID:
-            self._check_converted_models_are_in_libs()
-        # TODO : Needs to add a check that all legacy models are in provided libs in full mode
+
+        model_conversion_configs = {}
+        for model in self.model_list:
+            model_conversion_configs[model] = self._get_model_conversion_config(model)
+        self._check_converted_models_are_in_libs(model_conversion_configs)
 
         components: list[InputComponent] = []
         connections: list[InputPortConnections] = []
@@ -582,6 +586,7 @@ class AntaresStudyConverter:
                 components,
                 connections,
                 area_connections,
+                model_conversion_configs,
             )
         if self.mode == ConversionMode.HYBRID:
             self._delete_legacy_objects()
