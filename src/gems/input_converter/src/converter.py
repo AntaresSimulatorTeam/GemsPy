@@ -494,7 +494,7 @@ class AntaresStudyConverter:
         return lib_data["id"], [model["id"] for model in models]
 
     def _check_converted_models_are_in_libs(
-        self, model_conversion_configs: dict[str, dict[str, Any]]
+        self, model_conversion_templates: dict[str, dict[str, Any]]
     ) -> None:
         lib_to_model_ids = {}
         for lib_path in self.lib_paths:
@@ -502,7 +502,7 @@ class AntaresStudyConverter:
             lib_to_model_ids[lib_id] = model_ids
 
         for model in self.model_list:
-            lib_id, model_id = model_conversion_configs[model]["model"].split(".")
+            lib_id, model_id = model_conversion_templates[model]["model"].split(".")
             if lib_id not in lib_to_model_ids:
                 raise ValueError(
                     "Library {lib_id} has not been found in provided libraries"
@@ -513,17 +513,19 @@ class AntaresStudyConverter:
                 )
 
     # TODO: Does not depend on self for now, but will be once the config is a class attribute
-    def _get_model_conversion_config(self, model: str) -> dict[str, Any]:
-        model_conversion_config_file = RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
-        if not model_conversion_config_file.exists():
+    def _get_model_conversion_template(self, model: str) -> dict[str, Any]:
+        model_conversion_template_file = (
+            RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
+        )
+        if not model_conversion_template_file.exists():
             raise FileNotFoundError(
-                f"The model configuration file for {model} has not been found at the location {model_conversion_config_file}"
+                f"The model configuration file for {model} has not been found at the location {model_conversion_template_file}"
             )
-        model_conversion_config = read_yaml_file(model_conversion_config_file)[
+        model_conversion_template = read_yaml_file(model_conversion_template_file)[
             "template"
         ]
 
-        return model_conversion_config
+        return model_conversion_template
 
     def _copy_libs_to_model_librairies(self) -> None:
         # Retrieve library files and put it in the output study (as fro now libs must be contained in modeler studies)
@@ -547,23 +549,23 @@ class AntaresStudyConverter:
         components: list[InputComponent],
         connections: list[InputPortConnections],
         area_connections: list[InputAreaConnections],
-        model_conversion_configs: dict[str, dict[str, Any]],
+        model_conversion_templates: dict[str, dict[str, Any]],
     ) -> None:
         self.logger.info("Converting components of model {model}...")
 
-        conversion_config = model_conversion_configs[model]
-        valid_areas = self._validate_resources_not_excluded(conversion_config, "area")
+        conversion_template = model_conversion_templates[model]
+        valid_areas = self._validate_resources_not_excluded(conversion_template, "area")
 
         (
             components_from_model,
             connections_from_model,
             area_connections_from_model,
-        ) = self._convert_model_to_component_list(valid_areas, conversion_config)
+        ) = self._convert_model_to_component_list(valid_areas, conversion_template)
         components.extend(components_from_model)
         connections.extend(connections_from_model)
         area_connections.extend(area_connections_from_model)
 
-        for param in conversion_config.get("template-parameters", []):
+        for param in conversion_template.get("template-parameters", []):
             if param.get("name") == "area":
                 all_excluded_areas.update(
                     item["id"] for item in param.get("exclude", [])
@@ -574,10 +576,12 @@ class AntaresStudyConverter:
     def convert_study_to_input_system(self) -> InputSystem:
         self._copy_libs_to_model_librairies()
 
-        model_conversion_configs = {}
+        model_conversion_template = {}
         for model in self.model_list:
-            model_conversion_configs[model] = self._get_model_conversion_config(model)
-        self._check_converted_models_are_in_libs(model_conversion_configs)
+            model_conversion_template[model] = self._get_model_conversion_template(
+                model
+            )
+        self._check_converted_models_are_in_libs(model_conversion_template)
 
         components: list[InputComponent] = []
         connections: list[InputPortConnections] = []
@@ -594,7 +598,7 @@ class AntaresStudyConverter:
                 components,
                 connections,
                 area_connections,
-                model_conversion_configs,
+                model_conversion_template,
             )
         if self.mode == ConversionMode.HYBRID:
             self._delete_legacy_objects()
