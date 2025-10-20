@@ -34,10 +34,10 @@ from gems.input_converter.src.data_preprocessing.preprocessing import (
 )
 from gems.input_converter.src.data_preprocessing.thermal import ThermalDataPreprocessing
 from gems.input_converter.src.utils import (
+    dump_to_yaml,
     match_area_pattern,
     read_yaml_file,
     resolve_path,
-    transform_to_yaml,
 )
 from gems.study.parsing import (
     InputAreaConnections,
@@ -290,20 +290,22 @@ class AntaresStudyConverter:
                         )()[item.get("cluster")]
                     )
                 elif item_type in MATRIX_TYPES_TO_SET_METHOD:
+                    # To "delete" legacy wind, solar or load object, we simply set an empty timeseries
                     getattr(
                         self.areas[item.get("area")],
                         MATRIX_TYPES_TO_SET_METHOD[item_type],
                     )(pd.DataFrame())
+
             except ReferencedObjectDeletionNotAllowed:
                 self.logger.warning(
-                    f"Item {item} will not be deleted because it reference an object from binding constraints"
+                    f"Item {item} will not be deleted because it is referenced in a binding constraint"
                 )
-            except NotImplementedError as e:
+            except NotImplementedError:
                 self.logger.warning(
                     f"Failure to delete {item} because the method is not implemented yet on antares craft"
                 )
 
-        self.legacy_objects[:] = []
+        self.legacy_objects = []
 
     def _iterate_through_model(
         self,
@@ -480,38 +482,40 @@ class AntaresStudyConverter:
         }
 
     @staticmethod
-    def _extract_model_id_from_file(path: str) -> tuple[str, list]:
-        lib_data = read_yaml_file(Path(path))
-        lib_models = lib_data.get("library", {}).get("models", [])
-        return lib_data.get("library", {}).get("id", []), [
-            obj["id"] for obj in lib_models
-        ]
+    def _extract_lib_and_model_ids(path: str) -> tuple[str, list]:
+        lib_data = read_yaml_file(Path(path))["library"]
+        models = lib_data.get("models", [])
+        return lib_data["id"], [model["id"] for model in models]
 
-    def _validate_model_in_libs(self) -> None:
-        file_models = []
-        lib_names = []
+    def _check_converted_models_are_in_libs(self) -> None:
+        lib_to_model_ids = {}
         for lib_path in self.lib_paths:
-            model_name, file_model = self._extract_model_id_from_file(lib_path)
-            lib_names.append(model_name)
-            file_models.extend(file_model)
+            lib_id, model_ids = self._extract_lib_and_model_ids(lib_path)
+            lib_to_model_ids[lib_id] = model_ids
 
         for model in self.model_list:
-            if model not in file_models:
-                raise ValueError(
-                    f"The follwing model is not found in the model libraries : {model}"
-                )
-            file_path = RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
-            if not file_path.exists():
+            model_conversion_config_file = (
+                RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
+            )
+            if not model_conversion_config_file.exists():
                 raise FileNotFoundError(
-                    f"No folder exists at the location specified: {file_path}"
+                    f"The model configuration file for {model} has not been found at the location {model_conversion_config_file}"
                 )
-            model_lib_name = read_yaml_file(file_path)["template"]["model"]
-            if not model_lib_name.split(".")[0] in lib_names:
+            lib_and_model_id = read_yaml_file(model_conversion_config_file)["template"][
+                "model"
+            ]
+            lib_id, model_id = lib_and_model_id.split(".")
+            if lib_id not in lib_to_model_ids:
                 raise ValueError(
-                    f"The follwing model lib from config do not match existing libraries: {model_lib_name}"
+                    "Library {lib_id} has not been found in provided libraries"
+                )
+            if model_id not in lib_to_model_ids[lib_id]:
+                raise ValueError(
+                    f"Model {model_id} has not been found in library {lib_id}"
                 )
 
     def _copy_libs_to_model_librairies(self) -> None:
+        # Retrieve library files and put it in the output study (as fro now libs must be contained in modeler studies)
         dest_dir = self.output_folder / "input" / LIBS_FOLDER
         dest_dir.mkdir(parents=True, exist_ok=True)
         for path in self.lib_paths:
@@ -519,15 +523,16 @@ class AntaresStudyConverter:
 
     def get_model_name_among_libs(self, model_name: str) -> str:
         for lib_path in self.lib_paths:
-            lib_name, file_model = self._extract_model_id_from_file(lib_path)
+            lib_name, file_model = self._extract_lib_and_model_ids(lib_path)
             if model_name in file_model:
                 return lib_name
         return "antares-historic"
 
-    def convert_study_to_input_study(self) -> InputSystem:
+    def convert_study_to_input_system(self) -> InputSystem:
         self._copy_libs_to_model_librairies()
         if self.mode == ConversionMode.HYBRID:
-            self._validate_model_in_libs()
+            self._check_converted_models_are_in_libs()
+        # TODO : Needs to add a check that all legacy models are in provided libs in full mode
 
         list_components: list[InputComponent] = []
         list_connections: list[InputPortConnections] = []
@@ -589,19 +594,6 @@ class AntaresStudyConverter:
         return InputSystem(**data)
 
     def process_all(self) -> None:
-        study = self.convert_study_to_input_study()
-        self.logger.info("Converting input study into yaml file...")
-        transform_to_yaml(model=study, output_path=self.output_path)
-
-    def count_objects_in_yaml_file(self, output_path: Path) -> dict[str, int]:
-        if output_path:
-            data = read_yaml_file(output_path)
-        else:
-            data = read_yaml_file(self.output_path)
-
-        return {
-            "components": len(data["system"].get("components", [])),
-            "connections": len(data["system"].get("connections", [])),
-            "nodes": len(data["system"].get("nodes", [])),
-            "area_connections": len(data["system"].get("area_connections", [])),
-        }
+        system = self.convert_study_to_input_system()
+        self.logger.info("Dumping input system into yaml file...")
+        dump_to_yaml(model=system, output_path=self.output_path)
