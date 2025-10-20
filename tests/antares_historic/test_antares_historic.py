@@ -10,7 +10,7 @@ from gems.model.parsing import InputLibrary, parse_yaml_library
 from gems.model.resolve_library import resolve_library
 from gems.simulation import TimeBlock, build_problem
 from gems.simulation.optimization import OptimizationProblem
-from gems.study.data import load_ts_from_txt
+from gems.study.data import load_ts_from_file
 from gems.study.parsing import InputSystem, parse_yaml_components
 from gems.study.resolve_components import (
     build_data_base,
@@ -131,7 +131,7 @@ def _setup_study_component(study, period=None) -> ToolTestStudy:
     fill_timeseries(study_path)
     area_fr = study.get_areas()["fr"]
     path = study_path / "input" / "load" / "series"
-    timeseries = load_ts_from_txt("load_fr", path)
+    timeseries = load_ts_from_file("load_fr", path)
     area_fr.set_load(pd.DataFrame(timeseries))
     converter: AntaresStudyConverter = AntaresStudyConverter(
         study_input=study, logger=logger, mode="full", lib_paths=LIB_PATHS
