@@ -160,6 +160,8 @@ def load_ts_from_file(
     raise FileNotFoundError(
         f"File '{timeseries_name}.txt' or '{timeseries_name}.tsv' does not exist"
     )
+
+
 def dataframe_to_time_series(ts_dataframe: pd.DataFrame) -> Dict[TimeIndex, float]:
     if ts_dataframe.shape[1] != 1:
         raise ValueError(
