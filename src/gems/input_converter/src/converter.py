@@ -47,8 +47,11 @@ from gems.study.parsing import (
     InputSystem,
 )
 
+ANTARES_HISTORIC_LIB_ID = "antares-historic"
 RESOURCES_FOLDER = Path(__file__).parents[1] / "data" / "model_configuration"
 LIBS_FOLDER = "model-libraries"
+
+# TODO: Move all global variables in a config class, that is used in AntaresStudyConverter constructor
 
 
 class AntaresStudyConverter:
@@ -268,42 +271,44 @@ class AntaresStudyConverter:
         return components
 
     def _delete_legacy_objects(self) -> None:
-        for item in self.legacy_objects:
-            item_type = item.get("type")
+        for legacy_component_properties in self.legacy_objects:
+            legacy_component_type = legacy_component_properties.get("type")
             try:
-                if item_type in STUDY_LEVEL_DELETION:
+                if legacy_component_type in STUDY_LEVEL_DELETION:
                     id = (
-                        item["binding-constraint-id"]
-                        if item_type == "binding_constraint"
-                        else item[item_type]
+                        legacy_component_properties["binding-constraint-id"]
+                        if legacy_component_type == "binding_constraint"
+                        else legacy_component_properties[legacy_component_type]
                     )
-                    getattr(self.study, STUDY_LEVEL_DELETION[item_type])(
-                        getattr(self.study, STUDY_LEVEL_GET[item_type])()[id]
+                    getattr(self.study, STUDY_LEVEL_DELETION[legacy_component_type])(
+                        getattr(self.study, STUDY_LEVEL_GET[legacy_component_type])()[
+                            id
+                        ]
                     )
-                elif item_type in TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD:
+                elif legacy_component_type in TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD:
                     getattr(
-                        self.areas[item.get("area")],
-                        TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD[item_type],
+                        self.areas[legacy_component_properties.get("area")],
+                        TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD[legacy_component_type],
                     )(
                         getattr(
-                            self.areas[item.get("area")],
-                            TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[item_type],
-                        )()[item.get("cluster")]
+                            self.areas[legacy_component_properties.get("area")],
+                            TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[legacy_component_type],
+                        )()[legacy_component_properties.get("cluster")]
                     )
-                elif item_type in MATRIX_TYPES_TO_SET_METHOD:
+                elif legacy_component_type in MATRIX_TYPES_TO_SET_METHOD:
                     # To "delete" legacy wind, solar or load object, we simply set an empty timeseries
                     getattr(
-                        self.areas[item.get("area")],
-                        MATRIX_TYPES_TO_SET_METHOD[item_type],
+                        self.areas[legacy_component_properties.get("area")],
+                        MATRIX_TYPES_TO_SET_METHOD[legacy_component_type],
                     )(pd.DataFrame())
 
             except ReferencedObjectDeletionNotAllowed:
                 self.logger.warning(
-                    f"Item {item} will not be deleted because it is referenced in a binding constraint"
+                    f"Item {legacy_component_properties} will not be deleted because it is referenced in a binding constraint"
                 )
             except NotImplementedError:
                 self.logger.warning(
-                    f"Failure to delete {item} because the method is not implemented yet on antares craft"
+                    f"Failure to delete {legacy_component_properties} because the method is not implemented yet on antares craft"
                 )
 
         self.legacy_objects = []
@@ -507,6 +512,7 @@ class AntaresStudyConverter:
                     f"Model {model_id} has not been found in library {lib_id}"
                 )
 
+    # TODO: Does not depend on self for now, but will be once the config is a class attribute
     def _get_model_conversion_config(self, model: str) -> dict[str, Any]:
         model_conversion_config_file = RESOURCES_FOLDER / MODEL_NAME_TO_FILE_NAME[model]
         if not model_conversion_config_file.exists():
@@ -543,19 +549,21 @@ class AntaresStudyConverter:
         area_connections: list[InputAreaConnections],
         model_conversion_configs: dict[str, dict[str, Any]],
     ) -> None:
-        resource_content = model_conversion_configs[model]
-        valid_areas = self._validate_resources_not_excluded(resource_content, "area")
+        self.logger.info("Converting components of model {model}...")
+
+        conversion_config = model_conversion_configs[model]
+        valid_areas = self._validate_resources_not_excluded(conversion_config, "area")
 
         (
             components_from_model,
             connections_from_model,
             area_connections_from_model,
-        ) = self._convert_model_to_component_list(valid_areas, resource_content)
+        ) = self._convert_model_to_component_list(valid_areas, conversion_config)
         components.extend(components_from_model)
         connections.extend(connections_from_model)
         area_connections.extend(area_connections_from_model)
 
-        for param in resource_content.get("template-parameters", []):
+        for param in conversion_config.get("template-parameters", []):
             if param.get("name") == "area":
                 all_excluded_areas.update(
                     item["id"] for item in param.get("exclude", [])
@@ -593,13 +601,10 @@ class AntaresStudyConverter:
         else:
             components.extend(
                 self._convert_area_to_component_list(
-                    self.get_model_name_among_libs("area"), list(list_valid_areas)
+                    ANTARES_HISTORIC_LIB_ID, list(list_valid_areas)
                 )
             )
 
-        self.logger.info(
-            "Converting node, components and connections into Input study..."
-        )
         system = InputSystem(
             id=self.study.name,
             components=components,
