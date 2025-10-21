@@ -19,6 +19,8 @@ import yaml
 from pandas import DataFrame
 from pydantic import BaseModel
 
+from gems.input_converter.src.parsing import ConversionTemplate
+
 
 def resolve_path(path: Path) -> Path:
     if not path.exists():
@@ -32,27 +34,6 @@ def check_file_exists(input_path: Path) -> bool:
     if input_path.exists() and input_path.is_file() and input_path.stat().st_size > 0:
         return True
     return False
-
-
-def match_area_pattern(
-    object: Any, param_value: str, model_area_pattern: str = "${area}"
-) -> Any:
-    # TODO: Handle the case ConversionTemplate
-    if isinstance(object, dict):
-        return {
-            match_area_pattern(k, param_value, model_area_pattern): match_area_pattern(
-                v, param_value, model_area_pattern
-            )
-            for k, v in object.items()
-        }
-    elif isinstance(object, list):
-        return [
-            match_area_pattern(elem, param_value, model_area_pattern) for elem in object
-        ]
-    elif isinstance(object, str):
-        return object.replace(model_area_pattern, param_value)
-    else:
-        return object
 
 
 def check_dataframe_validity(df: DataFrame) -> bool:

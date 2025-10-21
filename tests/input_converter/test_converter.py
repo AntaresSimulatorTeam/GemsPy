@@ -18,8 +18,8 @@ import pytest
 from antares.craft.model.study import Study
 
 from gems.input_converter.src.converter import AntaresStudyConverter
-from gems.input_converter.src.data_preprocessing.data_classes import Operation
 from gems.input_converter.src.logger import Logger
+from gems.input_converter.src.parsing import Operation, parse_conversion_template
 from gems.input_converter.src.utils import (
     check_file_exists,
     dump_to_yaml,
@@ -260,16 +260,13 @@ class TestConverter:
         assert validated_data == expected_validated_data
 
     def test_convert_st_storages_to_component(
-        self, local_study_with_st_storage, lib_id: str
+        self, local_study_with_st_storage: Study, lib_id: str
     ):
         converter = self._init_converter_from_study(local_study_with_st_storage)
         path_load = RESOURCES_FOLDER / "st-storage.yaml"
 
-        resource_content = read_yaml_file(path_load).get("template", {})
-
-        valid_areas: dict = converter._validate_resources_not_excluded(
-            resource_content, "area"
-        )
+        with path_load.open() as template:
+            resource_content = parse_conversion_template(template)
 
         (
             storage_components,
@@ -394,11 +391,8 @@ class TestConverter:
         converter = self._init_converter_from_study(local_study_w_thermal)
         path_load = RESOURCES_FOLDER / "thermal.yaml"
 
-        resource_content = read_yaml_file(path_load).get("template", {})
-
-        valid_areas: dict = converter._validate_resources_not_excluded(
-            resource_content, "area"
-        )
+        with path_load.open() as template:
+            resource_content = parse_conversion_template(template)
 
         (
             thermals_components,
@@ -548,11 +542,8 @@ class TestConverter:
         converter = self._init_converter_from_path(input_path, output_path, "full")
         path_load = RESOURCES_FOLDER / "load.yaml"
 
-        resource_content = read_yaml_file(path_load).get("template", {})
-
-        valid_areas: dict = converter._validate_resources_not_excluded(
-            resource_content, "area"
-        )
+        with path_load.open() as template:
+            resource_content = parse_conversion_template(template)
 
         (
             load_components,
@@ -617,11 +608,8 @@ class TestConverter:
 
         path_load = RESOURCES_FOLDER / "solar.yaml"
 
-        resource_content = read_yaml_file(path_load).get("template", {})
-
-        valid_areas: dict = converter._validate_resources_not_excluded(
-            resource_content, "area"
-        )
+        with path_load.open() as template:
+            resource_content = parse_conversion_template(template)
 
         (
             solar_components,
@@ -677,11 +665,8 @@ class TestConverter:
         converter = self._init_converter_from_study(fr_load)
         path_load = RESOURCES_FOLDER / "load.yaml"
 
-        resource_content = read_yaml_file(path_load).get("template", {})
-
-        valid_areas: dict = converter._validate_resources_not_excluded(
-            resource_content, "area"
-        )
+        with path_load.open() as template:
+            resource_content = parse_conversion_template(template)
 
         (
             load_components,
@@ -729,11 +714,8 @@ class TestConverter:
 
         path_load = RESOURCES_FOLDER / "wind.yaml"
 
-        resource_content = read_yaml_file(path_load).get("template", {})
-
-        valid_areas: dict = converter._validate_resources_not_excluded(
-            resource_content, "area"
-        )
+        with path_load.open() as template:
+            resource_content = parse_conversion_template(template)
 
         (
             wind_components,
@@ -799,11 +781,8 @@ class TestConverter:
 
         path_load = RESOURCES_FOLDER / "wind.yaml"
 
-        resource_content = read_yaml_file(path_load).get("template", {})
-
-        valid_areas: dict = converter._validate_resources_not_excluded(
-            resource_content, "area"
-        )
+        with path_load.open() as template:
+            resource_content = parse_conversion_template(template)
 
         (
             wind_components,
@@ -824,11 +803,8 @@ class TestConverter:
 
         path_load = RESOURCES_FOLDER / "wind.yaml"
 
-        resource_content = read_yaml_file(path_load).get("template", {})
-
-        valid_areas: dict = converter._validate_resources_not_excluded(
-            resource_content, "area"
-        )
+        with path_load.open() as template:
+            resource_content = parse_conversion_template(template)
 
         (
             wind_components,
@@ -841,11 +817,8 @@ class TestConverter:
         converter = self._init_converter_from_study(local_study_w_links)
         path_load = RESOURCES_FOLDER / "link.yaml"
 
-        resource_content = read_yaml_file(path_load).get("template", {})
-
-        valid_areas: dict = converter._validate_resources_not_excluded(
-            resource_content, "area"
-        )
+        with path_load.open() as template:
+            resource_content = parse_conversion_template(template)
 
         (
             links_components,
@@ -1005,8 +978,8 @@ class TestConverter:
         converter = self._init_converter_from_path(input_path, output_path, "full")
         path_cc = RESOURCES_FOLDER / "battery.yaml"
 
-        bc_data = read_yaml_file(path_cc).get("template", {})
-        valid_areas: dict = converter._validate_resources_not_excluded(bc_data, "area")
+        with path_cc.open() as template:
+            bc_data = parse_conversion_template(template)
         (
             binding_components,
             binding_connections,
@@ -1084,8 +1057,8 @@ class TestConverter:
             / "battery.yaml"
         )
 
-        bc_data = read_yaml_file(path_cc).get("template", {})
-        valid_areas: dict = converter._validate_resources_not_excluded(bc_data, "area")
+        with path_cc.open() as template:
+            bc_data = parse_conversion_template(template)
 
         (
             _,

@@ -37,14 +37,10 @@ from gems.input_converter.src.data_preprocessing.preprocessing import (
 from gems.input_converter.src.data_preprocessing.thermal import ThermalDataPreprocessing
 from gems.input_converter.src.parsing import (
     ConversionTemplate,
+    ObjectProperties,
     parse_conversion_template,
 )
-from gems.input_converter.src.utils import (
-    dump_to_yaml,
-    match_area_pattern,
-    read_yaml_file,
-    resolve_path,
-)
+from gems.input_converter.src.utils import dump_to_yaml, read_yaml_file, resolve_path
 from gems.study.parsing import (
     InputAreaConnections,
     InputComponent,
@@ -128,7 +124,7 @@ class AntaresStudyConverter:
         self.output_path = self.output_folder / "input" / "system.yml"
 
         self.areas: MappingProxyType = self.study.get_areas()
-        self.legacy_objects: list[dict] = []
+        self.legacy_objects: list[ObjectProperties] = []
 
     def _convert_thermal_to_component_list(
         self,
@@ -280,51 +276,54 @@ class AntaresStudyConverter:
         return components
 
     def _delete_legacy_objects(self) -> None:
-        for legacy_component_properties in self.legacy_objects:
-            legacy_component_type = legacy_component_properties.get("type")
+        for legacy_component in self.legacy_objects:
             try:
-                if legacy_component_type in STUDY_LEVEL_DELETION:
-                    id = (
-                        legacy_component_properties["binding-constraint-id"]
-                        if legacy_component_type == "binding_constraint"
-                        else legacy_component_properties[legacy_component_type]
-                    )
-                    getattr(self.study, STUDY_LEVEL_DELETION[legacy_component_type])(
-                        getattr(self.study, STUDY_LEVEL_GET[legacy_component_type])()[
+                if legacy_component.type in STUDY_LEVEL_DELETION:
+                    if legacy_component.type == "area":
+                        id = legacy_component.area
+                    elif legacy_component.type == "link":
+                        id = legacy_component.link
+                    elif legacy_component.type == "binding_constraint":
+                        id = legacy_component.binding_constraint_id
+                    else:
+                        # Should not happen
+                        pass
+                    getattr(self.study, STUDY_LEVEL_DELETION[legacy_component.type])(
+                        getattr(self.study, STUDY_LEVEL_GET[legacy_component.type])()[
                             id
                         ]
                     )
-                elif legacy_component_type in TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD:
+                elif legacy_component.type in TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD:
                     getattr(
-                        self.areas[legacy_component_properties.get("area")],
-                        TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD[legacy_component_type],
+                        self.areas[legacy_component.area],
+                        TEMPLATE_CLUSTER_TYPE_TO_DELETE_METHOD[legacy_component.type],
                     )(
                         getattr(
-                            self.areas[legacy_component_properties.get("area")],
-                            TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[legacy_component_type],
-                        )()[legacy_component_properties.get("cluster")]
+                            self.areas[legacy_component.area],
+                            TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[legacy_component.type],
+                        )()[legacy_component.cluster]
                     )
-                elif legacy_component_type in MATRIX_TYPES_TO_SET_METHOD:
+                elif legacy_component.type in MATRIX_TYPES_TO_SET_METHOD:
                     # To "delete" legacy wind, solar or load object, we simply set an empty timeseries
                     getattr(
-                        self.areas[legacy_component_properties.get("area")],
-                        MATRIX_TYPES_TO_SET_METHOD[legacy_component_type],
+                        self.areas[legacy_component.area],
+                        MATRIX_TYPES_TO_SET_METHOD[legacy_component.type],
                     )(pd.DataFrame())
 
             except ReferencedObjectDeletionNotAllowed:
                 self.logger.warning(
-                    f"Item {legacy_component_properties} will not be deleted because it is referenced in a binding constraint"
+                    f"Item {legacy_component} will not be deleted because it is referenced in a binding constraint"
                 )
             except NotImplementedError:
                 self.logger.warning(
-                    f"Failure to delete {legacy_component_properties} because the method is not implemented yet on antares craft"
+                    f"Failure to delete {legacy_component} because the method is not implemented yet on antares craft"
                 )
 
         self.legacy_objects = []
 
     def _iterate_through_model(
         self,
-        valid_resources: dict,
+        resolved_conversion_template: ConversionTemplate,
         components: list,
         connections: list,
         area_connections: list,
@@ -332,53 +331,56 @@ class AntaresStudyConverter:
     ) -> None:
         components.append(
             InputComponent(
-                id=valid_resources["component"]["id"],
-                model=valid_resources["model"],
+                id=resolved_conversion_template.component.id,
+                model=resolved_conversion_template.model,
                 parameters=[
                     InputComponentParameter(
-                        id=str(param.get("id")),
-                        time_dependent=bool(param.get("time-dependent")),
-                        scenario_dependent=bool(param.get("scenario-dependent")),
-                        value=mp.convert_param_value(param["id"], param["value"]),
+                        id=param.id,
+                        time_dependent=bool(param.time_dependent),
+                        scenario_dependent=bool(param.scenario_dependent),
+                        value=mp.convert_param_value(param.id, param.value),
                     )
-                    for param in valid_resources["component"]["parameters"]
+                    for param in resolved_conversion_template.component.parameters
                 ],
             )
         )
 
         if self.mode == ConversionMode.HYBRID:
-            for resource_connection in valid_resources["area-connections"]:
-                if "." in resource_connection["component"]:
-                    component_parts = resource_connection["component"].split(".")
+            for area_connection in resolved_conversion_template.area_connections:
+                # TODO: Improve logic
+                if "." in area_connection.component:
+                    component_parts = area_connection.component.split(".")
                     component_value = getattr(
                         self.study.get_links()[component_parts[0]], component_parts[1]
                     )
                 else:
-                    component_value = resource_connection["component"]
+                    component_value = area_connection.component
                 area_connections.append(
                     InputAreaConnections(
                         component=component_value,
-                        port=resource_connection["port"],
-                        area=resource_connection["area"],
+                        port=area_connection.port,
+                        area=area_connection.area,
                     )
                 )
-            for item in valid_resources.get("legacy-objects-to-delete", []):
-                self.legacy_objects.append(item["object-properties"])
+            # TODO : Simplify usage, use directly legacy_objectis_to_delete
+            for item in resolved_conversion_template.legacy_objects_to_delete:
+                self.legacy_objects.append(item.object_properties)
         else:
-            for resource_connection in valid_resources["connections"]:
-                if "." in resource_connection["component2"]:
-                    component2_parts = resource_connection["component2"].split(".")
+            for connection in resolved_conversion_template.connections:
+                # TODO: Factorize logic with previous connections
+                if "." in connection.component2:
+                    component2_parts = connection.component2.split(".")
                     component2_value = getattr(
                         self.study.get_links()[component2_parts[0]], component2_parts[1]
                     )
                 else:
-                    component2_value = resource_connection["component2"]
+                    component2_value = connection.component2
                 connections.append(
                     InputPortConnections(
-                        component1=resource_connection["component1"],
-                        port1=resource_connection["port1"],
+                        component1=connection.component1,
+                        port1=connection.port1,
                         component2=component2_value,
-                        port2=resource_connection["port2"],
+                        port2=connection.port2,
                     )
                 )
 
@@ -387,14 +389,11 @@ class AntaresStudyConverter:
     ) -> tuple[
         list[InputComponent], list[InputPortConnections], list[InputAreaConnections]
     ]:
-
         components: list[InputComponent] = []
         connections: list[InputPortConnections] = []
         area_connections: list[InputAreaConnections] = []
         self.logger.info("Converting models to component list...")
 
-        # Récupère le nom du pattern sur lequel itérer
-        # TODO: Do we really need a list for template parameters ?
         model_area_pattern = f"${{{conversion_template.template_parameters[0].name}}}"
 
         model_preprocessor = ModelConversionPreprocessor(
@@ -407,11 +406,11 @@ class AntaresStudyConverter:
                     conversion_template, "link"
                 )
                 for link in valid_resources.values():
-                    data_with_link: dict = match_area_pattern(
-                        conversion_template, link.id, model_area_pattern
+                    resolved_template = conversion_template.resolve_template(
+                        model_area_pattern, link.id
                     )
                     self._iterate_through_model(
-                        data_with_link,
+                        resolved_template,
                         components,
                         connections,
                         area_connections,
@@ -433,12 +432,12 @@ class AntaresStudyConverter:
                     )
                     return components, connections, area_connections
                 for area in valid_areas.values():
-                    data_consolidated: dict = match_area_pattern(
-                        conversion_template, area.id, model_area_pattern
+                    resolved_template = conversion_template.resolve_template(
+                        model_area_pattern, area.id
                     )
                     cluster_type = next(
                         (
-                            template.get("cluster-type")
+                            template.cluster_type
                             for template in conversion_template.template_parameters
                         ),
                         None,
@@ -447,11 +446,12 @@ class AntaresStudyConverter:
                         for cluster_id in getattr(
                             area, TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD[cluster_type]
                         )():
-                            data_consolidated = match_area_pattern(
-                                data_consolidated, cluster_id, f"${{{cluster_type}}}"
+                            # We have already resolved areas, now need to resolve cluster ids
+                            resolved_template = resolved_template.resolve_template(
+                                f"${{{cluster_type}}}", cluster_id
                             )
                             self._iterate_through_model(
-                                data_consolidated,
+                                resolved_template,
                                 components,
                                 connections,
                                 area_connections,
@@ -460,11 +460,11 @@ class AntaresStudyConverter:
 
                     elif conversion_template.name in MATRIX_TYPES:
                         if all(
-                            model_preprocessor.check_timeseries_validity(param["value"])
-                            for param in data_consolidated["component"]["parameters"]
+                            model_preprocessor.check_timeseries_validity(param.value)
+                            for param in resolved_template.component.parameters
                         ):
                             self._iterate_through_model(
-                                data_consolidated,
+                                resolved_template,
                                 components,
                                 connections,
                                 area_connections,
@@ -472,7 +472,7 @@ class AntaresStudyConverter:
                             )
                     else:
                         self._iterate_through_model(
-                            data_consolidated,
+                            resolved_template,
                             components,
                             connections,
                             area_connections,
@@ -492,8 +492,8 @@ class AntaresStudyConverter:
     ) -> dict:
         excluded_ids: set[Any] = set()
         for param in conversion_template.template_parameters:
-            if param.get("name") == parameter:
-                excluded_ids.update(item["id"] for item in param.get("exclude", []))
+            if param.name == parameter and param.exclude is not None:
+                excluded_ids.update(item.id for item in param.exclude)
 
         if parameter == "area":
             resources = self.areas
@@ -568,7 +568,6 @@ class AntaresStudyConverter:
         area_connections: list[InputAreaConnections],
         model_conversion_templates: dict[str, ConversionTemplate],
     ) -> None:
-
         self.logger.info(f"Converting components of model {model}...")
         conversion_template = model_conversion_templates[model]
 
@@ -582,11 +581,10 @@ class AntaresStudyConverter:
         connections.extend(connections_from_model)
         area_connections.extend(area_connections_from_model)
 
-        for param in conversion_template.get("template-parameters", []):
-            if param.get("name") == "area":
-                all_excluded_areas.update(
-                    item["id"] for item in param.get("exclude", [])
-                )
+        for param in conversion_template.template_parameters:
+            # TODO: This logic seems duplicated elsewhere
+            if param.name == "area" and param.exclude is not None:
+                all_excluded_areas.update(item.id for item in param.exclude)
 
         list_valid_areas.difference_update(all_excluded_areas)
 

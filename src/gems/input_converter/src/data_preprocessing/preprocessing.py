@@ -11,10 +11,8 @@ from gems.input_converter.src.config import (
     TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD,
     TIMESERIES_NAME_TO_METHOD,
 )
-from gems.input_converter.src.data_preprocessing.data_classes import (
-    ComplexData,
-    ConversionMode,
-)
+from gems.input_converter.src.data_preprocessing.data_classes import ConversionMode
+from gems.input_converter.src.parsing import ConversionValue
 from gems.input_converter.src.utils import check_dataframe_validity, save_to_file
 
 ALLOWED_TYPES: list = [
@@ -41,7 +39,7 @@ class ModelConversionPreprocessor:
         self.file_path = Path(".")
 
     def calculate_matrix_data_values(
-        self, obj: ComplexData, type_resource: str
+        self, obj: ConversionValue, type_resource: str
     ) -> pd.DataFrame:
         if not obj.object_properties or not obj.object_properties.area:
             raise ValueError(
@@ -54,7 +52,7 @@ class ModelConversionPreprocessor:
             self.study.get_areas()[area], MATRIX_TYPES_TO_GET_METHOD[type_resource]
         )()
 
-    def calculate_link_data_values(self, obj: ComplexData) -> pd.DataFrame:
+    def calculate_link_data_values(self, obj: ConversionValue) -> pd.DataFrame:
         if (
             not obj.object_properties
             or not obj.object_properties.link
@@ -73,7 +71,7 @@ class ModelConversionPreprocessor:
         return getattr(link, TIMESERIES_NAME_TO_METHOD[obj.object_properties.field])()
 
     def calculate_cluster_data_values(
-        self, type_resource: str, obj: ComplexData
+        self, type_resource: str, obj: ConversionValue
     ) -> Union[Any, pd.DataFrame]:
         if (
             not obj.object_properties
@@ -108,7 +106,7 @@ class ModelConversionPreprocessor:
         return time_series
 
     def calculate_binding_constraint_data_values(
-        self, obj: ComplexData
+        self, obj: ConversionValue
     ) -> Union[float, pd.Series, pd.DataFrame]:
         if (
             not obj.object_properties
@@ -127,7 +125,7 @@ class ModelConversionPreprocessor:
         else:
             return term.weight
 
-    def calculate_value(self, obj: ComplexData) -> Union[float, str]:
+    def calculate_value(self, obj: ConversionValue) -> Union[float, str]:
         if obj.object_properties is None or obj.object_properties.type is None:
             raise ValueError(f"Object properties {obj} must not be None")
         type_resource: str = obj.object_properties.type
@@ -152,9 +150,9 @@ class ModelConversionPreprocessor:
             time_series: pd.Series = time_series.iloc[:, obj.column]  # type: ignore
 
             if getattr(obj, "operation") and obj.operation is not None:
-                parameter_value: Union[pd.Series, pd.DataFrame, float] = (
-                    obj.operation.execute(time_series, self.preprocessed_values)
-                )
+                parameter_value: Union[
+                    pd.Series, pd.DataFrame, float
+                ] = obj.operation.execute(time_series, self.preprocessed_values)
                 if isinstance(parameter_value, float):
                     self.preprocessed_values[self.param_id] = parameter_value
                     return parameter_value
@@ -167,35 +165,40 @@ class ModelConversionPreprocessor:
 
         return str(self.file_path).removesuffix(".tsv")
 
-    def convert_param_value(self, id: str, value_content: dict) -> Union[str, float]:
+    def convert_param_value(
+        self, id: str, value_content: ConversionValue
+    ) -> Union[str, float]:
         self.param_id = id
-        if value_content.get("constant") is not None:
-            return float(value_content.get("constant", 0))
-        obj = ComplexData.model_validate(value_content)
+        if value_content.constant is not None:
+            return value_content.constant
 
-        if not obj.object_properties:
+        if not value_content.object_properties:
             raise ValueError(f"Object properties from {value_content} must not be None")
-        if obj.object_properties.type not in ALLOWED_TYPES:
-            raise ValueError(f"Unknown value type: {obj.object_properties.type}")
-        return self.calculate_value(obj)
+        if value_content.object_properties.type not in ALLOWED_TYPES:
+            raise ValueError(
+                f"Unknown value type: {value_content.object_properties.type}"
+            )
+        return self.calculate_value(value_content)
 
-    def check_timeseries_validity(self, value_content: dict) -> bool:
-        if value_content.get("constant") is not None:
+    def check_timeseries_validity(self, value_content: ConversionValue) -> bool:
+        if value_content.constant is not None:
             return True
 
-        obj = ComplexData.model_validate(value_content)
         if (
-            not obj.object_properties
-            or not obj.object_properties.area
-            or not obj.object_properties.type
+            not value_content.object_properties
+            or not value_content.object_properties.area
+            or not value_content.object_properties.type
         ):
             raise ValueError(
-                f"Object properties, its area, and type from {obj} must not be None"
+                f"Object properties, its area, and type from {value_content} must not be None"
             )
-        if obj.object_properties.type not in ALLOWED_TYPES:
-            raise ValueError(f"Unknown value type: {obj.object_properties.type}")
+        # TODO : Do not duplicate logic with the one in convert_param_value
+        if value_content.object_properties.type not in ALLOWED_TYPES:
+            raise ValueError(
+                f"Unknown value type: {value_content.object_properties.type}"
+            )
         time_series: pd.DataFrame = getattr(
-            self.study.get_areas()[obj.object_properties.area],
-            MATRIX_TYPES_TO_GET_METHOD[obj.object_properties.type],
+            self.study.get_areas()[value_content.object_properties.area],
+            MATRIX_TYPES_TO_GET_METHOD[value_content.object_properties.type],
         )()
         return check_dataframe_validity(time_series)
