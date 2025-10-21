@@ -153,7 +153,7 @@ class TestConverter:
         assert input_study == expected_input_study
 
     def test_convert_area_to_component(self, local_study_w_areas: Study, lib_id: str):
-        converter = self._init_converter_from_study(local_study_w_areas)
+        converter = self._init_converter_from_study(local_study_w_areas, model_list=[])
         area_components = converter._convert_area_to_component_list(lib_id)
 
         expected_area_components = [
@@ -202,7 +202,7 @@ class TestConverter:
         assert area_components == expected_area_components
 
     def test_convert_area_to_yaml(self, local_study_w_areas: Study, lib_id: str):
-        converter = self._init_converter_from_study(local_study_w_areas)
+        converter = self._init_converter_from_study(local_study_w_areas, model_list=[])
         area_components = converter._convert_area_to_component_list(lib_id)
         input_study = InputSystem(id=converter.study.name, components=area_components)
 
@@ -268,7 +268,10 @@ class TestConverter:
     def test_convert_st_storages_to_component(
         self, local_study_with_st_storage: Study, lib_id: str
     ):
-        converter = self._init_converter_from_study(local_study_with_st_storage)
+        # This test is on the inner function _convert_model_to_component_list, no need to pass a model_list to the converter constructor
+        converter = self._init_converter_from_study(
+            local_study_with_st_storage, model_list=[]
+        )
         path_load = RESOURCES_FOLDER / "st-storage.yaml"
 
         with path_load.open() as template:
@@ -394,7 +397,9 @@ class TestConverter:
         self,
         local_study_w_thermal: Study,
     ):
-        converter = self._init_converter_from_study(local_study_w_thermal)
+        converter = self._init_converter_from_study(
+            local_study_w_thermal, model_list=[]
+        )
         path_load = RESOURCES_FOLDER / "thermal.yaml"
 
         with path_load.open() as template:
@@ -545,7 +550,10 @@ class TestConverter:
         output_path = tmp_path / "output" / LOCAL_PATH
         shutil.copytree(local_path, input_path)
 
-        converter = self._init_converter_from_path(input_path, output_path, "full")
+        # This test is on the inner function _convert_model_to_component_list, no need to pass a model_list to the converter constructor
+        converter = self._init_converter_from_path(
+            input_path, output_path, "full", model_list=[]
+        )
         path_load = RESOURCES_FOLDER / "load.yaml"
 
         with path_load.open() as template:
@@ -610,7 +618,8 @@ class TestConverter:
         indirect=True,
     )
     def test_convert_solar_to_component_from_study(self, fr_solar: None):
-        converter = self._init_converter_from_study(fr_solar)
+        # This test is on the inner function _convert_model_to_component_list, no need to pass a model_list to the converter constructor
+        converter = self._init_converter_from_study(fr_solar, model_list=[])
 
         path_load = RESOURCES_FOLDER / "solar.yaml"
 
@@ -716,7 +725,7 @@ class TestConverter:
         indirect=True,
     )
     def test_convert_wind_to_component_from_study(self, fr_wind: Study):
-        converter = self._init_converter_from_study(fr_wind)
+        converter = self._init_converter_from_study(fr_wind, model_list=[])
 
         path_load = RESOURCES_FOLDER / "wind.yaml"
 
@@ -783,7 +792,7 @@ class TestConverter:
         self,
         fr_wind: object,
     ):
-        converter = self._init_converter_from_study(fr_wind)
+        converter = self._init_converter_from_study(fr_wind, model_list=[])
 
         path_load = RESOURCES_FOLDER / "wind.yaml"
 
@@ -805,7 +814,7 @@ class TestConverter:
         indirect=True,
     )
     def test_convert_wind_to_component_zero_values(self, fr_wind: int):
-        converter = self._init_converter_from_study(fr_wind)
+        converter = self._init_converter_from_study(fr_wind, model_list=[])
 
         path_load = RESOURCES_FOLDER / "wind.yaml"
 
@@ -820,7 +829,8 @@ class TestConverter:
         assert wind_components == []
 
     def test_convert_links_to_component(self, local_study_w_links: Study, lib_id: str):
-        converter = self._init_converter_from_study(local_study_w_links)
+        # This test is on the inner function _convert_model_to_component_list, no need to pass a model_list to the converter constructor
+        converter = self._init_converter_from_study(local_study_w_links, model_list=[])
         path_load = RESOURCES_FOLDER / "link.yaml"
 
         with path_load.open() as template:
@@ -981,7 +991,10 @@ class TestConverter:
         output_path = tmp_path / "output" / LOCAL_PATH
         shutil.copytree(local_path, input_path)
 
-        converter = self._init_converter_from_path(input_path, output_path, "full")
+        # This test is on the inner function _convert_model_to_component_list, no need to pass a model_list to the converter constructor
+        converter = self._init_converter_from_path(
+            input_path, output_path, "full", model_list=[]
+        )
         path_cc = RESOURCES_FOLDER / "battery.yaml"
 
         with path_cc.open() as template:
@@ -990,7 +1003,9 @@ class TestConverter:
             binding_components,
             binding_connections,
             area_connections,
-        ) = converter._convert_model_to_component_list(bc_data)
+        ) = converter._convert_model_to_component_list(
+            bc_data, bc_data.get_excluded_objects_ids()
+        )  # Bad design, either the test should call a higher level function, or virtual objects should be deduced from single model
 
         connection = binding_connections[0]
         ### Compare area connections

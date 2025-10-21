@@ -395,7 +395,9 @@ class AntaresStudyConverter:
                 )
 
     def _convert_model_to_component_list(
-        self, conversion_template: ConversionTemplate
+        self,
+        conversion_template: ConversionTemplate,
+        virtual_objects: dict[str, list[str]] = {},
     ) -> tuple[
         list[InputComponent], list[InputPortConnections], list[InputAreaConnections]
     ]:
@@ -409,12 +411,10 @@ class AntaresStudyConverter:
             self.study, self.mode, self.output_folder
         )
 
-        excluded_objets_per_type = conversion_template.get_excluded_objects_ids()
-
         try:
             if conversion_template.name in LINK_TYPES:
                 for link in self.study.get_links().values():
-                    if link not in excluded_objets_per_type["link"]:
+                    if link.id not in virtual_objects.get("link", []):
                         resolved_template = conversion_template.resolve_template(
                             model_area_pattern, link.id
                         )
@@ -430,14 +430,14 @@ class AntaresStudyConverter:
                     # Legacy conversion for thermal cluster
                     self._convert_thermal_to_component_list(
                         self.get_model_name_among_libs("thermal"),
-                        excluded_objets_per_type["area"],
+                        virtual_objects.get("area", []),
                         components,
                         connections,
                         area_connections,
                     )
                     return components, connections, area_connections
                 for area in self.areas.values():
-                    if area not in excluded_objets_per_type["area"]:
+                    if area.id not in virtual_objects.get("area", []):
                         resolved_template = conversion_template.resolve_template(
                             model_area_pattern, area.id
                         )
@@ -550,7 +550,7 @@ class AntaresStudyConverter:
     def _convert_single_model(
         self,
         conversion_template: ConversionTemplate,
-        excluded_objects_per_type: dict[str, list[str]],
+        virtual_objects: dict[str, list[str]],
         components: list[InputComponent],
         connections: list[InputPortConnections],
         area_connections: list[InputAreaConnections],
@@ -563,7 +563,7 @@ class AntaresStudyConverter:
             components_from_model,
             connections_from_model,
             area_connections_from_model,
-        ) = self._convert_model_to_component_list(conversion_template)
+        ) = self._convert_model_to_component_list(conversion_template, virtual_objects)
 
         components.extend(components_from_model)
         connections.extend(connections_from_model)
@@ -579,6 +579,13 @@ class AntaresStudyConverter:
             )
         self._check_converted_models_are_in_libs(model_conversion_templates)
 
+        virtual_objects: dict[str, list[str]] = {}
+        for model in self.models_to_convert:
+            virtual_objects_this_model = model_conversion_templates[
+                model
+            ].get_excluded_objects_ids()
+            virtual_objects = merge_dicts(virtual_objects, virtual_objects_this_model)
+
         components: list[InputComponent] = []
         connections: list[InputPortConnections] = []
         area_connections: list[InputAreaConnections] = []
@@ -586,25 +593,21 @@ class AntaresStudyConverter:
         # list_valid_areas: set[str] = set(self.areas.keys())
         # all_excluded_areas: set[Any] = set()
 
-        all_excluded_objects_per_type: dict[str, list[str]] = {"area": [], "link": []}
-
         for model in self.models_to_convert:
             conversion_template = model_conversion_templates[model]
-            excluded_objects_per_type = conversion_template.get_excluded_objects_ids()
             self._convert_single_model(
                 conversion_template,
-                excluded_objects_per_type,
+                virtual_objects,
                 components,
                 connections,
                 area_connections,
             )
-            merge_dicts(all_excluded_objects_per_type, excluded_objects_per_type)
         if self.mode == ConversionMode.HYBRID:
             self._delete_legacy_objects()
         else:
             components.extend(
                 self._convert_area_to_component_list(
-                    ANTARES_HISTORIC_LIB_ID, all_excluded_objects_per_type["area"]
+                    ANTARES_HISTORIC_LIB_ID, virtual_objects.get("area", [])
                 )
             )
 
