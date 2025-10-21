@@ -16,6 +16,7 @@ from typing import Optional, Union
 
 import pandas as pd
 from antares.craft.exceptions.exceptions import ReferencedObjectDeletionNotAllowed
+from antares.craft.model.link import Link
 from antares.craft.model.study import Study, read_study_local
 
 from gems.input_converter.src.config import (
@@ -418,11 +419,7 @@ class AntaresStudyConverter:
         try:
             if conversion_template.name in LINK_TYPES:
                 for link in self.study.get_links().values():
-                    if (
-                        link.id not in virtual_objects.links
-                        and link.area_from_id not in virtual_objects.areas
-                        and link.area_to_id not in virtual_objects.areas
-                    ):
+                    if not self.is_virtual_link(link, virtual_objects):
                         resolved_template = conversion_template.resolve_template(
                             model_area_pattern, link.id
                         )
@@ -504,6 +501,14 @@ class AntaresStudyConverter:
         return components, connections, area_connections
 
     @staticmethod
+    def is_virtual_link(link: Link, virtual_objects: VirtualObjectsRepository) -> bool:
+        return (
+            link.id in virtual_objects.links
+            or link.area_from_id in virtual_objects.areas
+            or link.area_to_id in virtual_objects.areas
+        )
+
+    @staticmethod
     def _extract_lib_and_model_ids(path: str) -> tuple[str, list]:
         lib_data = read_yaml_file(Path(path))["library"]
         models = lib_data.get("models", [])
@@ -580,19 +585,10 @@ class AntaresStudyConverter:
     def convert_study_to_input_system(self) -> InputSystem:
         self._copy_libs_to_model_librairies()
 
-        model_conversion_templates: dict[str, ConversionTemplate] = {}
-        for model in self.models_to_convert:
-            model_conversion_templates[model] = self._get_model_conversion_template(
-                model
-            )
+        model_conversion_templates = self._build_model_conversion_templates()
         self._check_converted_models_are_in_libs(model_conversion_templates)
 
-        virtual_objects = VirtualObjectsRepository()
-        for model in self.models_to_convert:
-            virtual_objects_this_model = model_conversion_templates[
-                model
-            ].get_excluded_objects_ids()
-            virtual_objects.add(virtual_objects_this_model)
+        virtual_objects = self._build_virtual_objects_repo(model_conversion_templates)
 
         components: list[InputComponent] = []
         connections: list[InputPortConnections] = []
@@ -627,6 +623,26 @@ class AntaresStudyConverter:
         )
         data = system.model_dump(exclude_none=True)
         return InputSystem(**data)
+
+    def _build_model_conversion_templates(self) -> dict[str, ConversionTemplate]:
+        model_conversion_templates: dict[str, ConversionTemplate] = {}
+        for model in self.models_to_convert:
+            model_conversion_templates[model] = self._get_model_conversion_template(
+                model
+            )
+
+        return model_conversion_templates
+
+    def _build_virtual_objects_repo(
+        self, model_conversion_templates: dict[str, ConversionTemplate]
+    ) -> VirtualObjectsRepository:
+        virtual_objects = VirtualObjectsRepository()
+        for model in self.models_to_convert:
+            virtual_objects_this_model = model_conversion_templates[
+                model
+            ].get_excluded_objects_ids()
+            virtual_objects.add(virtual_objects_this_model)
+        return virtual_objects
 
     def process_all(self) -> None:
         system = self.convert_study_to_input_system()
