@@ -560,16 +560,16 @@ class AntaresStudyConverter:
 
     def _convert_single_model(
         self,
-        model: str,
+        conversion_template: ConversionTemplate,
         list_valid_areas: set[str],
         all_excluded_areas: set[Any],
         components: list[InputComponent],
         connections: list[InputPortConnections],
         area_connections: list[InputAreaConnections],
-        model_conversion_templates: dict[str, ConversionTemplate],
     ) -> None:
-        self.logger.info(f"Converting components of model {model}...")
-        conversion_template = model_conversion_templates[model]
+        self.logger.info(
+            f"Converting components of model {conversion_template.name}..."
+        )
 
         (
             components_from_model,
@@ -591,12 +591,12 @@ class AntaresStudyConverter:
     def convert_study_to_input_system(self) -> InputSystem:
         self._copy_libs_to_model_librairies()
 
-        model_conversion_template: dict[str, ConversionTemplate] = {}
+        model_conversion_templates: dict[str, ConversionTemplate] = {}
         for model in self.model_list:
-            model_conversion_template[model] = self._get_model_conversion_template(
+            model_conversion_templates[model] = self._get_model_conversion_template(
                 model
             )
-        self._check_converted_models_are_in_libs(model_conversion_template)
+        self._check_converted_models_are_in_libs(model_conversion_templates)
 
         components: list[InputComponent] = []
         connections: list[InputPortConnections] = []
@@ -607,13 +607,12 @@ class AntaresStudyConverter:
 
         for model in self.model_list:
             self._convert_single_model(
-                model,
+                model_conversion_templates[model],
                 list_valid_areas,
                 all_excluded_areas,
                 components,
                 connections,
                 area_connections,
-                model_conversion_template,
             )
         if self.mode == ConversionMode.HYBRID:
             self._delete_legacy_objects()
