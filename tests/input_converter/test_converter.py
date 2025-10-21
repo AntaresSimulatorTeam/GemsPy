@@ -1290,11 +1290,6 @@ class TestConverter:
                 for c in components
             ]
 
-        dump_to_yaml(
-            obtained_data,
-            local_path / "test_output.yaml",
-        )
-
         assert sorted(
             normalize_components(obtained_components), key=lambda x: x["id"]
         ) == sorted(expected_data["components"], key=lambda x: x["id"])

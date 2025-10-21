@@ -10,11 +10,34 @@
 #
 # This file is part of the Antares project.
 
+from dataclasses import dataclass, field
 from typing import Optional, TextIO, Union
 
 import pandas as pd
 from pydantic import BaseModel, Field
 from yaml import safe_load
+
+
+@dataclass
+class VirtualObjectsRepository:
+    areas: list[str] = field(default_factory=list)
+    links: list[str] = field(default_factory=list)
+    thermals: list[str] = field(default_factory=list)
+
+    def resolve_template(
+        self, template_pattern: str, value: str
+    ) -> "VirtualObjectsRepository":
+        thermals = []
+        for thermal in self.thermals:
+            thermals.append(thermal.replace(template_pattern, value))
+        return VirtualObjectsRepository(
+            areas=self.areas, links=self.links, thermals=thermals
+        )
+
+    def add(self, other: "VirtualObjectsRepository") -> None:
+        self.areas += other.areas
+        self.links += other.links
+        self.thermals += other.thermals
 
 
 def _to_kebab(snake: str) -> str:
@@ -253,21 +276,25 @@ class ConversionTemplate(ModifiedBaseModel):
             legacy_objects_to_delete=legacy_objects_to_delete,
         )
 
-    def get_excluded_objects_ids(self) -> dict[str, list[str]]:
-        virtual_objects_per_type: dict[str, list[str]] = {"area": [], "link": []}
+    def get_excluded_objects_ids(self) -> VirtualObjectsRepository:
+        virtual_areas = []
+        virtual_links = []
+        virtual_thermals = []
         for param in self.template_parameters:
             if param.exclude is not None:
                 for excluded_object in param.exclude:
                     exclude_prop = excluded_object.object_properties
                     if exclude_prop.type == "area" and exclude_prop.area is not None:
-                        virtual_objects_per_type[exclude_prop.type].append(
-                            exclude_prop.area
-                        )
+                        virtual_areas.append(exclude_prop.area)
                     elif exclude_prop.type == "link" and exclude_prop.link is not None:
-                        virtual_objects_per_type[exclude_prop.type].append(
-                            exclude_prop.link
-                        )
-        return virtual_objects_per_type
+                        virtual_links.append(exclude_prop.link)
+                    elif exclude_prop.type == "thermal":
+                        if (
+                            exclude_prop.area is not None
+                            and exclude_prop.cluster is not None
+                        ):
+                            virtual_thermals.append(exclude_prop.cluster)
+        return VirtualObjectsRepository(virtual_areas, virtual_links, virtual_thermals)
 
 
 def parse_conversion_template(input_template: TextIO) -> ConversionTemplate:
