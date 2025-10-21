@@ -40,12 +40,7 @@ from gems.input_converter.src.parsing import (
     VirtualObjectsRepository,
     parse_conversion_template,
 )
-from gems.input_converter.src.utils import (
-    dump_to_yaml,
-    merge_dicts,
-    read_yaml_file,
-    resolve_path,
-)
+from gems.input_converter.src.utils import dump_to_yaml, read_yaml_file, resolve_path
 from gems.study.parsing import (
     InputAreaConnections,
     InputComponent,

@@ -77,12 +77,3 @@ def save_to_file(series: Union[pd.DataFrame, pd.Series], output_file: PurePath) 
         os.makedirs(output_dir, exist_ok=True)
 
     series.to_csv(output_file, sep="\t", index=False, header=False)
-
-
-def merge_dicts(
-    dict1: dict[str, list[str]], dict2: dict[str, list[str]]
-) -> dict[str, list[str]]:
-    merged = {}
-    for key in dict1.keys() | dict2.keys():
-        merged[key] = dict1.get(key, []) + dict2.get(key, [])
-    return merged
