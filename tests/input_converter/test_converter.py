@@ -17,6 +17,7 @@ import pandas as pd
 import pytest
 from antares.craft.model.study import Study
 
+from gems.input_converter.src.config import MODEL_NAME_TO_FILE_NAME
 from gems.input_converter.src.converter import AntaresStudyConverter
 from gems.input_converter.src.logger import Logger
 from gems.input_converter.src.parsing import Operation, parse_conversion_template
@@ -63,10 +64,19 @@ MODEL_LIST_WITH_BASE = [str(Path(os.getcwd()) / suffix) for suffix in LIB_PATHS]
 
 
 class TestConverter:
-    def _init_converter_from_study(self, local_study, mode: str = "full"):
+    def _init_converter_from_study(
+        self,
+        local_study,
+        model_list: list[str] = list(MODEL_NAME_TO_FILE_NAME.keys()),
+        mode: str = "full",
+    ):
         logger = Logger(__name__, local_study.path)
         converter: AntaresStudyConverter = AntaresStudyConverter(
-            study_input=local_study, logger=logger, mode=mode, lib_paths=LIB_PATHS
+            study_input=local_study,
+            logger=logger,
+            mode=mode,
+            lib_paths=LIB_PATHS,
+            models_to_convert=model_list,
         )
         return converter
 
@@ -76,7 +86,7 @@ class TestConverter:
         output_path: Path,
         mode: str = "full",
         lib_paths: list = None,
-        model_list: list = None,
+        model_list: list = list(MODEL_NAME_TO_FILE_NAME.keys()),
     ):
         logger = Logger(__name__, str(input_path))
         converter: AntaresStudyConverter = AntaresStudyConverter(
@@ -85,12 +95,12 @@ class TestConverter:
             mode=mode,
             output_folder=output_path,
             lib_paths=lib_paths,
-            model_list=model_list,
+            models_to_convert=model_list,
         )
         return converter
 
     def test_convert_study_to_input_study(self, local_study_w_areas: Study):
-        converter = self._init_converter_from_study(local_study_w_areas)
+        converter = self._init_converter_from_study(local_study_w_areas, model_list=[])
         input_study = converter.convert_study_to_input_system()
 
         expected_input_study = InputSystem(
@@ -144,9 +154,7 @@ class TestConverter:
 
     def test_convert_area_to_component(self, local_study_w_areas: Study, lib_id: str):
         converter = self._init_converter_from_study(local_study_w_areas)
-        area_components = converter._convert_area_to_component_list(
-            lib_id, ["fr", "it"]
-        )
+        area_components = converter._convert_area_to_component_list(lib_id)
 
         expected_area_components = [
             InputComponent(
@@ -195,9 +203,7 @@ class TestConverter:
 
     def test_convert_area_to_yaml(self, local_study_w_areas: Study, lib_id: str):
         converter = self._init_converter_from_study(local_study_w_areas)
-        area_components = converter._convert_area_to_component_list(
-            lib_id, ["fr", "it"]
-        )
+        area_components = converter._convert_area_to_component_list(lib_id)
         input_study = InputSystem(id=converter.study.name, components=area_components)
 
         # Dump model into yaml file
@@ -1268,6 +1274,11 @@ class TestConverter:
                 }
                 for c in components
             ]
+
+        dump_to_yaml(
+            obtained_data,
+            local_path / "test_output.yaml",
+        )
 
         assert sorted(
             normalize_components(obtained_components), key=lambda x: x["id"]

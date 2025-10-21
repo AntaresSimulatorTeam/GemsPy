@@ -253,6 +253,22 @@ class ConversionTemplate(ModifiedBaseModel):
             legacy_objects_to_delete=legacy_objects_to_delete,
         )
 
+    def get_excluded_objects_ids(self) -> dict[str, list[str]]:
+        excluded_objects_per_type: dict[str, list[str]] = {"area": [], "link": []}
+        for param in self.template_parameters:
+            if param.exclude is not None:
+                for excluded_object in param.exclude:
+                    exclude_prop = excluded_object.object_properties
+                    if exclude_prop.type == "area" and exclude_prop.area is not None:
+                        excluded_objects_per_type[exclude_prop.type].append(
+                            exclude_prop.area
+                        )
+                    elif exclude_prop.type == "link" and exclude_prop.link is not None:
+                        excluded_objects_per_type[exclude_prop.type].append(
+                            exclude_prop.link
+                        )
+        return excluded_objects_per_type
+
 
 def parse_conversion_template(input_template: TextIO) -> ConversionTemplate:
     tree = safe_load(input_template)

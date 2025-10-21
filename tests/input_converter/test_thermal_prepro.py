@@ -31,11 +31,11 @@ DATAFRAME_PREPRO_THERMAL_CONFIG = (
     create_dataframe_from_constant(lines=8760, columns=4, value=3),  # modulation
     create_dataframe_from_constant(lines=8760, columns=1, value=6),  # series
 )
-MODEL_LIST = [
+LIB_PATHS = [
     "src/gems/libs/antares_historic/antares_historic.yml",
     "src/gems/libs/reference_models/andromede_v1_models.yml",
 ]
-MODEL_LIST_WITH_BASE = [str(Path(os.getcwd()) / suffix) for suffix in MODEL_LIST]
+LIB_PATHS_WITH_BASE = [str(Path(os.getcwd()) / suffix) for suffix in LIB_PATHS]
 
 
 class TestThermalPreprocessing:
@@ -52,7 +52,7 @@ class TestThermalPreprocessing:
             study_input=local_study_w_thermal,
             logger=logger,
             mode="full",
-            lib_paths=MODEL_LIST,
+            lib_paths=LIB_PATHS,
         )
 
         return converter
