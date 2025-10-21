@@ -34,7 +34,7 @@ from gems.study.data import (
     TimeSeriesData,
     dataframe_to_scenario_series,
     dataframe_to_time_series,
-    load_ts_from_txt,
+    load_ts_from_file,
 )
 from gems.study.parsing import InputComponent, InputPortConnections, InputSystem
 
@@ -177,7 +177,7 @@ def _build_data(
 ) -> AbstractDataStructure:
     if isinstance(param_value, str):
         # Should happen only if time-dependent or scenario-dependent
-        ts_data = load_ts_from_txt(param_value, timeseries_dir)
+        ts_data = load_ts_from_file(param_value, timeseries_dir)
         if time_dependent and scenario_dependent:
             return TimeScenarioSeriesData(ts_data, scenarization)
         elif time_dependent:

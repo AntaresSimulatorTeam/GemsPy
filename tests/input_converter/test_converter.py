@@ -1095,25 +1095,25 @@ class TestConverter:
 
         output_path = converter.output_folder
         path1 = (
-            output_path / "input" / "data-series" / "marginal_cost_fr_z_batteries.txt"
+            output_path / "input" / "data-series" / "marginal_cost_fr_z_batteries.tsv"
         )
         path2 = (
             output_path
             / "input"
             / "data-series"
-            / "p_max_injection_modulation_fr_z_batteries.txt"
+            / "p_max_injection_modulation_fr_z_batteries.tsv"
         )
         path3 = (
             output_path
             / "input"
             / "data-series"
-            / "p_max_withdrawal_modulation_fr_fr_batteries_inj.txt"
+            / "p_max_withdrawal_modulation_fr_fr_batteries_inj.tsv"
         )
         path4 = (
             output_path
             / "input"
             / "data-series"
-            / "upper_rule_curve_z_batteries_z_batteries_batteries_fr_1.txt"
+            / "upper_rule_curve_z_batteries_z_batteries_batteries_fr_1.tsv"
         )
         assert check_file_exists(path1)
         assert check_file_exists(path2)

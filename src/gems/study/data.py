@@ -132,19 +132,34 @@ class ScenarioSeriesData(AbstractDataStructure):
         return scenario
 
 
-def load_ts_from_txt(
+def load_ts_from_file(
     timeseries_name: Optional[str], path_to_file: Optional[Path]
 ) -> pd.DataFrame:
-    if path_to_file is not None and timeseries_name is not None:
-        timeseries_with_extension = timeseries_name + ".txt"
-        ts_path = path_to_file / timeseries_with_extension
-    try:
-        return pd.read_csv(ts_path, header=None, sep=r"\s+")
-
-    except FileNotFoundError:
+    if path_to_file is None or timeseries_name is None:
         raise FileNotFoundError(f"File '{timeseries_name}' does not exist")
-    except Exception:
-        raise Exception(f"An error has arrived when processing '{ts_path}'")
+
+    base_path = path_to_file / timeseries_name
+    candidates = [base_path.with_suffix(".txt"), base_path.with_suffix(".tsv")]
+
+    last_exc: Optional[Exception] = None
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            sep = r"\s+" if candidate.suffix == ".txt" else "\t"
+            return pd.read_csv(candidate, header=None, sep=sep)
+        except Exception as e:
+            last_exc = e
+            break
+
+    if last_exc is not None:
+        raise Exception(
+            f"An error has arrived when processing '{candidate}': {last_exc}"
+        )
+
+    raise FileNotFoundError(
+        f"File '{timeseries_name}.txt' or '{timeseries_name}.tsv' does not exist"
+    )
 
 
 def dataframe_to_time_series(ts_dataframe: pd.DataFrame) -> Dict[TimeIndex, float]:
