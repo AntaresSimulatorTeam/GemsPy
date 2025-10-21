@@ -594,9 +594,6 @@ class AntaresStudyConverter:
         connections: list[InputPortConnections] = []
         area_connections: list[InputAreaConnections] = []
 
-        # list_valid_areas: set[str] = set(self.areas.keys())
-        # all_excluded_areas: set[Any] = set()
-
         for model in self.models_to_convert:
             conversion_template = model_conversion_templates[model]
             self._convert_single_model(
