@@ -238,9 +238,9 @@ def test_benders_decomposed_integration(
         "solution": {
             "overall_cost": 80_000,
             "values": {
-                "CAND_p_max": 100,
-                "DISCRETE_p_max": 100,
-                "DISCRETE_nb_units": 10,
+                "CAND.p_max": 100,
+                "DISCRETE.p_max": 100,
+                "DISCRETE.nb_units": 10,
             },
         }
     }
@@ -332,7 +332,7 @@ def test_benders_decomposed_multi_time_block_single_scenario(
         "solution": {
             "overall_cost": 62_000,
             "values": {
-                "CAND_p_max": 100,
+                "CAND.p_max": 100,
             },
         }
     }
@@ -419,7 +419,7 @@ def test_benders_decomposed_single_time_block_multi_scenario(
         "solution": {
             "overall_cost": 55_000,
             "values": {
-                "CAND_p_max": 100,
+                "CAND.p_max": 100,
             },
         }
     }
@@ -513,7 +513,7 @@ def test_benders_decomposed_multi_time_block_multi_scenario(
         "solution": {
             "overall_cost": 58_000,
             "values": {
-                "CAND_p_max": 100,
+                "CAND.p_max": 100,
             },
         }
     }

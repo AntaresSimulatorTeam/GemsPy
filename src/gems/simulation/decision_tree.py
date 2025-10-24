@@ -133,20 +133,20 @@ class DecisionTreeNode(NodeMixin):
         prefix_par = ""
         cumulative_var_par_id = ""
         if self.parent:
-            prefix_par = f"{self.parent.id}_{component_par.id}"
-            cumulative_var_par_id = f"{prefix_par}_{cumulative_par_var_id}"
+            prefix_par = f"{self.parent.id}.{component_par.id}"
+            cumulative_var_par_id = f"{prefix_par}.{cumulative_par_var_id}"
 
             self.coupling_info.variables.add(cumulative_var_par_id)
 
-        prefix_chd = f"{self.id}_{component_chd.id}"
-        cumulative_var_chd_id = f"{prefix_chd}_{cumulative_chd_var_id}"
-        incremental_var_par_id = f"{prefix_chd}_{incremental_chd_var_id}"
+        prefix_chd = f"{self.id}.{component_chd.id}"
+        cumulative_var_chd_id = f"{prefix_chd}.{cumulative_chd_var_id}"
+        incremental_var_par_id = f"{prefix_chd}.{incremental_chd_var_id}"
 
         self.coupling_info.variables.add(cumulative_var_chd_id)
         self.coupling_info.variables.add(incremental_var_par_id)
 
         self.coupling_info.constraints[
-            f"{prefix_par}_{prefix_chd}_{len(self.coupling_info.constraints)}"
+            f"{prefix_par}.{prefix_chd}.{len(self.coupling_info.constraints)}"
         ] = (var(cumulative_var_chd_id) - var(incremental_var_par_id)) == (
             var(cumulative_var_par_id) if cumulative_var_par_id else literal(0)
         )

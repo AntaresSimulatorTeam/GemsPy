@@ -142,7 +142,7 @@ def test_writing_p_min_max_constraint_should_represent_all_expected_constraints(
 ):
     """
     Aim at representing the following mathematical constraints:
-    For all t, p_min <= p[t] <= p_max * alpha[t] where p_min, p_max are literal paramters and alpha is an input timeseries
+    For all t, p_min <= p[t] <= p_max * alpha[t] where p_min, p_max are literal parameters and alpha is an input timeseries
     """
     try:
         p_min = literal(5)

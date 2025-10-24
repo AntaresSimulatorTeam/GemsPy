@@ -546,7 +546,7 @@ def make_constraint(
     """
     Adds constraint to the solver.
     """
-    constraint_name = f"{data.name}_t{block_timestep}_s{scenario}"
+    constraint_name = _solver_constraint_name(context, block_timestep, scenario, data)
 
     solver_constraint: lp.Constraint = solver.Constraint(constraint_name)
     constant: float = 0
@@ -562,6 +562,24 @@ def make_constraint(
     solver_constraint.SetBounds(
         data.lower_bound - constant, data.upper_bound - constant
     )
+
+
+def _solver_constraint_name(
+    context: OptimizationContext,
+    block_timestep: int,
+    scenario: int,
+    data: ConstraintData,
+) -> str:
+    scenario_suffix = (
+        f"_s{scenario}" if (scenario is not None and context.scenarios > 1) else ""
+    )
+    block_suffix = (
+        f"_t{block_timestep}"
+        if (block_timestep is not None and context.block_length() > 1)
+        else ""
+    )
+    constraint_name = f"{data.name}{scenario_suffix}{block_suffix}"
+    return constraint_name
 
 
 class OptimizationProblem:
@@ -616,10 +634,10 @@ class OptimizationProblem:
         self, component_id: str, var_name: str, t: Optional[int], s: Optional[int]
     ) -> str:
         component_prefix = (
-            f"{component_id}_" if (self.context.full_var_name and component_id) else ""
+            f"{component_id}." if (self.context.full_var_name and component_id) else ""
         )
         tree_prefix = (
-            f"{self.context.tree_node}_"
+            f"{self.context.tree_node}."
             if (self.context.full_var_name and self.context.tree_node)
             else ""
         )
@@ -635,7 +653,7 @@ class OptimizationProblem:
         # Internally, it will be indexed by a structure that into account
         # the component id, variable name, timestep and scenario separately
         return (
-            f"{tree_prefix}{component_prefix}{var_name}{block_suffix}{scenario_suffix}"
+            f"{tree_prefix}{component_prefix}{var_name}{scenario_suffix}{block_suffix}"
         )
 
     def _create_variables(self) -> None:
@@ -721,7 +739,7 @@ class OptimizationProblem:
                 )
 
                 instantiated_constraint = Constraint(
-                    name=f"{component.id}_{constraint.name}",
+                    name=f"{component.id}.{constraint.name}",
                     expression=instantiated_expr,
                     lower_bound=instantiated_lb,
                     upper_bound=instantiated_ub,
@@ -835,7 +853,7 @@ def fusion_problems(
                 coeff = cstr.GetCoefficient(var)
                 # If variable present in constraint, we add the constraint to root
                 if coeff != 0:
-                    key = f"{master.name}_{cstr.name()}"
+                    key = f"{master.name}.{cstr.name()}"
                     if key not in root_constraints:
                         root_constraints[key] = root_master.solver.Constraint(
                             cstr.Lb(), cstr.Ub(), key

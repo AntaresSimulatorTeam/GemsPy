@@ -252,10 +252,10 @@ def test_investment_pathway_on_sequential_nodes(
         "solution": {
             "overall_cost": 17_000,
             "values": {
-                "parent_CAND_delta_invest": 80,
-                "child_CAND_delta_invest": 20,
-                "parent_CAND_invested_capa": 80,
-                "child_CAND_invested_capa": 100,
+                "parent.CAND.delta_invest": 80,
+                "child.CAND.delta_invest": 20,
+                "parent.CAND.invested_capa": 80,
+                "child.CAND.invested_capa": 100,
             },
         }
     }
@@ -464,12 +464,12 @@ def test_investment_pathway_on_a_tree_with_one_root_two_children(
         "solution": {
             "overall_cost": 39_200,
             "values": {
-                "root_CAND_delta_invest": 300,
-                "childA_CAND_delta_invest": 0,
-                "childB_CAND_delta_invest": 100,
-                "root_CAND_invested_capa": 300,
-                "childA_CAND_invested_capa": 300,
-                "childB_CAND_invested_capa": 400,
+                "root.CAND.delta_invest": 300,
+                "childA.CAND.delta_invest": 0,
+                "childB.CAND.delta_invest": 100,
+                "root.CAND.invested_capa": 300,
+                "childA.CAND.invested_capa": 300,
+                "childB.CAND.invested_capa": 400,
             },
         }
     }
