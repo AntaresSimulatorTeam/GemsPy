@@ -9,48 +9,51 @@ from gems.simulation.simulation_table import (
 
 
 
+@dataclass(frozen=True)
 class FakeTimeIndex:
-    def __init__(self, time: int, scenario: int):
-        self.time = time
-        self.scenario = scenario
+    time: int
+    scenario: int
 
 
-class FakeSolver:
-    def Objective(self):
-        class Obj:
-            def Value(self) -> float:
-                return 42.0
-
-        return Obj()
-
-
-class FakeContext:
-    def __init__(self):
-        class Block:
-            id = 1
-
-        self._block = Block()
-
-    def block_length(self):
-        return 3
-
-
-class FakeProblem:
-    def __init__(self):
-        self.context = FakeContext()
-        self.solver = FakeSolver()
-
-
+@dataclass(frozen=True)
 class FakeVariable:
-    def __init__(self, name, values, basis_status):
-        self._name = name
-        self._value = values
-        self._basis_status = basis_status
+    _name: str
+    _value: dict  # e.g. {FakeTimeIndex: float}
+    _basis_status: dict  # e.g. {FakeTimeIndex: str}
 
 
+@dataclass(frozen=True)
 class FakeComponent:
-    def __init__(self, variables):
-        self._variables = variables
+    _variables: dict
+
+
+class FakeOutputValues(OutputValues):
+    def __init__(self, problem, components):
+        self.problem = problem
+        self._components = components
+
+
+@dataclass(frozen=True)
+class FakeSolver:
+    @dataclass(frozen=True)
+    class Obj:
+        def Value(self) -> float:
+            return 42.0
+
+    def Objective(self):
+        return self.Obj()
+
+
+@dataclass(frozen=True)
+class FakeContext:
+    @dataclass(frozen=True)
+    class Block:
+        id: int = 1
+
+    _block: Block = Block()
+
+    def block_length(self) -> int:
+        return 3
 
 
 class FakeOutputValues(OutputValues):
@@ -67,13 +70,13 @@ def test_simulation_table_builder_manual(tmp_path):
     ts1 = FakeTimeIndex(time=1, scenario=0)
 
     var = FakeVariable(
-        name="p",
-        values={ts0: 10.0, ts1: 20.0},
-        basis_status={ts0: "BASIC", ts1: "NONBASIC"},
+        _name="p",
+        _value={ts0: 10.0, ts1: 20.0},
+        _basis_status={ts0: "BASIC", ts1: "NONBASIC"},
     )
 
-    component = FakeComponent({"var1": var})
-    output_values = FakeOutputValues(problem, {"compA": component})
+    component = FakeComponent(_variables={"var1": var})
+    output_values = FakeOutputValues(problem=problem, components={"compA": component})
 
     # --- Build simulation table ---
     builder = SimulationTableBuilder(simulation_id="test")
@@ -129,4 +132,3 @@ def test_simulation_table_builder_manual(tmp_path):
 
     expected_header = ",".join(col.value for col in SimulationColumns)
     assert first_line == expected_header, "CSV header does not match expected columns"
-    csv_path.unlink()

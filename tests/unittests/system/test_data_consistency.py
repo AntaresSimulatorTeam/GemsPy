@@ -39,7 +39,7 @@ from gems.study import (
     TimeSeriesData,
     create_component,
 )
-from gems.study.data import load_ts_from_txt
+from gems.study.data import load_ts_from_file
 from tests.unittests.system.libs.standard import (
     BALANCE_PORT_TYPE,
     CONSTANT,
@@ -336,7 +336,7 @@ def test_requirements_consistency_scenario_varying_parameter_with_correct_data_p
 def test_load_data_from_txt() -> None:
     txt_file = "gen-costs"
 
-    gen_costs = load_ts_from_txt(txt_file, Path(__file__).parent / "series")
+    gen_costs = load_ts_from_file(txt_file, Path(__file__).parent / "series")
     expected_timeseries = pd.DataFrame(
         [[100, 200], [50, 100]], index=[0, 1], columns=[0, 1]
     )

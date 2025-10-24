@@ -19,9 +19,10 @@ import yaml
 from pandas import DataFrame
 from pydantic import BaseModel
 
+from gems.input_converter.src.parsing import ConversionTemplate
 
-def resolve_path(path_str: Path) -> Path:
-    path = Path(path_str)
+
+def resolve_path(path: Path) -> Path:
     if not path.exists():
         raise FileNotFoundError
 
@@ -49,10 +50,12 @@ def check_dataframe_validity(df: DataFrame) -> bool:
     return True
 
 
-def transform_to_yaml(model: BaseModel, output_path: Path) -> None:
+def dump_to_yaml(model: BaseModel, output_path: Path) -> None:
     with open(output_path, "w", encoding="utf-8") as yaml_file:
         yaml.dump(
-            {"system": model.model_dump(by_alias=True, exclude_unset=True)},
+            {
+                "system": model.model_dump(by_alias=True, exclude_unset=True),
+            },
             yaml_file,
             allow_unicode=True,
         )
@@ -68,7 +71,7 @@ def read_yaml_file(file_path: Path) -> dict[str, Any]:
             raise yaml.YAMLError(f"Error trying to read yaml file {file_path}: {e}")
 
 
-def save_to_csv(series: Union[pd.DataFrame, pd.Series], output_file: PurePath) -> None:
+def save_to_file(series: Union[pd.DataFrame, pd.Series], output_file: PurePath) -> None:
     output_dir = os.path.dirname(output_file)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)

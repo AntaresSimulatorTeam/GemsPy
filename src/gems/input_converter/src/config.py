@@ -1,3 +1,15 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
 TEMPLATE_CLUSTER_TYPE_TO_GET_METHOD = {
     "thermal": "get_thermals",
     "renewable": "get_renewables",
@@ -75,3 +87,18 @@ TEMPLATE_TO_TIMESERIES_FILE_TYPE = {
     "series_fuel_cost": "THERMAL_FUEL",
     "renewable_series": "RENEWABLE_SERIES",
 }
+
+MODEL_NAME_TO_FILE_NAME = {
+    "battery": "battery.yaml",
+    "link": "link.yaml",
+    "load": "load.yaml",
+    "solar": "solar.yaml",
+    "short-term-storage": "st-storage.yaml",
+    "thermal": "thermal.yaml",
+    "wind": "wind.yaml",
+}
+
+MATRIX_TYPES = ["load", "solar", "wind"]
+CLUSTER_TYPES = ["thermal", "renewable", "st_storage"]
+LINK_TYPES = ["link"]
+AREA_TYPES = ["area"]

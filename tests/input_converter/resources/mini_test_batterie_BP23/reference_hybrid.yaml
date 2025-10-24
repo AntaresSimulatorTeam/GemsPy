@@ -1,0 +1,50 @@
+system:
+  area-connections:
+  - area: fr
+    component: battery_fr
+    port: injection_port
+  components:
+  - id: battery_fr
+    model: andromede-v1-models.battery
+    parameters:
+    - id: reservoir_capacity
+      scenario-dependent: false
+      time-dependent: false
+      value: 2000.0
+    - id: injection_nominal_capacity
+      scenario-dependent: false
+      time-dependent: false
+      value: 1100.0
+    - id: withdrawal_nominal_capacity
+      scenario-dependent: false
+      time-dependent: false
+      value: 1000.0
+    - id: efficiency_injection
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.923
+    - id: efficiency_withdrawal
+      scenario-dependent: false
+      time-dependent: false
+      value: 1.026
+    - id: lower_rule_curve
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0
+    - id: upper_rule_curve
+      scenario-dependent: false
+      time-dependent: true
+      value: upper_rule_curve_z_batteries_z_batteries_batteries_fr_1
+    - id: p_max_injection_modulation
+      scenario-dependent: false
+      time-dependent: true
+      value: p_max_injection_modulation_fr_z_batteries
+    - id: p_max_withdrawal_modulation
+      scenario-dependent: false
+      time-dependent: true
+      value: p_max_withdrawal_modulation_fr_fr_batteries_inj
+    - id: marginal_cost
+      scenario-dependent: false
+      time-dependent: true
+      value: marginal_cost_fr_z_batteries
+  id: mini_test_batterie_BP23

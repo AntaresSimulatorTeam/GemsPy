@@ -30,6 +30,12 @@ template:
           object-properties:
             type: area
             area: z_batteries_pcomp
+        - id: area_batteries_inj
+          object-properties:
+            type: thermal
+            area: ${area}
+            cluster: ${area}_batteries_inj
+
 
   component:
     id: battery_${area}

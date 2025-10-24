@@ -1,3 +1,4 @@
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Callable
@@ -18,6 +19,7 @@ class ThermalDataPreprocessing:
     DEFAULT_PERIOD: int = 168
 
     def __init__(self, thermal: ThermalCluster, study_path: Path):
+        # TODO Do we move preprocessing files in data series folder ?
         self.thermal = thermal
         self.study_path = study_path
         self.series_path = (
@@ -27,6 +29,11 @@ class ThermalDataPreprocessing:
             / "series"
             / self.thermal.area_id
             / self.thermal.id
+        )
+        # Write the series. It is necessary as the input folder may be different than the output folder
+        series_data: pd.DataFrame = self.thermal.get_series_matrix()
+        series_data.to_csv(
+            self.series_path / "series.txt", sep="\t", index=False, header=False
         )
         self._prepro_parameter_functions: dict[str, Callable[[int], pd.DataFrame]] = {
             "p_min_cluster": lambda _: self._compute_p_min_cluster(),
@@ -111,6 +118,9 @@ class ThermalDataPreprocessing:
         df = self._prepro_parameter_functions[parameter_id](period)
         csv_path = self._build_csv_path(parameter_id)
 
+        output_dir = os.path.dirname(csv_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
         # This separator is chosen to comply with the antares_craft timeseries creation
         df.to_csv(csv_path, sep="\t", index=False, header=False)
 

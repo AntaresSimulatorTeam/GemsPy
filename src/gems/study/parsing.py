@@ -34,6 +34,12 @@ def parse_scenario_builder(file: Path) -> pd.DataFrame:
     return sb
 
 
+class InputAreaConnections(ModifiedBaseModel):
+    component: str
+    port: str
+    area: str
+
+
 class InputPortConnections(ModifiedBaseModel):
     component1: str
     port1: str
@@ -57,10 +63,12 @@ class InputComponent(ModifiedBaseModel):
 
 
 class InputSystem(ModifiedBaseModel):
+    id: Optional[str] = None
     model_libraries: Optional[str] = None  # Parsed but unused for now
-    nodes: List[InputComponent] = Field(default_factory=list)
     components: List[InputComponent] = Field(default_factory=list)
-    connections: List[InputPortConnections] = Field(default_factory=list)
+    connections: Optional[List[InputPortConnections]] = None
+    area_connections: Optional[List[InputAreaConnections]] = None
+    nodes: Optional[List[InputComponent]] = []
 
 
 @dataclass(frozen=True)

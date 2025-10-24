@@ -34,7 +34,7 @@ from gems.study.data import (
     TimeSeriesData,
     dataframe_to_scenario_series,
     dataframe_to_time_series,
-    load_ts_from_txt,
+    load_ts_from_file,
 )
 from gems.study.parsing import InputComponent, InputPortConnections, InputSystem
 
@@ -66,10 +66,12 @@ def resolve_system(input_system: InputSystem, libraries: dict[str, Library]) -> 
     components_list = [
         _resolve_component(libraries, m) for m in input_system.components
     ]
-    nodes = [_resolve_component(libraries, n) for n in input_system.nodes]
+    nodes_input = getattr(input_system, "nodes", []) or []
+    nodes = [_resolve_component(libraries, n) for n in nodes_input]
     all_components: List[Component] = components_list + nodes
+    connections_input = getattr(input_system, "connections", []) or []
     connections = []
-    for cnx in input_system.connections:
+    for cnx in connections_input:
         resolved_cnx = _resolve_connections(cnx, all_components)
         connections.append(resolved_cnx)
 
@@ -150,7 +152,8 @@ def build_data_base(
     input_system: InputSystem, timeseries_dir: Optional[Path]
 ) -> DataBase:
     database = DataBase()
-    input_system_objects = input_system.components + input_system.nodes
+    nodes_input = getattr(input_system, "nodes", []) or []
+    input_system_objects = input_system.components + nodes_input
     for comp in input_system_objects:
         # This idiom allows mypy to 'ignore' the fact that comp.parameter can be None
         for param in comp.parameters or []:
@@ -174,7 +177,7 @@ def _build_data(
 ) -> AbstractDataStructure:
     if isinstance(param_value, str):
         # Should happen only if time-dependent or scenario-dependent
-        ts_data = load_ts_from_txt(param_value, timeseries_dir)
+        ts_data = load_ts_from_file(param_value, timeseries_dir)
         if time_dependent and scenario_dependent:
             return TimeScenarioSeriesData(ts_data, scenarization)
         elif time_dependent:

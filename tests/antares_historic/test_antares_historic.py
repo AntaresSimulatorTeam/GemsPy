@@ -10,7 +10,7 @@ from gems.model.parsing import InputLibrary, parse_yaml_library
 from gems.model.resolve_library import resolve_library
 from gems.simulation import TimeBlock, build_problem
 from gems.simulation.optimization import OptimizationProblem
-from gems.study.data import load_ts_from_txt
+from gems.study.data import load_ts_from_file
 from gems.study.parsing import InputSystem, parse_yaml_components
 from gems.study.resolve_components import (
     build_data_base,
@@ -18,6 +18,11 @@ from gems.study.resolve_components import (
     consistency_check,
     resolve_system,
 )
+
+LIB_PATHS = [
+    "src/gems/libs/antares_historic/antares_historic.yml",
+    "src/gems/libs/reference_models/andromede_v1_models.yml",
+]
 
 
 @dataclass(frozen=True)
@@ -124,18 +129,18 @@ def _setup_study_component(study, period=None) -> ToolTestStudy:
     logger = Logger(__name__, study_path)
 
     fill_timeseries(study_path)
-
     area_fr = study.get_areas()["fr"]
     path = study_path / "input" / "load" / "series"
-    timeseries = load_ts_from_txt("load_fr", path)
+    timeseries = load_ts_from_file("load_fr", path)
     area_fr.set_load(pd.DataFrame(timeseries))
-
-    converter = AntaresStudyConverter(study_input=study, logger=logger, period=period)
+    converter: AntaresStudyConverter = AntaresStudyConverter(
+        study_input=study, logger=logger, mode="full", lib_paths=LIB_PATHS
+    )
     converter.process_all()
-
     compo_file = converter.output_path
+    path = converter.output_folder / "input" / "data-series"
     with compo_file.open() as c:
-        return ToolTestStudy(parse_yaml_components(c), study_path)
+        return ToolTestStudy(parse_yaml_components(c), path)
 
 
 @pytest.fixture
@@ -211,10 +216,9 @@ def test_thermal_balance_using_converter(
 
     status = problem.solver.Solve()
     assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == 165
+    assert problem.solver.Objective().Value() == pytest.approx(165, rel=1e-9)
 
 
-# @pytest.mark.skip("Pass test for the moment")
 def test_storage_balance_using_converter(
     study_component_st_storage: InputSystem, input_library: InputLibrary
 ) -> None:
