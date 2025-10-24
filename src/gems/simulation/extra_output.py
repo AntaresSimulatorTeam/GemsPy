@@ -37,16 +37,16 @@ def evaluate_all_extra_outputs(
 
     results: Dict[str, Dict[str, ExtraOutput]] = {}
 
-    for cmp in getattr(problem.context.network, "all_components", []):
-        model_def = getattr(cmp, "model", None)
-        if not getattr(model_def, "extra_outputs", None):
+    for cmp in problem.context.network.all_components:
+        model_def = cmp.model
+        if not model_def or not model_def.extra_outputs:
             continue
 
-        comp_obj = component_lookup(getattr(cmp, "id"))
+        comp_obj = component_lookup(cmp.id)
         extra_results = evaluate_extra_outputs_for_a_component(comp_obj, problem)
 
         if extra_results:
-            results[getattr(cmp, "id")] = extra_results
+            results[cmp.id] = extra_results
 
     return results
 

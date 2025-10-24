@@ -21,6 +21,9 @@ from gems.simulation.extra_output import ExtraOutput, evaluate_all_extra_outputs
 from gems.simulation.optimization import OptimizationProblem
 from gems.study.data import TimeScenarioIndex
 
+# Output Values do not consider these models for the moments.
+IGNORED_MODEL_KEYWORDS = {"node_balance", "demand"}
+
 
 @dataclass
 class OutputValues:
@@ -230,9 +233,17 @@ class OutputValues:
                 status=status,
                 is_mip=is_mip,
             )
+
+        # Register all network components and auto-ignore structural ones
         for cmp in self.problem.context.network.all_components:
-            self.component(cmp.id).model = cmp.model
-            self.component(cmp.id).network_component = cmp
+            comp = self.component(cmp.id)
+            comp.model = cmp.model
+            comp.network_component = cmp
+
+            # Automatically ignore non solver related component to keep coherent comparaisons.
+            model_id = getattr(cmp.model, "id", "").lower()
+            if any(keyword in model_id for keyword in IGNORED_MODEL_KEYWORDS):
+                comp.ignore = True
 
     def component(self, component_id: str) -> "OutputValues.Component":
         if component_id not in self._components:

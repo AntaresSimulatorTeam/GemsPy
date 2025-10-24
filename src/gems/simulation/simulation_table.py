@@ -48,7 +48,7 @@ class SimulationTableBuilder:
         block = getattr(context._block, "id")
         block_size = context.block_length()
         absolute_time_offset = absolute_time_offset or (block - 1) * block_size
-
+        assert absolute_time_offset is not None
         rows: list[dict[str, Any]] = []
         rows += self._collect_solver_outputs(output_values, block, absolute_time_offset)
         rows += self._collect_extra_outputs(output_values, block, absolute_time_offset)
