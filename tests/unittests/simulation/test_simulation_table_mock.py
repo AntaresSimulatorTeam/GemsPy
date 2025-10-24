@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 from dataclasses import dataclass
+
 import pandas as pd
 
 from gems.simulation.output_values import OutputValues
@@ -15,6 +16,7 @@ from gems.simulation.simulation_table import (
 @dataclass(frozen=True)
 class FakeTimeIndex:
     """Represents a (time, scenario) pair for testing."""
+
     time: int
     scenario: int
 
@@ -22,6 +24,7 @@ class FakeTimeIndex:
 @dataclass(frozen=True)
 class FakeVariable:
     """Mimics a solver variable with values and basis statuses."""
+
     _name: str
     _value: dict[FakeTimeIndex, float]
     _basis_status: dict[FakeTimeIndex, str]
@@ -30,12 +33,14 @@ class FakeVariable:
 @dataclass(frozen=True)
 class FakeComponent:
     """Container for fake variables."""
+
     _variables: dict[str, FakeVariable]
 
 
 @dataclass(frozen=True)
 class FakeSolver:
     """Fake solver providing a fixed objective value."""
+
     @dataclass(frozen=True)
     class Obj:
         def Value(self) -> float:
@@ -48,6 +53,7 @@ class FakeSolver:
 @dataclass(frozen=True)
 class FakeContext:
     """Fake optimization context with a single block and block length."""
+
     @dataclass(frozen=True)
     class Block:
         id: int = 1
@@ -61,14 +67,16 @@ class FakeContext:
 @dataclass(frozen=True)
 class FakeProblem:
     """Fake problem that binds context and solver."""
+
     context: FakeContext = FakeContext()
     solver: FakeSolver = FakeSolver()
 
 
 class FakeOutputValues(OutputValues):
     """Simplified OutputValues holding fake components and optional extras."""
+
     def __init__(self, problem: FakeProblem, components: dict, extra_outputs=None):
-        self.problem = problem # type: ignore
+        self.problem = problem  # type: ignore
         self._components = components
         self._extra_outputs = extra_outputs or {}
 
