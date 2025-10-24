@@ -29,20 +29,12 @@ class CommandRunner:
         self.emplacement: pathlib.Path = emplacement
         self.arguments: List[str] = list_arguments
 
-    def check_command(self) -> bool:
+    def check_command(self) -> None:
         if not self.command.is_file():
-            print(f"{self.command} executable not found")
-            return False
-        return True
+            raise ValueError(f"{self.current_dir / self.command} executable not found")
 
     def run(self) -> int:
-        if not self.check_command():
-            # TODO For now, it will return 0 as if nothing is wrong
-            # eventually if should return an error
-            # maybe wait when we separate unit tests from integration tests
-            # modify with bender_decomposed's read_solution
-            print("Return code 0 for now")
-            return 0
+        self.check_command()
 
         os.chdir(self.emplacement)
         res = subprocess.run(

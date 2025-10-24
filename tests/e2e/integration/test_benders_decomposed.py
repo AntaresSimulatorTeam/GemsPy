@@ -166,12 +166,95 @@ def cluster_candidate(discrete_candidate: Model) -> Component:
     return cluster
 
 
-def test_benders_decomposed_integration(
+def test_benders_decomposed_one_candidate(
+    generator: Component,
+    candidate: Component,
+) -> None:
+    """
+    Study case 13_1 : to test investment problems
+    Simple generation expansion problem on one node, one timestep and one scenario with one candidate.
+
+    Demand = 400
+    Generator : P_max : 200, Cost : 45
+    Unsupplied energy : Cost : 501
+
+    -> 200 of unsupplied energy
+    -> Total cost without investment = 45 * 200 + 501 * 200 = 109_200
+
+    Continuous candidate  : Invest cost : 400 / MW; Prod cost : 10
+
+    Optimal investment : 200 MW
+
+    -> Optimal cost = 400 * 200 + 10 * 200 (Invest cost + prod cost of new generator)
+                                + 45 * 200 (Generator)
+                    =    80_000 +   11_000
+                    = 91_000
+    """
+
+    database = DataBase()
+    database.add_data("D", "demand", ConstantData(400))
+
+    database.add_data("N", "spillage_cost", ConstantData(1))
+    database.add_data("N", "ens_cost", ConstantData(501))
+
+    database.add_data("G1", "p_max", ConstantData(200))
+    database.add_data("G1", "cost", ConstantData(45))
+
+    database.add_data("CAND", "op_cost", ConstantData(10))
+    database.add_data("CAND", "invest_cost", ConstantData(400))
+
+    demand = create_component(model=DEMAND_MODEL, id="D")
+
+    node = Node(model=NODE_WITH_SPILL_AND_ENS, id="N")
+    network = Network("test")
+    network.add_node(node)
+    network.add_component(demand)
+    network.add_component(generator)
+    network.add_component(candidate)
+    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    network.connect(PortRef(generator, "balance_port"), PortRef(node, "balance_port"))
+    network.connect(PortRef(candidate, "balance_port"), PortRef(node, "balance_port"))
+
+    scenarios = 1
+    blocks = [TimeBlock(1, [0])]
+
+    config = InterDecisionTimeScenarioConfig(blocks, scenarios)
+    decision_tree_root = DecisionTreeNode("", config, network)
+
+    xpansion = build_benders_decomposed_problem(decision_tree_root, database)
+
+    data = {
+        "solution": {
+            "overall_cost": 91_000,
+            "values": {
+                "CAND_p_max": 200,
+            },
+        }
+    }
+    solution = BendersSolution(data)
+
+    assert xpansion.run()
+    decomposed_solution = xpansion.solution
+    if decomposed_solution is not None:  # For mypy only
+        assert decomposed_solution.is_close(
+            solution
+        ), f"Solution differs from expected: {decomposed_solution}"
+
+    assert xpansion.run(should_merge=True)
+    merged_solution = xpansion.solution
+    if merged_solution is not None:  # For mypy only
+        assert merged_solution.is_close(
+            solution
+        ), f"Solution differs from expected: {merged_solution}"
+
+
+def test_benders_decomposed_with_discrete_candidate(
     generator: Component,
     candidate: Component,
     cluster_candidate: Component,
 ) -> None:
     """
+    Study case 13_2 : to test investment problems
     Simple generation expansion problem on one node, one timestep and one scenario
     but this time with two candidates: one continuous and one discrete.
     We separate master/subproblem and export the problems in MPS format to be solved by the Benders and MergeMPS
