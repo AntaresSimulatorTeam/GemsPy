@@ -1,7 +1,4 @@
-from pathlib import Path
-
 import pandas as pd
-import pytest
 
 from gems.simulation.output_values import OutputValues
 from gems.simulation.simulation_table import (
@@ -10,7 +7,6 @@ from gems.simulation.simulation_table import (
     SimulationTableWriter,
 )
 
-# --- Fake classes for isolated testing ---
 
 
 class FakeTimeIndex:
@@ -61,10 +57,7 @@ class FakeOutputValues(OutputValues):
     def __init__(self, problem, components, extra_outputs=None):
         self.problem = problem
         self._components = components
-        self._extra_outputs = extra_outputs or {}  # <- NEW: ensure it always exists
-
-
-# --- The actual test ---
+        self._extra_outputs = extra_outputs or {}  
 
 
 def test_simulation_table_builder_manual(tmp_path):
@@ -84,7 +77,7 @@ def test_simulation_table_builder_manual(tmp_path):
 
     # --- Build simulation table ---
     builder = SimulationTableBuilder(simulation_id="test")
-    df = builder.build(output_values)
+    df = builder.build(output_values) # type: ignore
 
     expected_rows = [
         {
@@ -126,7 +119,6 @@ def test_simulation_table_builder_manual(tmp_path):
         check_dtype=False,
     )
 
-    # --- Test CSV writing ---
     writer = SimulationTableWriter(df)
     csv_path = writer.write_csv(tmp_path, simulation_id="test", optim_nb=1)
 
@@ -137,5 +129,4 @@ def test_simulation_table_builder_manual(tmp_path):
 
     expected_header = ",".join(col.value for col in SimulationColumns)
     assert first_line == expected_header, "CSV header does not match expected columns"
-
     csv_path.unlink()

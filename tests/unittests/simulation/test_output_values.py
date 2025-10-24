@@ -39,32 +39,27 @@ def test_component_and_flow_output_object() -> None:
 
     opt_context.block_length.return_value = 1
 
-    # ✅ Add minimal fake network to avoid AttributeError
     opt_context.network = Mock()
-    opt_context.network.all_components = []  # no actual components needed
+    opt_context.network.all_components = [] 
 
     mock_problem.context = opt_context
     mock_solver = Mock()
     mock_solver.IsMip.return_value = False
     mock_problem.solver = mock_solver
 
-    # ✅ Patch evaluate_all_extra_outputs to avoid touching real simulation code
     with patch(
         "gems.simulation.output_values.evaluate_all_extra_outputs", return_value={}
     ):
         output = OutputValues(mock_problem)
 
-    # Create a comparison OutputValues instance with no problem (empty)
     test_output = OutputValues()
     assert output != test_output, f"Output is equal to empty output: {output}"
 
-    # Ignore the component entirely
     test_output.component("component_id_test").ignore = True
     assert (
         output == test_output
     ), f"Output differs from expected output after 'ignore': {output}"
 
-    # Re-enable component; add variable values and ignores
     test_output.component("component_id_test").ignore = False
     test_output.component("component_id_test").var("component_var_name").value = 1.0
     test_output.component("component_id_test").var(
@@ -75,7 +70,6 @@ def test_component_and_flow_output_object() -> None:
         output == test_output
     ), f"Output differs from expected output after setting variable values: {output}"
 
-    # Slight difference outside tolerance
     test_output.component("component_id_test").var(
         "component_approx_var_name"
     ).ignore = False
@@ -87,7 +81,6 @@ def test_component_and_flow_output_object() -> None:
         test_output
     ), f"Output is equal to expected outside tolerance: {output}"
 
-    # Within tolerance
     test_output.component("component_id_test").var(
         "component_approx_var_name"
     ).value = 1.000_000_000_1
