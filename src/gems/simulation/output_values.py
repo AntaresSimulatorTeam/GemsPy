@@ -1,47 +1,29 @@
 # Copyright (c) 2024, RTE (https://www.rte-france.com)
 #
-# See AUTHORS.txt
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
 
 """
-Util class to obtain solver results
+Utility classes to obtain solver results.
 """
 import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Tuple, TypeVar, Union, cast
 
-from gems.simulation.extra_output import ExtraOutput, evaluate_all_extra_outputs
+from gems.simulation.extra_output import ExtraOutput
 from gems.simulation.optimization import OptimizationProblem
 from gems.study.data import TimeScenarioIndex
-
-# Output Values do not consider these models for the moments.
-IGNORED_MODEL_KEYWORDS = {"node_balance", "demand"}
 
 
 @dataclass
 class OutputValues:
     """
-    Contents variables output values after solver work completion.
+    Contains variables and extra outputs after solver work completion.
     """
 
     @dataclass
     class Variable:
-        """
-        'constant_var':      c1,
-        'time_only_var':     [[t1, t2, t3]],
-        'scenario_only_var': [s1, s2],
-        'time_scenario_var': [[t1s1, t2s1, t3s1], [t1s2, t2s2, t3s2]]
-
-        Internally, the _value attribute will be a dict mapping TimeScenarioIndex(t,s) to float
-        """
-
         _name: str
         _value: Dict[TimeScenarioIndex, float] = field(init=False, default_factory=dict)
         _size: Tuple[int, int] = field(init=False, default=(0, 0))
@@ -66,8 +48,6 @@ class OutputValues:
             rel_tol: float = 1.0e-9,
             abs_tol: float = 0.0,
         ) -> bool:
-            # From the docs in https://docs.python.org/3/library/math.html#math.isclose
-            # math.isclose(a, b) returns abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
             return (self.ignore or other.ignore) or (
                 self._name == other._name
                 and self._size == other._size
@@ -93,13 +73,10 @@ class OutputValues:
             size_s, size_t = self._size
             if size_t == 1:
                 if size_s == 1:
-                    # Constant
                     return self._value[TimeScenarioIndex(0, 0)]
                 else:
-                    # Scenario-only
                     return [self._value[TimeScenarioIndex(0, s)] for s in range(size_s)]
             else:
-                # Either Time-only or Time-Scenario
                 return [
                     [self._value[TimeScenarioIndex(t, s)] for t in range(size_t)]
                     for s in range(size_s)
@@ -108,24 +85,19 @@ class OutputValues:
         @value.setter
         def value(self, values: Union[float, List[float], List[List[float]]]) -> None:
             size_s, size_t = 1, 1
-
             if isinstance(values, list):
                 size_s = len(values)
                 for scenario, timesteps in enumerate(values):
                     if isinstance(timesteps, list):
                         size_t = len(timesteps)
                         for timestep, value in enumerate(timesteps):
-                            # Either Time-only or Time-Scenario
                             self._value[TimeScenarioIndex(timestep, scenario)] = value
                     else:
-                        # Scenario-only
                         self._value[TimeScenarioIndex(0, scenario)] = cast(
                             float, timesteps
                         )
             else:
-                # Constant
                 self._value[TimeScenarioIndex(0, 0)] = values
-
             self._size = (size_s, size_t)
 
         def _set(
@@ -154,7 +126,7 @@ class OutputValues:
         _variables: Dict[str, "OutputValues.Variable"] = field(
             init=False, default_factory=dict
         )
-        network_component: Optional[Any] = field(default=None, init=False)
+        _extra_outputs: Dict[str, ExtraOutput] = field(init=False, default_factory=dict)
         model: Optional[Any] = field(default=None, init=False)
         ignore: bool = field(default=False, init=False)
 
@@ -175,12 +147,19 @@ class OutputValues:
                 and _are_mappings_close(
                     self._variables, other._variables, rel_tol, abs_tol
                 )
+                and _are_mappings_close(
+                    self._extra_outputs, other._extra_outputs, rel_tol, abs_tol
+                )
             )
 
         def __str__(self) -> str:
             string = f"{self._id} : {'(ignored)' if self.ignore else ''}\n"
             for var in self._variables.values():
                 string += f"  {str(var)}\n"
+            if self._extra_outputs:
+                string += "  [Extra Outputs]\n"
+                for out in self._extra_outputs.values():
+                    string += f"    {out.name}: {out.values}\n"
             return string
 
         def var(self, variable_name: str) -> "OutputValues.Variable":
@@ -188,11 +167,19 @@ class OutputValues:
                 self._variables[variable_name] = OutputValues.Variable(variable_name)
             return self._variables[variable_name]
 
+        def evaluate_extra_outputs(self, problem: Any) -> None:
+            """Evaluate this component’s model-defined extra outputs."""
+            from gems.simulation.extra_output import (
+                evaluate_extra_outputs_for_a_component,
+            )
+
+            self._extra_outputs.clear()
+            self._extra_outputs.update(
+                evaluate_extra_outputs_for_a_component(self, problem)
+            )
+
     problem: Optional[OptimizationProblem] = field(default=None)
     _components: Dict[str, "OutputValues.Component"] = field(
-        init=False, default_factory=dict
-    )
-    _extra_outputs: Dict[str, Dict[str, ExtraOutput]] = field(
         init=False, default_factory=dict
     )
 
@@ -213,17 +200,13 @@ class OutputValues:
         )
 
     def __str__(self) -> str:
-        string = "\n"
-        for comp in self._components.values():
-            string += f"{str(comp)}"
-
-        return string
+        return "\n" + "".join(f"{comp}\n" for comp in self._components.values())
 
     def _build_components(self) -> None:
         if self.problem is None:
             return
-        is_mip = self.problem.solver.IsMip()
 
+        is_mip = self.problem.solver.IsMip()
         for key, value in self.problem.context.get_all_component_variables().items():
             status = None if is_mip else value.basis_status()
             self.component(key.component_id).var(str(key.variable_name))._set(
@@ -234,16 +217,9 @@ class OutputValues:
                 is_mip=is_mip,
             )
 
-        # Register all network components and auto-ignore structural ones
         for cmp in self.problem.context.network.all_components:
             comp = self.component(cmp.id)
             comp.model = cmp.model
-            comp.network_component = cmp
-
-            # Automatically ignore non solver related component to keep coherent comparaisons.
-            model_id = getattr(cmp.model, "id", "").lower()
-            if any(keyword in model_id for keyword in IGNORED_MODEL_KEYWORDS):
-                comp.ignore = True
 
     def component(self, component_id: str) -> "OutputValues.Component":
         if component_id not in self._components:
@@ -251,14 +227,14 @@ class OutputValues:
         return self._components[component_id]
 
     def evaluate_extra_outputs(self) -> None:
-        """Evaluate all model-defined extra outputs for all components."""
-        self._extra_outputs.clear()
-        self._extra_outputs.update(
-            evaluate_all_extra_outputs(self.problem, self.component)
-        )
+        """Evaluate extra outputs for all components."""
+        for comp in self._components.values():
+            comp.evaluate_extra_outputs(self.problem)
 
 
-Comparable = TypeVar("Comparable", OutputValues.Component, OutputValues.Variable)
+Comparable = TypeVar(
+    "Comparable", OutputValues.Component, OutputValues.Variable, ExtraOutput
+)
 
 
 def _are_mappings_close(
@@ -270,26 +246,34 @@ def _are_mappings_close(
     lhs_keys = lhs.keys()
     rhs_keys = rhs.keys()
 
-    if (lhs_only_keys := lhs_keys - rhs_keys) and any(
-        not lhs[key].ignore for key in lhs_only_keys
-    ):
-        return False
+    # Keys present only on the left
+    lhs_only = lhs_keys - rhs_keys
+    if lhs_only:
+        for key in lhs_only:
+            item = lhs[key]
+            if getattr(item, "ignore", False) is False:
+                return False
 
-    elif (rhs_only_keys := rhs_keys - lhs_keys) and any(
-        not rhs[key].ignore for key in rhs_only_keys
-    ):
-        return False
+    # Keys present only on the right
+    rhs_only = rhs_keys - lhs_keys
+    if rhs_only:
+        for key in rhs_only:
+            item = rhs[key]
+            if getattr(item, "ignore", False) is False:
+                return False
 
-    elif intersect_keys := lhs_keys & rhs_keys:
-        if rel_tol == abs_tol == 0.0:
-            return all(lhs[key] == rhs[key] for key in intersect_keys)
+    # Keys in common
+    for key in lhs_keys & rhs_keys:
+        left_item = lhs[key]
+        right_item = rhs[key]
+        if hasattr(left_item, "is_close"):
+            if not left_item.is_close(right_item, rel_tol=rel_tol, abs_tol=abs_tol):
+                return False
         else:
-            return all(
-                lhs[key].is_close(rhs[key], rel_tol=rel_tol, abs_tol=abs_tol)
-                for key in intersect_keys
-            )
-    else:
-        return True
+            if left_item != right_item:
+                return False
+
+    return True
 
 
 @dataclass(frozen=True)

@@ -74,7 +74,7 @@ class InputPortFieldDefinition(ModifiedBaseModel):
 
 
 @dataclass
-class InputExtraOutput:
+class InputExtraOutput(ModifiedBaseModel):
     id: str
     expression: str
 

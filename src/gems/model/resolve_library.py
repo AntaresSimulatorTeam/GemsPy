@@ -169,8 +169,6 @@ def _resolve_model(input_model: InputModel, port_types: Dict[str, PortType]) -> 
         variables={v.id for v in input_model.variables},
         parameters={p.id for p in input_model.parameters},
     )
-
-    # Parse extra outputs if present, otherwise leave as None
     extra_outputs = (
         {
             eo.id: parse_expression(eo.expression, identifiers)
@@ -179,7 +177,6 @@ def _resolve_model(input_model: InputModel, port_types: Dict[str, PortType]) -> 
         if input_model.extra_outputs
         else None
     )
-
     return model(
         id=input_model.id,
         parameters=[_to_parameter(p) for p in input_model.parameters],
@@ -196,7 +193,7 @@ def _resolve_model(input_model: InputModel, port_types: Dict[str, PortType]) -> 
         objective_operational_contribution=_to_expression_if_present(
             input_model.objective, identifiers
         ),
-        extra_outputs=extra_outputs,  # will be None if YAML defines none
+        extra_outputs=extra_outputs,
     )
 
 

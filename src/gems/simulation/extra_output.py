@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict
+from typing import Any, Dict
 
 from gems.expression import evaluate
 from gems.expression.evaluate import EvaluationError, ValueProvider
-from gems.expression.expression import ExpressionNode
+from gems.simulation.optimization import OptimizationProblem
 from gems.study.data import ComponentParameterIndex, TimeScenarioIndex
 
 
@@ -20,76 +20,70 @@ class ExtraOutput:
     def get(self, t: int, s: int) -> float | None:
         return self.values.get(TimeScenarioIndex(t, s))
 
+    def is_close(
+        self, other: "ExtraOutput", *, rel_tol: float = 1e-9, abs_tol: float = 0.0
+    ) -> bool:
+        if self.name != other.name:
+            return False
+        if self.values.keys() != other.values.keys():
+            return False
+        import math
 
-def evaluate_all_extra_outputs(
-    problem: Any, component_lookup: Callable[[str], Any]
-) -> Dict[str, Dict[str, ExtraOutput]]:
-    """
-    Evaluate all model-defined extra outputs for every component in the network.
-    """
-    if problem is None or getattr(problem, "context", None) is None:
-        return {}
-
-    database = getattr(problem.context, "database", None)
-    if database is None:
-        print("[WARN] No database found in problem context; extra outputs skipped.")
-        return {}
-
-    results: Dict[str, Dict[str, ExtraOutput]] = {}
-
-    for cmp in problem.context.network.all_components:
-        model_def = cmp.model
-        if not model_def or not model_def.extra_outputs:
-            continue
-
-        comp_obj = component_lookup(cmp.id)
-        extra_results = evaluate_extra_outputs_for_a_component(comp_obj, problem)
-
-        if extra_results:
-            results[cmp.id] = extra_results
-
-    return results
+        return all(
+            math.isclose(
+                self.values[k], other.values[k], rel_tol=rel_tol, abs_tol=abs_tol
+            )
+            for k in self.values
+        )
 
 
+# Component extra output evaluation
 def evaluate_extra_outputs_for_a_component(
-    component: Any, problem: Any
+    component: Any, problem: OptimizationProblem | None
 ) -> Dict[str, ExtraOutput]:
-    """
-    Evaluate one component's model-defined extra outputs using solver variables as context.
-    """
+    """Evaluate model-defined extra outputs for a single component."""
     results: Dict[str, ExtraOutput] = {}
-    model_def = getattr(component, "model", None)
-    outputs: Dict[str, ExpressionNode] = getattr(model_def, "extra_outputs", {}) or {}
+
+    model = getattr(component, "model", None)
+    if model and hasattr(model, "extra_outputs"):
+        outputs = model.extra_outputs or {}
+    else:
+        outputs = {}
+
+    if problem is None:
+        raise ValueError("Expected a valid OptimizationProblem, got None.")
+
+    results: Dict[str, ExtraOutput] = {}
+
     if not outputs:
         return results
 
-    # Determine all time/scenario indices
-    all_indices: set[TimeScenarioIndex] = {
-        idx
-        for var in getattr(component, "_variables", {}).values()
-        for idx in getattr(var, "_value", {})
-    }
+    # Collect all time/scenario indices from the component’s variables
+    all_indices = set()
+    if hasattr(component, "_variables"):
+        for var in component._variables.values():
+            if hasattr(var, "_value"):
+                all_indices.update(var._value.keys())
+
     if not all_indices:
         all_indices = {TimeScenarioIndex(0, 0)}
+
     sorted_indices = sorted(all_indices, key=lambda k: (k.time, k.scenario))
 
-    # Evaluate all ExpressionNodes for each index
     for idx in sorted_indices:
         for out_id, expr_node in outputs.items():
             try:
                 expanded_expr = problem.context.expand_operators(expr_node)
-                value_provider = ExtraOutputValueProvider(component, problem, idx)
-                val: float = float(evaluate(expanded_expr, value_provider))
+                provider = ExtraOutputValueProvider(component, problem, idx)
+                val = float(evaluate(expanded_expr, provider))
             except EvaluationError as e:
                 print(
-                    f"[ERROR] Failed to evaluate extra output '{out_id}' "
-                    f"for {getattr(component, '_id', '')} at t={idx.time}, s={idx.scenario}: {e}"
+                    f"[ERROR] Eval failed for '{out_id}' in {component._id} at t={idx.time}, s={idx.scenario}: {e}"
                 )
                 val = float("nan")
             except Exception as e:
                 print(
-                    f"[ERROR] Unexpected error evaluating '{out_id}' "
-                    f"for {getattr(component, '_id', '')} at t={idx.time}, s={idx.scenario}: {e}"
+                    f"[ERROR] Unexpected error for '{out_id}' in {component._id}: {e}"
                 )
                 val = float("nan")
 
@@ -99,18 +93,18 @@ def evaluate_extra_outputs_for_a_component(
 
     return results
 
+    # Value provider
+
 
 class ExtraOutputValueProvider(ValueProvider):
-    """
-    ValueProvider that builds context from a component, problem, and time/scenario index.
-    """
+    """Provides variable and parameter values for extra output expressions."""
 
-    component: Any
-    problem: Any
-    idx: TimeScenarioIndex
-    context: Dict[str, float]
-
-    def __init__(self, component: Any, problem: Any, idx: TimeScenarioIndex) -> None:
+    def __init__(
+        self,
+        component: Any,
+        problem: OptimizationProblem,
+        idx: TimeScenarioIndex,
+    ) -> None:
         self.component = component
         self.problem = problem
         self.idx = idx
@@ -119,29 +113,35 @@ class ExtraOutputValueProvider(ValueProvider):
     def _build_context(self) -> Dict[str, float]:
         ctx: Dict[str, float] = {}
 
-        # Add variables with both direct and component-qualified names
-        for vname, vobj in getattr(self.component, "_variables", {}).items():
-            val = getattr(vobj, "_value", {}).get(self.idx)
-            if val is not None:
-                ctx[vname] = val
-                ctx[f"{getattr(self.component, '_id', '')}.{vname}"] = val
+        # --- Variables ---
+        if hasattr(self.component, "_variables"):
+            for vname, vobj in self.component._variables.items():
+                if hasattr(vobj, "_value"):
+                    val = vobj._value.get(self.idx)
+                    if val is not None:
+                        ctx[vname] = val
+                        if hasattr(self.component, "_id"):
+                            ctx[f"{self.component._id}.{vname}"] = val
 
-        # Add parameters with both direct and component-qualified names
-        param_names = getattr(getattr(self.component, "model", {}), "parameters", [])
-        for pname in param_names:
-            try:
-                val = self.problem.context.database.get_value(
-                    ComponentParameterIndex(getattr(self.component, "_id", ""), pname),
-                    self.idx.time,
-                    self.idx.scenario,
-                )
-                ctx[pname] = val
-                ctx[f"{getattr(self.component, '_id', '')}.{pname}"] = val
-            except KeyError:
-                continue
+        # --- Parameters ---
+        model = getattr(self.component, "model", None)
+        if model is not None and hasattr(model, "parameters"):
+            for pname in model.parameters:
+                try:
+                    val = self.problem.context.database.get_value(
+                        ComponentParameterIndex(self.component._id, pname),
+                        self.idx.time,
+                        self.idx.scenario,
+                    )
+                    ctx[pname] = val
+                    if hasattr(self.component, "_id"):
+                        ctx[f"{self.component._id}.{pname}"] = val
+                except KeyError:
+                    continue
 
         return ctx
 
+    # ValueProvider interface
     def get_variable_value(self, name: str) -> float:
         return self.context[name]
 
