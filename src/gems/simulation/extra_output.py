@@ -53,8 +53,6 @@ def evaluate_extra_outputs_for_a_component(
     if problem is None:
         raise ValueError("Expected a valid OptimizationProblem, got None.")
 
-    results: Dict[str, ExtraOutput] = {}
-
     if not outputs:
         return results
 
