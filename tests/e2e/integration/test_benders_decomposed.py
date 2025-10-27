@@ -227,7 +227,7 @@ def test_benders_decomposed_one_candidate(
         "solution": {
             "overall_cost": 91_000,
             "values": {
-                "CAND_p_max": 200,
+                "CAND.p_max": 200,
             },
         }
     }
