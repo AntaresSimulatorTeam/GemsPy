@@ -761,6 +761,21 @@ class OptimizationProblem:
                     instantiated_constraint,
                 )
 
+    # def _create_objectives(self) -> None:
+    #     for component in self.context.network.all_components:
+    #         model = component.model
+
+    #         for objective in self.context.build_strategy.get_objectives(model):
+    #             if objective is not None:
+    #                 _create_objective(
+    #                     self.solver,
+    #                     self.context,
+    #                     component,
+    #                     self.context.risk_strategy(objective),
+    #                 )
+                    
+    # --- inside OptimizationProblem class in gems/simulation/optimization.py ---
+
     def _create_objectives(self) -> None:
         """
         Iterates over all network components and creates their corresponding
@@ -806,6 +821,7 @@ class OptimizationProblem:
             main_objective = _add_linear_expression_to_objective(
                 self.solver, self.context, linear_expr, existing_obj=main_objective
             )
+
 
     def export_as_mps(self) -> str:
         return self.solver.ExportModelAsMpsFormat(fixed_format=True, obfuscated=False)

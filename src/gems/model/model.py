@@ -161,6 +161,7 @@ def model(
     inter_block_dyn: bool = False,
     ports: Optional[Iterable[ModelPort]] = None,
     port_fields_definitions: Optional[Iterable[PortFieldDefinition]] = None,
+    objective_contributions: Optional[Dict[str, ExpressionNode]] = None,  # NEW
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None,
     objective_contributions: Optional[Dict[str, ExpressionNode]] = None,  # NEW
 ) -> Model:
