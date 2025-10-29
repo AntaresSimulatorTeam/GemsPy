@@ -1,43 +1,28 @@
+# extra_output.py
+
 from dataclasses import dataclass, field
 from typing import Any, Dict
 
 from gems.expression import evaluate
 from gems.expression.evaluate import EvaluationError, ValueProvider
 from gems.simulation.optimization import OptimizationProblem
+from gems.simulation.output_values_base import BaseOutputValue
 from gems.study.data import ComponentParameterIndex, TimeScenarioIndex
 
 
 @dataclass
-class ExtraOutput:
-    """Stores evaluated outputs (from ExpressionNodes), not solver variables."""
+class ExtraOutput(BaseOutputValue):  # <-- INHERITS from the Base Class
+    """
+    Stores evaluated outputs (from ExpressionNodes), not solver variables.
+    Inherits all common fields (_name, _value, _size, ignore) and methods
+    (__eq__, is_close, __str__, value property) from BaseOutputValue.
+    """
 
-    name: str
-    values: Dict[TimeScenarioIndex, float] = field(default_factory=dict)
-
+    # Simplified setting methods, using inherited fields:
     def set(self, t: int, s: int, value: float) -> None:
-        self.values[TimeScenarioIndex(t, s)] = value
-
-    def get(self, t: int, s: int) -> float | None:
-        return self.values.get(TimeScenarioIndex(t, s))
-
-    def is_close(
-        self, other: "ExtraOutput", *, rel_tol: float = 1e-9, abs_tol: float = 0.0
-    ) -> bool:
-        if self.name != other.name:
-            return False
-        if self.values.keys() != other.values.keys():
-            return False
-        import math
-
-        return all(
-            math.isclose(
-                self.values[k], other.values[k], rel_tol=rel_tol, abs_tol=abs_tol
-            )
-            for k in self.values
-        )
+        self._value[TimeScenarioIndex(t, s)] = value
 
 
-# Component extra output evaluation
 def evaluate_extra_outputs_for_a_component(
     component: Any, problem: OptimizationProblem | None
 ) -> Dict[str, ExtraOutput]:
@@ -91,10 +76,9 @@ def evaluate_extra_outputs_for_a_component(
 
     return results
 
-    # Value provider
-
 
 class ExtraOutputValueProvider(ValueProvider):
+    # ... (content remains the same, as it only interacts with public methods/inherited fields like _value) ...
     """Provides variable and parameter values for extra output expressions."""
 
     def __init__(

@@ -13,7 +13,56 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, TypeVar, Union, ca
 
 from gems.simulation.extra_output import ExtraOutput
 from gems.simulation.optimization import OptimizationProblem
+from gems.simulation.output_values_base import BaseOutputValue
 from gems.study.data import TimeScenarioIndex
+
+
+@dataclass
+class Variable(BaseOutputValue):  # <-- INHERITS from the Base Class
+    """
+    Contains a single solver variable's values and status.
+    All shared logic is now in BaseOutputValue.
+    """
+
+    _basis_status: Dict[TimeScenarioIndex, str] = field(
+        init=False, default_factory=dict
+    )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Variable):
+            return NotImplemented
+        # Check base equality first (name, size, value)
+        if not super().__eq__(other):
+            return False
+        # Then check the unique field
+        return (self.ignore or other.ignore) or (
+            self._basis_status == other._basis_status
+        )
+
+    # is_close is inherited from BaseOutputValue (no change needed here as it doesn't use basis_status)
+
+    # __str__ and value getter/setter are inherited from BaseOutputValue
+    # The original __str__ logic is covered by the base class.
+
+    def _set(
+        self,
+        timestep: Optional[int],
+        scenario: Optional[int],
+        value: float,
+        status: Optional[str] = None,
+        is_mip: bool = True,
+    ) -> None:
+        timestep = 0 if timestep is None else timestep
+        scenario = 0 if scenario is None else scenario
+        key = TimeScenarioIndex(timestep, scenario)
+        if key not in self._value:
+            size_s = max(self._size[0], scenario + 1)
+            size_t = max(self._size[1], timestep + 1)
+            self._size = (size_s, size_t)
+
+        self._value[key] = value
+        if not is_mip and status is not None:
+            self._basis_status[key] = status
 
 
 @dataclass
@@ -23,109 +72,9 @@ class OutputValues:
     """
 
     @dataclass
-    class Variable:
-        _name: str
-        _value: Dict[TimeScenarioIndex, float] = field(init=False, default_factory=dict)
-        _size: Tuple[int, int] = field(init=False, default=(0, 0))
-        _basis_status: Dict[TimeScenarioIndex, str] = field(
-            init=False, default_factory=dict
-        )
-        ignore: bool = field(default=False, init=False)
-
-        def __eq__(self, other: object) -> bool:
-            if not isinstance(other, OutputValues.Variable):
-                return NotImplemented
-            return (self.ignore or other.ignore) or (
-                self._name == other._name
-                and self._size == other._size
-                and self._value == other._value
-            )
-
-        def is_close(
-            self,
-            other: "OutputValues.Variable",
-            *,
-            rel_tol: float = 1.0e-9,
-            abs_tol: float = 0.0,
-        ) -> bool:
-            return (self.ignore or other.ignore) or (
-                self._name == other._name
-                and self._size == other._size
-                and self._value.keys() == other._value.keys()
-                and all(
-                    math.isclose(
-                        self._value[key],
-                        other._value[key],
-                        rel_tol=rel_tol,
-                        abs_tol=abs_tol,
-                    )
-                    for key in self._value
-                )
-            )
-
-        def __str__(self) -> str:
-            return (
-                f"{self._name} : {str(self.value)} {'(ignored)' if self.ignore else ''}"
-            )
-
-        @property
-        def value(self) -> Union[None, float, List[float], List[List[float]]]:
-            size_s, size_t = self._size
-            if size_t == 1:
-                if size_s == 1:
-                    return self._value[TimeScenarioIndex(0, 0)]
-                else:
-                    return [self._value[TimeScenarioIndex(0, s)] for s in range(size_s)]
-            else:
-                return [
-                    [self._value[TimeScenarioIndex(t, s)] for t in range(size_t)]
-                    for s in range(size_s)
-                ]
-
-        @value.setter
-        def value(self, values: Union[float, List[float], List[List[float]]]) -> None:
-            size_s, size_t = 1, 1
-            if isinstance(values, list):
-                size_s = len(values)
-                for scenario, timesteps in enumerate(values):
-                    if isinstance(timesteps, list):
-                        size_t = len(timesteps)
-                        for timestep, value in enumerate(timesteps):
-                            self._value[TimeScenarioIndex(timestep, scenario)] = value
-                    else:
-                        self._value[TimeScenarioIndex(0, scenario)] = cast(
-                            float, timesteps
-                        )
-            else:
-                self._value[TimeScenarioIndex(0, 0)] = values
-            self._size = (size_s, size_t)
-
-        def _set(
-            self,
-            timestep: Optional[int],
-            scenario: Optional[int],
-            value: float,
-            status: Optional[str] = None,
-            is_mip: bool = True,
-        ) -> None:
-            timestep = 0 if timestep is None else timestep
-            scenario = 0 if scenario is None else scenario
-            key = TimeScenarioIndex(timestep, scenario)
-            if key not in self._value:
-                size_s = max(self._size[0], scenario + 1)
-                size_t = max(self._size[1], timestep + 1)
-                self._size = (size_s, size_t)
-
-            self._value[key] = value
-            if not is_mip and status is not None:
-                self._basis_status[key] = status
-
-    @dataclass
     class Component:
         _id: str
-        _variables: Dict[str, "OutputValues.Variable"] = field(
-            init=False, default_factory=dict
-        )
+        _variables: Dict[str, Variable] = field(init=False, default_factory=dict)
         _extra_outputs: Dict[str, ExtraOutput] = field(init=False, default_factory=dict)
         model: Optional[Any] = field(default=None, init=False)
         ignore: bool = field(default=False, init=False)
@@ -159,12 +108,12 @@ class OutputValues:
             if self._extra_outputs:
                 string += "  [Extra Outputs]\n"
                 for out in self._extra_outputs.values():
-                    string += f"    {out.name}: {out.values}\n"
+                    string += f"    {out._name}: {out._value}\n"
             return string
 
-        def var(self, variable_name: str) -> "OutputValues.Variable":
+        def var(self, variable_name: str) -> Variable:
             if variable_name not in self._variables:
-                self._variables[variable_name] = OutputValues.Variable(variable_name)
+                self._variables[variable_name] = Variable(variable_name)
             return self._variables[variable_name]
 
         def evaluate_extra_outputs(self, problem: Any) -> None:
@@ -232,9 +181,7 @@ class OutputValues:
             comp.evaluate_extra_outputs(self.problem)
 
 
-Comparable = TypeVar(
-    "Comparable", OutputValues.Component, OutputValues.Variable, ExtraOutput
-)
+Comparable = TypeVar("Comparable", OutputValues.Component, Variable, ExtraOutput)
 
 
 def _are_mappings_close(
