@@ -759,6 +759,21 @@ class OptimizationProblem:
                     instantiated_constraint,
                 )
 
+    # def _create_objectives(self) -> None:
+    #     for component in self.context.network.all_components:
+    #         model = component.model
+
+    #         for objective in self.context.build_strategy.get_objectives(model):
+    #             if objective is not None:
+    #                 _create_objective(
+    #                     self.solver,
+    #                     self.context,
+    #                     component,
+    #                     self.context.risk_strategy(objective),
+    #                 )
+                    
+    # --- inside OptimizationProblem class in gems/simulation/optimization.py ---
+
     def _create_objectives(self) -> None:
         """
         Iterates over all network components and creates their corresponding
