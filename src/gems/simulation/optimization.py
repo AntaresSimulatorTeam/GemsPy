@@ -750,18 +750,56 @@ class OptimizationProblem:
                     instantiated_constraint,
                 )
 
+    # def _create_objectives(self) -> None:
+    #     for component in self.context.network.all_components:
+    #         model = component.model
+
+    #         for objective in self.context.build_strategy.get_objectives(model):
+    #             if objective is not None:
+    #                 _create_objective(
+    #                     self.solver,
+    #                     self.context,
+    #                     component,
+    #                     self.context.risk_strategy(objective),
+    #                 )
+                    
+    # --- inside OptimizationProblem class in gems/simulation/optimization.py ---
+
     def _create_objectives(self) -> None:
         for component in self.context.network.all_components:
             model = component.model
+            # TODO: refacto for a better function decomposition     
+            # If model defines objective_contributions (new format), iterate them
+            if getattr(model, "objective_contributions", None):
+                # model.objective_contributions: Dict[str, ExpressionNode]
+                for contrib_id, expr in model.objective_contributions.items():
+                    if expr is None:
+                        continue
+                    # instantiate and expand as usual (reuse _create_objective by adapting it slightly)
+                    instantiated = _instantiate_model_expression(expr, component.id, self.context)
+                    expanded = self.context.expand_operators(instantiated)
+                    linear_expr = self.context.linearize_expression(expanded)
 
-            for objective in self.context.build_strategy.get_objectives(model):
-                if objective is not None:
-                    _create_objective(
-                        self.solver,
-                        self.context,
-                        component,
-                        self.context.risk_strategy(objective),
-                    )
+                    obj: lp.Objective = self.solver.Objective()
+                    for term in linear_expr.terms.values():
+                        solver_var = _get_solver_var(term, self.context)
+                        self.context._solver_variables[solver_var.name()].is_in_objective = True
+                        obj.SetCoefficient(
+                            solver_var,
+                            obj.GetCoefficient(solver_var) + term.coefficient,
+                        )
+                    obj.SetOffset(linear_expr.constant + obj.offset())
+            else:
+                # Preserve legacy behavior: iterate over whatever the build strategy returns
+                for objective in self.context.build_strategy.get_objectives(model):
+                    if objective is not None:
+                        _create_objective(
+                            self.solver,
+                            self.context,
+                            component,
+                            self.context.risk_strategy(objective),
+                        )
+
 
     def export_as_mps(self) -> str:
         return self.solver.ExportModelAsMpsFormat(fixed_format=True, obfuscated=False)
