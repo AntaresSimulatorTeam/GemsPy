@@ -91,7 +91,7 @@ class BaseOutputValue(ABC):
 
     def get(self, t: int, s: int) -> float | None:
         return self._value.get(TimeScenarioIndex(t, s))
-    
+
     @abstractmethod
     def _set(
         self,

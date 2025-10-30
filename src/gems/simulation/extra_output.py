@@ -24,7 +24,7 @@ class ExtraOutput(BaseOutputValue):  # <-- INHERITS from the Base Class
         scenario: Optional[int],
         value: float,
         status: Optional[str] = None,  # conservé pour compatibilité avec l'interface
-        is_mip: bool = True,            # idem
+        is_mip: bool = True,  # idem
     ) -> None:
         timestep = 0 if timestep is None else timestep
         scenario = 0 if scenario is None else scenario

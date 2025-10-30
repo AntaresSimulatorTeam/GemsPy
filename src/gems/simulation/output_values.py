@@ -29,7 +29,7 @@ class OutputVariable(BaseOutputValue):  # <-- RENAMED from Variable
     )
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, OutputVariable): # Reference updated
+        if not isinstance(other, OutputVariable):  # Reference updated
             return NotImplemented
         # Check base equality first (name, size, value)
         if not super().__eq__(other):
@@ -61,33 +61,34 @@ class OutputVariable(BaseOutputValue):  # <-- RENAMED from Variable
 
 
 @dataclass
-class OutputComponent: # RENAMED from Component
+class OutputComponent:  # RENAMED from Component
     """
     Represents the output results for a single component (e.g., an area, a link).
     """
+
     _id: str
-    _variables: Dict[str, OutputVariable] = field(init=False, default_factory=dict) # Type updated
+    _variables: Dict[str, OutputVariable] = field(
+        init=False, default_factory=dict
+    )  # Type updated
     _extra_outputs: Dict[str, ExtraOutput] = field(init=False, default_factory=dict)
     model: Optional[Any] = field(default=None, init=False)
     ignore: bool = field(default=False, init=False)
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, OutputComponent): # Reference updated
+        if not isinstance(other, OutputComponent):  # Reference updated
             return NotImplemented
         return self.is_close(other, rel_tol=0.0, abs_tol=0.0)
 
     def is_close(
         self,
-        other: "OutputComponent", # Type hint updated
+        other: "OutputComponent",  # Type hint updated
         *,
         rel_tol: float = 1.0e-9,
         abs_tol: float = 0.0,
     ) -> bool:
         return (self.ignore or other.ignore) or (
             self._id == other._id
-            and _are_mappings_close(
-                self._variables, other._variables, rel_tol, abs_tol
-            )
+            and _are_mappings_close(self._variables, other._variables, rel_tol, abs_tol)
             and _are_mappings_close(
                 self._extra_outputs, other._extra_outputs, rel_tol, abs_tol
             )
@@ -103,22 +104,21 @@ class OutputComponent: # RENAMED from Component
                 string += f"    {out._name}: {out._value}\n"
         return string
 
-    def var(self, variable_name: str) -> OutputVariable: # Return type updated
+    def var(self, variable_name: str) -> OutputVariable:  # Return type updated
         if variable_name not in self._variables:
-            self._variables[variable_name] = OutputVariable(variable_name) # Class name updated
+            self._variables[variable_name] = OutputVariable(
+                variable_name
+            )  # Class name updated
         return self._variables[variable_name]
-    
+
     def extra_output(self, output_name: str) -> ExtraOutput:
         if output_name not in self._extra_outputs:
             self._extra_outputs[output_name] = ExtraOutput(output_name)
         return self._extra_outputs[output_name]
 
-
     def evaluate_extra_outputs(self, problem: Any) -> None:
         """Evaluate this component’s model-defined extra outputs."""
-        from gems.simulation.extra_output import (
-            evaluate_extra_outputs_for_a_component,
-        )
+        from gems.simulation.extra_output import evaluate_extra_outputs_for_a_component
 
         self._extra_outputs.clear()
         self._extra_outputs.update(
@@ -133,7 +133,7 @@ class OutputValues:
     """
 
     problem: Optional[OptimizationProblem] = field(default=None)
-    _components: Dict[str, OutputComponent] = field( # Type updated
+    _components: Dict[str, OutputComponent] = field(  # Type updated
         init=False, default_factory=dict
     )
 
@@ -158,7 +158,7 @@ class OutputValues:
 
     def _build_components(self) -> None:
         """
-        Initializes component objects and links them to their models. 
+        Initializes component objects and links them to their models.
         It only creates the structure, no values are set.
         """
         if self.problem is None:
@@ -168,7 +168,7 @@ class OutputValues:
         for cmp in self.problem.context.network.all_components:
             comp = self.component(cmp.id)
             comp.model = cmp.model
-            
+
     def _fill_components(self) -> None:
         """
         Fills all output values (Variables from solver, ExtraOutputs from evaluation).
@@ -178,11 +178,12 @@ class OutputValues:
 
         # 2. Evaluate Extra Outputs, which depend on the variables being set
         self.evaluate_extra_outputs()
-            
 
-    def component(self, component_id: str) -> OutputComponent: # Return type updated
+    def component(self, component_id: str) -> OutputComponent:  # Return type updated
         if component_id not in self._components:
-            self._components[component_id] = OutputComponent(component_id) # Class name updated
+            self._components[component_id] = OutputComponent(
+                component_id
+            )  # Class name updated
         return self._components[component_id]
 
     def _evaluate_variables(self) -> None:
@@ -193,7 +194,7 @@ class OutputValues:
             return
 
         is_mip = self.problem.solver.IsMip()
-        
+
         for key, value in self.problem.context.get_all_component_variables().items():
             status = None if is_mip else value.basis_status()
             self.component(key.component_id).var(str(key.variable_name))._set(
@@ -203,14 +204,16 @@ class OutputValues:
                 status=status,
                 is_mip=is_mip,
             )
-            
+
     def evaluate_extra_outputs(self) -> None:
         """Evaluate extra outputs for all components."""
         for comp in self._components.values():
             comp.evaluate_extra_outputs(self.problem)
 
 
-Comparable = TypeVar("Comparable", OutputComponent, OutputVariable, ExtraOutput) # TypeVar updated
+Comparable = TypeVar(
+    "Comparable", OutputComponent, OutputVariable, ExtraOutput
+)  # TypeVar updated
 
 
 def _are_mappings_close(
@@ -254,7 +257,7 @@ def _are_mappings_close(
 
 @dataclass(frozen=True)
 class BendersSolution:
-# ... (BendersSolution and its subclasses remain the same) ...
+    # ... (BendersSolution and its subclasses remain the same) ...
     data: Dict[str, Any]
 
     def __eq__(self, other: object) -> bool:
