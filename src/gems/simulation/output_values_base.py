@@ -1,9 +1,9 @@
 # output_values_base.py
 
 import math
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Union, cast
+from typing import Dict, List, Optional, Tuple, Union, cast
 
 from gems.study.data import TimeScenarioIndex
 
@@ -91,3 +91,14 @@ class BaseOutputValue(ABC):
 
     def get(self, t: int, s: int) -> float | None:
         return self._value.get(TimeScenarioIndex(t, s))
+    
+    @abstractmethod
+    def _set(
+        self,
+        timestep: Optional[int],
+        scenario: Optional[int],
+        value: float,
+        status: Optional[str] = None,
+        is_mip: bool = True,
+    ) -> None:
+        pass

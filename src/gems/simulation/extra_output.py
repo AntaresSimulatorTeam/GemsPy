@@ -1,7 +1,7 @@
 # extra_output.py
 
 from dataclasses import dataclass, field
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from gems.expression import evaluate
 from gems.expression.evaluate import EvaluationError, ValueProvider
@@ -18,9 +18,24 @@ class ExtraOutput(BaseOutputValue):  # <-- INHERITS from the Base Class
     (__eq__, is_close, __str__, value property) from BaseOutputValue.
     """
 
-    # Simplified setting methods, using inherited fields:
-    def set(self, t: int, s: int, value: float) -> None:
-        self._value[TimeScenarioIndex(t, s)] = value
+    def _set(
+        self,
+        timestep: Optional[int],
+        scenario: Optional[int],
+        value: float,
+        status: Optional[str] = None,  # conservé pour compatibilité avec l'interface
+        is_mip: bool = True,            # idem
+    ) -> None:
+        timestep = 0 if timestep is None else timestep
+        scenario = 0 if scenario is None else scenario
+        key = TimeScenarioIndex(timestep, scenario)
+
+        if key not in self._value:
+            size_s = max(self._size[0], scenario + 1)
+            size_t = max(self._size[1], timestep + 1)
+            self._size = (size_s, size_t)
+
+        self._value[key] = value
 
 
 def evaluate_extra_outputs_for_a_component(
@@ -72,7 +87,7 @@ def evaluate_extra_outputs_for_a_component(
 
             if out_id not in results:
                 results[out_id] = ExtraOutput(out_id)
-            results[out_id].set(idx.time, idx.scenario, val)
+            results[out_id]._set(idx.time, idx.scenario, val)
 
     return results
 
