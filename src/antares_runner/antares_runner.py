@@ -22,7 +22,6 @@ import pandas as pd
 
 
 class AntaresHybridRunner:
-
     def __init__(
         self, exec_dir: Path, study_dir: Path, solver: None | str = None
     ) -> None:
@@ -71,7 +70,6 @@ class AntaresHybridRunner:
 
 
 class AntaresHybridStudyBenchmarker:
-
     def __init__(
         self,
         exec_path: Path,
@@ -118,7 +116,6 @@ class AntaresHybridStudyBenchmarker:
 
 
 class AntaresModelerRunner:
-
     def __init__(self, exec_dir: str, study_dir: str) -> None:
         self.exec_dir, self.study_dir = exec_dir, study_dir
         self.exec_path = self.exec_dir / Path("antares-modeler")
