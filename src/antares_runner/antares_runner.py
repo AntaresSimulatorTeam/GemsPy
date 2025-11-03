@@ -32,7 +32,7 @@ class AntaresHybridRunner:
         self.SIMULATION_TABLE_2_FILE = "simulation_table--optim-nb-2.csv"
 
     def run(self) -> None:
-        # Build the command to run antares-modeler.exe
+        # Build the command to run antares-solver.exe
         command = str(self.exec_path) + " " + str(self.study_dir)
         if self.solver:
             command += " --linear-solver " + self.solver
