@@ -36,7 +36,6 @@ class AntaresHybridRunner:
         command = str(self.exec_path) + " " + str(self.study_dir)
         if self.solver:
             command += " --linear-solver " + self.solver
-            
         # Run the command and wait for it to finish
         try:
             start = time.time()
@@ -53,7 +52,6 @@ class AntaresHybridRunner:
             raise RuntimeError(
                 f"Antares execution failed with code {e.returncode}: {e.stderr}"
             )
-
         # Read the objective value from the solution file
         path = self.study_dir / Path(self.OUTPUT_FILE_DIR_NAME)
         folders = [
@@ -123,7 +121,6 @@ class AntaresModelerRunner:
     def run(self) -> None:
         # Build the command to run antares-modeler.exe
         command = [str(self.exec_path), str(self.study_dir)]
-
         # Run the command and wait for it to finish
         try:
             start = time.time()
