@@ -9,7 +9,7 @@ Utility classes to obtain solver results.
 """
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, Dict, Mapping, Optional, TypeVar
 
 from gems.simulation.extra_output import ExtraOutput
 from gems.simulation.optimization import OptimizationProblem
@@ -18,7 +18,7 @@ from gems.study.data import TimeScenarioIndex
 
 
 @dataclass
-class OutputVariable(BaseOutputValue):  # <-- RENAMED from Variable
+class OutputVariable(BaseOutputValue):
     """
     Contains a single solver variable's values and status.
     All shared logic is now in BaseOutputValue.
@@ -29,7 +29,7 @@ class OutputVariable(BaseOutputValue):  # <-- RENAMED from Variable
     )
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, OutputVariable):  # Reference updated
+        if not isinstance(other, OutputVariable):
             return NotImplemented
         # Check base equality first (name, size, value)
         if not super().__eq__(other):
@@ -61,27 +61,21 @@ class OutputVariable(BaseOutputValue):  # <-- RENAMED from Variable
 
 
 @dataclass
-class OutputComponent:  # RENAMED from Component
-    """
-    Represents the output results for a single component (e.g., an area, a link).
-    """
-
+class OutputComponent:
     _id: str
-    _variables: Dict[str, OutputVariable] = field(
-        init=False, default_factory=dict
-    )  # Type updated
+    _variables: Dict[str, OutputVariable] = field(init=False, default_factory=dict)
     _extra_outputs: Dict[str, ExtraOutput] = field(init=False, default_factory=dict)
     model: Optional[Any] = field(default=None, init=False)
     ignore: bool = field(default=False, init=False)
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, OutputComponent):  # Reference updated
+        if not isinstance(other, OutputComponent):
             return NotImplemented
         return self.is_close(other, rel_tol=0.0, abs_tol=0.0)
 
     def is_close(
         self,
-        other: "OutputComponent",  # Type hint updated
+        other: "OutputComponent",
         *,
         rel_tol: float = 1.0e-9,
         abs_tol: float = 0.0,
@@ -104,11 +98,9 @@ class OutputComponent:  # RENAMED from Component
                 string += f"    {out._name}: {out._value}\n"
         return string
 
-    def var(self, variable_name: str) -> OutputVariable:  # Return type updated
+    def var(self, variable_name: str) -> OutputVariable:
         if variable_name not in self._variables:
-            self._variables[variable_name] = OutputVariable(
-                variable_name
-            )  # Class name updated
+            self._variables[variable_name] = OutputVariable(variable_name)
         return self._variables[variable_name]
 
     def extra_output(self, output_name: str) -> ExtraOutput:
@@ -116,14 +108,22 @@ class OutputComponent:  # RENAMED from Component
             self._extra_outputs[output_name] = ExtraOutput(output_name)
         return self._extra_outputs[output_name]
 
-    def evaluate_extra_outputs(self, problem: Any) -> None:
-        """Evaluate this component’s model-defined extra outputs."""
-        from gems.simulation.extra_output import evaluate_extra_outputs_for_a_component
+    def evaluate_extra_outputs_for_a_component(
+        self, problem: OptimizationProblem
+    ) -> None:
+        """Evaluate all model-defined extra outputs and populate self._extra_outputs."""
+        if problem is None:
+            raise ValueError("Expected a valid OptimizationProblem, got None.")
 
-        self._extra_outputs.clear()
-        self._extra_outputs.update(
-            evaluate_extra_outputs_for_a_component(self, problem)
-        )
+        if self.model is None or self.model.extra_outputs is None:
+            return
+
+        self._extra_outputs = {}
+
+        for out_id, expr_node in self.model.extra_outputs.items():
+            if out_id not in self._extra_outputs:
+                self._extra_outputs[out_id] = ExtraOutput(out_id)
+            self._extra_outputs[out_id].evaluate(self, problem, expr_node)
 
 
 @dataclass
@@ -133,9 +133,7 @@ class OutputValues:
     """
 
     problem: Optional[OptimizationProblem] = field(default=None)
-    _components: Dict[str, OutputComponent] = field(  # Type updated
-        init=False, default_factory=dict
-    )
+    _components: Dict[str, OutputComponent] = field(init=False, default_factory=dict)
 
     def __post_init__(self) -> None:
         self._build_components()
@@ -177,13 +175,11 @@ class OutputValues:
         self._evaluate_variables()
 
         # 2. Evaluate Extra Outputs, which depend on the variables being set
-        self.evaluate_extra_outputs()
+        self._evaluate_extra_outputs()
 
-    def component(self, component_id: str) -> OutputComponent:  # Return type updated
+    def component(self, component_id: str) -> OutputComponent:
         if component_id not in self._components:
-            self._components[component_id] = OutputComponent(
-                component_id
-            )  # Class name updated
+            self._components[component_id] = OutputComponent(component_id)
         return self._components[component_id]
 
     def _evaluate_variables(self) -> None:
@@ -205,15 +201,15 @@ class OutputValues:
                 is_mip=is_mip,
             )
 
-    def evaluate_extra_outputs(self) -> None:
+    def _evaluate_extra_outputs(self) -> None:
         """Evaluate extra outputs for all components."""
+        if self.problem is None:
+            return
         for comp in self._components.values():
-            comp.evaluate_extra_outputs(self.problem)
+            comp.evaluate_extra_outputs_for_a_component(self.problem)
 
 
-Comparable = TypeVar(
-    "Comparable", OutputComponent, OutputVariable, ExtraOutput
-)  # TypeVar updated
+Comparable = TypeVar("Comparable", OutputComponent, OutputVariable, ExtraOutput)
 
 
 def _are_mappings_close(
@@ -226,38 +222,29 @@ def _are_mappings_close(
     rhs_keys = rhs.keys()
 
     # Keys present only on the left
-    lhs_only = lhs_keys - rhs_keys
-    if lhs_only:
-        for key in lhs_only:
-            item = lhs[key]
-            if getattr(item, "ignore", False) is False:
-                return False
+    for key in lhs_keys - rhs_keys:
+        if not lhs[key].ignore:
+            return False
 
     # Keys present only on the right
-    rhs_only = rhs_keys - lhs_keys
-    if rhs_only:
-        for key in rhs_only:
-            item = rhs[key]
-            if getattr(item, "ignore", False) is False:
-                return False
+    for key in rhs_keys - lhs_keys:
+        if not rhs[key].ignore:
+            return False
 
     # Keys in common
     for key in lhs_keys & rhs_keys:
         left_item = lhs[key]
         right_item = rhs[key]
-        if hasattr(left_item, "is_close"):
-            if not left_item.is_close(right_item, rel_tol=rel_tol, abs_tol=abs_tol):
-                return False
-        else:
-            if left_item != right_item:
-                return False
+        if not left_item.ignore and not left_item.is_close(
+            right_item, rel_tol=rel_tol, abs_tol=abs_tol
+        ):
+            return False
 
     return True
 
 
 @dataclass(frozen=True)
 class BendersSolution:
-    # ... (BendersSolution and its subclasses remain the same) ...
     data: Dict[str, Any]
 
     def __eq__(self, other: object) -> bool:

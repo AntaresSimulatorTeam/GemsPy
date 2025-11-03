@@ -1,6 +1,4 @@
-# extra_output.py
-
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from gems.expression import evaluate
@@ -11,7 +9,7 @@ from gems.study.data import ComponentParameterIndex, TimeScenarioIndex
 
 
 @dataclass
-class ExtraOutput(BaseOutputValue):  # <-- INHERITS from the Base Class
+class ExtraOutput(BaseOutputValue):
     """
     Stores evaluated outputs (from ExpressionNodes), not solver variables.
     Inherits all common fields (_name, _value, _size, ignore) and methods
@@ -23,8 +21,6 @@ class ExtraOutput(BaseOutputValue):  # <-- INHERITS from the Base Class
         timestep: Optional[int],
         scenario: Optional[int],
         value: float,
-        status: Optional[str] = None,  # conservé pour compatibilité avec l'interface
-        is_mip: bool = True,  # idem
     ) -> None:
         timestep = 0 if timestep is None else timestep
         scenario = 0 if scenario is None else scenario
@@ -37,59 +33,44 @@ class ExtraOutput(BaseOutputValue):  # <-- INHERITS from the Base Class
 
         self._value[key] = value
 
-
-def evaluate_extra_outputs_for_a_component(
-    component: Any, problem: OptimizationProblem | None
-) -> Dict[str, ExtraOutput]:
-    """Evaluate model-defined extra outputs for a single component."""
-    results: Dict[str, ExtraOutput] = {}
-
-    model = getattr(component, "model", None)
-    if model and hasattr(model, "extra_outputs"):
-        outputs = model.extra_outputs or {}
-    else:
-        outputs = {}
-
-    if problem is None:
-        raise ValueError("Expected a valid OptimizationProblem, got None.")
-
-    if not outputs:
-        return results
-
-    # Collect all time/scenario indices from the component’s variables
-    all_indices = set()
-    if hasattr(component, "_variables"):
+    def evaluate(
+        self,
+        component: Any,  # Relaxed type from "OutputComponent" to workaround cyclic dependency
+        problem: "OptimizationProblem",
+        expr_node: Any,
+    ) -> None:
+        """
+        Evaluate this single extra output for all time/scenario indices
+        from the component's variables.
+        """
+        # Gather all time/scenario indices from component variables
+        all_indices = set()
         for var in component._variables.values():
-            if hasattr(var, "_value"):
-                all_indices.update(var._value.keys())
+            all_indices.update(var._value.keys())
+        if not all_indices:
+            all_indices = {TimeScenarioIndex(0, 0)}
 
-    if not all_indices:
-        all_indices = {TimeScenarioIndex(0, 0)}
+        sorted_indices = sorted(all_indices, key=lambda k: (k.time, k.scenario))
 
-    sorted_indices = sorted(all_indices, key=lambda k: (k.time, k.scenario))
-
-    for idx in sorted_indices:
-        for out_id, expr_node in outputs.items():
+        # Evaluate at each index
+        for idx in sorted_indices:
             try:
                 expanded_expr = problem.context.expand_operators(expr_node)
                 provider = ExtraOutputValueProvider(component, problem, idx)
                 val = float(evaluate(expanded_expr, provider))
             except EvaluationError as e:
                 print(
-                    f"[ERROR] Eval failed for '{out_id}' in {component._id} at t={idx.time}, s={idx.scenario}: {e}"
+                    f"[ERROR] Eval failed for '{self._name}' in {component._id} "
+                    f"at t={idx.time}, s={idx.scenario}: {e}"
                 )
                 val = float("nan")
             except Exception as e:
                 print(
-                    f"[ERROR] Unexpected error for '{out_id}' in {component._id}: {e}"
+                    f"[ERROR] Unexpected error for '{self._name}' in {component._id}: {e}"
                 )
                 val = float("nan")
 
-            if out_id not in results:
-                results[out_id] = ExtraOutput(out_id)
-            results[out_id]._set(idx.time, idx.scenario, val)
-
-    return results
+            self._set(idx.time, idx.scenario, val)
 
 
 class ExtraOutputValueProvider(ValueProvider):

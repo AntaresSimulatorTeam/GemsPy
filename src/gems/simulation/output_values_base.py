@@ -91,14 +91,3 @@ class BaseOutputValue(ABC):
 
     def get(self, t: int, s: int) -> float | None:
         return self._value.get(TimeScenarioIndex(t, s))
-
-    @abstractmethod
-    def _set(
-        self,
-        timestep: Optional[int],
-        scenario: Optional[int],
-        value: float,
-        status: Optional[str] = None,
-        is_mip: bool = True,
-    ) -> None:
-        pass

@@ -97,23 +97,24 @@ class SimulationTableBuilder:
         for comp_id, comp in output_values._components.items():
             if hasattr(comp, "_extra_outputs"):
                 for name, extra_output in comp._extra_outputs.items():
-                    if hasattr(extra_output, "values"):
-                        for ts_index, val in extra_output.values.items():
-                            t: int = ts_index.time
-                            s: int = ts_index.scenario
-                            rows.append(
-                                {
-                                    SimulationColumns.BLOCK.value: block,
-                                    SimulationColumns.COMPONENT.value: comp_id,
-                                    SimulationColumns.OUTPUT.value: name,
-                                    SimulationColumns.ABSOLUTE_TIME_INDEX.value: abs_offset
-                                    + t,
-                                    SimulationColumns.BLOCK_TIME_INDEX.value: t,
-                                    SimulationColumns.SCENARIO_INDEX.value: s,
-                                    SimulationColumns.VALUE.value: val,
-                                    SimulationColumns.BASIS_STATUS.value: None,
-                                }
-                            )
+                    for ts_index, val in extra_output._value.items():
+                        # if hasattr(extra_output, "values"):
+                        #     for ts_index, val in extra_output.values.items():
+                        t: int = ts_index.time
+                        s: int = ts_index.scenario
+                        rows.append(
+                            {
+                                SimulationColumns.BLOCK.value: block,
+                                SimulationColumns.COMPONENT.value: comp_id,
+                                SimulationColumns.OUTPUT.value: name,
+                                SimulationColumns.ABSOLUTE_TIME_INDEX.value: abs_offset
+                                + t,
+                                SimulationColumns.BLOCK_TIME_INDEX.value: t,
+                                SimulationColumns.SCENARIO_INDEX.value: s,
+                                SimulationColumns.VALUE.value: val,
+                                SimulationColumns.BASIS_STATUS.value: None,
+                            }
+                        )
         return rows
 
     # -------------------------------------------------------------------------
