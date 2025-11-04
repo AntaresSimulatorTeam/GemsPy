@@ -168,6 +168,22 @@ def _resolve_model(input_model: InputModel, port_types: Dict[str, PortType]) -> 
         variables={v.id for v in input_model.variables},
         parameters={p.id for p in input_model.parameters},
     )
+
+    # Multiple objective contributions
+    if input_model.objective_contributions:
+        objective_contributions = {
+            contrib.id: parse_expression(contrib.expression, identifiers)
+            for contrib in input_model.objective_contributions
+        }
+    else:
+        objective_contributions = None
+
+    # (old single-objective field)
+    if input_model.objective and not objective_contributions:
+        objective_contributions = {
+            "default": parse_expression(input_model.objective, identifiers)
+        }
+
     return model(
         id=input_model.id,
         parameters=[_to_parameter(p) for p in input_model.parameters],
@@ -181,9 +197,7 @@ def _resolve_model(input_model: InputModel, port_types: Dict[str, PortType]) -> 
             _to_constraint(c, identifiers) for c in input_model.binding_constraints
         ],
         constraints=[_to_constraint(c, identifiers) for c in input_model.constraints],
-        objective_operational_contribution=_to_expression_if_present(
-            input_model.objective, identifiers
-        ),
+        objective_contributions=objective_contributions,
     )
 
 
