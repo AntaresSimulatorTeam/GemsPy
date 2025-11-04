@@ -193,6 +193,22 @@ def _resolve_model(input_model: InputModel, port_types: Dict[str, PortType]) -> 
         if input_model.extra_outputs
         else None
     )
+
+    # Multiple objective contributions
+    if input_model.objective_contributions:
+        objective_contributions = {
+            contrib.id: parse_expression(contrib.expression, identifiers)
+            for contrib in input_model.objective_contributions
+        }
+    else:
+        objective_contributions = None
+
+    # (old single-objective field)
+    if input_model.objective and not objective_contributions:
+        objective_contributions = {
+            "default": parse_expression(input_model.objective, identifiers)
+        }
+
     return model(
         id=input_model.id,
         parameters=[_to_parameter(p) for p in input_model.parameters],
