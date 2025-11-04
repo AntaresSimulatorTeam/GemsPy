@@ -9,7 +9,7 @@ Utility classes to obtain solver results.
 """
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional, TypeVar
+from typing import Any, Dict, Mapping, Optional, Set, TypeVar
 
 from gems.expression import evaluate
 from gems.expression.evaluate import EvaluationError
@@ -138,7 +138,7 @@ class OutputComponent:
         Evaluate a single ExtraOutput for all time/scenario indices
         from the component's variables.
         """
-        all_indices = set()
+        all_indices: Set[TimeScenarioIndex] = set()
         for var in self._variables.values():
             all_indices.update(var._value.keys())
         if not all_indices:
