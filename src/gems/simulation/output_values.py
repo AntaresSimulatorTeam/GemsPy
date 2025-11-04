@@ -11,7 +11,9 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, Mapping, Optional, TypeVar
 
-from gems.simulation.extra_output import ExtraOutput
+from gems.expression import evaluate
+from gems.expression.evaluate import EvaluationError
+from gems.simulation.extra_output import ExtraOutput, ExtraOutputValueProvider
 from gems.simulation.optimization import OptimizationProblem
 from gems.simulation.output_values_base import BaseOutputValue
 from gems.study.data import TimeScenarioIndex
@@ -108,9 +110,7 @@ class OutputComponent:
             self._extra_outputs[output_name] = ExtraOutput(output_name)
         return self._extra_outputs[output_name]
 
-    def evaluate_extra_outputs_for_a_component(
-        self, problem: OptimizationProblem
-    ) -> None:
+    def evaluate_extra_outputs(self, problem: OptimizationProblem) -> None:
         """Evaluate all model-defined extra outputs and populate self._extra_outputs."""
         if problem is None:
             raise ValueError("Expected a valid OptimizationProblem, got None.")
@@ -123,7 +123,47 @@ class OutputComponent:
         for out_id, expr_node in self.model.extra_outputs.items():
             if out_id not in self._extra_outputs:
                 self._extra_outputs[out_id] = ExtraOutput(out_id)
-            self._extra_outputs[out_id].evaluate(self, problem, expr_node)
+
+            self._evaluate_single_extra_output(
+                self._extra_outputs[out_id], problem, expr_node
+            )
+
+    def _evaluate_single_extra_output(
+        self,
+        extra_output: ExtraOutput,
+        problem: OptimizationProblem,
+        expr_node: Any,
+    ) -> None:
+        """
+        Evaluate a single ExtraOutput for all time/scenario indices
+        from the component's variables.
+        """
+        all_indices = set()
+        for var in self._variables.values():
+            all_indices.update(var._value.keys())
+        if not all_indices:
+            all_indices = {TimeScenarioIndex(0, 0)}
+
+        sorted_indices = sorted(all_indices, key=lambda k: (k.time, k.scenario))
+
+        for idx in sorted_indices:
+            try:
+                expanded_expr = problem.context.expand_operators(expr_node)
+                provider = ExtraOutputValueProvider(self, problem, idx)
+                val = float(evaluate(expanded_expr, provider))
+            except EvaluationError as e:
+                print(
+                    f"[ERROR] Eval failed for '{extra_output._name}' in {self._id} "
+                    f"at t={idx.time}, s={idx.scenario}: {e}"
+                )
+                val = float("nan")
+            except Exception as e:
+                print(
+                    f"[ERROR] Unexpected error for '{extra_output._name}' in {self._id}: {e}"
+                )
+                val = float("nan")
+
+            extra_output._set(idx.time, idx.scenario, val)
 
 
 @dataclass
@@ -206,7 +246,7 @@ class OutputValues:
         if self.problem is None:
             return
         for comp in self._components.values():
-            comp.evaluate_extra_outputs_for_a_component(self.problem)
+            comp.evaluate_extra_outputs(self.problem)
 
 
 Comparable = TypeVar("Comparable", OutputComponent, OutputVariable, ExtraOutput)

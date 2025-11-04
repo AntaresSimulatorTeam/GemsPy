@@ -45,7 +45,7 @@ def test_component_and_flow_output_object() -> None:
 
     with patch.object(
         OutputComponent,
-        "evaluate_extra_outputs_for_a_component",
+        "evaluate_extra_outputs",
         return_value={},
     ):
         actual_output = OutputValues(mock_problem)

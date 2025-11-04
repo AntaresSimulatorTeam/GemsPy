@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from gems.expression import evaluate
-from gems.expression.evaluate import EvaluationError, ValueProvider
+from gems.expression.evaluate import ValueProvider
 from gems.simulation.optimization import OptimizationProblem
 from gems.simulation.output_values_base import BaseOutputValue
 from gems.study.data import ComponentParameterIndex, TimeScenarioIndex
@@ -32,45 +31,6 @@ class ExtraOutput(BaseOutputValue):
             self._size = (size_s, size_t)
 
         self._value[key] = value
-
-    def evaluate(
-        self,
-        component: Any,  # Relaxed type from "OutputComponent" to workaround cyclic dependency
-        problem: "OptimizationProblem",
-        expr_node: Any,
-    ) -> None:
-        """
-        Evaluate this single extra output for all time/scenario indices
-        from the component's variables.
-        """
-        # Gather all time/scenario indices from component variables
-        all_indices = set()
-        for var in component._variables.values():
-            all_indices.update(var._value.keys())
-        if not all_indices:
-            all_indices = {TimeScenarioIndex(0, 0)}
-
-        sorted_indices = sorted(all_indices, key=lambda k: (k.time, k.scenario))
-
-        # Evaluate at each index
-        for idx in sorted_indices:
-            try:
-                expanded_expr = problem.context.expand_operators(expr_node)
-                provider = ExtraOutputValueProvider(component, problem, idx)
-                val = float(evaluate(expanded_expr, provider))
-            except EvaluationError as e:
-                print(
-                    f"[ERROR] Eval failed for '{self._name}' in {component._id} "
-                    f"at t={idx.time}, s={idx.scenario}: {e}"
-                )
-                val = float("nan")
-            except Exception as e:
-                print(
-                    f"[ERROR] Unexpected error for '{self._name}' in {component._id}: {e}"
-                )
-                val = float("nan")
-
-            self._set(idx.time, idx.scenario, val)
 
 
 class ExtraOutputValueProvider(ValueProvider):
