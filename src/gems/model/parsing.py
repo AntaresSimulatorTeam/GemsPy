@@ -108,7 +108,7 @@ class InputModel(ModifiedBaseModel):
     extra_outputs: Optional[List[InputExtraOutput]] = None
 
     @model_validator(mode="after")
-    def _migrate_legacy_objective(self) -> 'InputModel':
+    def _migrate_legacy_objective(self) -> "InputModel":
         """
         If only 'objective' is defined, convert it into a single contribution.
         """

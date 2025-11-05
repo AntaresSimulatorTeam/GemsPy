@@ -792,13 +792,13 @@ class OptimizationProblem:
         """
         model = component.model
         if model.objective_contributions is None:
-                return
-        
-        main_objective: Optional[lp.Objective] = None 
+            return
+
+        main_objective: Optional[lp.Objective] = None
         for contrib_id, expr in model.objective_contributions.items():
             if expr is None:
                 continue
-            
+
             instantiated = _instantiate_model_expression(
                 expr, component.id, self.context
             )
