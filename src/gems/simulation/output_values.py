@@ -1,194 +1,183 @@
 # Copyright (c) 2024, RTE (https://www.rte-france.com)
 #
-# See AUTHORS.txt
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
 
 """
-Util class to obtain solver results
+Utility classes to obtain solver results.
 """
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, Dict, Mapping, Optional, Set, TypeVar
 
+from gems.expression import evaluate
+from gems.expression.evaluate import EvaluationError
+from gems.simulation.extra_output import ExtraOutput, ExtraOutputValueProvider
 from gems.simulation.optimization import OptimizationProblem
+from gems.simulation.output_values_base import BaseOutputValue
 from gems.study.data import TimeScenarioIndex
+
+
+@dataclass
+class OutputVariable(BaseOutputValue):
+    """
+    Contains a single solver variable's values and status.
+    All shared logic is now in BaseOutputValue.
+    """
+
+    _basis_status: Dict[TimeScenarioIndex, str] = field(
+        init=False, default_factory=dict
+    )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, OutputVariable):
+            return NotImplemented
+        # Check base equality first (name, size, value)
+        if not super().__eq__(other):
+            return False
+        # Then check the unique field
+        return (self.ignore or other.ignore) or (
+            self._basis_status == other._basis_status
+        )
+
+    def _set(
+        self,
+        timestep: Optional[int],
+        scenario: Optional[int],
+        value: float,
+        status: Optional[str] = None,
+        is_mip: bool = True,
+    ) -> None:
+        timestep = 0 if timestep is None else timestep
+        scenario = 0 if scenario is None else scenario
+        key = TimeScenarioIndex(timestep, scenario)
+        if key not in self._value:
+            size_s = max(self._size[0], scenario + 1)
+            size_t = max(self._size[1], timestep + 1)
+            self._size = (size_s, size_t)
+
+        self._value[key] = value
+        if not is_mip and status is not None:
+            self._basis_status[key] = status
+
+
+@dataclass
+class OutputComponent:
+    _id: str
+    _variables: Dict[str, OutputVariable] = field(init=False, default_factory=dict)
+    _extra_outputs: Dict[str, ExtraOutput] = field(init=False, default_factory=dict)
+    model: Optional[Any] = field(default=None, init=False)
+    ignore: bool = field(default=False, init=False)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, OutputComponent):
+            return NotImplemented
+        return self.is_close(other, rel_tol=0.0, abs_tol=0.0)
+
+    def is_close(
+        self,
+        other: "OutputComponent",
+        *,
+        rel_tol: float = 1.0e-9,
+        abs_tol: float = 0.0,
+    ) -> bool:
+        return (self.ignore or other.ignore) or (
+            self._id == other._id
+            and _are_mappings_close(self._variables, other._variables, rel_tol, abs_tol)
+            and _are_mappings_close(
+                self._extra_outputs, other._extra_outputs, rel_tol, abs_tol
+            )
+        )
+
+    def __str__(self) -> str:
+        string = f"{self._id} : {'(ignored)' if self.ignore else ''}\n"
+        for var in self._variables.values():
+            string += f"  {str(var)}\n"
+        if self._extra_outputs:
+            string += "  [Extra Outputs]\n"
+            for out in self._extra_outputs.values():
+                string += f"    {out._name}: {out._value}\n"
+        return string
+
+    def var(self, variable_name: str) -> OutputVariable:
+        if variable_name not in self._variables:
+            self._variables[variable_name] = OutputVariable(variable_name)
+        return self._variables[variable_name]
+
+    def extra_output(self, output_name: str) -> ExtraOutput:
+        if output_name not in self._extra_outputs:
+            self._extra_outputs[output_name] = ExtraOutput(output_name)
+        return self._extra_outputs[output_name]
+
+    def evaluate_extra_outputs(self, problem: OptimizationProblem) -> None:
+        """Evaluate all model-defined extra outputs and populate self._extra_outputs."""
+        if problem is None:
+            raise ValueError("Expected a valid OptimizationProblem, got None.")
+
+        if self.model is None or self.model.extra_outputs is None:
+            return
+
+        self._extra_outputs = {}
+
+        for out_id, expr_node in self.model.extra_outputs.items():
+            if out_id not in self._extra_outputs:
+                self._extra_outputs[out_id] = ExtraOutput(out_id)
+
+            self._evaluate_single_extra_output(
+                self._extra_outputs[out_id], problem, expr_node
+            )
+
+    def _evaluate_single_extra_output(
+        self,
+        extra_output: ExtraOutput,
+        problem: OptimizationProblem,
+        expr_node: Any,
+    ) -> None:
+        """
+        Evaluate a single ExtraOutput for all time/scenario indices
+        from the component's variables.
+        """
+        all_indices: Set[TimeScenarioIndex] = set()
+        for var in self._variables.values():
+            all_indices.update(var._value.keys())
+        if not all_indices:
+            all_indices = {TimeScenarioIndex(0, 0)}
+
+        sorted_indices = sorted(all_indices, key=lambda k: (k.time, k.scenario))
+
+        for idx in sorted_indices:
+            try:
+                expanded_expr = problem.context.expand_operators(expr_node)
+                provider = ExtraOutputValueProvider(self, problem, idx)
+                val = float(evaluate(expanded_expr, provider))
+            except EvaluationError as e:
+                print(
+                    f"[ERROR] Eval failed for '{extra_output._name}' in {self._id} "
+                    f"at t={idx.time}, s={idx.scenario}: {e}"
+                )
+                val = float("nan")
+            except Exception as e:
+                print(
+                    f"[ERROR] Unexpected error for '{extra_output._name}' in {self._id}: {e}"
+                )
+                val = float("nan")
+
+            extra_output._set(idx.time, idx.scenario, val)
 
 
 @dataclass
 class OutputValues:
     """
-    Contents variables output values after solver work completion.
+    Contains variables and extra outputs after solver work completion.
     """
 
-    @dataclass
-    class Variable:
-        """
-        'constant_var':      c1,
-        'time_only_var':     [[t1, t2, t3]],
-        'scenario_only_var': [s1, s2],
-        'time_scenario_var': [[t1s1, t2s1, t3s1], [t1s2, t2s2, t3s2]]
-
-        Internally, the _value attribute will be a dict mapping TimeScenarioIndex(t,s) to float
-        """
-
-        _name: str
-        _value: Dict[TimeScenarioIndex, float] = field(init=False, default_factory=dict)
-        _size: Tuple[int, int] = field(init=False, default=(0, 0))
-        _basis_status: Dict[TimeScenarioIndex, str] = field(
-            init=False, default_factory=dict
-        )
-        ignore: bool = field(default=False, init=False)
-
-        def __eq__(self, other: object) -> bool:
-            if not isinstance(other, OutputValues.Variable):
-                return NotImplemented
-            return (self.ignore or other.ignore) or (
-                self._name == other._name
-                and self._size == other._size
-                and self._value == other._value
-            )
-
-        def is_close(
-            self,
-            other: "OutputValues.Variable",
-            *,
-            rel_tol: float = 1.0e-9,
-            abs_tol: float = 0.0,
-        ) -> bool:
-            # From the docs in https://docs.python.org/3/library/math.html#math.isclose
-            # math.isclose(a, b) returns abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
-            return (self.ignore or other.ignore) or (
-                self._name == other._name
-                and self._size == other._size
-                and self._value.keys() == other._value.keys()
-                and all(
-                    math.isclose(
-                        self._value[key],
-                        other._value[key],
-                        rel_tol=rel_tol,
-                        abs_tol=abs_tol,
-                    )
-                    for key in self._value
-                )
-            )
-
-        def __str__(self) -> str:
-            return (
-                f"{self._name} : {str(self.value)} {'(ignored)' if self.ignore else ''}"
-            )
-
-        @property
-        def value(self) -> Union[None, float, List[float], List[List[float]]]:
-            size_s, size_t = self._size
-            if size_t == 1:
-                if size_s == 1:
-                    # Constant
-                    return self._value[TimeScenarioIndex(0, 0)]
-                else:
-                    # Scenario-only
-                    return [self._value[TimeScenarioIndex(0, s)] for s in range(size_s)]
-            else:
-                # Either Time-only or Time-Scenario
-                return [
-                    [self._value[TimeScenarioIndex(t, s)] for t in range(size_t)]
-                    for s in range(size_s)
-                ]
-
-        @value.setter
-        def value(self, values: Union[float, List[float], List[List[float]]]) -> None:
-            size_s, size_t = 1, 1
-
-            if isinstance(values, list):
-                size_s = len(values)
-                for scenario, timesteps in enumerate(values):
-                    if isinstance(timesteps, list):
-                        size_t = len(timesteps)
-                        for timestep, value in enumerate(timesteps):
-                            # Either Time-only or Time-Scenario
-                            self._value[TimeScenarioIndex(timestep, scenario)] = value
-                    else:
-                        # Scenario-only
-                        self._value[TimeScenarioIndex(0, scenario)] = cast(
-                            float, timesteps
-                        )
-            else:
-                # Constant
-                self._value[TimeScenarioIndex(0, 0)] = values
-
-            self._size = (size_s, size_t)
-
-        def _set(
-            self,
-            timestep: Optional[int],
-            scenario: Optional[int],
-            value: float,
-            status: Optional[str] = None,
-            is_mip: bool = True,
-        ) -> None:
-            timestep = 0 if timestep is None else timestep
-            scenario = 0 if scenario is None else scenario
-            key = TimeScenarioIndex(timestep, scenario)
-            if key not in self._value:
-                size_s = max(self._size[0], scenario + 1)
-                size_t = max(self._size[1], timestep + 1)
-                self._size = (size_s, size_t)
-
-            self._value[key] = value
-            if not is_mip and status is not None:
-                self._basis_status[key] = status
-
-    @dataclass
-    class Component:
-        _id: str
-        _variables: Dict[str, "OutputValues.Variable"] = field(
-            init=False, default_factory=dict
-        )
-        ignore: bool = field(default=False, init=False)
-
-        def __eq__(self, other: object) -> bool:
-            if not isinstance(other, OutputValues.Component):
-                return NotImplemented
-            return self.is_close(other, rel_tol=0.0, abs_tol=0.0)
-
-        def is_close(
-            self,
-            other: "OutputValues.Component",
-            *,
-            rel_tol: float = 1.0e-9,
-            abs_tol: float = 0.0,
-        ) -> bool:
-            return (self.ignore or other.ignore) or (
-                self._id == other._id
-                and _are_mappings_close(
-                    self._variables, other._variables, rel_tol, abs_tol
-                )
-            )
-
-        def __str__(self) -> str:
-            string = f"{self._id} : {'(ignored)' if self.ignore else ''}\n"
-            for var in self._variables.values():
-                string += f"  {str(var)}\n"
-            return string
-
-        def var(self, variable_name: str) -> "OutputValues.Variable":
-            if variable_name not in self._variables:
-                self._variables[variable_name] = OutputValues.Variable(variable_name)
-            return self._variables[variable_name]
-
     problem: Optional[OptimizationProblem] = field(default=None)
-    _components: Dict[str, "OutputValues.Component"] = field(
-        init=False, default_factory=dict
-    )
+    _components: Dict[str, OutputComponent] = field(init=False, default_factory=dict)
 
     def __post_init__(self) -> None:
         self._build_components()
+        self._fill_components()
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, OutputValues):
@@ -203,15 +192,43 @@ class OutputValues:
         )
 
     def __str__(self) -> str:
-        string = "\n"
-        for comp in self._components.values():
-            string += f"{str(comp)}"
-
-        return string
+        return "\n" + "".join(f"{comp}\n" for comp in self._components.values())
 
     def _build_components(self) -> None:
+        """
+        Initializes component objects and links them to their models.
+        It only creates the structure, no values are set.
+        """
         if self.problem is None:
             return
+
+        # Ensure a Component object exists for every component in the network
+        for cmp in self.problem.context.network.all_components:
+            comp = self.component(cmp.id)
+            comp.model = cmp.model
+
+    def _fill_components(self) -> None:
+        """
+        Fills all output values (Variables from solver, ExtraOutputs from evaluation).
+        """
+        # 1. Populate Variables
+        self._evaluate_variables()
+
+        # 2. Evaluate Extra Outputs, which depend on the variables being set
+        self._evaluate_extra_outputs()
+
+    def component(self, component_id: str) -> OutputComponent:
+        if component_id not in self._components:
+            self._components[component_id] = OutputComponent(component_id)
+        return self._components[component_id]
+
+    def _evaluate_variables(self) -> None:
+        """
+        Populates the OutputVariable values from the solver results. # Docstring updated
+        """
+        if self.problem is None:
+            return
+
         is_mip = self.problem.solver.IsMip()
 
         for key, value in self.problem.context.get_all_component_variables().items():
@@ -224,13 +241,15 @@ class OutputValues:
                 is_mip=is_mip,
             )
 
-    def component(self, component_id: str) -> "OutputValues.Component":
-        if component_id not in self._components:
-            self._components[component_id] = OutputValues.Component(component_id)
-        return self._components[component_id]
+    def _evaluate_extra_outputs(self) -> None:
+        """Evaluate extra outputs for all components."""
+        if self.problem is None:
+            return
+        for comp in self._components.values():
+            comp.evaluate_extra_outputs(self.problem)
 
 
-Comparable = TypeVar("Comparable", OutputValues.Component, OutputValues.Variable)
+Comparable = TypeVar("Comparable", OutputComponent, OutputVariable, ExtraOutput)
 
 
 def _are_mappings_close(
@@ -242,26 +261,26 @@ def _are_mappings_close(
     lhs_keys = lhs.keys()
     rhs_keys = rhs.keys()
 
-    if (lhs_only_keys := lhs_keys - rhs_keys) and any(
-        not lhs[key].ignore for key in lhs_only_keys
-    ):
-        return False
+    # Keys present only on the left
+    for key in lhs_keys - rhs_keys:
+        if not lhs[key].ignore:
+            return False
 
-    elif (rhs_only_keys := rhs_keys - lhs_keys) and any(
-        not rhs[key].ignore for key in rhs_only_keys
-    ):
-        return False
+    # Keys present only on the right
+    for key in rhs_keys - lhs_keys:
+        if not rhs[key].ignore:
+            return False
 
-    elif intersect_keys := lhs_keys & rhs_keys:
-        if rel_tol == abs_tol == 0.0:
-            return all(lhs[key] == rhs[key] for key in intersect_keys)
-        else:
-            return all(
-                lhs[key].is_close(rhs[key], rel_tol=rel_tol, abs_tol=abs_tol)
-                for key in intersect_keys
-            )
-    else:
-        return True
+    # Keys in common
+    for key in lhs_keys & rhs_keys:
+        left_item = lhs[key]
+        right_item = rhs[key]
+        if not left_item.ignore and not left_item.is_close(
+            right_item, rel_tol=rel_tol, abs_tol=abs_tol
+        ):
+            return False
+
+    return True
 
 
 @dataclass(frozen=True)

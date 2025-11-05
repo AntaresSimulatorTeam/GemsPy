@@ -142,3 +142,9 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
 
 def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:
     return visit(expression, EvaluationVisitor(value_provider))
+
+
+class EvaluationError(Exception):
+    """Raised when an expression cannot be evaluated due to missing context or math errors."""
+
+    pass

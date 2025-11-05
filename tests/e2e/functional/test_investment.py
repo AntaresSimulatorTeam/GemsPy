@@ -239,6 +239,8 @@ def test_generation_xpansion_single_time_step_single_scenario(
     expected_output.component("G1").var("generation").value = 200.0
     expected_output.component("CAND").var("generation").value = 100.0
     expected_output.component("CAND").var("p_max").value = 100.0
+    expected_output.component("N")
+    expected_output.component("D")
 
     assert output == expected_output, f"Output differs from expected: {output}"
 
@@ -316,7 +318,8 @@ def test_two_candidates_xpansion_single_time_step_single_scenario(
     expected_output.component("DISCRETE").var("generation").value = 100.0
     expected_output.component("DISCRETE").var("p_max").value = 100.0
     expected_output.component("DISCRETE").var("nb_units").value = 10.0
-
+    expected_output.component("D")
+    expected_output.component("N")
     assert output == expected_output, f"Output differs from expected: {output}"
 
 
@@ -401,5 +404,8 @@ def test_generation_xpansion_two_time_steps_two_scenarios(
         [200.0, 300.0],
     ]
     expected_output.component("CAND").var("p_max").value = 300.0
+
+    expected_output.component("N")
+    expected_output.component("D")
 
     assert output == expected_output, f"Output differs from expected: {output}"

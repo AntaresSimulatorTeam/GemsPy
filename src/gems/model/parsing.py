@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 import typing
+from dataclasses import dataclass
 from typing import List, Optional
 
 from pydantic import Field, ValidationError, model_validator
@@ -79,6 +80,12 @@ class InputObjectiveContribution(ModifiedBaseModel):
     expression: str
 
 
+@dataclass
+class InputExtraOutput(ModifiedBaseModel):
+    id: str
+    expression: str
+
+
 class InputModel(ModifiedBaseModel):
     id: str
     parameters: List[InputParameter] = Field(default_factory=list)
@@ -96,6 +103,7 @@ class InputModel(ModifiedBaseModel):
     # --- backward compatibility with legacy "objective" field ---
     objective: Optional[str] = None
     description: Optional[str] = None
+    extra_outputs: Optional[List[InputExtraOutput]] = None
 
     @model_validator(mode="after")
     def _migrate_legacy_objective(self):

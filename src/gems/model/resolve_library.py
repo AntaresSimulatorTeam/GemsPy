@@ -27,6 +27,7 @@ from gems.model import (
     model,
 )
 from gems.model.library import Library
+from gems.model.model import model
 from gems.model.parsing import (
     InputConstraint,
     InputField,
@@ -184,6 +185,14 @@ def _resolve_model(input_model: InputModel, port_types: Dict[str, PortType]) -> 
             "default": parse_expression(input_model.objective, identifiers)
         }
 
+    extra_outputs = (
+        {
+            eo.id: parse_expression(eo.expression, identifiers)
+            for eo in input_model.extra_outputs
+        }
+        if input_model.extra_outputs
+        else None
+    )
     return model(
         id=input_model.id,
         parameters=[_to_parameter(p) for p in input_model.parameters],
@@ -198,6 +207,7 @@ def _resolve_model(input_model: InputModel, port_types: Dict[str, PortType]) -> 
         ],
         constraints=[_to_constraint(c, identifiers) for c in input_model.constraints],
         objective_contributions=objective_contributions,
+        extra_outputs=extra_outputs,
     )
 
 
