@@ -103,7 +103,7 @@ class Model:
     variables: Dict[str, Variable] = field(default_factory=dict)
     objective_operational_contribution: Optional[ExpressionNode] = None
     objective_investment_contribution: Optional[ExpressionNode] = None
-    # Objective contribution approach 
+    # Objective contribution approach
     objective_contributions: Optional[Dict[str, ExpressionNode]] = None
     ports: Dict[str, ModelPort] = field(default_factory=dict)  # key = port name
     port_fields_definitions: Dict[PortFieldId, PortFieldDefinition] = field(

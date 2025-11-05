@@ -67,9 +67,9 @@ def test_library_parsing(libs_dir: Path) -> None:
                 definition=var("generation"),
             )
         ],
-        objective_operational_contribution=(param("cost") * var("generation"))
-        .time_sum()
-        .expec(),
+        objective_contributions={
+            "operational": (param("cost") * var("generation")).time_sum().expec()
+        },
     )
     short_term_storage = lib[input_lib.id].models["short-term-storage"]
     assert short_term_storage == model(

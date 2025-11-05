@@ -72,10 +72,12 @@ class InputPortFieldDefinition(ModifiedBaseModel):
     field: str
     definition: str
 
+
 class InputObjectiveContribution(ModifiedBaseModel):
     """
     Represents one term in the objective function.
     """
+
     id: str
     expression: str
 
