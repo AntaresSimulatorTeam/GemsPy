@@ -169,6 +169,14 @@ def _resolve_model(input_model: InputModel, port_types: Dict[str, PortType]) -> 
         variables={v.id for v in input_model.variables},
         parameters={p.id for p in input_model.parameters},
     )
+    extra_outputs = (
+        {
+            eo.id: parse_expression(eo.expression, identifiers)
+            for eo in input_model.extra_outputs
+        }
+        if input_model.extra_outputs
+        else None
+    )
 
     # Multiple objective contributions
     if input_model.objective_contributions:
