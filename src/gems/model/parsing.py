@@ -99,7 +99,7 @@ class InputModel(ModifiedBaseModel):
 
     # --- new field ---
     objective_contributions: Optional[List[InputObjectiveContribution]] = Field(
-        default_factory=list, alias="objective-contributions"
+        default_factory=lambda: [], alias="objective-contributions"
     )
 
     # --- backward compatibility with legacy "objective" field ---
@@ -108,7 +108,7 @@ class InputModel(ModifiedBaseModel):
     extra_outputs: Optional[List[InputExtraOutput]] = None
 
     @model_validator(mode="after")
-    def _migrate_legacy_objective(self):
+    def _migrate_legacy_objective(self) -> 'InputModel':
         """
         If only 'objective' is defined, convert it into a single contribution.
         """

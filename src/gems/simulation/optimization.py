@@ -774,7 +774,7 @@ class OptimizationProblem:
             else:
                 self._create_objectives_from_build_strategy(component)
 
-    def _create_objectives_from_build_strategy(self, component) -> None:
+    def _create_objectives_from_build_strategy(self, component: "Component") -> None:
         model = component.model
         for objective in self.context.build_strategy.get_objectives(model):
             if objective is not None:
@@ -785,18 +785,20 @@ class OptimizationProblem:
                     self.context.risk_strategy(objective),
                 )
 
-    def _create_objectives_from_contributions(self, component) -> None:
+    def _create_objectives_from_contributions(self, component: "Component") -> None:
         """
         Creates objectives from the 'objective_contributions' dictionary defined
         directly on the component's model (new format).
         """
         model = component.model
-        main_objective: Optional[lp.Objective] = None  # Start with no objective
-
+        if model.objective_contributions is None:
+                return
+        
+        main_objective: Optional[lp.Objective] = None 
         for contrib_id, expr in model.objective_contributions.items():
             if expr is None:
                 continue
-
+            
             instantiated = _instantiate_model_expression(
                 expr, component.id, self.context
             )
