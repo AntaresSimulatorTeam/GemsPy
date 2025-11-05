@@ -41,8 +41,9 @@ library:
         - port: injection_port
           field: flow
           definition: generation
-      objective: expec(sum(cost * generation))
-
+      objective-contributions:
+      - id: operational
+        expression: expec(sum(cost * generation))
     - id: node
       description: A basic balancing node model
       ports:

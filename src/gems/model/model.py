@@ -103,6 +103,8 @@ class Model:
     variables: Dict[str, Variable] = field(default_factory=dict)
     objective_operational_contribution: Optional[ExpressionNode] = None
     objective_investment_contribution: Optional[ExpressionNode] = None
+    # Objective contribution approach
+    objective_contributions: Optional[Dict[str, ExpressionNode]] = None
     ports: Dict[str, ModelPort] = field(default_factory=dict)  # key = port name
     port_fields_definitions: Dict[PortFieldId, PortFieldDefinition] = field(
         default_factory=dict
@@ -119,6 +121,10 @@ class Model:
             _is_objective_contribution_valid(
                 self, self.objective_investment_contribution
             )
+        # Validate each contribution if present
+        if self.objective_contributions:
+            for cid, expr in self.objective_contributions.items():
+                _is_objective_contribution_valid(self, expr)
 
         for definition in self.port_fields_definitions.values():
             port_name = definition.port_field.port_name
@@ -156,6 +162,7 @@ def model(
     ports: Optional[Iterable[ModelPort]] = None,
     port_fields_definitions: Optional[Iterable[PortFieldDefinition]] = None,
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None,
+    objective_contributions: Optional[Dict[str, ExpressionNode]] = None,  # NEW
 ) -> Model:
     """
     Utility method to create Models from relaxed arguments
@@ -180,6 +187,7 @@ def model(
         variables={v.name: v for v in variables} if variables else {},
         objective_operational_contribution=objective_operational_contribution,
         objective_investment_contribution=objective_investment_contribution,
+        objective_contributions=objective_contributions,
         inter_block_dyn=inter_block_dyn,
         ports=existing_port_names,
         port_fields_definitions={d.port_field: d for d in port_fields_definitions}

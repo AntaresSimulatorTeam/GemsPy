@@ -500,20 +500,31 @@ def _create_objective(
     expanded = opt_context.expand_operators(instantiated_expr)
     linear_expr = opt_context.linearize_expression(expanded)
 
-    obj: lp.Objective = solver.Objective()
+    _add_linear_expression_to_objective(solver, opt_context, linear_expr)
+
+
+def _add_linear_expression_to_objective(
+    solver: lp.Solver,
+    context: OptimizationContext,
+    linear_expr: LinearExpression,
+    existing_obj: Optional[lp.Objective] = None,
+) -> lp.Objective:
+    """
+    Adds terms from a LinearExpression to an existing lp.Objective, or creates a new one.
+    This function handles the accumulation logic required for objective contributions.
+    """
+    obj: lp.Objective = existing_obj if existing_obj is not None else solver.Objective()
+
     for term in linear_expr.terms.values():
-        solver_var = _get_solver_var(
-            term,
-            opt_context,
-        )
-        opt_context._solver_variables[solver_var.name()].is_in_objective = True
+        solver_var = _get_solver_var(term, context)
+        context._solver_variables[solver_var.name()].is_in_objective = True
         obj.SetCoefficient(
             solver_var,
             obj.GetCoefficient(solver_var) + term.coefficient,
         )
 
-    # This should have no effect on the optimization
     obj.SetOffset(linear_expr.constant + obj.offset())
+    return obj
 
 
 @dataclass
@@ -751,17 +762,50 @@ class OptimizationProblem:
                 )
 
     def _create_objectives(self) -> None:
+        """
+        Iterates over all network components and creates their corresponding
+        optimization objectives in the solver.
+        """
         for component in self.context.network.all_components:
             model = component.model
+            # We distinguish between objective_contributions and classical objective retreived from context build_strategy
+            if getattr(model, "objective_contributions", None):
+                self._create_objectives_from_contributions(component)
+            else:
+                self._create_objectives_from_build_strategy(component)
 
-            for objective in self.context.build_strategy.get_objectives(model):
-                if objective is not None:
-                    _create_objective(
-                        self.solver,
-                        self.context,
-                        component,
-                        self.context.risk_strategy(objective),
-                    )
+    def _create_objectives_from_build_strategy(self, component) -> None:
+        model = component.model
+        for objective in self.context.build_strategy.get_objectives(model):
+            if objective is not None:
+                _create_objective(
+                    self.solver,
+                    self.context,
+                    component,
+                    self.context.risk_strategy(objective),
+                )
+
+    def _create_objectives_from_contributions(self, component) -> None:
+        """
+        Creates objectives from the 'objective_contributions' dictionary defined
+        directly on the component's model (new format).
+        """
+        model = component.model
+        main_objective: Optional[lp.Objective] = None  # Start with no objective
+
+        for contrib_id, expr in model.objective_contributions.items():
+            if expr is None:
+                continue
+
+            instantiated = _instantiate_model_expression(
+                expr, component.id, self.context
+            )
+            expanded = self.context.expand_operators(instantiated)
+            linear_expr = self.context.linearize_expression(expanded)
+
+            main_objective = _add_linear_expression_to_objective(
+                self.solver, self.context, linear_expr, existing_obj=main_objective
+            )
 
     def export_as_mps(self) -> str:
         return self.solver.ExportModelAsMpsFormat(fixed_format=True, obfuscated=False)
