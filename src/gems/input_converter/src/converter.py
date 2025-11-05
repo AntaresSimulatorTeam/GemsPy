@@ -52,6 +52,7 @@ from gems.study.parsing import (
 ANTARES_HISTORIC_LIB_ID = "antares-historic"
 MODEL_TEMPLATE_FOLDER = Path(__file__).parents[1] / "data" / "model_configuration"
 LIBS_FOLDER = "model-libraries"
+SERIES_FOLDER = "data-series"
 
 # TODO: Move all global variables in a config class, that is used in AntaresStudyConverter constructor
 
@@ -119,9 +120,7 @@ class AntaresStudyConverter:
                 self.study = read_study_local(resolve_path(self.output_folder))
             else:
                 self.study = read_study_local(resolve_path(study_input))
-
-        self.output_path = self.output_folder / "input" / "system.yml"
-
+        self.output_system_path = self.output_folder / "input" / "system.yml"
         self.areas = self.study.get_areas()
         self.legacy_objects: list[ObjectProperties] = []
 
@@ -143,16 +142,6 @@ class AntaresStudyConverter:
                 thermals = area.get_thermals()
                 for thermal in thermals.values():
                     if thermal.id not in resolved_virtual_objects.thermals:
-                        # TODO Do  we move preprocessing files in data series folder ?
-                        series_path = (
-                            self.thermal_input_path
-                            / "input"
-                            / "thermal"
-                            / "series"
-                            / Path(thermal.area_id)
-                            / Path(thermal.id)
-                            / "series.txt"
-                        )
                         tdp = ThermalDataPreprocessing(thermal, self.thermal_input_path)
                         components.append(
                             InputComponent(
@@ -160,6 +149,7 @@ class AntaresStudyConverter:
                                 model=f"{lib_id}.thermal",
                                 parameters=[
                                     tdp.generate_component_parameter("p_min_cluster"),
+                                    tdp.generate_component_parameter("p_max_cluster"),
                                     tdp.generate_component_parameter("nb_units_min"),
                                     tdp.generate_component_parameter("nb_units_max"),
                                     tdp.generate_component_parameter(
@@ -222,12 +212,6 @@ class AntaresStudyConverter:
                                         scenario_dependent=False,
                                         value=thermal.properties.min_down_time,
                                     ),
-                                    InputComponentParameter(
-                                        id="p_max_cluster",
-                                        time_dependent=True,
-                                        scenario_dependent=True,
-                                        value=str(series_path).removesuffix(".txt"),
-                                    ),
                                 ],
                             )
                         )
@@ -241,11 +225,22 @@ class AntaresStudyConverter:
                                 )
                             )
                         else:
+
                             area_connections.append(
                                 InputAreaConnections(
                                     component=f"{thermal.area_id}_{thermal.id}",
                                     port="balance_port",
                                     area=f"{thermal.area_id}",
+                                )
+                            )
+                            self.legacy_objects.append(
+                                ObjectProperties(
+                                    type="thermal",
+                                    area=thermal.area_id,
+                                    link=None,
+                                    cluster=thermal.id,
+                                    binding_constraint_id=None,
+                                    field=None,
                                 )
                             )
         return components, connections
@@ -280,6 +275,7 @@ class AntaresStudyConverter:
         return components
 
     def _delete_legacy_objects(self) -> None:
+
         for legacy_component in self.legacy_objects:
             try:
                 if legacy_component.type in STUDY_LEVEL_DELETION:
@@ -548,6 +544,10 @@ class AntaresStudyConverter:
         for path in self.lib_paths:
             shutil.copy2(path, dest_dir)
 
+    def _create_dataseries_dir(self) -> None:
+        dest_dir = self.output_folder / "input" / SERIES_FOLDER
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
     def get_model_name_among_libs(self, model_name: str) -> str:
         for lib_path in self.lib_paths:
             lib_name, file_model = self._extract_lib_and_model_ids(lib_path)
@@ -578,8 +578,9 @@ class AntaresStudyConverter:
         area_connections.extend(area_connections_from_model)
 
     def convert_study_to_input_system(self) -> InputSystem:
-        self._copy_libs_to_model_librairies()
 
+        self._copy_libs_to_model_librairies()
+        self._create_dataseries_dir()
         model_conversion_templates = self._build_model_conversion_templates()
         self._check_converted_models_are_in_libs(model_conversion_templates)
 
@@ -599,6 +600,7 @@ class AntaresStudyConverter:
                 area_connections,
             )
         if self.mode == ConversionMode.HYBRID:
+            print(self.legacy_objects)
             self._delete_legacy_objects()
         else:
             components.extend(
@@ -639,4 +641,4 @@ class AntaresStudyConverter:
     def process_all(self) -> None:
         system = self.convert_study_to_input_system()
         self.logger.info("Dumping input system into yaml file...")
-        dump_to_yaml(model=system, output_path=self.output_path)
+        dump_to_yaml(model=system, output_path=self.output_system_path)
