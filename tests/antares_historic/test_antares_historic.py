@@ -137,7 +137,7 @@ def _setup_study_component(study, period=None) -> ToolTestStudy:
         study_input=study, logger=logger, mode="full", lib_paths=LIB_PATHS
     )
     converter.process_all()
-    compo_file = converter.output_path
+    compo_file = converter.output_system_path
     path = converter.output_folder / "input" / "data-series"
     with compo_file.open() as c:
         return ToolTestStudy(parse_yaml_components(c), path)
