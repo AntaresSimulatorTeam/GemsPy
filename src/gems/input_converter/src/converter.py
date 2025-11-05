@@ -225,7 +225,6 @@ class AntaresStudyConverter:
                                 )
                             )
                         else:
-
                             area_connections.append(
                                 InputAreaConnections(
                                     component=f"{thermal.area_id}_{thermal.id}",
@@ -275,7 +274,6 @@ class AntaresStudyConverter:
         return components
 
     def _delete_legacy_objects(self) -> None:
-
         for legacy_component in self.legacy_objects:
             try:
                 if legacy_component.type in STUDY_LEVEL_DELETION:
@@ -578,18 +576,14 @@ class AntaresStudyConverter:
         area_connections.extend(area_connections_from_model)
 
     def convert_study_to_input_system(self) -> InputSystem:
-
         self._copy_libs_to_model_librairies()
         self._create_dataseries_dir()
         model_conversion_templates = self._build_model_conversion_templates()
         self._check_converted_models_are_in_libs(model_conversion_templates)
-
         virtual_objects = self._build_virtual_objects_repo(model_conversion_templates)
-
         components: list[InputComponent] = []
         connections: list[InputPortConnections] = []
         area_connections: list[InputAreaConnections] = []
-
         for model in self.models_to_convert:
             conversion_template = model_conversion_templates[model]
             self._convert_single_model(
@@ -608,7 +602,6 @@ class AntaresStudyConverter:
                     ANTARES_HISTORIC_LIB_ID, virtual_objects.areas
                 )
             )
-
         system = InputSystem(
             id=self.study.name,
             components=components,
@@ -624,7 +617,6 @@ class AntaresStudyConverter:
             model_conversion_templates[model] = self._get_model_conversion_template(
                 model
             )
-
         return model_conversion_templates
 
     def _build_virtual_objects_repo(
