@@ -592,7 +592,6 @@ class AntaresStudyConverter:
                 area_connections,
             )
         if self.mode == ConversionMode.HYBRID:
-            print(self.legacy_objects)
             self._delete_legacy_objects()
         else:
             components.extend(

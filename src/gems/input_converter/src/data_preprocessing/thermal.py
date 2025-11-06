@@ -23,20 +23,6 @@ class ThermalDataPreprocessing:
         self.study_path = study_path
         self.suffix = suffix
         self.output_series_dir = self.study_path / "input" / "data-series"
-
-        # self.series_path = (
-        #    self.study_path
-        #    / "input"
-        #    / "thermal"
-        #    / "series"
-        #    / self.thermal.area_id
-        #    / self.thermal.id
-        # )
-        # Write the series. It is necessary as the input folder may be different than the output folder
-        # series_data: pd.DataFrame = self.thermal.get_series_matrix()
-        # series_data.to_csv(
-        #    str(self.output_series_path)+"_series"+self.suffix, sep="\t", index=False, header=False
-        # )
         self._prepro_parameter_functions: dict[str, Callable[[int], pd.DataFrame]] = {
             "p_min_cluster": lambda _: self._compute_p_min_cluster(),
             "p_max_cluster": lambda _: self._compute_p_max_cluster(),
@@ -66,13 +52,6 @@ class ThermalDataPreprocessing:
 
     def _compute_p_max_cluster(self) -> pd.DataFrame:
         return self.thermal.get_series_matrix()
-
-    # InputComponentParameter(
-    #    id="p_max_cluster",
-    #    time_dependent=True,
-    #    scenario_dependent=True,
-    #    value=str(series_path).removesuffix(".txt"),
-    # ),
 
     def _compute_nb_units_min(self) -> pd.DataFrame:
         p_min_cluster: pd.DataFrame = self._compute_p_min_cluster()

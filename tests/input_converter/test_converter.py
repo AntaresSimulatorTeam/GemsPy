@@ -1234,7 +1234,6 @@ class TestConverter:
     def test_convert_study_path_to_input_study(self, tmp_path: Path):
         local_path = Path(__file__).parent / "resources" / LOCAL_PATH
         ref_path = local_path / "reference.yaml"
-        expected_data = read_yaml_file(ref_path)["system"]
         input_path = tmp_path / "input"
         output_path = tmp_path / "output"
         shutil.copytree(local_path, input_path)
