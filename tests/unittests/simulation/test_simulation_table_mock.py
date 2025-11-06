@@ -1,49 +1,46 @@
-# Standard library imports
-from dataclasses import dataclass
-from pathlib import Path
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# SPDX-License-Identifier: MPL-2.0
 
-# Third-party imports
+from dataclasses import dataclass
+
 import pandas as pd
 
-# Local application/library imports
-from gems.model.parsing import parse_yaml_library
-from gems.model.resolve_library import resolve_library
-from gems.simulation import OutputValues, TimeBlock, build_problem
+from gems.simulation.output_values import OutputValues
 from gems.simulation.simulation_table import (
     SimulationColumns,
     SimulationTableBuilder,
     SimulationTableWriter,
 )
-from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import build_data_base, build_network, resolve_system
 
 
 @dataclass(frozen=True)
 class FakeTimeIndex:
+    """Represents a (time, scenario) pair for testing."""
+
     time: int
     scenario: int
 
 
 @dataclass(frozen=True)
 class FakeVariable:
+    """Mimics a solver variable with values and basis statuses."""
+
     _name: str
-    _value: dict  # e.g. {FakeTimeIndex: float}
-    _basis_status: dict  # e.g. {FakeTimeIndex: str}
+    _value: dict[FakeTimeIndex, float]
+    _basis_status: dict[FakeTimeIndex, str]
 
 
 @dataclass(frozen=True)
 class FakeComponent:
-    _variables: dict
+    """Container for fake variables."""
 
-
-class FakeOutputValues(OutputValues):
-    def __init__(self, problem, components):
-        self.problem = problem
-        self._components = components
+    _variables: dict[str, FakeVariable]
 
 
 @dataclass(frozen=True)
 class FakeSolver:
+    """Fake solver providing a fixed objective value."""
+
     @dataclass(frozen=True)
     class Obj:
         def Value(self) -> float:
@@ -55,6 +52,8 @@ class FakeSolver:
 
 @dataclass(frozen=True)
 class FakeContext:
+    """Fake optimization context with a single block and block length."""
+
     @dataclass(frozen=True)
     class Block:
         id: int = 1
@@ -67,11 +66,23 @@ class FakeContext:
 
 @dataclass(frozen=True)
 class FakeProblem:
+    """Fake problem that binds context and solver."""
+
     context: FakeContext = FakeContext()
     solver: FakeSolver = FakeSolver()
 
 
+class FakeOutputValues(OutputValues):
+    """Simplified OutputValues holding fake components and optional extras."""
+
+    def __init__(self, problem: FakeProblem, components: dict, extra_outputs=None):
+        self.problem = problem  # type: ignore
+        self._components = components
+        self._extra_outputs = extra_outputs or {}
+
+
 def test_simulation_table_builder_manual(tmp_path):
+    """Test SimulationTableBuilder and SimulationTableWriter with fake data."""
     problem = FakeProblem()
 
     ts0 = FakeTimeIndex(time=0, scenario=0)
@@ -86,9 +97,8 @@ def test_simulation_table_builder_manual(tmp_path):
     component = FakeComponent(_variables={"var1": var})
     output_values = FakeOutputValues(problem=problem, components={"compA": component})
 
-    # --- Build table ---
     builder = SimulationTableBuilder(simulation_id="test")
-    df = builder.build(output_values)
+    df = builder.build(output_values)  # type: ignore
 
     expected_rows = [
         {
@@ -125,7 +135,9 @@ def test_simulation_table_builder_manual(tmp_path):
     expected_df = pd.DataFrame(expected_rows).fillna(pd.NA)
 
     pd.testing.assert_frame_equal(
-        df.reset_index(drop=True).fillna(pd.NA), expected_df, check_dtype=False
+        df.reset_index(drop=True).fillna(pd.NA),
+        expected_df,
+        check_dtype=False,
     )
 
     writer = SimulationTableWriter(df)
@@ -138,3 +150,5 @@ def test_simulation_table_builder_manual(tmp_path):
 
     expected_header = ",".join(col.value for col in SimulationColumns)
     assert first_line == expected_header, "CSV header does not match expected columns"
+
+    csv_path.unlink()

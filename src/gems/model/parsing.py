@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 import typing
+from dataclasses import dataclass
 from typing import List, Optional
 
 from pydantic import Field, ValidationError
@@ -72,6 +73,12 @@ class InputPortFieldDefinition(ModifiedBaseModel):
     definition: str
 
 
+@dataclass
+class InputExtraOutput(ModifiedBaseModel):
+    id: str
+    expression: str
+
+
 class InputModel(ModifiedBaseModel):
     id: str
     parameters: List[InputParameter] = Field(default_factory=list)
@@ -82,6 +89,7 @@ class InputModel(ModifiedBaseModel):
     constraints: List[InputConstraint] = Field(default_factory=list)
     objective: Optional[str] = None
     description: Optional[str] = None
+    extra_outputs: Optional[List[InputExtraOutput]] = None
 
 
 class InputLibrary(ModifiedBaseModel):

@@ -107,6 +107,7 @@ class Model:
     port_fields_definitions: Dict[PortFieldId, PortFieldDefinition] = field(
         default_factory=dict
     )
+    extra_outputs: Optional[Dict[str, ExpressionNode]] = None
 
     def __post_init__(self) -> None:
         if self.objective_operational_contribution:
@@ -154,6 +155,7 @@ def model(
     inter_block_dyn: bool = False,
     ports: Optional[Iterable[ModelPort]] = None,
     port_fields_definitions: Optional[Iterable[PortFieldDefinition]] = None,
+    extra_outputs: Optional[Dict[str, ExpressionNode]] = None,
 ) -> Model:
     """
     Utility method to create Models from relaxed arguments
@@ -183,4 +185,5 @@ def model(
         port_fields_definitions={d.port_field: d for d in port_fields_definitions}
         if port_fields_definitions
         else {},
+        extra_outputs=extra_outputs,
     )
