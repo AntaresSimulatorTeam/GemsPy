@@ -110,11 +110,9 @@ class AntaresStudyConverter:
         if isinstance(study_input, Study):
             # We have a different way of managing thermal preprocessing files, because in this case we want to modify the study_path.
             # But in the same moment we dont want the preprocessing files in the modified study_path
-            self.thermal_input_path = Path(study_input.path)
             study_input.path = self.output_folder
             self.study = study_input
         else:
-            self.thermal_input_path = Path(study_input)
             # TODO: Check whether this dinstinction is needed
             if mode == ConversionMode.HYBRID:
                 self.study = read_study_local(resolve_path(self.output_folder))
@@ -142,14 +140,13 @@ class AntaresStudyConverter:
                 thermals = area.get_thermals()
                 for thermal in thermals.values():
                     if thermal.id not in resolved_virtual_objects.thermals:
-                        tdp = ThermalDataPreprocessing(thermal, self.thermal_input_path)
+                        tdp = ThermalDataPreprocessing(thermal, self.output_folder)
                         components.append(
                             InputComponent(
                                 id=f"{thermal.area_id}_{thermal.id}",
                                 model=f"{lib_id}.thermal",
                                 parameters=[
                                     tdp.generate_component_parameter("p_min_cluster"),
-                                    tdp.generate_component_parameter("p_max_cluster"),
                                     tdp.generate_component_parameter("nb_units_min"),
                                     tdp.generate_component_parameter("nb_units_max"),
                                     tdp.generate_component_parameter(
@@ -212,6 +209,7 @@ class AntaresStudyConverter:
                                         scenario_dependent=False,
                                         value=thermal.properties.min_down_time,
                                     ),
+                                    tdp.generate_component_parameter("p_max_cluster"),
                                 ],
                             )
                         )
