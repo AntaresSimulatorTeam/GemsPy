@@ -119,8 +119,8 @@ class ThermalDataPreprocessing:
             columns={variation.columns[0]: f"nb_units_max_variation_{direction.value}"}
         )
 
-    def _build_csv_path_and_name(self, component_id: str) -> tuple[Path, str]:
-        name = f"{self.thermal.area_id}_{self.thermal.id}_{component_id}"
+    def _build_csv_path_and_name(self, param_id: str) -> tuple[Path, str]:
+        name = f"{self.thermal.area_id}_{self.thermal.id}_{param_id}"
         return self.output_series_dir / str(name + self.suffix), name
 
     def generate_component_parameter(
