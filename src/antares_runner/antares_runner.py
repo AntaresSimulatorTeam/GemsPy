@@ -110,9 +110,11 @@ class AntaresHybridStudyBenchmarker:
             (self.weekly_objectives_2[0] - self.weekly_objectives_2[1])
             / self.weekly_objectives_2[0]
         )
-    
+
     def weekly_abs_gaps(self) -> Tuple[np.ndarray, np.ndarray]:
-        return np.abs(self.weekly_objectives_1[0] - self.weekly_objectives_1[1]), np.abs(self.weekly_objectives_2[0] - self.weekly_objectives_2[1])
+        return np.abs(
+            self.weekly_objectives_1[0] - self.weekly_objectives_1[1]
+        ), np.abs(self.weekly_objectives_2[0] - self.weekly_objectives_2[1])
 
 
 class AntaresModelerRunner:
