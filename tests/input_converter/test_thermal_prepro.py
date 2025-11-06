@@ -53,6 +53,7 @@ class TestThermalPreprocessing:
             logger=logger,
             mode="full",
             lib_paths=LIB_PATHS,
+            output_folder=local_study_w_thermal.path.parent / "converter_output",
         )
 
         return converter
@@ -77,10 +78,11 @@ class TestThermalPreprocessing:
     def _init_tdp(self, local_study_w_thermal: Study) -> ThermalDataPreprocessing:
         converter = self.setup_preprocessing_thermal(local_study_w_thermal)
         thermal: ThermalCluster = self.get_first_thermal_cluster_from_study(converter)
-        return ThermalDataPreprocessing(thermal, converter.thermal_input_path)
+        return ThermalDataPreprocessing(thermal, converter.output_folder, suffix=".txt")
 
     def _validate_component_parameter(
         self,
+        timeserie_file_path: Path,
         component_parameter: InputComponentParameter,
         component_id: str,
         expected_values: list,
@@ -95,8 +97,8 @@ class TestThermalPreprocessing:
             scenario_dependent=True,
             value=component_parameter.value,
         )
-        current_path = Path(component_parameter.value).with_suffix(".txt")
-        current_df = pd.read_csv(current_path, header=None)
+        # current_path = Path(component_parameter.value).with_suffix(".txt")
+        current_df = pd.read_csv(timeserie_file_path, header=None)
         expected_df = pd.DataFrame(expected_values)
         assert current_df.equals(expected_df)
 
@@ -117,8 +119,9 @@ class TestThermalPreprocessing:
         expected_values = expected_values.squeeze()
         expected_values.name = None
         component_parameter = tdp.generate_component_parameter("p_min_cluster")
+        filepath, _ = tdp._build_csv_path_and_name("p_min_cluster")
         self._validate_component_parameter(
-            component_parameter, "p_min_cluster", expected_values
+            filepath, component_parameter, "p_min_cluster", expected_values
         )
 
     @pytest.mark.parametrize(
@@ -137,9 +140,9 @@ class TestThermalPreprocessing:
         expected_values.name = None
         tdp.generate_component_parameter("p_min_cluster")
         component_parameter = tdp.generate_component_parameter("nb_units_min")
-
+        filepath, _ = tdp._build_csv_path_and_name("nb_units_min")
         self._validate_component_parameter(
-            component_parameter, "nb_units_min", expected_values
+            filepath, component_parameter, "nb_units_min", expected_values
         )
 
     @pytest.mark.parametrize(
@@ -158,9 +161,9 @@ class TestThermalPreprocessing:
         expected_values.name = None
         tdp.generate_component_parameter("p_min_cluster")
         component_parameter = tdp.generate_component_parameter("nb_units_max")
-
+        filepath, _ = tdp._build_csv_path_and_name("nb_units_max")
         self._validate_component_parameter(
-            component_parameter, "nb_units_max", expected_values
+            filepath, component_parameter, "nb_units_max", expected_values
         )
 
     def nb_units_max_variation(
@@ -177,23 +180,21 @@ class TestThermalPreprocessing:
         expected_path = (
             tdp.study_path
             / "input"
-            / "thermal"
-            / "series"
-            / "fr"
-            / "gaz"
-            / f"nb_units_max_variation_{direction.value}.txt"
+            / "data-series"
+            / f"fr_gaz_nb_units_max_variation_{direction.value}.txt"
         )
         tdp.generate_component_parameter("nb_units_max")
-
+        nb_unit_max_path, _ = tdp._build_csv_path_and_name("nb_units_max")
         variation_component = tdp.generate_component_parameter(
             f"nb_units_max_variation_{direction.value}"
         )
 
-        current_df = pd.read_csv(variation_component.value + ".txt", header=None)
-
-        nb_units_max_output = pd.read_csv(
-            tdp.series_path / "nb_units_max.txt", header=None
+        series_path, _ = tdp._build_csv_path_and_name(
+            f"nb_units_max_variation_{direction.value}"
         )
+        current_df = pd.read_csv(series_path, header=None)
+
+        nb_units_max_output = pd.read_csv(nb_unit_max_path, header=None)
 
         assert current_df[0][0] == max(
             0, nb_units_max_output[0][167] - nb_units_max_output[0][0]
@@ -205,7 +206,7 @@ class TestThermalPreprocessing:
             0, nb_units_max_output[0][335] - nb_units_max_output[0][168]
         )
 
-        assert variation_component.value == str(expected_path).removesuffix(".txt")
+        assert str(series_path) == str(expected_path)
 
     @pytest.mark.parametrize(
         "direction, local_study_w_thermal",

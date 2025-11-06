@@ -56,23 +56,23 @@ system:
         - id: p_min_cluster
           scenario-dependent: true
           time-dependent: true
-          value: input/thermal/series/fr/fr_nuclear_epr/p_min_cluster
+          value: fr_fr_nuclear_epr_p_min_cluster
         - id: nb_units_min
           scenario-dependent: true
           time-dependent: true
-          value: input/thermal/series/fr/fr_nuclear_epr/nb_units_min
+          value: fr_fr_nuclear_epr_nb_units_min
         - id: nb_units_max
           scenario-dependent: true
           time-dependent: true
-          value: input/thermal/series/fr/fr_nuclear_epr/nb_units_max
+          value: fr_fr_nuclear_epr_nb_units_max
         - id: nb_units_max_variation_forward
           scenario-dependent: true
           time-dependent: true
-          value: input/thermal/series/fr/fr_nuclear_epr/nb_units_max_variation_forward
+          value: fr_fr_nuclear_epr_nb_units_max_variation_forward
         - id: nb_units_max_variation_backward
           scenario-dependent: true
           time-dependent: true
-          value: input/thermal/series/fr/fr_nuclear_epr/nb_units_max_variation_backward
+          value: fr_fr_nuclear_epr_nb_units_max_variation_backward
         - id: unit_count
           scenario-dependent: false
           time-dependent: false
@@ -112,7 +112,7 @@ system:
         - id: p_max_cluster
           scenario-dependent: true
           time-dependent: true
-          value: input/thermal/series/fr/fr_nuclear_epr/series
+          value: fr_fr_nuclear_epr_p_max_cluster
     - id: fr
       model: antares-historic.area
       parameters:
