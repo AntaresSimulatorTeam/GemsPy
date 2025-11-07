@@ -32,6 +32,7 @@ from gems.study.parsing import (
     InputSystem,
 )
 
+
 class PyPSAStudyConverter:
     def __init__(
         self,

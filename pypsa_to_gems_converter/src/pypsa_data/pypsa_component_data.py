@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import pandas as pd
 
+
 @dataclass
 class PyPSAComponentData:
     pypsa_model_id: str

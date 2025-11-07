@@ -27,9 +27,12 @@ def any_to_float(el: Any) -> float:
     except:
         raise TypeError(f"Could not convert {el} to float")
 
+
 """
 This is used to convert in memory pypsa study to a yaml file.
 """
+
+
 def transform_to_yaml(model: BaseModel, output_path: str) -> None:
     with open(output_path, "w", encoding="utf-8") as yaml_file:
         yaml.dump(
