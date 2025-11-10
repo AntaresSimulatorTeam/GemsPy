@@ -17,15 +17,16 @@ import pandas as pd
 from pypsa import Network
 
 from src.utils import any_to_float
-from src.pypsa_data.pypsa_component_data import (
-    PyPSAComponentData,
-    PyPSAGlobalConstraintData,
-)
+from src.pypsa_data.pypsa_component_data import PyPSAComponentData
+from src.pypsa_data.pypsa_global_constraint_data import PyPSAGlobalConstraintData
 
 """
-This 4 classes needs to be migrated also 
+This 4 classes needs to be migrated also, check for unneceserraly code inside parsing files
+Probably we could rename this components into:
+GemsComponent, GemsComponentParameter, GemsPortConnections, GemsSystem
+Because that's gems model which is used to store pypsa data. 
 """
-from gems.study.parsing import (
+from pypsa_to_gems_converter.src.parsing import (
     InputComponent,
     InputComponentParameter,
     InputPortConnections,

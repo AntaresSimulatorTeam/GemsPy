@@ -18,6 +18,11 @@ from pydantic import BaseModel
 PYPSA_CONVERTER_MAX_FLOAT = 100_000_000_000
 
 
+"""
+This function is used inside pypsa_converter.py
+"""
+
+
 def any_to_float(el: Any) -> float:
     """Auxiliary function for type consistency"""
     try:
@@ -29,7 +34,8 @@ def any_to_float(el: Any) -> float:
 
 
 """
-This is used to convert in memory pypsa study to a yaml file.
+This function is used inside tests to convert in memory pypsa study to a yaml file.
+NOTE: This isn't used in the pypsa_converter.py file.
 """
 
 

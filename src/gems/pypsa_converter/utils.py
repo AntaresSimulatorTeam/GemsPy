@@ -29,6 +29,11 @@ def any_to_float(el: Any) -> float:
         raise TypeError(f"Could not convert {el} to float")
 
 
+"""
+This method is called in tests why is this written in this file?
+"""
+
+
 def transform_to_yaml(model: BaseModel, output_path: str) -> None:
     with open(output_path, "w", encoding="utf-8") as yaml_file:
         yaml.dump(

@@ -12,6 +12,7 @@
 
 """
 Module for technical utilities.
+Check what could be excluded from this file. TODO: check
 """
 import json
 import pathlib
@@ -74,6 +75,7 @@ def read_json(filename: str, path: pathlib.Path) -> Dict[str, Any]:
 
 """
 Only _to_kebab adn ModifiedBaseModel are used in the project.
+TODO: Check if other functions could be excluded from this file.
 """
 
 
