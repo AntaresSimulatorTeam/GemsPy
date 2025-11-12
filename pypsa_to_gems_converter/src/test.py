@@ -26,15 +26,21 @@ systems_dir.mkdir(parents=True, exist_ok=True)
 series_dir.mkdir(parents=True, exist_ok=True)
 
 
-input_system_from_pypsa_converter = PyPSAStudyConverter(network, logging.Logger(__name__, ""), systems_dir, series_dir,".csv").to_gems_study()
+input_system_from_pypsa_converter = PyPSAStudyConverter(
+    network, logging.Logger(__name__, ""), systems_dir, series_dir, ".csv"
+).to_gems_study()
 
-pypsa_study_as_yaml = transform_to_yaml(input_system_from_pypsa_converter, systems_dir / "pypsa_study.yml")
+pypsa_study_as_yaml = transform_to_yaml(
+    input_system_from_pypsa_converter, systems_dir / "pypsa_study.yml"
+)
 
 with open(systems_dir / "pypsa_study.yml") as compo_file:
     input_system = parse_yaml_components(compo_file)
 
 
-lib_path = repo_root / "pypsa_to_gems_converter" / "src" / "pypsa_models" / "pypsa_models.yml"
+lib_path = (
+    repo_root / "pypsa_to_gems_converter" / "src" / "pypsa_models" / "pypsa_models.yml"
+)
 
 
 with open(lib_path) as lib_file:
@@ -49,7 +55,9 @@ database = build_data_base(input_system, series_dir)
 
 # Build a Gems network and optimisation problem, then solve it
 gems_network = build_network(resolved_system)
-timesteps = len(network.snapshots)  # or len(network.timesteps) depending on PyPSA version
+timesteps = len(
+    network.snapshots
+)  # or len(network.timesteps) depending on PyPSA version
 
 problem = build_problem(
     gems_network,

@@ -6,7 +6,10 @@ import logging
 from pypsa_to_gems_converter.src.utils import transform_to_yaml
 from gems.study.parsing import parse_yaml_components
 from gems.model.parsing import parse_yaml_library
-from tests.pypsa_converter.test_advanced_pypsa_cases import replace_lines_by_links, extend_quota
+from tests.pypsa_converter.test_advanced_pypsa_cases import (
+    replace_lines_by_links,
+    extend_quota,
+)
 from gems.model.resolve_library import resolve_library
 from gems.simulation.optimization import build_problem
 from gems.simulation.time_block import TimeBlock
@@ -35,15 +38,21 @@ logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
 
-input_system_from_pypsa_converter = PyPSAStudyConverter(network, logger, systems_dir, series_dir,".txt").to_gems_study()
+input_system_from_pypsa_converter = PyPSAStudyConverter(
+    network, logger, systems_dir, series_dir, ".txt"
+).to_gems_study()
 
-pypsa_study_as_yaml = transform_to_yaml(input_system_from_pypsa_converter, systems_dir / "pypsa_study.yml")
+pypsa_study_as_yaml = transform_to_yaml(
+    input_system_from_pypsa_converter, systems_dir / "pypsa_study.yml"
+)
 
 with open(systems_dir / "pypsa_study.yml") as compo_file:
     input_system = parse_yaml_components(compo_file)
 
 
-lib_path = repo_root / "pypsa_to_gems_converter" / "src" / "pypsa_models" / "pypsa_models.yml"
+lib_path = (
+    repo_root / "pypsa_to_gems_converter" / "src" / "pypsa_models" / "pypsa_models.yml"
+)
 
 
 with open(lib_path) as lib_file:
@@ -58,7 +67,9 @@ database = build_data_base(input_system, series_dir)
 
 # Build a Gems network and optimisation problem, then solve it
 gems_network = build_network(resolved_system)
-timesteps = len(network.snapshots)  # or len(network.timesteps) depending on PyPSA version
+timesteps = len(
+    network.snapshots
+)  # or len(network.timesteps) depending on PyPSA version
 
 problem = build_problem(
     gems_network,
