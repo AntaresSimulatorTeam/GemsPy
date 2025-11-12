@@ -16,9 +16,13 @@ from pathlib import Path
 import pandas as pd
 from pypsa import Network
 
-from src.utils import any_to_float
-from src.pypsa_data.pypsa_component_data import PyPSAComponentData
-from src.pypsa_data.pypsa_global_constraint_data import PyPSAGlobalConstraintData
+from pypsa_to_gems_converter.src.utils import any_to_float
+from pypsa_to_gems_converter.src.pypsa_data.pypsa_component_data import (
+    PyPSAComponentData,
+)
+from pypsa_to_gems_converter.src.pypsa_data.pypsa_global_constraint_data import (
+    PyPSAGlobalConstraintData,
+)
 
 """
 This 4 classes needs to be migrated also, check for unneceserraly code inside parsing files
