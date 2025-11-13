@@ -21,6 +21,7 @@ from yaml import safe_load
 
 from gems.pypsa_converter.models.gems_system_yaml_schema import GemsSystem
 
+
 def parse_yaml_components(input_study: TextIO) -> GemsSystem:
     tree = safe_load(input_study)
     return GemsSystem.model_validate(tree["system"])
