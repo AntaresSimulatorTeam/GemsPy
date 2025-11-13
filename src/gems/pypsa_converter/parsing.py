@@ -14,69 +14,23 @@ import argparse
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, TextIO, Union
+from typing import List, TextIO
 
 import pandas as pd
-from pydantic import Field
 from yaml import safe_load
 
-# TO DO: Resolve imports
-# Restructura classes inside specific files for more readability
-
-from gems.utils import ModifiedBaseModel
+from gems.pypsa_converter.models.gems_system_yaml_schema import GemsSystemYaml
 
 
-"""
-This parsing file is used for parsing system.yaml file.(Real instance of objects,not just mathematical representation)
-"""
-
-
-def parse_yaml_components(input_study: TextIO) -> "InputSystem":
+def parse_yaml_components(input_study: TextIO) -> "GemsSystemYaml":
     tree = safe_load(input_study)
-    return InputSystem.model_validate(tree["system"])
+    return GemsSystemYaml.model_validate(tree["system"])
 
 
 def parse_scenario_builder(file: Path) -> pd.DataFrame:
     sb = pd.read_csv(file, names=("name", "year", "scenario"))
     sb.rename(columns={0: "name", 1: "year", 2: "scenario"})
     return sb
-
-
-class InputAreaConnections(ModifiedBaseModel):
-    component: str
-    port: str
-    area: str
-
-
-class InputPortConnections(ModifiedBaseModel):
-    component1: str
-    port1: str
-    component2: str
-    port2: str
-
-
-class InputComponentParameter(ModifiedBaseModel):
-    id: str
-    time_dependent: bool = False
-    scenario_dependent: bool = False
-    value: Union[float, str]
-    scenario_group: Optional[str] = None
-
-
-class InputComponent(ModifiedBaseModel):
-    id: str
-    model: str
-    scenario_group: Optional[str] = None
-    parameters: Optional[List[InputComponentParameter]] = None
-
-
-class InputSystem(ModifiedBaseModel):
-    id: Optional[str] = None
-    model_libraries: Optional[str] = None  # Parsed but unused for now
-    components: List[InputComponent] = Field(default_factory=list)
-    connections: Optional[List[InputPortConnections]] = None
-    area_connections: Optional[List[InputAreaConnections]] = None
-    nodes: Optional[List[InputComponent]] = []
 
 
 @dataclass(frozen=True)
