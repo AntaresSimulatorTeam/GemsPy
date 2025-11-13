@@ -6,7 +6,7 @@ from .gems_port_connection import GemsPortConnection
 from .gems_area_conection import GemsAreaConection
 
 
-class GemsSystemYaml(ModifiedBaseModel):
+class GemsSystem(ModifiedBaseModel):
     id: Optional[str] = None
     model_libraries: Optional[str] = None  # Parsed but unused for n
     components: List[GemsComponent] = Field(default_factory=list)
