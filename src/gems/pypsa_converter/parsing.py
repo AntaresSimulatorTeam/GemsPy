@@ -23,7 +23,7 @@ from yaml import safe_load
 # TO DO: Resolve imports
 # Restructura classes inside specific files for more readability
 
-from pypsa_to_gems_converter.src.utils_parsing import ModifiedBaseModel
+from gems.utils import ModifiedBaseModel
 
 
 """

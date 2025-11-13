@@ -10,56 +10,30 @@
 #
 # This file is part of the Antares project.
 import logging
-from dataclasses import dataclass
 from math import inf
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-from pandas import DataFrame
 from pypsa import Network
 
 from gems.pypsa_converter.utils import any_to_float
+from gems.pypsa_converter.pypsa_data.pypsa_component_data import PyPSAComponentData
+from gems.pypsa_converter.pypsa_data.pypsa_global_constraint_data import (
+    PyPSAGlobalConstraintData,
+)
+
+"""
+This 4 classes needs to be migrated also, check for unneceserraly code inside parsing files
+Probably we could rename this components into:
+GemsComponent, GemsComponentParameter, GemsPortConnections, GemsSystem
+Because that's gems model which is used to store pypsa data. 
+"""
 from gems.study.parsing import (
     InputComponent,
     InputComponentParameter,
     InputPortConnections,
     InputSystem,
 )
-
-
-@dataclass
-class PyPSAComponentData:
-    pypsa_model_id: str
-    constant_data: pd.DataFrame
-    time_dependent_data: dict[str, pd.DataFrame]
-    gems_model_id: str
-    pypsa_params_to_gems_params: dict[str, str]
-    pypsa_params_to_gems_connections: dict[str, tuple[str, str]]
-
-    def check_params_consistency(self) -> None:
-        for key in self.pypsa_params_to_gems_params:
-            self._check_key_in_constant_data(key)
-        for key in self.pypsa_params_to_gems_connections:
-            self._check_key_in_constant_data(key)
-
-    def _check_key_in_constant_data(self, key: str) -> None:
-        if key not in self.constant_data.columns:
-            raise ValueError(
-                f"Parameter {key} not available in constant data, defining all available parameters for model {self.pypsa_model_id}"
-            )
-
-
-@dataclass
-class PyPSAGlobalConstraintData:
-    pypsa_name: str
-    # pypsa_investment_period
-    pypsa_carrier_attribute: str
-    pypsa_sense: str
-    pypsa_constant: float
-    gems_model_id: str  # gems model for this GlobalConstraint
-    gems_port_id: str  # gems port for this GlobalConstraint
-    gems_components_and_ports: list[tuple[str, str]]
 
 
 class PyPSAStudyConverter:
