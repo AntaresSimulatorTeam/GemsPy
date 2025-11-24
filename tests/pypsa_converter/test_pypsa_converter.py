@@ -153,7 +153,7 @@ def test_load_gen_emissions(
     quota = (ratio * min_emissions + (1 - ratio) * max_emissions) * (
         sum(load1) + sum(load2)
     )
-    n1.add("GlobalConstraint", name="co2_budget", sense="<=", constant=quota)
+    n1.add("GlobalConstraint", name="co2_budget", sense=sense, constant=quota)
     n1.optimize()
     # Testing the PyPSA_to_Gems converter
     run_conversion_test(
