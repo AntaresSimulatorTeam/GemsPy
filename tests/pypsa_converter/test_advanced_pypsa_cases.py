@@ -206,6 +206,6 @@ def pypsa_gemspy_benchmark(
 
 
 def test_case_gemspy() -> None:
-    pypsa_gemspy_benchmark("base_s_6_elec_lvopt_.nc", 0.4, True)
+    pypsa_gemspy_benchmark("base_s_4_elec.nc", 0.4, True)
     pypsa_gemspy_benchmark("base_s_6_elec_lvopt_.nc", 0.3, True)
     pypsa_gemspy_benchmark("simple.nc", 1.0, False)
