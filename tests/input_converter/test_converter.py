@@ -26,6 +26,7 @@ from gems.input_converter.src.utils import (
     dump_to_yaml,
     read_yaml_file,
 )
+from gems.model.resolve_library import resolve_library
 from gems.study.parsing import (
     InputAreaConnections,
     InputComponent,
@@ -34,6 +35,7 @@ from gems.study.parsing import (
     InputSystem,
     parse_yaml_components,
 )
+from gems.study.resolve_components import resolve_system
 from tests.input_converter.conftest import create_dataframe_from_constant
 
 RESOURCES_FOLDER = (
@@ -77,6 +79,7 @@ class TestConverter:
             mode=mode,
             lib_paths=LIB_PATHS,
             models_to_convert=model_list,
+            output_folder=local_study.path.parent / "converter_output",
         )
         return converter
 
@@ -410,8 +413,9 @@ class TestConverter:
             thermals_connections,
             _,
         ) = converter._convert_model_to_component_list(resource_content)
-        study_path = converter.thermal_input_path
-        series_path = study_path / "input" / "thermal" / "series" / "fr" / "gaz"
+        # study_path = converter.output_folder
+        # series_path = study_path / "input" / "thermal" / "series" / "fr" / "gaz"
+        print(thermals_components)
         expected_thermals_connections = [
             InputPortConnections(
                 component1="fr_gaz",
@@ -431,35 +435,35 @@ class TestConverter:
                         time_dependent=True,
                         scenario_dependent=True,
                         scenario_group=None,
-                        value=str(series_path / "p_min_cluster"),
+                        value="fr_gaz_p_min_cluster",
                     ),
                     InputComponentParameter(
                         id="nb_units_min",
                         time_dependent=True,
                         scenario_dependent=True,
                         scenario_group=None,
-                        value=str(series_path / "nb_units_min"),
+                        value="fr_gaz_nb_units_min",
                     ),
                     InputComponentParameter(
                         id="nb_units_max",
                         time_dependent=True,
                         scenario_dependent=True,
                         scenario_group=None,
-                        value=str(series_path / "nb_units_max"),
+                        value="fr_gaz_nb_units_max",
                     ),
                     InputComponentParameter(
                         id="nb_units_max_variation_forward",
                         time_dependent=True,
                         scenario_dependent=True,
                         scenario_group=None,
-                        value=str(series_path / "nb_units_max_variation_forward"),
+                        value="fr_gaz_nb_units_max_variation_forward",
                     ),
                     InputComponentParameter(
                         id="nb_units_max_variation_backward",
                         time_dependent=True,
                         scenario_dependent=True,
                         scenario_group=None,
-                        value=str(series_path / "nb_units_max_variation_backward"),
+                        value="fr_gaz_nb_units_max_variation_backward",
                     ),
                     InputComponentParameter(
                         id="unit_count",
@@ -529,7 +533,7 @@ class TestConverter:
                         time_dependent=True,
                         scenario_dependent=True,
                         scenario_group=None,
-                        value=str(series_path / "series"),
+                        value="fr_gaz_p_max_cluster",
                     ),
                 ],
             )
@@ -1229,70 +1233,17 @@ class TestConverter:
 
     def test_convert_study_path_to_input_study(self, tmp_path: Path):
         local_path = Path(__file__).parent / "resources" / LOCAL_PATH
-        output_path = local_path / "reference.yaml"
-        expected_data = read_yaml_file(output_path)["system"]
-
-        input_path = tmp_path / "input" / LOCAL_PATH
-        output_path = tmp_path / "output" / LOCAL_PATH
+        ref_path = local_path / "reference.yaml"
+        input_path = tmp_path / "input"
+        output_path = tmp_path / "output"
         shutil.copytree(local_path, input_path)
         converter = self._init_converter_from_path(
             input_path, output_path, "full", MODEL_LIST_WITH_BASE
         )
-        obtained_data = converter.convert_study_to_input_system()
-
-        # A little formatting of expected parameters:
-        # Convert tiret fields with snake_case version
-        # Add scenario group to None, if not present
-        for component in expected_data["components"]:
-            if not component.get("scenario_group"):
-                component["scenario_group"] = None
-            for item in component["parameters"]:
-                item["scenario_dependent"] = item.pop("scenario-dependent")
-                item["time_dependent"] = item.pop("time-dependent")
-                if not item.get("scenario_group"):
-                    item["scenario_group"] = None
-        # A little formatting of obtained parameters:
-        # Convert list of objects to list of dictionaries
-
-        obtained_components_to_dict = [
-            component.model_dump() for component in dict(obtained_data)["components"]
-        ]
-        # Replace absolute path of preprocessing thermal with relative path
-        # TODO keep it like that?
-        # TODO : Improve match area pattern function
-        # TODO : Add directly in the converter the relative path writing
-        obtained_components = TestConverter._match_area_pattern(
-            obtained_components_to_dict, "", str(input_path) + "/"
-        )
-        # Replace absolute path of data-series files with relative path
-        obtained_components = TestConverter._match_area_pattern(
-            obtained_components, "", str(input_path) + "/"
-        )
-
-        def normalize_components(components):
-            return [
-                {
-                    **c,
-                    "parameters": [
-                        {
-                            k: p[k]
-                            for k in (
-                                "id",
-                                "value",
-                                "scenario_dependent",
-                                "time_dependent",
-                                "scenario_group",
-                            )
-                        }
-                        for p in c["parameters"]
-                    ],
-                }
-                for c in components
-            ]
-
-        assert sorted(
-            normalize_components(obtained_components), key=lambda x: x["id"]
-        ) == sorted(expected_data["components"], key=lambda x: x["id"])
+        obtained_sys = converter.convert_study_to_input_system()
+        with open(ref_path) as system_file:
+            expected_sys = parse_yaml_components(system_file)
+        assert obtained_sys.components == expected_sys.components
 
     def test_multiply_operation(self):
         operation = Operation(multiply_by=2)

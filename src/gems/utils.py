@@ -72,6 +72,11 @@ def read_json(filename: str, path: pathlib.Path) -> Dict[str, Any]:
     return data
 
 
+"""
+Only _to_kebab adn ModifiedBaseModel are used in the project.
+"""
+
+
 # Design note: actual parsing and validation is delegated to pydantic models
 def _to_kebab(snake: str) -> str:
     return snake.replace("_", "-")

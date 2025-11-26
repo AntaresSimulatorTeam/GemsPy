@@ -126,6 +126,7 @@ def _setup_study_component(study, period=None) -> ToolTestStudy:
     Helper function to reduce redundancy in study component setup.
     """
     study_path = study.path
+
     logger = Logger(__name__, study_path)
 
     fill_timeseries(study_path)
@@ -134,10 +135,14 @@ def _setup_study_component(study, period=None) -> ToolTestStudy:
     timeseries = load_ts_from_file("load_fr", path)
     area_fr.set_load(pd.DataFrame(timeseries))
     converter: AntaresStudyConverter = AntaresStudyConverter(
-        study_input=study, logger=logger, mode="full", lib_paths=LIB_PATHS
+        study_input=study,
+        logger=logger,
+        mode="full",
+        lib_paths=LIB_PATHS,
+        output_folder=study_path.parent / "converter_output",
     )
     converter.process_all()
-    compo_file = converter.output_path
+    compo_file = converter.output_system_path
     path = converter.output_folder / "input" / "data-series"
     with compo_file.open() as c:
         return ToolTestStudy(parse_yaml_components(c), path)

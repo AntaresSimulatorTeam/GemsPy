@@ -18,25 +18,14 @@ class Direction(Enum):
 class ThermalDataPreprocessing:
     DEFAULT_PERIOD: int = 168
 
-    def __init__(self, thermal: ThermalCluster, study_path: Path):
-        # TODO Do we move preprocessing files in data series folder ?
+    def __init__(self, thermal: ThermalCluster, study_path: Path, suffix: str = ".tsv"):
         self.thermal = thermal
         self.study_path = study_path
-        self.series_path = (
-            self.study_path
-            / "input"
-            / "thermal"
-            / "series"
-            / self.thermal.area_id
-            / self.thermal.id
-        )
-        # Write the series. It is necessary as the input folder may be different than the output folder
-        series_data: pd.DataFrame = self.thermal.get_series_matrix()
-        series_data.to_csv(
-            self.series_path / "series.txt", sep="\t", index=False, header=False
-        )
+        self.suffix = suffix
+        self.output_series_dir = self.study_path / "input" / "data-series"
         self._prepro_parameter_functions: dict[str, Callable[[int], pd.DataFrame]] = {
             "p_min_cluster": lambda _: self._compute_p_min_cluster(),
+            "p_max_cluster": lambda _: self._compute_p_max_cluster(),
             "nb_units_min": lambda _: self._compute_nb_units_min(),
             "nb_units_max": lambda _: self._compute_nb_units_max(),
             "nb_units_max_variation_forward": lambda period: self._compute_nb_units_max_variation(
@@ -60,6 +49,9 @@ class ThermalDataPreprocessing:
             axis=1
         )
         return min_values.to_frame(name="p_min_cluster")
+
+    def _compute_p_max_cluster(self) -> pd.DataFrame:
+        return self.thermal.get_series_matrix()
 
     def _compute_nb_units_min(self) -> pd.DataFrame:
         p_min_cluster: pd.DataFrame = self._compute_p_min_cluster()
@@ -106,8 +98,9 @@ class ThermalDataPreprocessing:
             columns={variation.columns[0]: f"nb_units_max_variation_{direction.value}"}
         )
 
-    def _build_csv_path(self, component_id: str, suffix: str = ".txt") -> Path:
-        return self.series_path / Path(f"{component_id}").with_suffix(suffix)
+    def _build_csv_path_and_name(self, param_id: str) -> tuple[Path, str]:
+        name = f"{self.thermal.area_id}_{self.thermal.id}_{param_id}"
+        return self.output_series_dir / str(name + self.suffix), name
 
     def generate_component_parameter(
         self, parameter_id: str, period: int = 0
@@ -116,7 +109,7 @@ class ThermalDataPreprocessing:
             raise ValueError(f"Unsupported parameter_id: {parameter_id}")
 
         df = self._prepro_parameter_functions[parameter_id](period)
-        csv_path = self._build_csv_path(parameter_id)
+        csv_path, value_name = self._build_csv_path_and_name(parameter_id)
 
         output_dir = os.path.dirname(csv_path)
         if output_dir:
@@ -128,5 +121,5 @@ class ThermalDataPreprocessing:
             id=parameter_id,
             time_dependent=True,
             scenario_dependent=True,
-            value=str(csv_path).removesuffix(".txt"),
+            value=value_name,
         )

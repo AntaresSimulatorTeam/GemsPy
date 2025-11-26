@@ -52,6 +52,7 @@ from gems.study.parsing import (
 ANTARES_HISTORIC_LIB_ID = "antares-historic"
 MODEL_TEMPLATE_FOLDER = Path(__file__).parents[1] / "data" / "model_configuration"
 LIBS_FOLDER = "model-libraries"
+SERIES_FOLDER = "data-series"
 
 # TODO: Move all global variables in a config class, that is used in AntaresStudyConverter constructor
 
@@ -108,19 +109,15 @@ class AntaresStudyConverter:
         if isinstance(study_input, Study):
             # We have a different way of managing thermal preprocessing files, because in this case we want to modify the study_path.
             # But in the same moment we dont want the preprocessing files in the modified study_path
-            self.thermal_input_path = Path(study_input.path)
             study_input.path = self.output_folder
             self.study = study_input
         else:
-            self.thermal_input_path = Path(study_input)
             # TODO: Check whether this dinstinction is needed
             if mode == ConversionMode.HYBRID:
                 self.study = read_study_local(resolve_path(self.output_folder))
             else:
                 self.study = read_study_local(resolve_path(study_input))
-
-        self.output_path = self.output_folder / "input" / "system.yml"
-
+        self.output_system_path = self.output_folder / "input" / "system.yml"
         self.areas = self.study.get_areas()
         self.legacy_objects: list[ObjectProperties] = []
 
@@ -143,17 +140,7 @@ class AntaresStudyConverter:
                 thermals = area.get_thermals()
                 for thermal in thermals.values():
                     if thermal.id not in resolved_virtual_objects.thermals:
-                        # TODO Do  we move preprocessing files in data series folder ?
-                        series_path = (
-                            self.thermal_input_path
-                            / "input"
-                            / "thermal"
-                            / "series"
-                            / Path(thermal.area_id)
-                            / Path(thermal.id)
-                            / "series.txt"
-                        )
-                        tdp = ThermalDataPreprocessing(thermal, self.thermal_input_path)
+                        tdp = ThermalDataPreprocessing(thermal, self.output_folder)
                         components.append(
                             InputComponent(
                                 id=f"{thermal.area_id}_{thermal.id}",
@@ -222,12 +209,7 @@ class AntaresStudyConverter:
                                         scenario_dependent=False,
                                         value=thermal.properties.min_down_time,
                                     ),
-                                    InputComponentParameter(
-                                        id="p_max_cluster",
-                                        time_dependent=True,
-                                        scenario_dependent=True,
-                                        value=str(series_path).removesuffix(".txt"),
-                                    ),
+                                    tdp.generate_component_parameter("p_max_cluster"),
                                 ],
                                 # add scenario-group to each thermal component if provided
                                 scenario_group=scenario_group,
@@ -248,6 +230,16 @@ class AntaresStudyConverter:
                                     component=f"{thermal.area_id}_{thermal.id}",
                                     port="balance_port",
                                     area=f"{thermal.area_id}",
+                                )
+                            )
+                            self.legacy_objects.append(
+                                ObjectProperties(
+                                    type="thermal",
+                                    area=thermal.area_id,
+                                    link=None,
+                                    cluster=thermal.id,
+                                    binding_constraint_id=None,
+                                    field=None,
                                 )
                             )
         return components, connections
@@ -561,6 +553,10 @@ class AntaresStudyConverter:
         for path in self.lib_paths:
             shutil.copy2(path, dest_dir)
 
+    def _create_dataseries_dir(self) -> None:
+        dest_dir = self.output_folder / "input" / SERIES_FOLDER
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
     def get_model_name_among_libs(self, model_name: str) -> str:
         for lib_path in self.lib_paths:
             lib_name, file_model = self._extract_lib_and_model_ids(lib_path)
@@ -594,15 +590,13 @@ class AntaresStudyConverter:
         self._copy_libs_to_model_librairies()
         self._copy_scenario_builder()
 
+        self._create_dataseries_dir()
         model_conversion_templates = self._build_model_conversion_templates()
         self._check_converted_models_are_in_libs(model_conversion_templates)
-
         virtual_objects = self._build_virtual_objects_repo(model_conversion_templates)
-
         components: list[InputComponent] = []
         connections: list[InputPortConnections] = []
         area_connections: list[InputAreaConnections] = []
-
         for model in self.models_to_convert:
             conversion_template = model_conversion_templates[model]
             self._convert_single_model(
@@ -620,7 +614,6 @@ class AntaresStudyConverter:
                     ANTARES_HISTORIC_LIB_ID, virtual_objects.areas
                 )
             )
-
         system = InputSystem(
             id=self.study.name,
             components=components,
@@ -636,7 +629,6 @@ class AntaresStudyConverter:
             model_conversion_templates[model] = self._get_model_conversion_template(
                 model
             )
-
         return model_conversion_templates
 
     def _build_virtual_objects_repo(

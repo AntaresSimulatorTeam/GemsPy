@@ -10,56 +10,24 @@
 #
 # This file is part of the Antares project.
 import logging
-from dataclasses import dataclass
 from math import inf
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-from pandas import DataFrame
 from pypsa import Network
 
 from gems.pypsa_converter.utils import any_to_float
-from gems.study.parsing import (
-    InputComponent,
-    InputComponentParameter,
-    InputPortConnections,
-    InputSystem,
+from gems.pypsa_converter.models.pypsa_model_schema import (
+    PyPSAComponentData,
+    PyPSAGlobalConstraintData,
 )
 
-
-@dataclass
-class PyPSAComponentData:
-    pypsa_model_id: str
-    constant_data: pd.DataFrame
-    time_dependent_data: dict[str, pd.DataFrame]
-    gems_model_id: str
-    pypsa_params_to_gems_params: dict[str, str]
-    pypsa_params_to_gems_connections: dict[str, tuple[str, str]]
-
-    def check_params_consistency(self) -> None:
-        for key in self.pypsa_params_to_gems_params:
-            self._check_key_in_constant_data(key)
-        for key in self.pypsa_params_to_gems_connections:
-            self._check_key_in_constant_data(key)
-
-    def _check_key_in_constant_data(self, key: str) -> None:
-        if key not in self.constant_data.columns:
-            raise ValueError(
-                f"Parameter {key} not available in constant data, defining all available parameters for model {self.pypsa_model_id}"
-            )
-
-
-@dataclass
-class PyPSAGlobalConstraintData:
-    pypsa_name: str
-    # pypsa_investment_period
-    pypsa_carrier_attribute: str
-    pypsa_sense: str
-    pypsa_constant: float
-    gems_model_id: str  # gems model for this GlobalConstraint
-    gems_port_id: str  # gems port for this GlobalConstraint
-    gems_components_and_ports: list[tuple[str, str]]
+from gems.pypsa_converter.models.gems_system_yaml_schema import (
+    GemsComponent,
+    GemsComponentParameter,
+    GemsPortConnection,
+    GemsSystem,
+)
 
 
 class PyPSAStudyConverter:
@@ -428,7 +396,7 @@ class PyPSAStudyConverter:
             pypsa_params_to_gems_connections,
         )
 
-    def to_gems_study(self) -> InputSystem:
+    def to_gems_study(self) -> GemsSystem:
         """Main function, to export PyPSA as Gems system"""
 
         self.logger.info("Study conversion started")
@@ -451,13 +419,13 @@ class PyPSAStudyConverter:
             list_components.extend(components)
             list_connections.extend(connections)
 
-        return InputSystem(
+        return GemsSystem(
             nodes=[], components=list_components, connections=list_connections
         )
 
     def _convert_pypsa_components_of_given_model(
         self, pypsa_components_data: PyPSAComponentData
-    ) -> tuple[list[InputComponent], list[InputPortConnections]]:
+    ) -> tuple[list[GemsComponent], list[GemsPortConnection]]:
         """
         Generic function to handle the different PyPSA classes
 
@@ -494,16 +462,16 @@ class PyPSAStudyConverter:
 
     def _convert_pypsa_globalconstraint_of_given_model(
         self, pypsa_gc_data: PyPSAGlobalConstraintData
-    ) -> tuple[list[InputComponent], list[InputPortConnections]]:
+    ) -> tuple[list[GemsComponent], list[GemsPortConnection]]:
         self.logger.info(
             f"Creating PyPSA GlobalConstraint of type: {pypsa_gc_data.gems_model_id}. "
         )
         components = [
-            InputComponent(
+            GemsComponent(
                 id=pypsa_gc_data.pypsa_name,
                 model=f"{self.pypsalib_id}.{pypsa_gc_data.gems_model_id}",
                 parameters=[
-                    InputComponentParameter(
+                    GemsComponentParameter(
                         id="quota",
                         time_dependent=False,
                         scenario_dependent=False,
@@ -515,7 +483,7 @@ class PyPSAStudyConverter:
         connections = []
         for component_id, port_id in pypsa_gc_data.gems_components_and_ports:
             connections.append(
-                InputPortConnections(
+                GemsPortConnection(
                     component1=pypsa_gc_data.pypsa_name,
                     port1=pypsa_gc_data.gems_port_id,
                     component2=component_id,
@@ -550,15 +518,15 @@ class PyPSAStudyConverter:
         gems_model_id: str,
         pypsa_params_to_gems_params: dict[str, str],
         comp_param_to_timeseries_name: dict[tuple[str, str], str],
-    ) -> list[InputComponent]:
+    ) -> list[GemsComponent]:
         components = []
         for component in constant_data.index:
             components.append(
-                InputComponent(
+                GemsComponent(
                     id=component,
                     model=f"{self.pypsalib_id}.{gems_model_id}",
                     parameters=[
-                        InputComponentParameter(
+                        GemsComponentParameter(
                             id=pypsa_params_to_gems_params[param],
                             time_dependent=(component, param)
                             in comp_param_to_timeseries_name,
@@ -579,7 +547,7 @@ class PyPSAStudyConverter:
         self,
         constant_data: pd.DataFrame,
         pypsa_params_to_gems_connections: dict[str, tuple[str, str]],
-    ) -> list[InputPortConnections]:
+    ) -> list[GemsPortConnection]:
         connections = []
         for bus_id, (
             model_port,
@@ -588,7 +556,7 @@ class PyPSAStudyConverter:
             buses = constant_data[bus_id].values
             for component_id, component in enumerate(constant_data.index):
                 connections.append(
-                    InputPortConnections(
+                    GemsPortConnection(
                         component1=buses[component_id],
                         port1=bus_port,
                         component2=component,
