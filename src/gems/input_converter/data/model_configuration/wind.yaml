@@ -15,6 +15,7 @@ template:
   name: wind
   generator-version-compatibility: X.Y #TODO: find this information
   model: antares-historic.renewable
+  scenario-group: wind_group
   template-parameters:
     - name: area
       description: "Area identifier for the wind component"
