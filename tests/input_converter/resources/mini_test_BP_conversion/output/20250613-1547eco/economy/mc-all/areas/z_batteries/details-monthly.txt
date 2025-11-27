@@ -1,0 +1,19 @@
+z_batteries	area	de	monthly
+	VARIABLES	BEGIN	END
+	8	1	12
+
+z_batteries	monthly		z_batteries_batteries_FR_1	z_batteries_batteries_FR_2	z_batteries_batteries_FR_1	z_batteries_batteries_FR_2	z_batteries_batteries_FR_1	z_batteries_batteries_FR_2	z_batteries_batteries_FR_1	z_batteries_batteries_FR_2
+			MWh	MWh	NP Cost - Euro	NP Cost - Euro	NODU	NODU	Profit - Euro	Profit - Euro
+	index	month	EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP
+	1	JAN	1423015	1423015	0	0	739	739	807	807
+	2	FEB	1344000	1344000	0	0	672	672	762	762
+	3	MAR	1488000	1488000	0	0	744	744	844	844
+	4	APR	1440000	1440000	0	0	720	720	816	816
+	5	MAY	1488000	1488000	0	0	744	744	844	844
+	6	JUN	1440000	1440000	0	0	720	720	816	816
+	7	JUL	1488000	1488000	0	0	744	744	844	844
+	8	AUG	1488000	1488000	0	0	744	744	844	844
+	9	SEP	1440000	1440000	0	0	720	720	816	816
+	10	OCT	1488000	1488000	0	0	744	744	844	844
+	11	NOV	1440000	1440000	0	0	720	720	816	816
+	12	DEC	1440000	1440000	0	0	720	720	816	816

@@ -16,18 +16,17 @@ from pathlib import Path
 import pandas as pd
 from pypsa import Network
 
-from gems.pypsa_converter.utils import any_to_float
-from gems.pypsa_converter.models.pypsa_model_schema import (
-    PyPSAComponentData,
-    PyPSAGlobalConstraintData,
-)
-
 from gems.pypsa_converter.models.gems_system_yaml_schema import (
     GemsComponent,
     GemsComponentParameter,
     GemsPortConnection,
     GemsSystem,
 )
+from gems.pypsa_converter.models.pypsa_model_schema import (
+    PyPSAComponentData,
+    PyPSAGlobalConstraintData,
+)
+from gems.pypsa_converter.utils import any_to_float
 
 
 class PyPSAStudyConverter:

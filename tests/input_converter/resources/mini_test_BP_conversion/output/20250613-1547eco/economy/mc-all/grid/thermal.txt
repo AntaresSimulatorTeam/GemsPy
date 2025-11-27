@@ -1,0 +1,5 @@
+area id	id	name	group	unit count	nominal capacity	min stable power	min up/down time	spinning	co2	marginal cost	fixed cost	startup cost	market bid cost	spread cost
+fr	fr_batteries_inj	FR_batteries_inj	Other	1	1000.000000	0.000000	1	1	0.000000	0.000000	0.000000	0.000000	0.000000	0.000000	0.000000
+fr	fr_nuclear_epr	FR_Nuclear_epr	Nuclear	1	5000.000000	1130.250000	24	24	1.000000	0.000000	6.200000	0.000000	46200.000000	6.200000	0.000000
+z_batteries	z_batteries_batteries_fr_1	z_batteries_batteries_FR_1	Other	1	2000.000000	0.000000	1	1	0.000000	0.000000	0.000000	0.000000	0.000000	0.000000	0.000000
+z_batteries	z_batteries_batteries_fr_2	z_batteries_batteries_FR_2	Other	1	2000.000000	0.000000	1	1	0.000000	0.000000	0.000000	0.000000	0.000000	0.000000	0.000000

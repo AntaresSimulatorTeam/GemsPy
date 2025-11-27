@@ -57,9 +57,6 @@ SERIES_FOLDER = "data-series"
 # TODO: Move all global variables in a config class, that is used in AntaresStudyConverter constructor
 
 
-# TODO: Move all global variables in a config class, that is used in AntaresStudyConverter constructor
-
-
 class AntaresStudyConverter:
     def __init__(
         self,
@@ -70,6 +67,7 @@ class AntaresStudyConverter:
         period: Optional[int] = None,
         lib_paths: Optional[list[str]] = None,
         models_to_convert: list[str] = list(MODEL_NAME_TO_FILE_NAME.keys()),
+        scenario_builder_file: Optional[Path] = None,
     ):
         """
         Initialize processor
@@ -78,7 +76,7 @@ class AntaresStudyConverter:
         self.period: int = period if period else 168
         self.lib_paths: list[str] = lib_paths if lib_paths else []
         self.models_to_convert = models_to_convert
-
+        self.scenario_builder_file = scenario_builder_file
         try:
             self.mode = ConversionMode(mode)
         except ValueError:
@@ -129,6 +127,7 @@ class AntaresStudyConverter:
         components: list,
         connections: list,
         area_connections: list,
+        scenario_group: Optional[str] = None,
     ) -> tuple[list[InputComponent], list[InputPortConnections]]:
         self.logger.info("Converting thermals to component list...")
         # Add thermal components for each area
@@ -211,6 +210,7 @@ class AntaresStudyConverter:
                                     ),
                                     tdp.generate_component_parameter("p_max_cluster"),
                                 ],
+                                scenario_group=scenario_group,
                             )
                         )
                         if self.mode == ConversionMode.FULL:
@@ -331,19 +331,26 @@ class AntaresStudyConverter:
         area_connections: list,
         mp: ModelConversionPreprocessor,
     ) -> None:
+        parameters = [
+            InputComponentParameter(
+                id=param.id,
+                time_dependent=bool(param.time_dependent),
+                scenario_dependent=bool(param.scenario_dependent),
+                value=mp.convert_param_value(param.id, param.value),
+            )
+            for param in resolved_conversion_template.component.parameters
+        ]
+        scenario_group = getattr(resolved_conversion_template, "scenario_group", None)
+        kwargs = {}
+        if scenario_group is not None:
+            kwargs["scenario_group"] = scenario_group
+
         components.append(
             InputComponent(
                 id=resolved_conversion_template.component.id,
                 model=resolved_conversion_template.model,
-                parameters=[
-                    InputComponentParameter(
-                        id=param.id,
-                        time_dependent=bool(param.time_dependent),
-                        scenario_dependent=bool(param.scenario_dependent),
-                        value=mp.convert_param_value(param.id, param.value),
-                    )
-                    for param in resolved_conversion_template.component.parameters
-                ],
+                parameters=parameters,
+                **kwargs,
             )
         )
 
@@ -426,6 +433,9 @@ class AntaresStudyConverter:
                         components,
                         connections,
                         area_connections,
+                        scenario_group=getattr(
+                            conversion_template, "scenario_group", None
+                        ),
                     )
                     return components, connections, area_connections
                 for area in self.areas.values():
@@ -575,6 +585,7 @@ class AntaresStudyConverter:
 
     def convert_study_to_input_system(self) -> InputSystem:
         self._copy_libs_to_model_librairies()
+        self._copy_scenario_builder()
         self._create_dataseries_dir()
         model_conversion_templates = self._build_model_conversion_templates()
         self._check_converted_models_are_in_libs(model_conversion_templates)
@@ -631,3 +642,18 @@ class AntaresStudyConverter:
         system = self.convert_study_to_input_system()
         self.logger.info("Dumping input system into yaml file...")
         dump_to_yaml(model=system, output_path=self.output_system_path)
+
+    def _copy_scenario_builder(self) -> None:
+        if not self.scenario_builder_file:
+            return
+
+        dest = self.output_folder / "input" / "data-series"
+        dest.mkdir(parents=True, exist_ok=True)
+
+        dest_file = dest / "modeler-scenariobuilder.dat"  # enforce name
+
+        try:
+            shutil.copy2(self.scenario_builder_file, dest_file)
+            self.logger.info(f"Copied scenario builder file to {dest_file}")
+        except Exception as e:
+            self.logger.warning(f"Failed to copy scenario builder file: {e}")

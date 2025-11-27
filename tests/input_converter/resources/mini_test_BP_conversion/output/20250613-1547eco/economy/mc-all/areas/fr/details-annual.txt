@@ -1,0 +1,8 @@
+FR	area	de	annual
+	VARIABLES	BEGIN	END
+	8	1	1
+
+FR	annual	FR_batteries_inj	FR_Nuclear_epr	FR_batteries_inj	FR_Nuclear_epr	FR_batteries_inj	FR_Nuclear_epr	FR_batteries_inj	FR_Nuclear_epr
+		MWh	MWh	NP Cost - Euro	NP Cost - Euro	NODU	NODU	Profit - Euro	Profit - Euro
+		EXP	EXP	EXP	EXP	EXP	EXP	EXP	EXP
+	Annual	11770	803256	0	0	38	168	39090147	1757527305

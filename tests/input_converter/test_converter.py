@@ -757,27 +757,24 @@ class TestConverter:
         expected_wind_components = InputComponent(
             id="wind_fr",
             model="antares-historic.renewable",
-            scenario_group=None,
+            scenario_group="wind_group",
             parameters=[
                 InputComponentParameter(
                     id="nominal_capacity",
                     time_dependent=False,
                     scenario_dependent=False,
                     value=1.0,
-                    scenario_group=None,
                 ),
                 InputComponentParameter(
                     id="unit_count",
                     time_dependent=False,
                     scenario_dependent=False,
                     value=1.0,
-                    scenario_group=None,
                 ),
                 InputComponentParameter(
                     id="generation",
                     time_dependent=True,
                     scenario_dependent=True,
-                    scenario_group=None,
                     value="generation_fr",
                 ),
             ],

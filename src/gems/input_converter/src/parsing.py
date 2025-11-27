@@ -247,6 +247,7 @@ class ConversionTemplate(ModifiedBaseModel):
     legacy_objects_to_delete: list[ReferencedLegacyObjects] = Field(
         default_factory=list
     )
+    scenario_group: Optional[str] = None
 
     def resolve_template(
         self, template_pattern: str, value: str
@@ -274,6 +275,7 @@ class ConversionTemplate(ModifiedBaseModel):
             connections=connections,
             area_connections=area_connections,
             legacy_objects_to_delete=legacy_objects_to_delete,
+            scenario_group=self.scenario_group,
         )
 
     def get_excluded_objects_ids(self) -> VirtualObjectsRepository:
