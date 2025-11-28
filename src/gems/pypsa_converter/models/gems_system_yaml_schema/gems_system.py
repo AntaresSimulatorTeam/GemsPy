@@ -1,11 +1,9 @@
 from typing import List, Optional
-
 from pydantic import Field
-
 from ..modified_base_model import ModifiedBaseModel
-from .gems_area_connection import GemsAreaConnection
 from .gems_component import GemsComponent
 from .gems_port_connection import GemsPortConnection
+from .gems_area_connection import GemsAreaConnection
 
 
 class GemsSystem(ModifiedBaseModel):

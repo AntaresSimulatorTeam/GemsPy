@@ -1,5 +1,4 @@
 from typing import Optional, Union
-
 from ..modified_base_model import ModifiedBaseModel
 
 

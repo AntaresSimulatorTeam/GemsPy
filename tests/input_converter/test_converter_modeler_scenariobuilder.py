@@ -38,7 +38,7 @@ class TestAntaresStudyConverterReal:
             lib_paths=[library_file],
             mode="full",
             models_to_convert=["wind"],
-            scenario_builder_file=scenario_builder_file,
+            modeler_scenario_builder_file=scenario_builder_file,
         )
 
         converter.convert_study_to_input_system()
@@ -56,7 +56,7 @@ class TestAntaresStudyConverterReal:
             lib_paths=[library_file],
             mode="full",
             models_to_convert=["wind"],
-            scenario_builder_file=scenario_builder_file,
+            modeler_scenario_builder_file=scenario_builder_file,
         )
 
         input_system = converter.convert_study_to_input_system()

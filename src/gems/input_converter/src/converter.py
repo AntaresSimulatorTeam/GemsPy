@@ -67,7 +67,7 @@ class AntaresStudyConverter:
         period: Optional[int] = None,
         lib_paths: Optional[list[str]] = None,
         models_to_convert: list[str] = list(MODEL_NAME_TO_FILE_NAME.keys()),
-        scenario_builder_file: Optional[Path] = None,
+        modeler_scenario_builder_file: Optional[Path] = None,
     ):
         """
         Initialize processor
@@ -76,7 +76,7 @@ class AntaresStudyConverter:
         self.period: int = period if period else 168
         self.lib_paths: list[str] = lib_paths if lib_paths else []
         self.models_to_convert = models_to_convert
-        self.scenario_builder_file = scenario_builder_file
+        self.modeler_scenario_builder_file = modeler_scenario_builder_file
         try:
             self.mode = ConversionMode(mode)
         except ValueError:
@@ -644,7 +644,7 @@ class AntaresStudyConverter:
         dump_to_yaml(model=system, output_path=self.output_system_path)
 
     def _copy_scenario_builder(self) -> None:
-        if not self.scenario_builder_file:
+        if not self.modeler_scenario_builder_file:
             return
 
         dest = self.output_folder / "input" / "data-series"
@@ -653,7 +653,7 @@ class AntaresStudyConverter:
         dest_file = dest / "modeler-scenariobuilder.dat"  # enforce name
 
         try:
-            shutil.copy2(self.scenario_builder_file, dest_file)
+            shutil.copy2(self.modeler_scenario_builder_file, dest_file)
             self.logger.info(f"Copied scenario builder file to {dest_file}")
         except Exception as e:
             self.logger.warning(f"Failed to copy scenario builder file: {e}")
