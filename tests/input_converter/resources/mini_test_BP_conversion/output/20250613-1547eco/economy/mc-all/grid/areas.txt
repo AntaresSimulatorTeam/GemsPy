@@ -1,3 +1,0 @@
-id	name
-fr	FR
-z_batteries	z_batteries

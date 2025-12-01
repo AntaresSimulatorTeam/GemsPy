@@ -19,8 +19,7 @@ class TestAntaresStudyConverterReal:
 
     @pytest.fixture
     def library_file(self, study_path):
-        lib_file = study_path / "antares_legacy_models.yml"
-        return lib_file
+        return study_path / "antares_legacy_models.yml"
 
     @pytest.fixture
     def output_folder(self, tmp_path):
@@ -28,30 +27,12 @@ class TestAntaresStudyConverterReal:
         output_dir.mkdir(parents=True, exist_ok=True)
         return output_dir
 
-    def test_scenario_builder_file_copied(
+    def test_conversion_with_scenario_builder(
         self, study_path, scenario_builder_file, library_file, output_folder
     ):
         converter = AntaresStudyConverter(
             study_input=study_path,
-            logger=Logger("test-file-copy", str(study_path)),
-            output_folder=output_folder,
-            lib_paths=[library_file],
-            mode="full",
-            models_to_convert=["wind"],
-            modeler_scenario_builder_file=scenario_builder_file,
-        )
-
-        converter.convert_study_to_input_system()
-
-        copied_files = list(output_folder.glob("**/modeler-scenariobuilder.dat"))
-        assert copied_files, "Scenario builder file was not copied to output directory"
-
-    def test_wind_components_have_scenario_group(
-        self, study_path, scenario_builder_file, library_file, output_folder
-    ):
-        converter = AntaresStudyConverter(
-            study_input=study_path,
-            logger=Logger("test-wind-scenario", str(study_path)),
+            logger=Logger("test-scenario-builder", str(study_path)),
             output_folder=output_folder,
             lib_paths=[library_file],
             mode="full",
@@ -61,10 +42,11 @@ class TestAntaresStudyConverterReal:
 
         input_system = converter.convert_study_to_input_system()
 
-        scenario_found = False
-        for comp in input_system.components:
-            if hasattr(comp, "scenario_group") and comp.scenario_group is not None:
-                scenario_found = True
-                break
+        copied_files = list(output_folder.glob("**/modeler-scenariobuilder.dat"))
+        assert copied_files, "Scenario builder file was not copied to output directory"
 
+        scenario_found = any(
+            getattr(comp, "scenario_group", None) is not None
+            for comp in input_system.components
+        )
         assert scenario_found, "No component has scenario_group"
