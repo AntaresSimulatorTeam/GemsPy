@@ -1,0 +1,19 @@
+system:
+  id: basic-study
+   
+  components:
+
+  - id: modeler_load
+    model: load_library.load 
+    parameters:
+    - id: load_value
+      scenario-dependent: false
+      time-dependent: false
+      value: 0.0 #Option 2 : 6.0 #Option 3 : 11.0
+
+  area-connections:
+  - area: unique
+    component: modeler_load
+    port: balance_port
+ 
+  

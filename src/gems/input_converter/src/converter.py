@@ -513,7 +513,7 @@ class AntaresStudyConverter:
             lib_id, model_id = model_conversion_templates[model].model.split(".")
             if lib_id not in lib_to_model_ids:
                 raise ValueError(
-                    "Library {lib_id} has not been found in provided libraries"
+                    f"Library {lib_id} has not been found in provided libraries"
                 )
             if model_id not in lib_to_model_ids[lib_id]:
                 raise ValueError(
@@ -549,7 +549,7 @@ class AntaresStudyConverter:
             lib_name, file_model = self._extract_lib_and_model_ids(lib_path)
             if model_name in file_model:
                 return lib_name
-        return "antares-historic"
+        return ANTARES_HISTORIC_LIB_ID
 
     def _convert_single_model(
         self,
