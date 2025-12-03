@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 from pathlib import Path
+
 import pytest
 from antares.craft.model.area import AreaProperties
 from antares.craft.model.st_storage import STStorageProperties
@@ -24,18 +25,23 @@ from antares.craft.model.thermal import (
 
 ANTARES_VERSION = "rte-antares-9.3.2-rc2-installer-64bits"
 
-@pytest.fixture(scope="session") 
-def antares_exec_folder(tmp_path_factory: pytest.TempPathFactory)-> Path:
-        # TODO
-        # base = tmp_path_factory.mktemp("antares_exec")
-        # Download Antares depending on system
-        # return base / ANTARES_VERSION / "bin /" 
-        return Path("C:/Users/oustryant/Documents/4_Modeleur/rte-antares-9.3.2-rc2-installer-64bits/bin/")
+
+@pytest.fixture(scope="session")
+def antares_exec_folder(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    # TODO
+    # base = tmp_path_factory.mktemp("antares_exec")
+    # Download Antares depending on system
+    # return base / ANTARES_VERSION / "bin /"
+    return Path(
+        "C:/Users/oustryant/Documents/4_Modeleur/rte-antares-9.3.2-rc2-installer-64bits/bin/"
+    )
+
 
 @pytest.fixture(scope="session")
 def auto_generated_studies_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
     base = tmp_path_factory.mktemp("antares_session")
     return base / "antares-resources" / "antares-studies"
+
 
 @pytest.fixture
 def local_study(tmp_path) -> Study:
