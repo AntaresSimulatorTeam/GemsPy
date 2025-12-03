@@ -1,13 +1,15 @@
 import logging
-from pathlib import Path
 import shutil
+from pathlib import Path
 from typing import Optional
+
 import numpy as np
 import pandas as pd
 from antares.craft import *
+
 from antares_runner.antares_runner import AntaresHybridStudyBenchmarker
-from gems.input_converter.src.data_preprocessing.data_classes import ConversionMode
 from gems.input_converter.src.converter import AntaresStudyConverter
+from gems.input_converter.src.data_preprocessing.data_classes import ConversionMode
 from gems.input_converter.src.logger import Logger
 
 ANTARES_VERSION_CREATED_STUDIES = "9.2"
@@ -76,7 +78,9 @@ def createThermalTestAntaresStudy(
 ) -> None:
     # create a study named "my-study" on the antares-web server
     study = create_study_local(
-        study_name=study_name, version=ANTARES_VERSION_CREATED_STUDIES, parent_directory=parent_dir_path
+        study_name=study_name,
+        version=ANTARES_VERSION_CREATED_STUDIES,
+        parent_directory=parent_dir_path,
     )
     load_timeserie = pd.read_csv(load_time_serie_file)
     area = study.create_area(

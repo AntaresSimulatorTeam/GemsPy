@@ -2,22 +2,21 @@ import os
 from pathlib import Path
 from time import time
 
-import pytest
-
 import numpy as np
 import pandas as pd
-from gems.input_converter.src.logger import Logger
-from tests.antares_historic.utils import createThermalTestAntaresStudy
+import pytest
 from antares.craft import ThermalClusterGroup, ThermalClusterProperties
 
-from tests.antares_historic.utils import first_optim_relgap, convert_study
+from gems.input_converter.src.logger import Logger
+from tests.antares_historic.utils import (
+    convert_study,
+    createThermalTestAntaresStudy,
+    first_optim_relgap,
+)
 
 LOAD_FILES_DIR = Path("tests/antares_historic/data")
 THERMAL_TEST_REL_ACCURACY = 5 * 1e-5
 THERMAL_TEST_SOLVER = "highs"
-
-
-
 
 
 def thermal_test_procedure(
