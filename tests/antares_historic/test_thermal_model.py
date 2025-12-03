@@ -49,7 +49,6 @@ def thermal_test_procedure(
 
 @pytest.fixture(scope="session")
 def cluster_list_general_test() -> list[ThermalClusterProperties]:
-
     return [
         ThermalClusterProperties(
             unit_count=2,
