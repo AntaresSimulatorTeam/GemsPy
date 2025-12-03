@@ -42,6 +42,24 @@ jobs:
         run: |
           python -m mypy
 
+      - name: Download Antares v9.3.2 release
+        run: |
+          echo "Downloading Antares v9.3.2..."
+          curl -L -f -o antares-9.3.2-Ubuntu-22.04.tar.gz \
+            https://github.com/AntaresSimulatorTeam/Antares_Simulator/releases/download/v9.3.2/antares-9.3.2-Ubuntu-22.04.tar.gz
+          
+          if [ ! -f "antares-9.3.2-Ubuntu-22.04.tar.gz" ]; then
+            echo "Error: Download failed"
+            exit 1
+          fi
+          
+          echo "Download successful. File size: $(ls -lh antares-9.3.2-Ubuntu-22.04.tar.gz | awk '{print $5}')"
+      
+      - name: Extract Antares binaries
+        run: |
+          echo "Extracting archive..."
+          tar -xzf antares-9.3.2-Ubuntu-22.04.tar.gz
+
       - name: Test
         run: |
           pytest --cov antarest --cov-report xml
@@ -51,3 +69,10 @@ jobs:
         with:
           name: python-code-coverage-report
           path: coverage.xml
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f antares-9.3.2-Ubuntu-22.04.tar.gz
+          rm -rf antares-9.3.2-Ubuntu-22.04
+          echo "Cleanup completed"
+      

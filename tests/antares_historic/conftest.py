@@ -23,18 +23,21 @@ from antares.craft.model.thermal import (
     ThermalCostGeneration,
 )
 
-ANTARES_VERSION = "rte-antares-9.3.2-rc2-installer-64bits"
+ANTARES_VERSION = "antares-9.3.2-Ubuntu-22.04"
+
+current_dir = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture(scope="session")
-def antares_exec_folder(tmp_path_factory: pytest.TempPathFactory) -> Path:
+def antares_exec_folder() -> Path:
     # TODO
     # base = tmp_path_factory.mktemp("antares_exec")
     # Download Antares depending on system
-    # return base / ANTARES_VERSION / "bin /"
-    return Path(
-        "C:/Users/oustryant/Documents/4_Modeleur/rte-antares-9.3.2-rc2-installer-64bits/bin/"
-    )
+    return current_dir / ANTARES_VERSION / "bin" / "antares-modeler"
+    
+    #return Path(
+    #    "C:/Users/oustryant/Documents/4_Modeleur/rte-antares-9.3.2-rc2-installer-64bits/bin/"
+    #)
 
 
 @pytest.fixture(scope="session")
