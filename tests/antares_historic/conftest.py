@@ -32,7 +32,6 @@ current_dir = Path(__file__).resolve().parents[3]
 
 @pytest.fixture(scope="session")
 def antares_exec_folder() -> Path:
-
     if os.name == "nt":
         window_path = current_dir / ANTARES_VERSION_WINDOW / "bin"
         assert (

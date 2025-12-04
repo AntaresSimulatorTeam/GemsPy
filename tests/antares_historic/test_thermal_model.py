@@ -46,12 +46,7 @@ def thermal_test_procedure(
     )
     assert rel_gap < THERMAL_TEST_REL_ACCURACY
 
-
-
-
-
 @pytest.fixture(scope="session")
-
 def cluster_list_general_test() -> list[ThermalClusterProperties]:
     return [
         ThermalClusterProperties(
@@ -108,7 +103,6 @@ def test_general_thermal(
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-        
     for marg_cluster_properties in cluster_list_general_test:
         study_name = f"e2e_test_{str(time())}"
         thermal_test_procedure(
