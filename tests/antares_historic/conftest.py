@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -38,6 +39,7 @@ def antares_exec_folder() -> Path:
     if os.name == "posix":
         print("Linux or macOS")
         posix_path = current_dir.parent / ANTARES_VERSION_LINUX / "bin"
+        subprocess.run(posix_path / "antares-solver", stdout=subprocess.PIPE)
         return posix_path
     else:
         raise RuntimeError("Unsupported OS")
