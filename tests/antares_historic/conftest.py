@@ -26,7 +26,7 @@ from antares.craft.model.thermal import (
 )
 
 ANTARES_VERSION_POSIX = "antares-9.3.2-Ubuntu-22.04"
-ANTARES_VERSION_WINDOW = "rte-antares-9.3.2-installer-64bits"
+ANTARES_VERSION_WINDOWS = "rte-antares-9.3.2-installer-64bits"
 
 current_dir = Path(__file__).resolve().parents[2]
 
@@ -34,7 +34,7 @@ current_dir = Path(__file__).resolve().parents[2]
 @pytest.fixture(scope="session")
 def antares_exec_folder() -> Path:
     if os.name == "nt":
-        window_path = current_dir.parent / ANTARES_VERSION_WINDOW / "bin"
+        window_path = current_dir.parent / ANTARES_VERSION_WINDOWS / "bin"
         return window_path
     if os.name == "posix":
         posix_path = current_dir / ANTARES_VERSION_POSIX / "bin"

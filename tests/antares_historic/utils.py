@@ -76,7 +76,6 @@ def createThermalTestAntaresStudy(
     marg_cluster_properties: ThermalClusterProperties,
     marg_cluster_data_frame: pd.DataFrame,
 ) -> None:
-    # create a study named "my-study" on the antares-web server
     study = create_study_local(
         study_name=study_name,
         version=ANTARES_VERSION_CREATED_STUDIES,

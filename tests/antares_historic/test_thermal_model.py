@@ -41,9 +41,6 @@ def thermal_test_procedure(
     original_study_path, converted_study_path = convert_study(
         study_path, study_name, ["thermal"]
     )
-    print("Check study dir existence")
-    print(original_study_path.exists())
-    print(converted_study_path.exists())
     rel_gap = first_optim_relgap(
         exec_folder, original_study_path, converted_study_path, THERMAL_TEST_SOLVER
     )
