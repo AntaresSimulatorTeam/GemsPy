@@ -105,7 +105,7 @@ def test_general_thermal(
     antares_exec_folder: Path,
 ) -> None:
     for marg_cluster_properties in cluster_list_general_test:
-        study_name = f"e2e_test_{str(time())}"
+        study_name = f"e2e_test_{str(int(time()))}"
         thermal_test_procedure(
             study_name,
             auto_generated_studies_path,
