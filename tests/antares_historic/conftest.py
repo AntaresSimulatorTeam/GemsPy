@@ -33,6 +33,7 @@ current_dir = Path(__file__).resolve().parents[2]
 
 # Function to be deleted later, used for debugging purposes
 def print_tree(root: Path) -> None:
+    print(root)
     for dirpath, dirnames, filenames in os.walk(root):
         level = dirpath.replace(str(root), "").count(os.sep)
         indent = "    " * level
@@ -53,7 +54,7 @@ def antares_exec_folder() -> Path:
     if os.name == "posix":
         print("Linux or macOS")
         posix_path = current_dir / ANTARES_VERSION_LINUX / "bin"
-        print_tree(current_dir / ANTARES_VERSION_LINUX)
+        print_tree(current_dir / ANTARES_VERSION_LINUX / "bin")
         # subprocess.run(posix_path / "antares-solver", stdout=subprocess.PIPE)
         return posix_path
     else:
