@@ -45,6 +45,7 @@ def thermal_test_procedure(
         exec_folder, original_study_path, converted_study_path, THERMAL_TEST_SOLVER
     )
     assert rel_gap < THERMAL_TEST_REL_ACCURACY
+    
 
 @pytest.fixture(scope="session")
 def cluster_list_general_test() -> list[ThermalClusterProperties]:
