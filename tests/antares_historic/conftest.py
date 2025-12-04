@@ -41,7 +41,7 @@ def antares_exec_folder() -> Path:
         return window_path
     if os.name == "posix":
         print("Linux or macOS")
-        posix_path = current_dir / ANTARES_VERSION_LINUX / "bin"
+        posix_path = current_dir.parent / ANTARES_VERSION_LINUX / "bin"
         assert (
             posix_path.exists(),
             f"Antares executable folder not found at {posix_path}",
