@@ -33,7 +33,7 @@ class AntaresHybridRunner:
 
     def run(self) -> None:
         # Build the command to run antares-solver.exe
-        command = [str(self.exec_path.absolute()) , str(self.study_dir.absolute()) ]
+        command = [str(self.exec_path.absolute()), str(self.study_dir.absolute())]
         if self.solver:
             command.append("--linear-solver")
             command.append(self.solver)
