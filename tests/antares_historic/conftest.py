@@ -25,7 +25,7 @@ from antares.craft.model.thermal import (
     ThermalCostGeneration,
 )
 
-ANTARES_VERSION_LINUX = "antares-9.3.2-Ubuntu-22.04"
+ANTARES_VERSION_POSIX = "antares-9.3.2-Ubuntu-22.04"
 ANTARES_VERSION_WINDOW = "rte-antares-9.3.2-installer-64bits"
 
 current_dir = Path(__file__).resolve().parents[2]
@@ -53,8 +53,9 @@ def antares_exec_folder() -> Path:
         return window_path
     if os.name == "posix":
         print("Linux or macOS")
-        posix_path = current_dir / ANTARES_VERSION_LINUX / "bin"
-        print_tree(current_dir / ANTARES_VERSION_LINUX / "bin")
+        posix_path = current_dir / ANTARES_VERSION_POSIX / "bin"
+        print_tree(current_dir / ANTARES_VERSION_POSIX / "bin")
+        assert posix_path.exists()
         # subprocess.run(posix_path / "antares-solver", stdout=subprocess.PIPE)
         return posix_path
     else:
