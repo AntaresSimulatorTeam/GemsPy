@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
+import os
 from pathlib import Path
 
 import pytest
@@ -23,21 +24,37 @@ from antares.craft.model.thermal import (
     ThermalCostGeneration,
 )
 
-ANTARES_VERSION = "antares-9.3.2-Ubuntu-22.04"
+ANTARES_VERSION_LINUX = "antares-9.3.2-Ubuntu-22.04"
+ANTARES_VERSION_WINDOW = "rte-antares-9.3.2-installer-64bits"
 
 current_dir = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture(scope="session")
 def antares_exec_folder() -> Path:
-    # TODO
-    # base = tmp_path_factory.mktemp("antares_exec")
-    # Download Antares depending on system
-    return current_dir / ANTARES_VERSION / "bin" / "antares-modeler"
-    
-    #return Path(
-    #    "C:/Users/oustryant/Documents/4_Modeleur/rte-antares-9.3.2-rc2-installer-64bits/bin/"
-    #)
+
+    if os.name == "nt":
+        window_path = current_dir / ANTARES_VERSION_WINDOW / "bin"
+        assert (
+            window_path.exists(),
+            f"Antares executable folder not found at {window_path}",
+        )
+        return window_path
+    if os.name == "posix":
+        print("Linux or macOS")
+        posix_path = current_dir / ANTARES_VERSION_LINUX / "bin"
+        assert (
+            posix_path.exists(),
+            f"Antares executable folder not found at {posix_path}",
+        )
+        return posix_path
+    else:
+        raise RuntimeError("Unsupported OS")
+
+
+def assert_antares_exec_exists(antares_exec_folder: Path) -> None:
+    antares_exec = antares_exec_folder / "antares-modeler"
+    assert antares_exec.exists(), f"Antares executable not found at {antares_exec}"
 
 
 @pytest.fixture(scope="session")
