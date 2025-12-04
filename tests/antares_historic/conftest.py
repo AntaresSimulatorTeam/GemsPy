@@ -31,32 +31,13 @@ ANTARES_VERSION_WINDOW = "rte-antares-9.3.2-installer-64bits"
 current_dir = Path(__file__).resolve().parents[2]
 
 
-# Function to be deleted later, used for debugging purposes
-def print_tree(root: Path) -> None:
-    print(root)
-    for dirpath, dirnames, filenames in os.walk(root):
-        level = dirpath.replace(str(root), "").count(os.sep)
-        indent = "    " * level
-        print(f"{indent}{os.path.basename(dirpath)}/")
-        subindent = "    " * (level + 1)
-        for f in filenames:
-            print(f"{subindent}{f}")
-
-
-###########################################################
-
-
 @pytest.fixture(scope="session")
 def antares_exec_folder() -> Path:
     if os.name == "nt":
-        window_path = current_dir / ANTARES_VERSION_WINDOW / "bin"
+        window_path = current_dir.parent / ANTARES_VERSION_WINDOW / "bin"
         return window_path
     if os.name == "posix":
-        print("Linux or macOS")
         posix_path = current_dir / ANTARES_VERSION_POSIX / "bin"
-        # print_tree(current_dir / ANTARES_VERSION_POSIX / "bin")
-        print(posix_path.exists())
-        # subprocess.run(posix_path / "antares-solver", stdout=subprocess.PIPE)
         return posix_path
     else:
         raise RuntimeError("Unsupported OS")
