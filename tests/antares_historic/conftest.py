@@ -52,8 +52,8 @@ def antares_exec_folder() -> Path:
         return window_path
     if os.name == "posix":
         print("Linux or macOS")
-        posix_path = current_dir.parent / ANTARES_VERSION_LINUX / "bin"
-        print_tree(current_dir.parent)
+        posix_path = current_dir / ANTARES_VERSION_LINUX / "bin"
+        print_tree(current_dir)
         # subprocess.run(posix_path / "antares-solver", stdout=subprocess.PIPE)
         return posix_path
     else:
