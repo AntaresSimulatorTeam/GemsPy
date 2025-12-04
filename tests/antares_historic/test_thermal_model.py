@@ -47,11 +47,21 @@ def thermal_test_procedure(
     assert rel_gap < THERMAL_TEST_REL_ACCURACY
 
 
+
+
+
 @pytest.fixture(scope="session")
+
 def cluster_list_general_test() -> list[ThermalClusterProperties]:
     return [
         ThermalClusterProperties(
-            unit_count=2,
+            nominal_capacity=100,
+            marginal_cost=10,
+            market_bid_cost=10,
+            fixed_cost=1000,
+            group=ThermalClusterGroup.NUCLEAR,
+        ),
+        ThermalClusterProperties(
             nominal_capacity=100,
             marginal_cost=10,
             market_bid_cost=10,
@@ -62,7 +72,6 @@ def cluster_list_general_test() -> list[ThermalClusterProperties]:
             group=ThermalClusterGroup.NUCLEAR,
         ),
         ThermalClusterProperties(
-            unit_count=2,
             nominal_capacity=100,
             marginal_cost=27.7,
             market_bid_cost=27.7,
@@ -72,48 +81,40 @@ def cluster_list_general_test() -> list[ThermalClusterProperties]:
             min_up_time=2,
             group=ThermalClusterGroup.NUCLEAR,
         ),
+        ThermalClusterProperties(
+            nominal_capacity=100,
+            marginal_cost=200,
+            market_bid_cost=200,
+            startup_cost=10000,
+            fixed_cost=100,
+            min_down_time=2,
+            min_up_time=5,
+            group=ThermalClusterGroup.NUCLEAR,
+        ),
     ]  # ,
-    """           ThermalClusterProperties(unit_count=2,
-                                                                    nominal_capacity=100,
-                                                                    marginal_cost=27.7,
-                                                                    market_bid_cost=27.7,
-                                                                    startup_cost= 100,
-                                                                    fixed_cost= 100,
-                                                                    min_down_time = 2,
-                                                                    min_up_time = 4,
-                                                                    group=ThermalClusterGroup.NUCLEAR),
-                ThermalClusterProperties(unit_count=4,
-                                                                    nominal_capacity=100,
-                                                                    marginal_cost=127.7,
-                                                                    market_bid_cost=127.7,
-                                                                    startup_cost= 100,
-                                                                    fixed_cost= 1000,
-                                                                    min_down_time = 2,
-                                                                    min_up_time = 4,
-                                                                    group=ThermalClusterGroup.NUCLEAR),
-                 ThermalClusterProperties(unit_count=4,
-                                                                    nominal_capacity=100,
-                                                                    marginal_cost=127.7,
-                                                                    market_bid_cost=127.7,
-                                                                    startup_cost= 100,
-                                                                    fixed_cost= 1000,
-                                                                    min_down_time = 2,
-                                                                    min_up_time = 4,
-                                                                    group=ThermalClusterGroup.NUCLEAR)]"""
 
 
+@pytest.mark.parametrize(
+    "load_time_serie_file",
+    [
+        "load_matrix_1.txt",
+        "load_matrix_2.txt",
+        "load_matrix_original.txt",
+    ],
+)
 def test_general_thermal(
     cluster_list_general_test: list[ThermalClusterProperties],
+    load_time_serie_file: str,
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-    for load_time_serie_file in os.listdir(LOAD_FILES_DIR):
-        for marg_cluster_properties in cluster_list_general_test:
-            study_name = f"e2e_test_{str(time())}"
-            thermal_test_procedure(
-                study_name,
-                auto_generated_studies_path,
-                marg_cluster_properties,
-                LOAD_FILES_DIR / load_time_serie_file,
-                antares_exec_folder,
-            )
+        
+    for marg_cluster_properties in cluster_list_general_test:
+        study_name = f"e2e_test_{str(time())}"
+        thermal_test_procedure(
+            study_name,
+            auto_generated_studies_path,
+            marg_cluster_properties,
+            LOAD_FILES_DIR / load_time_serie_file,
+            antares_exec_folder,
+        )
