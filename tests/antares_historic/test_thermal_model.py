@@ -19,6 +19,7 @@ THERMAL_TEST_REL_ACCURACY = 5 * 1e-5
 THERMAL_TEST_SOLVER = "highs"
 MODIFICATION_RATIO = 1.2
 
+
 def thermal_test_procedure(
     study_name: str,
     study_path: Path,
@@ -114,10 +115,8 @@ def test_general_thermal(
             antares_exec_folder,
         )
 
-@pytest.mark.parametrize(
-    "base_capacity",
-    [50, 100, 200]
-)
+
+@pytest.mark.parametrize("base_capacity", [50, 100, 200])
 @pytest.mark.parametrize(
     "load_time_serie_file",
     [
@@ -192,7 +191,7 @@ def test_nominal_capacity(
 
     # Test -20% capacity
     marg_cluster_minus = ThermalClusterProperties(
-        nominal_capacity=base_capacity /MODIFICATION_RATIO,
+        nominal_capacity=base_capacity / MODIFICATION_RATIO,
         marginal_cost=20,
         market_bid_cost=20,
         fixed_cost=500,
@@ -216,3 +215,234 @@ def test_nominal_capacity(
         antares_exec_folder, orig_path_minus, conv_path_base, THERMAL_TEST_SOLVER
     )
     assert rel_gap_minus > THERMAL_TEST_REL_ACCURACY
+
+
+@pytest.mark.parametrize("base_startup_cost", [50, 1000, 5000])
+@pytest.mark.parametrize(
+    "load_time_serie_file",
+    [
+        "load_matrix_1.txt",
+        "load_matrix_2.txt",
+        "load_matrix_original.txt",
+    ],
+)
+def test_startup_cost(
+    base_startup_cost: float,
+    load_time_serie_file: str,
+    auto_generated_studies_path: Path,
+    antares_exec_folder: Path,
+) -> None:
+    # Setup thermal cluster properties with base startup cost
+    marg_cluster_properties = ThermalClusterProperties(
+        nominal_capacity=100,
+        marginal_cost=20,
+        market_bid_cost=20,
+        startup_cost=base_startup_cost,
+        fixed_cost=500,
+        group=ThermalClusterGroup.NUCLEAR,
+    )
+
+    # Run base test
+    study_name_base = f"e2e_startup_base_{str(int(100*time()))}"
+    cluster_data_frame_base = pd.DataFrame(
+        data=marg_cluster_properties.unit_count
+        * marg_cluster_properties.nominal_capacity
+        * np.ones((8760, 1))
+    )
+    createThermalTestAntaresStudy(
+        study_name_base,
+        auto_generated_studies_path,
+        LOAD_FILES_DIR / load_time_serie_file,
+        marg_cluster_properties,
+        cluster_data_frame_base,
+    )
+    orig_path_base, conv_path_base = convert_study(
+        auto_generated_studies_path, study_name_base, ["thermal"]
+    )
+    rel_gap_base = first_optim_relgap(
+        antares_exec_folder, orig_path_base, conv_path_base, THERMAL_TEST_SOLVER
+    )
+    assert rel_gap_base < THERMAL_TEST_REL_ACCURACY
+
+    for perturbation in [MODIFICATION_RATIO, 1 / MODIFICATION_RATIO]:
+        # Test +/-20% startup cost
+        marg_cluster = ThermalClusterProperties(
+            nominal_capacity=marg_cluster_properties.nominal_capacity,
+            marginal_cost=marg_cluster_properties.marginal_cost,
+            market_bid_cost=marg_cluster_properties.market_bid_cost,
+            startup_cost=base_startup_cost * perturbation,
+            group=ThermalClusterGroup.NUCLEAR,
+        )
+        study_name = f"e2e_startup_{str(int(100*time()))}"
+        cluster_data_frame = pd.DataFrame(
+            data=marg_cluster.unit_count
+            * marg_cluster.nominal_capacity
+            * np.ones((8760, 1))
+        )
+        createThermalTestAntaresStudy(
+            study_name,
+            auto_generated_studies_path,
+            LOAD_FILES_DIR / load_time_serie_file,
+            marg_cluster,
+            cluster_data_frame,
+        )
+        orig_path_perturbated = auto_generated_studies_path / study_name
+        rel_gap = first_optim_relgap(
+            antares_exec_folder,
+            orig_path_perturbated,
+            conv_path_base,
+            THERMAL_TEST_SOLVER,
+        )
+        assert rel_gap > THERMAL_TEST_REL_ACCURACY
+
+
+@pytest.mark.parametrize("base_fixed_cost", [250, 500, 1000])
+@pytest.mark.parametrize(
+    "load_time_serie_file",
+    [
+        "load_matrix_1.txt",
+        "load_matrix_2.txt",
+        "load_matrix_original.txt",
+    ],
+)
+def test_fixed_cost(
+    base_fixed_cost: float,
+    load_time_serie_file: str,
+    auto_generated_studies_path: Path,
+    antares_exec_folder: Path,
+) -> None:
+    # Setup thermal cluster properties with base fixed cost
+    marg_cluster_properties = ThermalClusterProperties(
+        nominal_capacity=100,
+        marginal_cost=20,
+        market_bid_cost=20,
+        fixed_cost=base_fixed_cost,
+        group=ThermalClusterGroup.NUCLEAR,
+    )
+
+    # Run base test
+    study_name_base = f"e2e_fixedcost_base_{str(int(100*time()))}"
+    cluster_data_frame_base = pd.DataFrame(
+        data=marg_cluster_properties.unit_count
+        * marg_cluster_properties.nominal_capacity
+        * np.ones((8760, 1))
+    )
+    createThermalTestAntaresStudy(
+        study_name_base,
+        auto_generated_studies_path,
+        LOAD_FILES_DIR / load_time_serie_file,
+        marg_cluster_properties,
+        cluster_data_frame_base,
+    )
+    orig_path_base, conv_path_base = convert_study(
+        auto_generated_studies_path, study_name_base, ["thermal"]
+    )
+    rel_gap_base = first_optim_relgap(
+        antares_exec_folder, orig_path_base, conv_path_base, THERMAL_TEST_SOLVER
+    )
+    assert rel_gap_base < THERMAL_TEST_REL_ACCURACY
+    for perturbation in [MODIFICATION_RATIO, 1 / MODIFICATION_RATIO]:
+        # Test +/-20% fixed cost
+        marg_cluster = ThermalClusterProperties(
+            nominal_capacity=marg_cluster_properties.nominal_capacity,
+            marginal_cost=marg_cluster_properties.marginal_cost,
+            market_bid_cost=marg_cluster_properties.market_bid_cost,
+            fixed_cost=base_fixed_cost * perturbation,
+            group=ThermalClusterGroup.NUCLEAR,
+        )
+        study_name = f"e2e_fixedcost_{str(int(100*time()))}"
+        cluster_data_frame = pd.DataFrame(
+            data=marg_cluster.unit_count
+            * marg_cluster.nominal_capacity
+            * np.ones((8760, 1))
+        )
+        createThermalTestAntaresStudy(
+            study_name,
+            auto_generated_studies_path,
+            LOAD_FILES_DIR / load_time_serie_file,
+            marg_cluster,
+            cluster_data_frame,
+        )
+        orig_path_perturbated = auto_generated_studies_path / study_name
+        rel_gap = first_optim_relgap(
+            antares_exec_folder,
+            orig_path_perturbated,
+            conv_path_base,
+            THERMAL_TEST_SOLVER,
+        )
+        assert rel_gap > THERMAL_TEST_REL_ACCURACY
+
+
+@pytest.mark.parametrize("base_marginal_cost", [1, 10, 100])
+@pytest.mark.parametrize(
+    "load_time_serie_file",
+    [
+        "load_matrix_1.txt",
+        "load_matrix_2.txt",
+        "load_matrix_original.txt",
+    ],
+)
+def test_marginal_cost_marketbid_equals(
+    base_marginal_cost: float,
+    load_time_serie_file: str,
+    auto_generated_studies_path: Path,
+    antares_exec_folder: Path,
+) -> None:
+    # Setup thermal cluster properties
+    marg_cluster_properties = ThermalClusterProperties(
+        nominal_capacity=50,
+        marginal_cost=base_marginal_cost,
+        market_bid_cost=base_marginal_cost,
+        group=ThermalClusterGroup.NUCLEAR,
+    )
+
+    # Run base test
+    study_name_base = f"e2e_marginal_base_{str(int(100*time()))}"
+    cluster_data_frame_base = pd.DataFrame(
+        data=marg_cluster_properties.unit_count
+        * marg_cluster_properties.nominal_capacity
+        * np.ones((8760, 1))
+    )
+    createThermalTestAntaresStudy(
+        study_name_base,
+        auto_generated_studies_path,
+        LOAD_FILES_DIR / load_time_serie_file,
+        marg_cluster_properties,
+        cluster_data_frame_base,
+    )
+    orig_path_base, conv_path_base = convert_study(
+        auto_generated_studies_path, study_name_base, ["thermal"]
+    )
+    rel_gap_base = first_optim_relgap(
+        antares_exec_folder, orig_path_base, conv_path_base, THERMAL_TEST_SOLVER
+    )
+    assert rel_gap_base < THERMAL_TEST_REL_ACCURACY
+    for perturbation in [MODIFICATION_RATIO, 1 / MODIFICATION_RATIO]:
+        # Test +/-20% marginal cost
+        marg_cluster = ThermalClusterProperties(
+            nominal_capacity=marg_cluster_properties.nominal_capacity,
+            marginal_cost=base_marginal_cost * perturbation,
+            market_bid_cost=base_marginal_cost * perturbation,
+            group=ThermalClusterGroup.NUCLEAR,
+        )
+        study_name = f"e2e_marginal_{str(int(100*time()))}"
+        cluster_data_frame = pd.DataFrame(
+            data=marg_cluster.unit_count
+            * marg_cluster.nominal_capacity
+            * np.ones((8760, 1))
+        )
+        createThermalTestAntaresStudy(
+            study_name,
+            auto_generated_studies_path,
+            LOAD_FILES_DIR / load_time_serie_file,
+            marg_cluster,
+            cluster_data_frame,
+        )
+        orig_path_perturbated = auto_generated_studies_path / study_name
+        rel_gap = first_optim_relgap(
+            antares_exec_folder,
+            orig_path_perturbated,
+            conv_path_base,
+            THERMAL_TEST_SOLVER,
+        )
+        assert rel_gap > THERMAL_TEST_REL_ACCURACY
