@@ -1,0 +1,70 @@
+import os
+from pathlib import Path
+from time import time
+
+import numpy as np
+import pandas as pd
+import pytest
+from antares.craft import LinkProperties
+
+from gems.input_converter.src.logger import Logger
+from tests.antares_historic.utils import (
+    convert_study,
+    createLinkTestAntaresStudy,
+    first_optim_relgap,
+)
+
+LOAD_FILES_DIR = Path("tests/antares_historic/data")
+LINK_TEST_REL_ACCURACY = 5 * 1e-5
+LINK_TEST_SOLVER = "highs"
+MODIFICATION_RATIO = 1.2
+
+
+def link_test_procedure(
+    study_name: str,
+    study_path: Path,
+    link_capacity_direct: np.ndarray,
+    link_capacity_indirect: np.ndarray,
+    load1_time_serie_file: Path,
+    load2_time_serie_file: Path,
+    exec_folder: Path,
+) -> None:
+    createLinkTestAntaresStudy(
+        study_name,
+        study_path,
+        load1_time_serie_file,
+        load2_time_serie_file,
+        link_capacity_direct,
+        link_capacity_indirect,
+    )
+    original_study_path, converted_study_path = convert_study(
+        study_path, study_name, ["link"]
+    )
+    rel_gap = first_optim_relgap(
+        exec_folder, original_study_path, converted_study_path, LINK_TEST_SOLVER
+    )
+    assert rel_gap < LINK_TEST_REL_ACCURACY
+
+
+def test_general_link(
+    auto_generated_studies_path: Path,
+    antares_exec_folder: Path,
+) -> None:
+
+    study_name = "link_test_study"
+    study_path = auto_generated_studies_path / study_name
+
+    load1_time_serie_file = LOAD_FILES_DIR / "load_matrix_1.txt"
+    load2_time_serie_file = LOAD_FILES_DIR / "load_matrix_2.txt"
+
+    link_capacity_direct = 20 * np.ones((8760, 1))
+    link_capacity_indirect = 20 * np.ones((8760, 1))
+    link_test_procedure(
+        study_name,
+        study_path,
+        link_capacity_direct,
+        link_capacity_indirect,
+        load1_time_serie_file,
+        load2_time_serie_file,
+        antares_exec_folder,
+    )
