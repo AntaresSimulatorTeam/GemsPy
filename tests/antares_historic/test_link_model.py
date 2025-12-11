@@ -15,7 +15,7 @@ from tests.antares_historic.utils import (
 )
 
 LOAD_FILES_DIR = Path("tests/antares_historic/data")
-LINK_TEST_REL_ACCURACY = 5 * 1e-5
+LINK_TEST_REL_ACCURACY = 1e-6
 LINK_TEST_SOLVER = "highs"
 MODIFICATION_RATIO = 1.2
 
@@ -46,16 +46,33 @@ def link_test_procedure(
     assert rel_gap < LINK_TEST_REL_ACCURACY
 
 
+@pytest.mark.parametrize("capacity_direct", [10, 100])
+@pytest.mark.parametrize("capacity_indirect", [10, 50])
 def test_general_link(
+    capacity_direct: float,
+    capacity_indirect: float,
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-    study_name = "link_test_study"
+    study_name = f"link_test_study_{str(int(100*time()))}"
     study_path = auto_generated_studies_path / study_name
     load1_time_serie_file = LOAD_FILES_DIR / "load_matrix_1.txt"
     load2_time_serie_file = LOAD_FILES_DIR / "load_matrix_2.txt"
-    link_capacity_direct = 20 * np.ones((8760, 1))
-    link_capacity_indirect = 20 * np.ones((8760, 1))
+    link_capacity_direct = capacity_direct * np.ones((8760, 1))
+    link_capacity_indirect = capacity_indirect * np.ones((8760, 1))
+    link_test_procedure(
+        study_name,
+        study_path,
+        link_capacity_direct,
+        link_capacity_indirect,
+        load1_time_serie_file,
+        load2_time_serie_file,
+        antares_exec_folder,
+    )
+    study_name = f"link_test_study_{str(int(100*time()))}"
+    link_capacity_direct = capacity_direct * np.random.random((8760, 1))
+    link_capacity_indirect = capacity_indirect * np.random.random((8760, 1))
+
     link_test_procedure(
         study_name,
         study_path,

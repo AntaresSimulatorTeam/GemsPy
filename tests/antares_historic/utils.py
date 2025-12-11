@@ -129,8 +129,8 @@ def createLinkTestAntaresStudy(
         parent_directory=parent_dir_path,
     )
     load_timeserie = [
-        0.2 * pd.read_csv(load1_time_serie_file),
-        0.2 * pd.read_csv(load2_time_serie_file),
+        pd.read_csv(load1_time_serie_file),
+        pd.read_csv(load2_time_serie_file),
     ]
     area_list = []
     study.create_area(
