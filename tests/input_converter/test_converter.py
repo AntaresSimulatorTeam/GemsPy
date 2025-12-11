@@ -851,7 +851,7 @@ class TestConverter:
         at_it_indirect_links_timeseries = "capacity_indirect_at_it"
         expected_link_component = [
             InputComponent(
-                id="fr / it",
+                id="fr_/_it",
                 model="antares-historic.link",
                 scenario_group=None,
                 parameters=[
@@ -872,7 +872,7 @@ class TestConverter:
                 ],
             ),
             InputComponent(
-                id="at / fr",
+                id="at_/_fr",
                 model="antares-historic.link",
                 scenario_group=None,
                 parameters=[
@@ -893,7 +893,7 @@ class TestConverter:
                 ],
             ),
             InputComponent(
-                id="at / it",
+                id="at_/_it",
                 model="antares-historic.link",
                 scenario_group=None,
                 parameters=[
@@ -917,37 +917,37 @@ class TestConverter:
 
         expected_link_connections = [
             InputPortConnections(
-                component1="at / fr",
+                component1="at_/_fr",
                 port1="in_port",
                 component2="at",
                 port2="balance_port",
             ),
             InputPortConnections(
-                component1="at / fr",
+                component1="at_/_fr",
                 port1="out_port",
                 component2="fr",
                 port2="balance_port",
             ),
             InputPortConnections(
-                component1="at / it",
+                component1="at_/_it",
                 port1="in_port",
                 component2="at",
                 port2="balance_port",
             ),
             InputPortConnections(
-                component1="at / it",
+                component1="at_/_it",
                 port1="out_port",
                 component2="it",
                 port2="balance_port",
             ),
             InputPortConnections(
-                component1="fr / it",
+                component1="fr_/_it",
                 port1="in_port",
                 component2="fr",
                 port2="balance_port",
             ),
             InputPortConnections(
-                component1="fr / it",
+                component1="fr_/_it",
                 port1="out_port",
                 component2="it",
                 port2="balance_port",
