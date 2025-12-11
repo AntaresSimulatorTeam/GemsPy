@@ -113,3 +113,65 @@ def createThermalTestAntaresStudy(
     cluster3 = area.create_thermal_cluster("prod3", marg_cluster_properties)
     cluster3.set_series(marg_cluster_data_frame)
     addHybridBehavior(parent_dir_path / study_name)
+
+
+def createLinkTestAntaresStudy(
+    study_name: str,
+    parent_dir_path: Path,
+    load1_time_serie_file: Path,
+    load2_time_serie_file: Path,
+    direct_capacity: np.ndarray,
+    indirect_capacity: np.ndarray,
+) -> None:
+    study = create_study_local(
+        study_name=study_name,
+        version=ANTARES_VERSION_CREATED_STUDIES,
+        parent_directory=parent_dir_path,
+    )
+    load_timeserie = [
+        0.2 * pd.read_csv(load1_time_serie_file),
+        0.2 * pd.read_csv(load2_time_serie_file),
+    ]
+    area_list = []
+    study.create_area(
+        area_name="unique", properties=AreaProperties(energy_cost_unsupplied=20000)
+    )
+    for i in range(2):
+        area_list.append(
+            study.create_area(
+                area_name=f"area{i+1}",
+                properties=AreaProperties(energy_cost_unsupplied=20000),
+            )
+        )
+        area_list[i].set_load(load_timeserie[i])
+        cluster1 = area_list[i].create_thermal_cluster(
+            f"prod1_area{i+1}",
+            ThermalClusterProperties(
+                unit_count=1,
+                nominal_capacity=150,
+                marginal_cost=10,
+                market_bid_cost=10,
+                group=ThermalClusterGroup.NUCLEAR,
+            ),
+        )
+        cluster1.set_series(pd.DataFrame(data=150 * np.ones((8760, 1))))
+
+        cluster2 = area_list[i].create_thermal_cluster(
+            f"prod2_area{i+1}",
+            ThermalClusterProperties(
+                unit_count=1,
+                nominal_capacity=200,
+                marginal_cost=20,
+                market_bid_cost=20,
+                group=ThermalClusterGroup.NUCLEAR,
+            ),
+        )
+        cluster2.set_series(pd.DataFrame(data=200 * np.ones((8760, 1))))
+
+    link = study.create_link(
+        area_from=area_list[0].name,
+        area_to=area_list[1].name,
+    )
+    link.set_capacity_direct(pd.DataFrame(direct_capacity))
+    link.set_capacity_indirect(pd.DataFrame(indirect_capacity))
+    addHybridBehavior(parent_dir_path / study_name)
