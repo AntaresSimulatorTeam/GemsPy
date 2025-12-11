@@ -50,13 +50,10 @@ def test_general_link(
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-
     study_name = "link_test_study"
     study_path = auto_generated_studies_path / study_name
-
     load1_time_serie_file = LOAD_FILES_DIR / "load_matrix_1.txt"
     load2_time_serie_file = LOAD_FILES_DIR / "load_matrix_2.txt"
-
     link_capacity_direct = 20 * np.ones((8760, 1))
     link_capacity_indirect = 20 * np.ones((8760, 1))
     link_test_procedure(
