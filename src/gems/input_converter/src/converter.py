@@ -347,7 +347,7 @@ class AntaresStudyConverter:
 
         components.append(
             InputComponent(
-                id=resolved_conversion_template.component.id,
+                id=(resolved_conversion_template.component.id).replace(" ", "_"),
                 model=resolved_conversion_template.model,
                 parameters=parameters,
                 **kwargs,
@@ -364,11 +364,20 @@ class AntaresStudyConverter:
                     )
                 else:
                     component_value = area_connection.component
+                component_value = component_value.replace(" ", "_")
+                if "." in area_connection.area:
+                    area_parts = area_connection.area.split(".")
+                    area_value = getattr(
+                        self.study.get_links()[area_parts[0]], area_parts[1]
+                    )
+                else:
+                    area_value = area_connection.area
+                area_value = area_value.replace(" ", "_")
                 area_connections.append(
                     InputAreaConnections(
                         component=component_value,
                         port=area_connection.port,
-                        area=area_connection.area,
+                        area=area_value,
                     )
                 )
             # TODO : Simplify usage, use directly legacy_objectis_to_delete
@@ -377,18 +386,23 @@ class AntaresStudyConverter:
         else:
             for connection in resolved_conversion_template.connections:
                 # TODO: Factorize logic with previous connections
-                if "." in connection.component2:
-                    component2_parts = connection.component2.split(".")
-                    component2_value = getattr(
-                        self.study.get_links()[component2_parts[0]], component2_parts[1]
-                    )
-                else:
-                    component2_value = connection.component2
+                treated_components = []
+                for component in [connection.component1, connection.component2]:
+                    if "." in component:
+                        component_parts = component.split(".")
+                        component_value = getattr(
+                            self.study.get_links()[component_parts[0]],
+                            component_parts[1],
+                        )
+                    else:
+                        component_value = component
+                    treated_components.append(component_value.replace(" ", "_"))
+
                 connections.append(
                     InputPortConnections(
-                        component1=connection.component1,
+                        component1=treated_components[0],
                         port1=connection.port1,
-                        component2=component2_value,
+                        component2=treated_components[1],
                         port2=connection.port2,
                     )
                 )
