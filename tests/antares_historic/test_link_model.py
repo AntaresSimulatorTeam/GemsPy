@@ -34,7 +34,7 @@ def link_test_procedure(
         link_capacity_indirect,
     )
     original_study_path, converted_study_path = convert_study(
-        study_path, study_name, ["link"]
+        study_path, study_name, ["link","thermal"]
     )
     rel_gap = first_optim_relgap(
         exec_folder, original_study_path, converted_study_path, LINK_TEST_SOLVER
