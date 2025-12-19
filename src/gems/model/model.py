@@ -101,11 +101,10 @@ class Model:
     inter_block_dyn: bool = False
     parameters: Dict[str, Parameter] = field(default_factory=dict)
     variables: Dict[str, Variable] = field(default_factory=dict)
+    objective_contributions: Optional[Dict[str, ExpressionNode]] = None
     objective_operational_contribution: Optional[ExpressionNode] = None
     objective_investment_contribution: Optional[ExpressionNode] = None
-    # Objective contribution approach
-    objective_contributions: Optional[Dict[str, ExpressionNode]] = None
-    ports: Dict[str, ModelPort] = field(default_factory=dict)  # key = port name
+    ports: Dict[str, ModelPort] = field(default_factory=dict)
     port_fields_definitions: Dict[PortFieldId, PortFieldDefinition] = field(
         default_factory=dict
     )
@@ -123,7 +122,7 @@ class Model:
             )
         # Validate each contribution if present
         if self.objective_contributions:
-            for cid, expr in self.objective_contributions.items():
+            for expr in self.objective_contributions.values():
                 _is_objective_contribution_valid(self, expr)
 
         for definition in self.port_fields_definitions.values():
@@ -156,13 +155,13 @@ def model(
     binding_constraints: Optional[Iterable[Constraint]] = None,
     parameters: Optional[Iterable[Parameter]] = None,
     variables: Optional[Iterable[Variable]] = None,
+    objective_contributions: Optional[Dict[str, ExpressionNode]] = None,
     objective_operational_contribution: Optional[ExpressionNode] = None,
     objective_investment_contribution: Optional[ExpressionNode] = None,
     inter_block_dyn: bool = False,
     ports: Optional[Iterable[ModelPort]] = None,
     port_fields_definitions: Optional[Iterable[PortFieldDefinition]] = None,
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None,
-    objective_contributions: Optional[Dict[str, ExpressionNode]] = None,  # NEW
 ) -> Model:
     """
     Utility method to create Models from relaxed arguments
@@ -185,9 +184,9 @@ def model(
         else {},
         parameters={p.name: p for p in parameters} if parameters else {},
         variables={v.name: v for v in variables} if variables else {},
-        objective_operational_contribution=objective_operational_contribution,
-        objective_investment_contribution=objective_investment_contribution,
         objective_contributions=objective_contributions,
+        objective_investment_contribution=objective_investment_contribution,
+        objective_operational_contribution=objective_operational_contribution,
         inter_block_dyn=inter_block_dyn,
         ports=existing_port_names,
         port_fields_definitions={d.port_field: d for d in port_fields_definitions}

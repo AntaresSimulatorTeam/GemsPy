@@ -41,7 +41,9 @@ library:
         - port: injection_port
           field: flow
           definition: generation
-      objective: expec(sum(cost * generation))
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * generation))
 
     - id: node
       description: A basic balancing node model
@@ -179,4 +181,6 @@ library:
           expression: sum(t-d_min_up + 1 .. t, nb_start) <= nb_on
         - id: Min down time
           expression: sum(t-d_min_down + 1 .. t, nb_stop) <= nb_units_max[t-d_min_down] - nb_on
-      objective: expec(sum(cost * generation))
+      objective-contributions:
+        - id: obj
+          expression:  expec(sum(cost * generation))

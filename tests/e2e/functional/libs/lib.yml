@@ -60,7 +60,9 @@ library:
         - port: balance_port
           field: flow
           definition: generation
-      objective: expec(sum(cost * generation))
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * generation))
 
     - id: production_with_min
       parameters:
@@ -84,7 +86,9 @@ library:
         - port: balance_port
           field: flow
           definition: generation
-      objective: expec(sum(cost * generation))
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * generation))
 
     - id: link
       parameters:
@@ -123,7 +127,9 @@ library:
         - port: balance_port
           field: flow
           definition: -input
-      objective: expec(sum(cost * input))
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * input))
 
     - id: unsuplied
       parameters:
@@ -140,7 +146,9 @@ library:
         - port: balance_port
           field: flow
           definition: output
-      objective: expec(sum(cost * output))
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * output))
 
     - id: thermal_cluster
       parameters:
@@ -185,4 +193,6 @@ library:
           expression: sum(t-d_min_up + 1 .. t, nb_starting) <= nb_units_on
         - id: stoping time
           expression: sum(t-d_min_down + 1 .. t, nb_stoping) <= nb_units_max - nb_units_on
-      objective: expec(sum(cost * production))
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * production))

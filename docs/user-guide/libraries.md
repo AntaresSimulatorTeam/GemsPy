@@ -154,7 +154,9 @@ A model is an abstract object, that will be instantiated once or several times i
     constraints:
       - id: respect_min_p
         expression: active_power >= is_on * min_active_power_setpoint
-    objective: active_power * proportional_cost + fixed_cost * is_on
+    objective-contributions:
+        - id: obj
+          expression: active_power * proportional_cost + fixed_cost * is_on
     ports:
       - id: injection_port
         type: dc_port

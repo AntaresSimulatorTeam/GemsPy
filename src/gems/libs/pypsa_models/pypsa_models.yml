@@ -191,7 +191,9 @@ library:
         expression: sum(p) >= e_sum_min
       - id: max_production
         expression: sum(p) <= e_sum_max
-      objective: expec(sum(marginal_cost * p)) + p_nom * capital_cost
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(marginal_cost * p)) + p_nom * capital_cost
 
     - id: link
     #Model for PyPSA link: https://pypsa.readthedocs.io/en/latest/user-guide/components.html#link
@@ -275,7 +277,9 @@ library:
           expression: p0 <= p_max_pu * p_nom
         - id: p0_lower
           expression: p0 >= p_min_pu * p_nom
-      objective: expec(sum(marginal_cost * p0)) + capital_cost * p_nom
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(marginal_cost * p0)) + capital_cost * p_nom
 
   
     - id: storage_unit
@@ -381,7 +385,9 @@ library:
           expression: state_of_charge <= max_hours * p_nom
         - id: state_of_charge_balance
           expression: state_of_charge = (1- standing_loss) * state_of_charge[t-1] + efficiency_store * p_store - p_dispatch / efficiency_dispatch  + inflow - spill
-      objective: expec(sum(marginal_cost * p_dispatch + spill_cost*spill + marginal_cost_storage * state_of_charge)) + capital_cost * p_nom
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(marginal_cost * p_dispatch + spill_cost*spill + marginal_cost_storage * state_of_charge)) + capital_cost * p_nom
 
     - id: store
       #Model for PyPSA store: https://pypsa.readthedocs.io/en/latest/user-guide/components.html#store
@@ -458,7 +464,9 @@ library:
           expression: e >= e_min_pu * e_nom
         - id: energy_balance
           expression: e = (1 - standing_loss) * e[t-1] - p
-      objective: expec(sum(marginal_cost * p + marginal_cost_storage * e)) + capital_cost * e_nom
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(marginal_cost * p + marginal_cost_storage * e)) + capital_cost * e_nom
 
 
 

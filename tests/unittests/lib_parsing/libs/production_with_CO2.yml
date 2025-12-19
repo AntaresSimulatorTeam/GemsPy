@@ -46,4 +46,6 @@ library:
         - port: emission_port
           field: CO2
           definition: generation * emission
-      objective: expec(sum(cost * generation))
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * generation))

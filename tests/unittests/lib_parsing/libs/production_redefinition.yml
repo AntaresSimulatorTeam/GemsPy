@@ -37,7 +37,9 @@ library:
         - port: injection_port
           field: flow
           definition: generation
-      objective: expec(sum(cost * generation))
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * generation))
     
     - id: generator
       description: A basic generator model

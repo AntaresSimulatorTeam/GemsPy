@@ -146,4 +146,6 @@ library:
       binding-constraints:
         - id: AC flow
           expression: flow = 1 / reactance * (port1.angle + phase_shift - port2.angle)
-      objective: expec(sum(phase_shift_cost * (phase_shift_pos + phase_shift_neg)))
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(phase_shift_cost * (phase_shift_pos + phase_shift_neg)))

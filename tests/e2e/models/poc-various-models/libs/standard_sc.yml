@@ -171,7 +171,9 @@ library:
         - port: co2_port
           field: emission
           definition: p * emission_rate
-      objective: expec(sum(cost * p))
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * p))
 
     - id: quota_co2
       description: A CO2 quota model

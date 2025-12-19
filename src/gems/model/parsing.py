@@ -13,10 +13,10 @@ import typing
 from dataclasses import dataclass
 from typing import List, Optional
 
-from pydantic import Field, ValidationError, model_validator
+from pydantic import Field, ValidationError
 from yaml import safe_load
 
-from gems.utils import ModifiedBaseModel, _to_kebab
+from gems.utils import ModifiedBaseModel
 
 
 def parse_yaml_library(input: typing.TextIO) -> "InputLibrary":
@@ -74,10 +74,6 @@ class InputPortFieldDefinition(ModifiedBaseModel):
 
 
 class InputObjectiveContribution(ModifiedBaseModel):
-    """
-    Represents one term in the objective function.
-    """
-
     id: str
     expression: str
 
@@ -96,27 +92,11 @@ class InputModel(ModifiedBaseModel):
     port_field_definitions: List[InputPortFieldDefinition] = Field(default_factory=list)
     binding_constraints: List[InputConstraint] = Field(default_factory=list)
     constraints: List[InputConstraint] = Field(default_factory=list)
-
-    # --- new field ---
-    objective_contributions: Optional[List[InputObjectiveContribution]] = Field(
-        default_factory=lambda: [], alias="objective-contributions"
+    objective_contributions: List[InputObjectiveContribution] = Field(
+        default_factory=list, alias="objective-contributions"
     )
-
-    # --- backward compatibility with legacy "objective" field ---
-    objective: Optional[str] = None
     description: Optional[str] = None
     extra_outputs: Optional[List[InputExtraOutput]] = None
-
-    @model_validator(mode="after")
-    def _migrate_legacy_objective(self) -> "InputModel":
-        """
-        If only 'objective' is defined, convert it into a single contribution.
-        """
-        if not self.objective_contributions and self.objective:
-            self.objective_contributions = [
-                InputObjectiveContribution(id="default", expression=self.objective)
-            ]
-        return self
 
 
 class InputLibrary(ModifiedBaseModel):
