@@ -189,7 +189,6 @@ def test_hurdle_cost_direct(
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-
     capacity_direct, capacity_indirect, hurdle_cost_indirect = 100.0, 100.0, 1
     study_name = f"link_test_study_{str(int(100*time()))}"
     load1_time_serie_file = LOAD_FILES_DIR / "load_matrix_1.txt"
@@ -249,7 +248,6 @@ def test_hurdle_cost_indirect(
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-
     capacity_direct, capacity_indirect, hurdle_cost_direct = 100.0, 100.0, 1
     study_name = f"link_test_study_{str(int(100*time()))}"
     load1_time_serie_file = LOAD_FILES_DIR / "load_matrix_1.txt"
