@@ -8,6 +8,7 @@ import pandas as pd
 from antares.craft import *
 
 from antares_runner.antares_runner import AntaresHybridStudyBenchmarker
+from gems import study
 from gems.input_converter.src.converter import AntaresStudyConverter
 from gems.input_converter.src.data_preprocessing.data_classes import ConversionMode
 from gems.input_converter.src.logger import Logger
@@ -122,6 +123,8 @@ def createLinkTestAntaresStudy(
     load2_time_serie_file: Path,
     direct_capacity: np.ndarray,
     indirect_capacity: np.ndarray,
+    hurdle_cost_direct: Optional[np.ndarray] = None,
+    hurdle_cost_indirect: Optional[np.ndarray] = None,
 ) -> None:
     study = create_study_local(
         study_name=study_name,
@@ -174,4 +177,18 @@ def createLinkTestAntaresStudy(
     )
     link.set_capacity_direct(pd.DataFrame(direct_capacity))
     link.set_capacity_indirect(pd.DataFrame(indirect_capacity))
+    if hurdle_cost_direct is not None or hurdle_cost_indirect is not None:
+        parameters = np.zeros((8760, 6))
+        if hurdle_cost_direct is not None:
+            parameters[:, 0] = hurdle_cost_direct.flatten()
+        if hurdle_cost_indirect is not None:
+            parameters[:, 1] = hurdle_cost_indirect.flatten()
+        link.set_parameters(
+            pd.DataFrame(parameters),
+        )
+    link.update_properties(LinkPropertiesUpdate(hurdles_cost=True))
+    opt_upd = OptimizationParametersUpdate(include_hurdlecosts=True)
+    settings_upd = StudySettingsUpdate(optimization_parameters=opt_upd)
+
+    study.update_settings(settings_upd)
     addHybridBehavior(parent_dir_path / study_name)

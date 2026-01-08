@@ -39,6 +39,24 @@ template:
             type: link
             link: ${link}
             field: capacity_indirect
+      - id: hurdle_cost_direct
+        time-dependent: true
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: link
+            link: ${link}
+            field: links_parameters
+          column: 0
+      - id: hurdle_cost_indirect
+        time-dependent: true
+        scenario-dependent: false
+        value:
+          object-properties:
+            type: link
+            link: ${link}
+            field: links_parameters
+          column: 1
 
   # For full modeler mode
   connections:

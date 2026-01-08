@@ -53,7 +53,6 @@ def auto_generated_studies_path(tmp_path_factory: pytest.TempPathFactory) -> Pat
     base = tmp_path_factory.mktemp("antares_session")
     return base / "antares-resources" / "antares-studies"
 
-
 @pytest.fixture
 def local_study(tmp_path) -> Study:
     """

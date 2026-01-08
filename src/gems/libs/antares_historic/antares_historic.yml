@@ -60,6 +60,12 @@ library:
         - id: capacity_indirect
           time-dependent: true
           scenario-dependent: true
+        - id: hurdle_cost_direct
+          time-dependent: true
+          scenario-dependent: false
+        - id: hurdle_cost_indirect
+          time-dependent: true
+          scenario-dependent: false
       variables:
         - id: flow_direct
           lower-bound: 0
@@ -80,6 +86,9 @@ library:
         - port: in_port
           field: flow
           definition: -flow
+      objective-contributions:
+        - id: objective
+          expression: expec(sum(hurdle_cost_direct * flow_direct + hurdle_cost_indirect * flow_indirect))
       constraints:
         - id: flow_direct_indirect
           expression: flow = flow_direct - flow_indirect

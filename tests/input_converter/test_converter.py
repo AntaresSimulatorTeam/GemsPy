@@ -845,10 +845,16 @@ class TestConverter:
 
         fr_it_direct_links_timeseries = "capacity_direct_fr_it"
         fr_it_indirect_links_timeseries = "capacity_indirect_fr_it"
+        fr_it_direct_costs_timeseries = "hurdle_cost_direct_fr_it"
+        fr_it_indirect_costs_timeseries = "hurdle_cost_indirect_fr_it"
         at_fr_direct_links_timeseries = "capacity_direct_at_fr"
         at_fr_indirect_links_timeseries = "capacity_indirect_at_fr"
         at_it_direct_links_timeseries = "capacity_direct_at_it"
         at_it_indirect_links_timeseries = "capacity_indirect_at_it"
+        at_fr_direct_costs_timeseries = "hurdle_cost_direct_at_fr"
+        at_fr_indirect_costs_timeseries = "hurdle_cost_indirect_at_fr"
+        at_it_direct_costs_timeseries = "hurdle_cost_direct_at_it"
+        at_it_indirect_costs_timeseries = "hurdle_cost_indirect_at_it"
         expected_link_component = [
             InputComponent(
                 id="fr_/_it",
@@ -868,6 +874,20 @@ class TestConverter:
                         scenario_dependent=True,
                         scenario_group=None,
                         value=f"{fr_it_indirect_links_timeseries}",
+                    ),
+                    InputComponentParameter(
+                        id="hurdle_cost_direct",
+                        time_dependent=True,
+                        scenario_dependent=False,
+                        scenario_group=None,
+                        value=f"{fr_it_direct_costs_timeseries}",
+                    ),
+                    InputComponentParameter(
+                        id="hurdle_cost_indirect",
+                        time_dependent=True,
+                        scenario_dependent=False,
+                        scenario_group=None,
+                        value=f"{fr_it_indirect_costs_timeseries}",
                     ),
                 ],
             ),
@@ -890,6 +910,20 @@ class TestConverter:
                         scenario_group=None,
                         value=f"{at_fr_indirect_links_timeseries}",
                     ),
+                    InputComponentParameter(
+                        id="hurdle_cost_direct",
+                        time_dependent=True,
+                        scenario_dependent=False,
+                        scenario_group=None,
+                        value=f"{at_fr_direct_costs_timeseries}",
+                    ),
+                    InputComponentParameter(
+                        id="hurdle_cost_indirect",
+                        time_dependent=True,
+                        scenario_dependent=False,
+                        scenario_group=None,
+                        value=f"{at_fr_indirect_costs_timeseries}",
+                    ),
                 ],
             ),
             InputComponent(
@@ -910,6 +944,20 @@ class TestConverter:
                         scenario_dependent=True,
                         scenario_group=None,
                         value=f"{at_it_indirect_links_timeseries}",
+                    ),
+                    InputComponentParameter(
+                        id="hurdle_cost_direct",
+                        time_dependent=True,
+                        scenario_dependent=False,
+                        scenario_group=None,
+                        value=f"{at_it_direct_costs_timeseries}",
+                    ),
+                    InputComponentParameter(
+                        id="hurdle_cost_indirect",
+                        time_dependent=True,
+                        scenario_dependent=False,
+                        scenario_group=None,
+                        value=f"{at_it_indirect_costs_timeseries}",
                     ),
                 ],
             ),
