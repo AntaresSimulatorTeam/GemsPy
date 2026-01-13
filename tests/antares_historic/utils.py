@@ -8,7 +8,6 @@ import pandas as pd
 from antares.craft import *
 
 from antares_runner.antares_runner import AntaresHybridStudyBenchmarker
-from gems import study
 from gems.input_converter.src.converter import AntaresStudyConverter
 from gems.input_converter.src.data_preprocessing.data_classes import ConversionMode
 from gems.input_converter.src.logger import Logger
