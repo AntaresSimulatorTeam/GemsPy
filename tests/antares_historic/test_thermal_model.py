@@ -14,6 +14,7 @@ from tests.antares_historic.utils import (
     first_optim_relgap,
 )
 
+## TESTING PROCEDURE FOR GEMS MODEL REPRENSENTING ANTARES v9.3 "THERMAL CLUSTER"  : CONSTANT DATA  ##
 LOAD_FILES_DIR = Path("tests/antares_historic/data")
 THERMAL_TEST_REL_ACCURACY = 5 * 1e-5
 THERMAL_TEST_SOLVER = "highs"
@@ -23,6 +24,42 @@ LOAD_TIME_SERIE_FILES = [
     # "load_matrix_2.txt", #uncomment to test with different load profile
     # "load_matrix_original.txt",
 ]
+
+## TESTING PROCEDURE FOR GEMS MODEL REPRENSENTING ANTARES v9.3 "THERMAL CLUSTERS"  : TESTS  ##
+
+# General tests [OK:test_general_thermal]
+
+# Testing Boolean/discrete parameters
+## group: [TODO]
+## gen_ts: [TODO]
+## must_run: [TODO]
+## law_forced: [TODO]
+## law_planned: [TODO]
+## cost_generation: [TODO]
+
+
+# Testing Float parameters
+## nominal_capacity [OK : test_nominal_capacity]
+## min_stable_power: [OK : test_min_stable_power]
+## min_up_time: [OK : test_min_up_time]
+## min_down_time: [OK : test_min_down_time]
+## marginal_cost: [OK : test_marginal_cost_marketbid_equals]
+## spread_cost: [TODO]
+## fixed_cost: [OK : test_fixed_cost]
+## startup_cost: [OK : test_startup_cost]
+## market_bid_cost: [OK : test_marginal_cost_marketbid_equals]
+## spinning: [TODO]
+## volatility_forced: [TODO]
+## volatility_planned: [TODO]
+## efficiency:  [TODO]
+## variable_o_m_cost: [TODO]
+## co2, nh3, so2:, nox, pm2_5, pm5, pm10, nmvoc, op1, op2, op3, op4, op5 [TODO]
+
+
+# Testing Timeseries parameters
+## series (availability) : [TODO]
+## co2_cost_matrix : [TODO]
+## fuel_cost_matrix : [TODO]
 
 
 def thermal_test_procedure(
@@ -421,7 +458,7 @@ def test_marginal_cost_marketbid_equals(
 @pytest.mark.parametrize("base_min_down_time", [2, 4, 6])
 @pytest.mark.parametrize("load_time_serie_file", LOAD_TIME_SERIE_FILES)
 def test_min_down_time(
-    base_min_down_time: float,
+    base_min_down_time: int,
     load_time_serie_file: str,
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
@@ -498,7 +535,7 @@ def test_min_down_time(
 @pytest.mark.parametrize("base_min_up_time", [3, 4, 6])
 @pytest.mark.parametrize("load_time_serie_file", LOAD_TIME_SERIE_FILES)
 def test_min_up_time(
-    base_min_up_time: float,
+    base_min_up_time: int,
     load_time_serie_file: str,
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,

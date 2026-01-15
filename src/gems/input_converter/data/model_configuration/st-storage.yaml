@@ -18,7 +18,7 @@ template:
   template-parameters:
     - name: area
       cluster-type: st_storage
-      description: "Area identifier for the load component"
+      description: "Area identifier for the component"
       # exclude:
 
   component:

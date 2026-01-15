@@ -10,10 +10,36 @@ from tests.antares_historic.utils import (
     first_optim_relgap,
 )
 
+## TESTING PROCEDURE FOR GEMS MODEL REPRENSENTING ANTARES v9.3 "LINK"  : CONSTANT DATA  ##
+
 LOAD_FILES_DIR = Path("tests/antares_historic/data")
 LINK_TEST_REL_ACCURACY = 1e-6
 LINK_TEST_SOLVER = "highs"
 MODIFICATION_RATIO = 1.2
+
+## TESTING PROCEDURE FOR GEMS MODEL REPRENSENTING ANTARES v9.3 "LINK"  : TESTS  ##
+
+# General tests [OK : test_general_link]
+
+# Testing Boolean/discrete parameters
+## hurdles_cost [TODO]
+## loop_flow [TODO]
+## use_phase_shifter [TODO]
+## transmission_capacities [TODO]
+## asset_type [TODO]
+
+# Testing Float parameters
+## /
+
+# Testing Timeseries parameters
+## capacity_direct [OK : test_direct_capacity]
+## capacity_indirect [OK : test_indirect_capacity]
+## hurdle_cost_direct [OK : TODO ref to test in main branch]
+## hurdle_cost_indirect [OK : TODO ref to test in main branch]
+## Impedance [TODO]
+## Loopflow [TODO]
+## Pshift Min [TODO]
+## Pshift Max [TODO]
 
 
 def link_test_procedure(
