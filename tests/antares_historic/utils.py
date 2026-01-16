@@ -175,3 +175,48 @@ def createLinkTestAntaresStudy(
     link.set_capacity_direct(pd.DataFrame(direct_capacity))
     link.set_capacity_indirect(pd.DataFrame(indirect_capacity))
     addHybridBehavior(parent_dir_path / study_name)
+
+
+def createSTSTestAntaresStudy(
+    study_name: str,
+    parent_dir_path: Path,
+    load_time_serie_file: Path,
+    sts_properties: STStorageProperties,
+    # sts_data_frame: pd.DataFrame,
+) -> None:
+    study = create_study_local(
+        study_name=study_name,
+        version=ANTARES_VERSION_CREATED_STUDIES,
+        parent_directory=parent_dir_path,
+    )
+    load_timeserie = pd.read_csv(load_time_serie_file)
+    area = study.create_area(
+        area_name="unique", properties=AreaProperties(energy_cost_unsupplied=20000)
+    )
+    area.set_load(load_timeserie)
+    cluster1 = area.create_thermal_cluster(
+        "prod",
+        ThermalClusterProperties(
+            unit_count=2,
+            nominal_capacity=200,
+            marginal_cost=10,
+            market_bid_cost=10,
+            group=ThermalClusterGroup.NUCLEAR,
+        ),
+    )
+    cluster1.set_series(pd.DataFrame(data=200 * np.ones((8760, 1))))
+
+    cluster2 = area.create_thermal_cluster(
+        "prod2",
+        ThermalClusterProperties(
+            unit_count=1,
+            nominal_capacity=400,
+            marginal_cost=100,
+            market_bid_cost=100,
+            group=ThermalClusterGroup.NUCLEAR,
+        ),
+    )
+    cluster2.set_series(pd.DataFrame(data=400 * np.ones((8760, 1))))
+
+    cluster3 = area.create_st_storage("sts", sts_properties)
+    addHybridBehavior(parent_dir_path / study_name)

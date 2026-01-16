@@ -65,7 +65,6 @@ def sts_test_procedure(
     load_time_serie_file: Path,
     exec_folder: Path,
 ) -> None:
-
     createSTSTestAntaresStudy(
         study_name,
         study_path,
@@ -88,7 +87,6 @@ def sts_test_procedure_float_param(
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-
     # Run base test
     study_name_base = f"e2e_{str(int(100*time()))}"
 
@@ -204,7 +202,6 @@ def test_injection_nominal_capacity(
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-
     sts_properties = STStorageProperties(
         group="battery",
         injection_nominal_capacity=injection_nominal_capacity_base,
@@ -231,7 +228,6 @@ def test_withdrawal_nominal_capacity(
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-
     sts_properties = STStorageProperties(
         group="battery",
         injection_nominal_capacity=200,
@@ -258,7 +254,6 @@ def test_reservoir_capacity(
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-
     sts_properties = STStorageProperties(
         group="battery",
         injection_nominal_capacity=80,
@@ -285,7 +280,6 @@ def test_efficiency(
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-
     sts_properties = STStorageProperties(
         group="battery",
         injection_nominal_capacity=80,
@@ -312,7 +306,6 @@ def test_efficiency_withdrawal(
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-
     sts_properties = STStorageProperties(
         group="battery",
         injection_nominal_capacity=80,
@@ -340,7 +333,6 @@ def test_initial_level(
     auto_generated_studies_path: Path,
     antares_exec_folder: Path,
 ) -> None:
-
     sts_properties = STStorageProperties(
         group="battery",
         injection_nominal_capacity=80,
