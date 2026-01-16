@@ -107,7 +107,6 @@ def sts_test_procedure_float_param(
     ref_value_param = getattr(sts_properties, tested_param)
 
     for modification in [MODIFICATION_RATIO, 1 / MODIFICATION_RATIO]:
-
         sts_properties_perturbated = replace(
             sts_properties, **{tested_param: ref_value_param * modification}
         )
