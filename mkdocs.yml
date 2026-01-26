@@ -1,4 +1,4 @@
-site_name: Gems - Generic Energy systems Modeling Scheme
+site_name: GemsPy - a Python interpreter for GEMS
 repo_url: https://github.com/AntaresSimulatorTeam/GemsPy
 nav:
   - 'Home': 'index.md'
