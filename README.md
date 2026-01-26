@@ -1,16 +1,16 @@
-# GemsPy
+# GemsPy, a Python interpreter for GEMS
 
-GemsPy is an open-source tool, developed in Python, for the modelling and the simulation of complex energy systems under uncertainty. This is a generic interpreter for the [**GEMS**](https://github.com/AntaresSimulatorTeam/Gems) modelling framework.
+GemsPy is an open-source tool, developed in Python, for the modelling and the simulation of complex energy systems under uncertainty. This is a generic interpreter for the [**GEMS**](https://gems-energy.readthedocs.io/en/latest/) modelling framework.
 
 <img src="docs/images/gemsV2.png" alt="Description" width="400"/>
 
 **Online GemsPy documentation**: [gemspy.readthedocs.io](https://gemspy.readthedocs.io/en/latest/).
 
-## The [GEMS](https://github.com/AntaresSimulatorTeam/Gems) framework
+## The [GEMS](https://gems-energy.readthedocs.io/en/latest/) framework
 
-### The rationale behind [GEMS](https://github.com/AntaresSimulatorTeam/Gems)
+### The rationale behind [GEMS](https://gems-energy.readthedocs.io/en/latest/)
 
-[**GEMS**](https://github.com/AntaresSimulatorTeam/Gems) introduces a novel approach to model and simulate energy systems, centered around a simple principle: getting models out of the code.
+[GEMS](https://gems-energy.readthedocs.io/en/latest/) introduces a novel approach to model and simulate energy systems, centered around a simple principle: getting models out of the code.
 
 To develop and test new models of energy system components, writing software code should not be a prerequisite. This is where the **Gems** framework excels, offering users a "no-code" modelling experience with unparalleled versatility.
 
