@@ -23,12 +23,12 @@ The GEMS framework consists of a **algebraic modelling language**, close to math
 
 For further information regarding the language, please consult the [GEMS documentation](https://gems-energy.readthedocs.io/en/latest/) website. 
 
-## The GEMS interpreters
+## About GemsPy
 
-Two open-source software packages are capable of reading and simulating the case studies described in the GEMS:
+[GemsPy](https://github.com/AntaresSimulatorTeam/GemsPy) is one of the two open-source software packages capable of reading and simulating the case studies described in the GEMS. In its current state, GemsPy is primarily designed for proof-of-concept and learning purposes.
 
-- [GemsPy](https://github.com/AntaresSimulatorTeam/GemsPy)
-- [Antares Simulator](https://antares-simulator.org/) *(functionality under development)*
+[Antares Simulator](https://antares-simulator.org/) is another GEMS interpreter, currently more efficient from a computational point of view. 
+
 
 ## Getting started
 
