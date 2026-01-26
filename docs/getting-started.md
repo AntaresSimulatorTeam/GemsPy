@@ -1,4 +1,4 @@
-# Getting started with GEMS
+# Getting started with GemsPy
 
 The [GEMS](https://gems-energy.readthedocs.io/en/latest/) framework consists of an **algebraic modelling language**, close to mathematical syntax, and a **data structure** for describing energy systems.
 
