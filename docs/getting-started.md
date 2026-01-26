@@ -1,14 +1,14 @@
-# Getting started with Gems
+# Getting started with GEMS
 
-The Gems framework consists of a **high-level modelling language**, close to mathematical syntax, and a **data structure** for describing energy systems.
+The [GEMS](https://gems-energy.readthedocs.io/en/latest/) framework consists of an **algebraic modelling language**, close to mathematical syntax, and a **data structure** for describing energy systems.
 
-More specifically, three main types of input files can be defined with the Gems framework:
+More specifically, three main types of input files can be defined with the [GEMS](https://gems-energy.readthedocs.io/en/latest/) framework:
 
-1. **Model libraries**: describe abstract component models.  
+1. **Library files**: describe abstract component models.  
 2. **System files**: describe the graph of components that make up a system of interest; refer to model libraries (instantiation of abstract models) and to timeseries files.  
 3. **Timeseries files**: the data of timeseries.
 
-To get started with the syntax of these files, the reader can find basic examples below. More details are available in the dedicated sections of the documentation.
+To get started with the syntax of these files, the reader can find basic examples below. A detailed introduction to the language is available on the [GEMS documentation website](https://gems-energy.readthedocs.io/en/latest/).
 
 ## Simple example of a library file
 
