@@ -1,4 +1,4 @@
-# Gems, a framework for generic modelling in energy systems
+# GemsPy, a Python interpreter for the GEMS modelling language
 
 
 ![Gems Logo](/images/gemsV2cropped.png)
@@ -17,26 +17,22 @@ As energy systems become more complex and dynamic, we need to improve energy pla
 
 - **Code stability and suitability for open-source**: prevent the simulator core from becoming overloaded with hard-coded logic.
 
-## The Gems framework
+## About GEMS
 
-The Gems framework consists of a **high-level modelling language**, close to mathematical syntax, and a **data structure** for describing energy systems.
+The GEMS framework consists of a **algebraic modelling language**, close to mathematical syntax, and a **data structure** for describing energy systems.
 
-More specifically, three main types of input file can be defined with the Gems framework:
+For further information regarding the language, please consult the [GEMS documentation](https://gems-energy.readthedocs.io/en/latest/) website. 
 
-- **Model libraries**: describe abstract component models.  
-- **System files**: describe the graph of components that make up a system of interest; refer to model libraries (instantiation of abstract models) and to timeseries files.  
-- **Timeseries files**: the data of timeseries.
+## The GEMS interpreters
 
-## The Gems interpreters
-
-Two open-source software packages are capable of reading and simulating the case studies described in the Gems framework:
+Two open-source software packages are capable of reading and simulating the case studies described in the GEMS:
 
 - [GemsPy](https://github.com/AntaresSimulatorTeam/GemsPy)
 - [Antares Simulator](https://antares-simulator.org/) *(functionality under development)*
 
 ## Getting started
 
-To create a run a study, refer to the [Getting started](getting-started.md) section.
+To create a run a study with GemsPy, refer to the [Getting started](getting-started.md) section.
 
 ## User guide
 
