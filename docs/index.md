@@ -41,6 +41,3 @@ For further information regarding the language, please consult the [GEMS documen
 
 To create a run a study with GemsPy, refer to the [Getting started](getting-started.md) section.
 
-## User guide
-
-To understand in-depth concepts behind the modeler, refer to the [User guide](user-guide.md).
