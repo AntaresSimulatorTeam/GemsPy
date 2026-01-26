@@ -3,13 +3,7 @@ repo_url: https://github.com/AntaresSimulatorTeam/GemsPy
 nav:
   - 'Home': 'index.md'
   - 'Getting started': 'getting-started.md'
-  - 'User guide: Gems language and dataformat': 
-    - 'Mathematical expressions and syntax': 'user-guide/syntax.md'
-    - 'Input files' :
-      - 'Libraries of models': 'user-guide/libraries.md'
-      - 'Systems': 'user-guide/systems.md'
-      - 'Data series': 'user-guide/data.md'
-    - 'Reference libraries' : 'user-guide/reference-libraries.md'
+  - 'User guide: GEMS language and data structure': 'user-guide.md'
   - 'User guide: GemsPy interpreter package':
     - 'Reading input files': 'user-guide/inputs.md'
     - 'Building systems with the Python API': 'user-guide/building.md'
