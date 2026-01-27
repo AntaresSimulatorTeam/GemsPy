@@ -32,7 +32,7 @@ For further information regarding the language, please consult the [GEMS documen
 
 ## About GemsPy
 
-[GemsPy](https://github.com/AntaresSimulatorTeam/GemsPy) is one of the two open-source software packages capable of reading and simulating the case studies described in the GEMS. In its current state, GemsPy is primarily designed for proof-of-concept and learning purposes.
+[GemsPy](https://github.com/AntaresSimulatorTeam/GemsPy) is one of the two open-source software packages capable of reading and simulating the case studies described in the GEMS language. In its current state, GemsPy is primarily designed for proof-of-concept and learning purposes.
 
 [Antares Simulator](https://antares-simulator.org/) is another GEMS interpreter, currently more efficient from a computational point of view. 
 
