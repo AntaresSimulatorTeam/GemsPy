@@ -23,7 +23,7 @@ from pathlib import Path
 
 from pypsa import Network
 
-from gems.input_converter.src.logger import Logger
+import logging
 from gems.model.parsing import parse_yaml_library
 from gems.model.resolve_library import resolve_library
 from gems.pypsa_converter.utils import transform_to_yaml
@@ -123,7 +123,7 @@ def pypsa_gemspy_benchmark(
     Main function to convert a PyPSA study to Gems format and run it.
     """
     # Set up logger
-    logger = Logger(__name__, "")
+    logger = logging.getLogger(__name__)
 
     # Define directories for systems and series
     current_dir = Path(__file__).parent

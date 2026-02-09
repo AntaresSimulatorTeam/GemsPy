@@ -1,2 +1,0 @@
-upstream	downstream
-fr	z_batteries

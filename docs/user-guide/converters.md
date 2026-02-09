@@ -1,3 +1,5 @@
 # Data converters
 
-For more information about the possibility to convert Antares Legacy or PyPSA study cases in the GEMS format, please consult the Interoperability section of [GEMS documentation website](https://gems-energy.readthedocs.io/).
+- **Antares Legacy → GEMS**: The Antares Legacy to GEMS converter is developed in a separate repository: [AntaresLegacyModels-to-GEMS-Converter](https://github.com/AntaresSimulatorTeam/AntaresLegacyModels-to-GEMS-Converter).
+
+For more information about converting study cases to the GEMS format, see the Interoperability section of the [GEMS documentation website](https://gems-energy.readthedocs.io/).

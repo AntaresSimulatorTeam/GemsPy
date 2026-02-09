@@ -1,8 +1,8 @@
+import logging
 from pathlib import Path
 
 from pypsa import Network
 
-from gems.input_converter.src.logger import Logger
 from gems.pypsa_converter.pypsa_converter import PyPSAStudyConverter
 from gems.simulation.optimization import OptimizationProblem, build_problem
 from gems.simulation.time_block import TimeBlock
@@ -24,7 +24,7 @@ def convert_pypsa_network(
     Returns:
         InputSystem: The converted Gems InputSystem
     """
-    logger = Logger(__name__, "")
+    logger = logging.getLogger(__name__)
     converter = PyPSAStudyConverter(
         pypsa_network, logger, systems_dir, series_dir, series_file_format
     )

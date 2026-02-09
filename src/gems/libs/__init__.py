@@ -12,4 +12,4 @@
 
 from pathlib import Path
 
-lib_path = Path(__file__).parent / "libs"
+lib_path = Path(__file__).parent
