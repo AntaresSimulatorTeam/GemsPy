@@ -44,7 +44,7 @@ jobs:
 
       - name: Test
         run: |
-          pytest --cov gems --cov-report xml
+          pytest --cov antarest --cov-report xml
 
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
