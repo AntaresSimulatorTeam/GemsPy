@@ -17,13 +17,13 @@ This script loads a PyPSA study using the load_pypsa_study function,
 converts it to Gems format, and runs the converted study.
 """
 
+import logging
 import math
 import os
 from pathlib import Path
 
 from pypsa import Network
 
-import logging
 from gems.model.parsing import parse_yaml_library
 from gems.model.resolve_library import resolve_library
 from gems.pypsa_converter.utils import transform_to_yaml
