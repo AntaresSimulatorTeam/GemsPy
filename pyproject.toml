@@ -3,15 +3,60 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gems"
+name = "gemspy"
 version = "0.0.1"
-license = {text="MPL-2.0"}
+description = "Python interpreter for GEMS: modelling and simulation of complex energy systems under uncertainty"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "a-zakir" },
+    { name = "aalzoobi" },
+    { name = "aoustry" },
+    { name = "ChouaneLouis" },
+    { name = "dusanparipovic" },
+    { name = "flomnes" },
+    { name = "ianmnz" },
+    { name = "Juliette-Gerbaux" },
+    { name = "killian-scalian" },
+    { name = "klorel" },
+    { name = "MartinBelthle" },
+    { name = "pet-mit" },
+    { name = "sylvlecl" },
+    { name = "tbittar" },
+    { name = "thibaulttoujouse" },
+    { name = "vargastat" },
+    { name = "Yann-Temudjin" },
+    { name = "YassineAbdelouadoud" },
+]
+requires-python = ">=3.10"
 dependencies = [
-    "ortools"
+    "numpy",
+    "ortools",
+    "scipy>=1.10",
+    "antlr4-python3-runtime>=4.13",
+    "PyYAML>=6.0",
+    "pydantic>=2.0",
+    "antares_craft>=0.3",
+    "anytree>=2.12",
+    "pypsa",
+]
+classifiers = [
+   #    Classifiers here: https://pypi.org/classifiers/
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 
+
 [project.scripts]
-andromede-simulator = "andromede.main.main:main_cli"
+gemspy = "gems.main.main:main_cli"
+
+[project.urls]
+Repository = "https://github.com/AntaresSimulatorTeam/GemsPy"
+"Bug Tracker" = "https://github.com/AntaresSimulatorTeam/GemsPy/issues"
 
 [tool.setuptools.packages.find]
 # All the following settings are optional:
