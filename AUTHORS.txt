@@ -1,11 +1,20 @@
 Github identifiers of authors, in alphabetical order:
 
+a-zakir
+aalzoobi
+aoustry
+ChouaneLouis
+dusanparipovic
 flomnes
 ianmnz
+Juliette-Gerbaux
+killian-scalian
 klorel
 MartinBelthle
 pet-mit
 sylvlecl
 tbittar
+thibaulttoujouse
 vargastat
 Yann-Temudjin
+YassineAbdelouadoud
