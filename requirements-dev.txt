@@ -261,8 +261,6 @@ pyproj==3.7.1
     # via
     #   -r requirements.txt
     #   geopandas
-pypsa==0.34.1
-    # via -r requirements.txt
 pytest==7.0.1
     # via
     #   -r requirements-dev.in

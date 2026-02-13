@@ -6,4 +6,3 @@ PyYAML~=6.0.1
 pydantic
 antares_craft>=0.3
 anytree==2.12.1
-pypsa

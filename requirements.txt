@@ -140,8 +140,6 @@ pyparsing==3.2.3
     # via matplotlib
 pyproj==3.7.1
     # via geopandas
-pypsa==0.34.1
-    # via -r requirements.in
 python-dateutil==2.9.0.post0
     # via
     #   matplotlib
