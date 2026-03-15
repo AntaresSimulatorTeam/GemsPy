@@ -47,8 +47,13 @@ def test_consistency_check_ok(
     consistency_check(result_system.components, result_lib["basic"].models)
 
 
-def test_load_input_system_ok() -> None:
-    result = load_input_system(COMPO_FILE)
+def test_load_input_system_ok(tmp_path: Path) -> None:
+    data = safe_load(COMPO_FILE.read_text())
+    system_only = data["system"]
+    file_for_load = tmp_path / "system.yml"
+    file_for_load.write_text(dump(system_only))
+
+    result = load_input_system(file_for_load)
 
     assert isinstance(result, InputSystem)
     assert len(result.components) == 2
@@ -58,7 +63,6 @@ def test_load_input_system_ok() -> None:
     assert len(result.connections) == 2
 
 
-@pytest.mark.xfail(reason="Expected to fail until validation error handling is fixed")
 def test_load_input_system_invalid_yaml_raises_value_error(tmp_path: Path) -> None:
     data = safe_load(COMPO_FILE.read_text())
     system_only = data["system"].copy()
