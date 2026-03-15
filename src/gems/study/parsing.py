@@ -17,10 +17,18 @@ from pathlib import Path
 from typing import List, Optional, TextIO, Union
 
 import pandas as pd
-from pydantic import Field
+from pydantic import Field, ValidationError
 from yaml import safe_load
 
 from gems.utils import ModifiedBaseModel
+
+
+def load_input_system(input_study: Path) -> "InputSystem":
+    try:
+        with input_study.open() as f:
+            return InputSystem.model_validate(safe_load(f))
+    except ValidationError as e:
+        raise ValueError(f"An error occurred during parsing: {e}")
 
 
 def parse_yaml_components(input_study: TextIO) -> "InputSystem":

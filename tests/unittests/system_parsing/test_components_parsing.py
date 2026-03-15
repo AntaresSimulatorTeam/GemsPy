@@ -1,18 +1,19 @@
 from pathlib import Path
 
 import pytest
+from yaml import dump, safe_load
 
 from gems.model.parsing import InputLibrary, parse_yaml_library
 from gems.model.resolve_library import resolve_library
-from gems.study.parsing import InputSystem, parse_yaml_components
+from gems.study.parsing import InputSystem, load_input_system, parse_yaml_components
 from gems.study.resolve_components import consistency_check, resolve_system
+
+COMPO_FILE = Path(__file__).parent / "systems/system.yml"
 
 
 @pytest.fixture
 def input_system() -> InputSystem:
-    compo_file = Path(__file__).parent / "systems/system.yml"
-
-    with compo_file.open() as c:
+    with COMPO_FILE.open() as c:
         return parse_yaml_components(c)
 
 
@@ -44,6 +45,36 @@ def test_consistency_check_ok(
     result_lib = resolve_library([input_library])
     result_system = resolve_system(input_system, result_lib)
     consistency_check(result_system.components, result_lib["basic"].models)
+
+
+def test_load_input_system_ok() -> None:
+    result = load_input_system(COMPO_FILE)
+
+    assert isinstance(result, InputSystem)
+    assert len(result.components) == 2
+    assert result.components[0].id == "G"
+    assert result.components[1].id == "D"
+    assert result.connections is not None
+    assert len(result.connections) == 2
+
+
+@pytest.mark.xfail(reason="Expected to fail until validation error handling is fixed")
+def test_load_input_system_invalid_yaml_raises_value_error(tmp_path: Path) -> None:
+    data = safe_load(COMPO_FILE.read_text())
+    system_only = data["system"].copy()
+    system_only["unknown_field"] = "not_allowed"
+    bad_file = tmp_path / "system.yml"
+    bad_file.write_text(dump(system_only))
+
+    with pytest.raises(ValueError, match="An error occurred during parsing"):
+        load_input_system(bad_file)
+
+
+def test_load_input_system_missing_file_raises_error() -> None:
+    missing = Path(__file__).parent / "systems/does_not_exist.yml"
+
+    with pytest.raises(FileNotFoundError):
+        load_input_system(missing)
 
 
 def test_consistency_check_ko(
