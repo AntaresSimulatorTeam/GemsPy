@@ -19,3 +19,17 @@ def test_comparison() -> None:
     expr: ExpressionNode = (5 * x + 3) >= p - 2
 
     assert visit(expr, PrinterVisitor()) == "((5.0 * x) + 3.0) >= (p - 2.0)"
+
+
+def test_floor_ceil_max_min_printer() -> None:
+    from gems.expression.expression import maximum, minimum
+
+    p = param("p")
+    q = param("q")
+
+    assert visit(p.floor(), PrinterVisitor()) == "floor(p)"
+    assert visit(p.ceil(), PrinterVisitor()) == "ceil(p)"
+    assert visit(maximum(p, q), PrinterVisitor()) == "max(p, q)"
+    assert visit(minimum(p, q), PrinterVisitor()) == "min(p, q)"
+    assert visit((p / q).ceil(), PrinterVisitor()) == "ceil((p / q))"
+    assert visit(maximum(param("a"), (p / q).ceil()), PrinterVisitor()) == "max(a, ceil((p / q)))"

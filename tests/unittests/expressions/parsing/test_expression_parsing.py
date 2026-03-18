@@ -15,7 +15,7 @@ import pytest
 
 from gems.expression import ExpressionNode, literal, param, print_expr, var
 from gems.expression.equality import expressions_equal
-from gems.expression.expression import port_field
+from gems.expression.expression import maximum, minimum, port_field
 from gems.expression.parsing.parse_expression import (
     AntaresParseException,
     ModelIdentifiers,
@@ -118,6 +118,42 @@ from gems.expression.parsing.parse_expression import (
             {"cost"},
             "expec(sum(cost * generation))",
             (param("cost") * var("generation")).time_sum().expec(),
+        ),
+        (
+            {},
+            {"p"},
+            "floor(p)",
+            param("p").floor(),
+        ),
+        (
+            {},
+            {"p"},
+            "ceil(p)",
+            param("p").ceil(),
+        ),
+        (
+            {},
+            {"a", "b"},
+            "max(a, b)",
+            maximum(param("a"), param("b")),
+        ),
+        (
+            {},
+            {"a", "b"},
+            "min(a, b)",
+            minimum(param("a"), param("b")),
+        ),
+        (
+            {},
+            {"p", "q"},
+            "ceil(p/q)",
+            (param("p") / param("q")).ceil(),
+        ),
+        (
+            {},
+            {"p", "q"},
+            "max(0, ceil(p/q))",
+            maximum(literal(0), (param("p") / param("q")).ceil()),
         ),
     ],
 )

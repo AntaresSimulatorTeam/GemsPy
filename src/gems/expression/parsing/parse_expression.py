@@ -22,6 +22,8 @@ from gems.expression.expression import (
     ComparisonNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    maximum,
+    minimum,
 )
 from gems.expression.parsing.antlr.ExprLexer import ExprLexer
 from gems.expression.parsing.antlr.ExprParser import ExprParser
@@ -166,6 +168,16 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             raise ValueError(f"Encountered invalid function name {function_name}")
         return fn(operand)
 
+    # Visit a parse tree produced by ExprParser#binaryFunction.
+    def visitBinaryFunction(self, ctx: ExprParser.BinaryFunctionContext) -> ExpressionNode:
+        function_name: str = ctx.IDENTIFIER().getText()  # type: ignore
+        left: ExpressionNode = ctx.expr(0).accept(self)  # type: ignore
+        right: ExpressionNode = ctx.expr(1).accept(self)  # type: ignore
+        fn = _BINARY_FUNCTIONS.get(function_name, None)
+        if fn is None:
+            raise ValueError(f"Encountered invalid binary function name {function_name}")
+        return fn(left, right)
+
     # Visit a parse tree produced by ExprParser#shift.
     def visitShift(self, ctx: ExprParser.ShiftContext) -> ExpressionNode:
         if ctx.shift_expr() is None:  # type: ignore
@@ -235,6 +247,13 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
 
 _FUNCTIONS = {
     "expec": ExpressionNode.expec,
+    "floor": ExpressionNode.floor,
+    "ceil": ExpressionNode.ceil,
+}
+
+_BINARY_FUNCTIONS = {
+    "max": maximum,
+    "min": minimum,
 }
 
 

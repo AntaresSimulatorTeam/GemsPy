@@ -111,3 +111,16 @@ def test_sum_expressions() -> None:
     assert expressions_equal(
         sum_expressions([literal(1), var("x"), param("p")]), 1 + (var("x") + param("p"))
     )
+
+
+def test_floor_ceil_max_min() -> None:
+    from gems.expression.expression import maximum, minimum
+
+    context = EvaluationContext(parameters={"p": 2.7, "q": 1.3})
+
+    assert visit(param("p").floor(), EvaluationVisitor(context)) == 2.0
+    assert visit(param("p").ceil(), EvaluationVisitor(context)) == 3.0
+    assert visit(maximum(param("p"), param("q")), EvaluationVisitor(context)) == pytest.approx(2.7)
+    assert visit(minimum(param("p"), param("q")), EvaluationVisitor(context)) == pytest.approx(1.3)
+    assert visit(maximum(literal(0), param("q")), EvaluationVisitor(context)) == pytest.approx(1.3)
+    assert visit(maximum(literal(0), -param("p")), EvaluationVisitor(context)) == 0.0

@@ -15,11 +15,15 @@ from typing import List, cast
 
 from .expression import (
     AllTimeSumNode,
+    CeilNode,
     ComparisonNode,
     ComponentParameterNode,
     ComponentVariableNode,
     ExpressionNode,
+    FloorNode,
     LiteralNode,
+    MaxNode,
+    MinNode,
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
@@ -94,6 +98,18 @@ class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> ExpressionNode:
         return PortFieldAggregatorNode(visit(node.operand, self), node.aggregator)
+
+    def floor(self, node: FloorNode) -> ExpressionNode:
+        return FloorNode(visit(node.operand, self))
+
+    def ceil(self, node: CeilNode) -> ExpressionNode:
+        return CeilNode(visit(node.operand, self))
+
+    def maximum(self, node: MaxNode) -> ExpressionNode:
+        return MaxNode(visit(node.left, self), visit(node.right, self))
+
+    def minimum(self, node: MinNode) -> ExpressionNode:
+        return MinNode(visit(node.left, self), visit(node.right, self))
 
 
 def copy_expression(expression: ExpressionNode) -> ExpressionNode:

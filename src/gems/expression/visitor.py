@@ -20,12 +20,16 @@ from typing import Generic, Protocol, TypeVar
 from gems.expression.expression import (
     AdditionNode,
     AllTimeSumNode,
+    CeilNode,
     ComparisonNode,
     ComponentParameterNode,
     ComponentVariableNode,
     DivisionNode,
     ExpressionNode,
+    FloorNode,
     LiteralNode,
+    MaxNode,
+    MinNode,
     MultiplicationNode,
     NegationNode,
     ParameterNode,
@@ -128,6 +132,22 @@ class ExpressionVisitor(ABC, Generic[T]):
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> T:
         ...
 
+    @abstractmethod
+    def floor(self, node: FloorNode) -> T:
+        ...
+
+    @abstractmethod
+    def ceil(self, node: CeilNode) -> T:
+        ...
+
+    @abstractmethod
+    def maximum(self, node: MaxNode) -> T:
+        ...
+
+    @abstractmethod
+    def minimum(self, node: MinNode) -> T:
+        ...
+
 
 def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
     """
@@ -171,6 +191,14 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
         return visitor.port_field(root)
     elif isinstance(root, PortFieldAggregatorNode):
         return visitor.port_field_aggregator(root)
+    elif isinstance(root, FloorNode):
+        return visitor.floor(root)
+    elif isinstance(root, CeilNode):
+        return visitor.ceil(root)
+    elif isinstance(root, MaxNode):
+        return visitor.maximum(root)
+    elif isinstance(root, MinNode):
+        return visitor.minimum(root)
     raise ValueError(f"Unknown expression node type {root.__class__}")
 
 

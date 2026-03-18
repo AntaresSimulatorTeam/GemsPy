@@ -10,14 +10,19 @@
 #
 # This file is part of the Antares project.
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict
 
 from gems.expression.expression import (
     AllTimeSumNode,
+    CeilNode,
     ComponentParameterNode,
     ComponentVariableNode,
+    FloorNode,
+    MaxNode,
+    MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
     ProblemParameterNode,
@@ -138,6 +143,18 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> float:
         raise NotImplementedError()
+
+    def floor(self, node: FloorNode) -> float:
+        return float(math.floor(visit(node.operand, self)))
+
+    def ceil(self, node: CeilNode) -> float:
+        return float(math.ceil(visit(node.operand, self)))
+
+    def maximum(self, node: MaxNode) -> float:
+        return max(visit(node.left, self), visit(node.right, self))
+
+    def minimum(self, node: MinNode) -> float:
+        return min(visit(node.left, self), visit(node.right, self))
 
 
 def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:

@@ -15,9 +15,13 @@ from typing import Dict
 
 from gems.expression.expression import (
     AllTimeSumNode,
+    CeilNode,
     ComponentParameterNode,
     ComponentVariableNode,
     ExpressionNode,
+    FloorNode,
+    MaxNode,
+    MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
     ProblemParameterNode,
@@ -129,6 +133,18 @@ class PrinterVisitor(ExpressionVisitor[str]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> str:
         return f"({visit(node.operand, self)}.{node.aggregator})"
+
+    def floor(self, node: FloorNode) -> str:
+        return f"floor({visit(node.operand, self)})"
+
+    def ceil(self, node: CeilNode) -> str:
+        return f"ceil({visit(node.operand, self)})"
+
+    def maximum(self, node: MaxNode) -> str:
+        return f"max({visit(node.left, self)}, {visit(node.right, self)})"
+
+    def minimum(self, node: MinNode) -> str:
+        return f"min({visit(node.left, self)}, {visit(node.right, self)})"
 
 
 def print_expr(expression: ExpressionNode) -> str:

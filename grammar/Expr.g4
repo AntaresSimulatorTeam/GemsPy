@@ -29,6 +29,7 @@ expr
     | 'sum_connections' '(' portFieldExpr ')'  # portFieldSum
     | 'sum' '(' from=shift '..' to=shift ',' expr ')'  # timeSum
     | IDENTIFIER '(' expr ')'                  # function
+    | IDENTIFIER '(' expr ',' expr ')'        # binaryFunction
     | IDENTIFIER '[' shift ']'                 # timeShift
     | IDENTIFIER '[' expr  ']'                 # timeIndex
     | '(' expr ')' '[' shift ']'               # timeShiftExpr

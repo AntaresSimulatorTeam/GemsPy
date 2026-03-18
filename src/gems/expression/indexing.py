@@ -19,12 +19,16 @@ from gems.expression.indexing_structure import IndexingStructure
 from .expression import (
     AdditionNode,
     AllTimeSumNode,
+    CeilNode,
     ComparisonNode,
     ComponentParameterNode,
     ComponentVariableNode,
     DivisionNode,
     ExpressionNode,
+    FloorNode,
     LiteralNode,
+    MaxNode,
+    MinNode,
     MultiplicationNode,
     NegationNode,
     ParameterNode,
@@ -158,6 +162,18 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         raise ValueError(
             "Port fields aggregators must be resolved before computing indexing structure."
         )
+
+    def floor(self, node: FloorNode) -> IndexingStructure:
+        return visit(node.operand, self)
+
+    def ceil(self, node: CeilNode) -> IndexingStructure:
+        return visit(node.operand, self)
+
+    def maximum(self, node: MaxNode) -> IndexingStructure:
+        return self._combine([node.left, node.right])
+
+    def minimum(self, node: MinNode) -> IndexingStructure:
+        return self._combine([node.left, node.right])
 
 
 def compute_indexation(

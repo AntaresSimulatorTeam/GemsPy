@@ -13,8 +13,12 @@
 import gems.expression.scenario_operator
 from gems.expression.expression import (
     AllTimeSumNode,
+    CeilNode,
     ComponentParameterNode,
     ComponentVariableNode,
+    FloorNode,
+    MaxNode,
+    MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
     ProblemParameterNode,
@@ -107,6 +111,18 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> int:
         return visit(node.operand, self)
+
+    def floor(self, node: FloorNode) -> int:
+        return visit(node.operand, self)
+
+    def ceil(self, node: CeilNode) -> int:
+        return visit(node.operand, self)
+
+    def maximum(self, node: MaxNode) -> int:
+        return max(visit(node.left, self), visit(node.right, self))
+
+    def minimum(self, node: MinNode) -> int:
+        return max(visit(node.left, self), visit(node.right, self))
 
 
 def compute_degree(expression: ExpressionNode) -> int:
