@@ -10,6 +10,8 @@
 #
 # This file is part of the Antares project.
 
+import math
+
 import gems.expression.scenario_operator
 from gems.expression.expression import (
     AllTimeSumNode,
@@ -43,7 +45,7 @@ from .expression import (
 from .visitor import ExpressionVisitor, T, visit
 
 
-class ExpressionDegreeVisitor(ExpressionVisitor[int]):
+class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
     """
     Computes degree of expression with respect to variables.
     """
@@ -112,20 +114,26 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int]):
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> int:
         return visit(node.operand, self)
 
-    def floor(self, node: FloorNode) -> int:
-        return visit(node.operand, self)
+    def floor(self, node: FloorNode) -> int | float:
+        d = visit(node.operand, self)
+        return 0 if d == 0 else math.inf
 
-    def ceil(self, node: CeilNode) -> int:
-        return visit(node.operand, self)
+    def ceil(self, node: CeilNode) -> int | float:
+        d = visit(node.operand, self)
+        return 0 if d == 0 else math.inf
 
-    def maximum(self, node: MaxNode) -> int:
-        return max(visit(node.left, self), visit(node.right, self))
+    def maximum(self, node: MaxNode) -> int | float:
+        d_l = visit(node.left, self)
+        d_r = visit(node.right, self)
+        return 0 if d_l == 0 and d_r == 0 else math.inf
 
-    def minimum(self, node: MinNode) -> int:
-        return max(visit(node.left, self), visit(node.right, self))
+    def minimum(self, node: MinNode) -> int | float:
+        d_l = visit(node.left, self)
+        d_r = visit(node.right, self)
+        return 0 if d_l == 0 and d_r == 0 else math.inf
 
 
-def compute_degree(expression: ExpressionNode) -> int:
+def compute_degree(expression: ExpressionNode) -> int | float:
     return visit(expression, ExpressionDegreeVisitor())
 
 

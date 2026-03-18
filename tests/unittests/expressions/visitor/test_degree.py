@@ -10,9 +10,20 @@
 #
 # This file is part of the Antares project.
 
+import math
+
 import pytest
 
-from gems.expression import ExpressionDegreeVisitor, LiteralNode, param, var, visit
+from gems.expression import (
+    ExpressionDegreeVisitor,
+    LiteralNode,
+    maximum,
+    minimum,
+    param,
+    var,
+    visit,
+)
+from gems.expression.expression import CeilNode, FloorNode
 
 
 def test_degree() -> None:
@@ -24,6 +35,28 @@ def test_degree() -> None:
 
     expr = x * expr
     assert visit(expr, ExpressionDegreeVisitor()) == 2
+
+
+def test_floor_ceil_degree() -> None:
+    x = var("x")
+    p = param("p")
+
+    assert visit(FloorNode(p), ExpressionDegreeVisitor()) == 0
+    assert visit(CeilNode(p), ExpressionDegreeVisitor()) == 0
+    assert visit(FloorNode(x), ExpressionDegreeVisitor()) == math.inf
+    assert visit(CeilNode(x), ExpressionDegreeVisitor()) == math.inf
+
+
+def test_max_min_degree() -> None:
+    x = var("x")
+    p = param("p")
+    q = param("q")
+
+    assert visit(maximum(p, q), ExpressionDegreeVisitor()) == 0
+    assert visit(minimum(p, q), ExpressionDegreeVisitor()) == 0
+    assert visit(maximum(x, p), ExpressionDegreeVisitor()) == math.inf
+    assert visit(minimum(p, x), ExpressionDegreeVisitor()) == math.inf
+    assert visit(maximum(x, x), ExpressionDegreeVisitor()) == math.inf
 
 
 @pytest.mark.xfail(reason="Degree simplification not implemented")
