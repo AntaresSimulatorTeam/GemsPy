@@ -14,6 +14,7 @@ import pytest
 
 from gems.expression import ExpressionNode, copy_expression, literal, param, var
 from gems.expression.equality import expressions_equal
+from gems.expression.expression import maximum, minimum
 
 
 @pytest.mark.parametrize(
@@ -30,6 +31,10 @@ from gems.expression.equality import expressions_equal
         var("x").time_sum(),
         var("x") + 5 <= 2,
         var("x").expec(),
+        var("x").floor(),
+        var("x").ceil(),
+        maximum(var("x"), param("p")),
+        minimum(var("x"), param("p")),
     ],
 )
 def test_equals(expr: ExpressionNode) -> None:
@@ -52,6 +57,14 @@ def test_equals(expr: ExpressionNode) -> None:
             var("x").time_sum(1, 10),
         ),
         (var("x").expec(), var("y").expec()),
+        # floor / ceil
+        (var("x").floor(), var("y").floor()),
+        (var("x").ceil(), var("y").ceil()),
+        (var("x").floor(), var("x").ceil()),  # different node type
+        # max / min
+        (maximum(var("x"), param("p")), maximum(var("y"), param("p"))),
+        (minimum(var("x"), param("p")), minimum(var("x"), param("q"))),
+        (maximum(var("x"), param("p")), minimum(var("x"), param("p"))),  # Max vs Min
     ],
 )
 def test_not_equals(lhs: ExpressionNode, rhs: ExpressionNode) -> None:
