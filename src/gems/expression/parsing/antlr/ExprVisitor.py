@@ -10,7 +10,6 @@ else:
 
 
 class ExprVisitor(ParseTreeVisitor):
-
     # Visit a parse tree produced by ExprParser#portFieldExpr.
     def visitPortFieldExpr(self, ctx: ExprParser.PortFieldExprContext):
         return self.visitChildren(ctx)

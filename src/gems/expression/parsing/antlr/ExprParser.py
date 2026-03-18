@@ -1328,7 +1328,6 @@ def serializedATN():
 
 
 class ExprParser(Parser):
-
     grammarFileName = "Expr.g4"
 
     atn = ATNDeserializer().deserialize(serializedATN())
@@ -1449,7 +1448,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     def portFieldExpr(self):
-
         localctx = ExprParser.PortFieldExprContext(self, self._ctx, self.state)
         self.enterRule(localctx, 0, self.RULE_portFieldExpr)
         try:
@@ -1493,7 +1491,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     def fullexpr(self):
-
         localctx = ExprParser.FullexprContext(self, self._ctx, self.state)
         self.enterRule(localctx, 2, self.RULE_fullexpr)
         try:
@@ -1526,7 +1523,6 @@ class ExprParser(Parser):
             super().copyFrom(ctx)
 
     class PortFieldSumContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1543,7 +1539,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class BinaryFunctionContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1566,7 +1561,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class NegationContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1583,7 +1577,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class UnsignedAtomContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1600,7 +1593,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class ExpressionContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1617,7 +1609,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class ComparisonContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1640,7 +1631,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class AllTimeSumContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1657,7 +1647,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class TimeIndexExprContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1677,7 +1666,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class AddsubContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1698,7 +1686,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class TimeShiftExprContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1718,7 +1705,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class PortFieldContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1735,7 +1721,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class MuldivContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1756,7 +1741,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class TimeSumContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1781,7 +1765,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class TimeIndexContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1801,7 +1784,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class TimeShiftContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -1821,7 +1803,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class FunctionContext(ExprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
@@ -2150,7 +2131,6 @@ class ExprParser(Parser):
             super().copyFrom(ctx)
 
     class NumberContext(AtomContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.AtomContext
@@ -2167,7 +2147,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class IdentifierContext(AtomContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.AtomContext
@@ -2184,7 +2163,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     def atom(self):
-
         localctx = ExprParser.AtomContext(self, self._ctx, self.state)
         self.enterRule(localctx, 6, self.RULE_atom)
         try:
@@ -2239,7 +2217,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     def shift(self):
-
         localctx = ExprParser.ShiftContext(self, self._ctx, self.state)
         self.enterRule(localctx, 8, self.RULE_shift)
         self._la = 0  # Token type
@@ -2278,7 +2255,6 @@ class ExprParser(Parser):
             super().copyFrom(ctx)
 
     class SignedAtomContext(Shift_exprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.Shift_exprContext
@@ -2296,7 +2272,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class SignedExpressionContext(Shift_exprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.Shift_exprContext
@@ -2314,7 +2289,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class ShiftMuldivContext(Shift_exprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.Shift_exprContext
@@ -2335,7 +2309,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class ShiftAddsubContext(Shift_exprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.Shift_exprContext
@@ -2503,7 +2476,6 @@ class ExprParser(Parser):
             super().copyFrom(ctx)
 
     class RightExpressionContext(Right_exprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.Right_exprContext
@@ -2520,7 +2492,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class RightMuldivContext(Right_exprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.Right_exprContext
@@ -2541,7 +2512,6 @@ class ExprParser(Parser):
                 return visitor.visitChildren(self)
 
     class RightAtomContext(Right_exprContext):
-
         def __init__(
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.Right_exprContext
