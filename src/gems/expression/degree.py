@@ -50,68 +50,68 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
     Computes degree of expression with respect to variables.
     """
 
-    def literal(self, node: LiteralNode) -> int:
+    def literal(self, node: LiteralNode) -> int | float:
         return 0
 
-    def negation(self, node: NegationNode) -> int:
+    def negation(self, node: NegationNode) -> int | float:
         return visit(node.operand, self)
 
     # TODO: Take into account simplification that can occur with literal coefficient for add, sub, mult, div
-    def addition(self, node: AdditionNode) -> int:
+    def addition(self, node: AdditionNode) -> int | float:
         degrees = [visit(o, self) for o in node.operands]
         return max(degrees)
 
-    def multiplication(self, node: MultiplicationNode) -> int:
+    def multiplication(self, node: MultiplicationNode) -> int | float:
         return visit(node.left, self) + visit(node.right, self)
 
-    def division(self, node: DivisionNode) -> int:
+    def division(self, node: DivisionNode) -> int | float:
         right_degree = visit(node.right, self)
         if right_degree != 0:
             raise ValueError("Degree computation not implemented for divisions.")
         return visit(node.left, self)
 
-    def comparison(self, node: ComparisonNode) -> int:
+    def comparison(self, node: ComparisonNode) -> int | float:
         return max(visit(node.left, self), visit(node.right, self))
 
-    def variable(self, node: VariableNode) -> int:
+    def variable(self, node: VariableNode) -> int | float:
         return 1
 
-    def parameter(self, node: ParameterNode) -> int:
+    def parameter(self, node: ParameterNode) -> int | float:
         return 0
 
-    def comp_variable(self, node: ComponentVariableNode) -> int:
+    def comp_variable(self, node: ComponentVariableNode) -> int | float:
         return 1
 
-    def comp_parameter(self, node: ComponentParameterNode) -> int:
+    def comp_parameter(self, node: ComponentParameterNode) -> int | float:
         return 0
 
-    def pb_variable(self, node: ProblemVariableNode) -> int:
+    def pb_variable(self, node: ProblemVariableNode) -> int | float:
         return 1
 
-    def pb_parameter(self, node: ProblemParameterNode) -> int:
+    def pb_parameter(self, node: ProblemParameterNode) -> int | float:
         return 0
 
-    def time_shift(self, node: TimeShiftNode) -> int:
+    def time_shift(self, node: TimeShiftNode) -> int | float:
         return visit(node.operand, self)
 
-    def time_eval(self, node: TimeEvalNode) -> int:
+    def time_eval(self, node: TimeEvalNode) -> int | float:
         return visit(node.operand, self)
 
-    def time_sum(self, node: TimeSumNode) -> int:
+    def time_sum(self, node: TimeSumNode) -> int | float:
         return visit(node.operand, self)
 
-    def all_time_sum(self, node: AllTimeSumNode) -> int:
+    def all_time_sum(self, node: AllTimeSumNode) -> int | float:
         return visit(node.operand, self)
 
-    def scenario_operator(self, node: ScenarioOperatorNode) -> int:
+    def scenario_operator(self, node: ScenarioOperatorNode) -> int | float:
         scenario_operator_cls = getattr(gems.expression.scenario_operator, node.name)
         # TODO: Carefully check if this formula is correct
         return scenario_operator_cls.degree() * visit(node.operand, self)
 
-    def port_field(self, node: PortFieldNode) -> int:
+    def port_field(self, node: PortFieldNode) -> int | float:
         return 1
 
-    def port_field_aggregator(self, node: PortFieldAggregatorNode) -> int:
+    def port_field_aggregator(self, node: PortFieldAggregatorNode) -> int | float:
         return visit(node.operand, self)
 
     def floor(self, node: FloorNode) -> int | float:
