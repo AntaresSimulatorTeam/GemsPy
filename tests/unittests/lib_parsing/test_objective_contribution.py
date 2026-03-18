@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 """Tests for objective creation logic and coefficient accumulation."""
+
 from typing import Any, Dict, Optional
 from unittest.mock import Mock, patch
 
@@ -97,7 +98,7 @@ class MockSolverVariable:
 
 
 def _setup_mock_optimization_environment(
-    linear_expressions: Dict[Any, LinearExpression]
+    linear_expressions: Dict[Any, LinearExpression],
 ) -> Any:
     """Sets up a mock context and problem with real OR-Tools solver objects."""
 

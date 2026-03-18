@@ -15,6 +15,7 @@ The model module defines the data model for user-defined models.
 A model allows to define the behaviour for components, by
 defining parameters, variables, and equations.
 """
+
 import itertools
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, Optional
@@ -179,9 +180,9 @@ def model(
     return Model(
         id=id,
         constraints={c.name: c for c in constraints} if constraints else {},
-        binding_constraints={c.name: c for c in binding_constraints}
-        if binding_constraints
-        else {},
+        binding_constraints=(
+            {c.name: c for c in binding_constraints} if binding_constraints else {}
+        ),
         parameters={p.name: p for p in parameters} if parameters else {},
         variables={v.name: v for v in variables} if variables else {},
         objective_contributions=objective_contributions,
@@ -189,8 +190,10 @@ def model(
         objective_operational_contribution=objective_operational_contribution,
         inter_block_dyn=inter_block_dyn,
         ports=existing_port_names,
-        port_fields_definitions={d.port_field: d for d in port_fields_definitions}
-        if port_fields_definitions
-        else {},
+        port_fields_definitions=(
+            {d.port_field: d for d in port_fields_definitions}
+            if port_fields_definitions
+            else {}
+        ),
         extra_outputs=extra_outputs,
     )

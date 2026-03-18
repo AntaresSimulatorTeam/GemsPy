@@ -13,6 +13,7 @@
 """
 The standard module contains the definition of standard models.
 """
+
 from gems.expression import literal, param, var
 from gems.expression.expression import port_field
 from gems.expression.indexing_structure import IndexingStructure

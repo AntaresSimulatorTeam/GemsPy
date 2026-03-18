@@ -14,6 +14,7 @@
 The network module defines the data model for an instance of network,
 including nodes, links, and components (model instantations).
 """
+
 import itertools
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, List, cast

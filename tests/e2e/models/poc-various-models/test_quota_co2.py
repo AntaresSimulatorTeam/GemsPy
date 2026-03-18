@@ -85,6 +85,6 @@ def test_quota_co2() -> None:
 
     assert status == problem.solver.OPTIMAL
     assert math.isclose(problem.solver.Objective().Value(), 5500)
-    assert math.isclose(oil1_p, 50)  # type:ignore
-    assert math.isclose(coal1_p, 50)  # type:ignore
-    assert math.isclose(l12_flow, -50)  # type:ignore
+    assert math.isclose(oil1_p, 50)  # type: ignore
+    assert math.isclose(coal1_p, 50)  # type: ignore
+    assert math.isclose(l12_flow, -50)  # type: ignore

@@ -33,6 +33,7 @@ Several cases are tested:
     - Description: Short-term storage behavior over different horizons and efficiencies.
     - Names: `test_short_test_horizon_10`, `test_short_test_horizon_5`.
 """
+
 import pandas as pd
 import pytest
 

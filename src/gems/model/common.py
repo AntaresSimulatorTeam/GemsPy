@@ -13,6 +13,7 @@
 """
 Module for common classes used in models.
 """
+
 from enum import Enum
 
 

@@ -14,6 +14,7 @@
 Specific modelling for "instantiated" linear expressions,
 with only variables and literal coefficients.
 """
+
 import dataclasses
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, TypeVar, Union
@@ -118,7 +119,6 @@ class TimeSumExpansion(TimeExpansion):
 
 @dataclass(frozen=True)
 class TermKey:
-
     """
     Utility class to provide key for a term that contains all term information except coefficient
     """

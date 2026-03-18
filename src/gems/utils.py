@@ -13,6 +13,7 @@
 """
 Module for technical utilities.
 """
+
 import json
 import pathlib
 from typing import Any, Callable, Dict, Optional, TypeVar

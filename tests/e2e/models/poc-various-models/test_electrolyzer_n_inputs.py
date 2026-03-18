@@ -129,9 +129,9 @@ def test_electrolyzer_n_inputs_1() -> None:
     print(ep2_gen)
     print(gp_gen)
 
-    assert math.isclose(ep1_gen, 70)  # type:ignore
-    assert math.isclose(ep2_gen, 42)  # type:ignore
-    assert math.isclose(gp_gen, 30)  # type:ignore
+    assert math.isclose(ep1_gen, 70)  # type: ignore
+    assert math.isclose(ep2_gen, 42)  # type: ignore
+    assert math.isclose(gp_gen, 30)  # type: ignore
 
     assert status == problem.solver.OPTIMAL
     assert math.isclose(problem.solver.Objective().Value(), 1990)
@@ -218,9 +218,9 @@ def test_electrolyzer_n_inputs_2() -> None:
     print(ep2_gen)
     print(gp_gen)
 
-    assert math.isclose(ep1_gen, 70)  # type:ignore
-    assert math.isclose(ep2_gen, 42)  # type:ignore
-    assert math.isclose(gp_gen, 30)  # type:ignore
+    assert math.isclose(ep1_gen, 70)  # type: ignore
+    assert math.isclose(ep2_gen, 42)  # type: ignore
+    assert math.isclose(gp_gen, 30)  # type: ignore
 
     assert status == problem.solver.OPTIMAL
     assert math.isclose(problem.solver.Objective().Value(), 1990)
@@ -313,9 +313,9 @@ def test_electrolyzer_n_inputs_3() -> None:
     ep2_gen = output.component("ep2").var("generation").value
     gp_gen = output.component("gp").var("generation").value
 
-    assert math.isclose(ep1_gen, 70)  # type:ignore
-    assert math.isclose(ep2_gen, 30)  # type:ignore
-    assert math.isclose(gp_gen, 30)  # type:ignore
+    assert math.isclose(ep1_gen, 70)  # type: ignore
+    assert math.isclose(ep2_gen, 30)  # type: ignore
+    assert math.isclose(gp_gen, 30)  # type: ignore
 
     assert status == problem.solver.OPTIMAL
     assert math.isclose(problem.solver.Objective().Value(), 1750)
@@ -401,9 +401,9 @@ def test_electrolyzer_n_inputs_4() -> None:
     ep2_gen = output.component("ep2").var("generation").value
     gp_gen = output.component("gp").var("generation").value
 
-    assert math.isclose(ep1_gen, 70)  # type:ignore
-    assert math.isclose(ep2_gen, 30)  # type:ignore
-    assert math.isclose(gp_gen, 30)  # type:ignore
+    assert math.isclose(ep1_gen, 70)  # type: ignore
+    assert math.isclose(ep2_gen, 30)  # type: ignore
+    assert math.isclose(gp_gen, 30)  # type: ignore
 
     assert status == problem.solver.OPTIMAL
     assert math.isclose(problem.solver.Objective().Value(), 1750)

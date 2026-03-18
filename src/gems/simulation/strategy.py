@@ -37,14 +37,12 @@ class ModelSelectionStrategy(ABC):
                 yield constraint
 
     @abstractmethod
-    def _keep_from_context(self, context: ProblemContext) -> bool:
-        ...
+    def _keep_from_context(self, context: ProblemContext) -> bool: ...
 
     @abstractmethod
     def get_objectives(
         self, model: Model
-    ) -> Generator[Optional[ExpressionNode], None, None]:
-        ...
+    ) -> Generator[Optional[ExpressionNode], None, None]: ...
 
 
 class MergedProblemStrategy(ModelSelectionStrategy):
@@ -96,8 +94,7 @@ class RiskManagementStrategy(ABC):
         return self._modify_expression(expr)
 
     @abstractmethod
-    def _modify_expression(self, expr: ExpressionNode) -> ExpressionNode:
-        ...
+    def _modify_expression(self, expr: ExpressionNode) -> ExpressionNode: ...
 
 
 class UniformRisk(RiskManagementStrategy):
