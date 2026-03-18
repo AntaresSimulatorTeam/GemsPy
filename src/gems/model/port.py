@@ -28,8 +28,12 @@ from gems.expression import (
 from gems.expression.expression import (
     AllTimeSumNode,
     BinaryOperatorNode,
+    CeilNode,
     ComponentParameterNode,
     ComponentVariableNode,
+    FloorNode,
+    MaxNode,
+    MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
     ProblemParameterNode,
@@ -164,6 +168,18 @@ class _PortFieldExpressionChecker(ExpressionVisitor[None]):
 
     def port_field(self, node: PortFieldNode) -> None:
         raise ValueError("Port definition cannot reference another port field.")
+
+    def floor(self, node: FloorNode) -> None:
+        visit(node.operand, self)
+
+    def ceil(self, node: CeilNode) -> None:
+        visit(node.operand, self)
+
+    def maximum(self, node: MaxNode) -> None:
+        self._visit_binary_op(node)
+
+    def minimum(self, node: MinNode) -> None:
+        self._visit_binary_op(node)
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> None:
         raise ValueError("Port definition cannot contain port field aggregation.")

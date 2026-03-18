@@ -23,12 +23,16 @@ from gems.expression import (
 )
 from gems.expression.expression import (
     AllTimeSumNode,
+    CeilNode,
     ComparisonNode,
     ComponentParameterNode,
     ComponentVariableNode,
     CurrentScenarioIndex,
     ExpressionNode,
+    FloorNode,
     LiteralNode,
+    MaxNode,
+    MinNode,
     NoScenarioIndex,
     NoTimeIndex,
     OneScenarioIndex,
@@ -199,6 +203,18 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
 
     def literal(self, node: LiteralNode) -> LinearExpressionData:
         return LinearExpressionData([], node.value)
+
+    def floor(self, node: FloorNode) -> LinearExpressionData:
+        raise ValueError("Linear expression cannot contain a floor operator.")
+
+    def ceil(self, node: CeilNode) -> LinearExpressionData:
+        raise ValueError("Linear expression cannot contain a ceil operator.")
+
+    def maximum(self, node: MaxNode) -> LinearExpressionData:
+        raise ValueError("Linear expression cannot contain a max operator.")
+
+    def minimum(self, node: MinNode) -> LinearExpressionData:
+        raise ValueError("Linear expression cannot contain a min operator.")
 
     def comparison(self, node: ComparisonNode) -> LinearExpressionData:
         raise ValueError("Linear expression cannot contain a comparison operator.")
