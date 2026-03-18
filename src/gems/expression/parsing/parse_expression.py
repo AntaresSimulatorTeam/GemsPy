@@ -169,13 +169,17 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         return fn(operand)
 
     # Visit a parse tree produced by ExprParser#binaryFunction.
-    def visitBinaryFunction(self, ctx: ExprParser.BinaryFunctionContext) -> ExpressionNode:
+    def visitBinaryFunction(
+        self, ctx: ExprParser.BinaryFunctionContext
+    ) -> ExpressionNode:
         function_name: str = ctx.IDENTIFIER().getText()  # type: ignore
         left: ExpressionNode = ctx.expr(0).accept(self)  # type: ignore
         right: ExpressionNode = ctx.expr(1).accept(self)  # type: ignore
         fn = _BINARY_FUNCTIONS.get(function_name, None)
         if fn is None:
-            raise ValueError(f"Encountered invalid binary function name {function_name}")
+            raise ValueError(
+                f"Encountered invalid binary function name {function_name}"
+            )
         return fn(left, right)
 
     # Visit a parse tree produced by ExprParser#shift.

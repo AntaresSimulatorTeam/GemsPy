@@ -13,6 +13,7 @@
 """
 Defines the model for generic expressions.
 """
+
 import enum
 import inspect
 from dataclasses import dataclass

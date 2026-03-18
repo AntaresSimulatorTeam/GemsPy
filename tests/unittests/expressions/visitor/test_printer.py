@@ -32,4 +32,7 @@ def test_floor_ceil_max_min_printer() -> None:
     assert visit(maximum(p, q), PrinterVisitor()) == "max(p, q)"
     assert visit(minimum(p, q), PrinterVisitor()) == "min(p, q)"
     assert visit((p / q).ceil(), PrinterVisitor()) == "ceil((p / q))"
-    assert visit(maximum(param("a"), (p / q).ceil()), PrinterVisitor()) == "max(a, ceil((p / q)))"
+    assert (
+        visit(maximum(param("a"), (p / q).ceil()), PrinterVisitor())
+        == "max(a, ceil((p / q)))"
+    )

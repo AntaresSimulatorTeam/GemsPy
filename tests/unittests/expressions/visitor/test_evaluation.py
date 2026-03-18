@@ -120,7 +120,13 @@ def test_floor_ceil_max_min() -> None:
 
     assert visit(param("p").floor(), EvaluationVisitor(context)) == 2.0
     assert visit(param("p").ceil(), EvaluationVisitor(context)) == 3.0
-    assert visit(maximum(param("p"), param("q")), EvaluationVisitor(context)) == pytest.approx(2.7)
-    assert visit(minimum(param("p"), param("q")), EvaluationVisitor(context)) == pytest.approx(1.3)
-    assert visit(maximum(literal(0), param("q")), EvaluationVisitor(context)) == pytest.approx(1.3)
+    assert visit(
+        maximum(param("p"), param("q")), EvaluationVisitor(context)
+    ) == pytest.approx(2.7)
+    assert visit(
+        minimum(param("p"), param("q")), EvaluationVisitor(context)
+    ) == pytest.approx(1.3)
+    assert visit(
+        maximum(literal(0), param("q")), EvaluationVisitor(context)
+    ) == pytest.approx(1.3)
     assert visit(maximum(literal(0), -param("p")), EvaluationVisitor(context)) == 0.0
