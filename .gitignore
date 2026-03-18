@@ -13,3 +13,4 @@ bin
 outputs
 build
 src/gems.egg-info/
+src/gemspy.egg-info/
