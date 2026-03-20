@@ -1,5 +1,6 @@
 # Generated from Expr.g4 by ANTLR 4.13.2
 from antlr4 import *
+
 if "." in __name__:
     from .ExprParser import ExprParser
 else:
