@@ -1,5 +1,12 @@
 # GemsPy, a Python interpreter for GEMS
 
+[![CI](https://github.com/AntaresSimulatorTeam/GemsPy/actions/workflows/ci.yml/badge.svg)](https://github.com/AntaresSimulatorTeam/GemsPy/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/gemspy)](https://pypi.org/project/gemspy/)
+[![Python versions](https://img.shields.io/pypi/pyversions/gemspy)](https://pypi.org/project/gemspy/)
+[![License: MPL-2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
+[![Documentation](https://readthedocs.org/projects/gemspy/badge/?version=latest)](https://gemspy.readthedocs.io/en/latest/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 GemsPy is an open-source tool, developed in Python, for the modelling and the simulation of complex energy systems under uncertainty. This is a generic interpreter for the [**GEMS**](https://gems-energy.readthedocs.io/en/latest/) modelling framework.
 
 <img src="docs/images/gemsV2.png" alt="Description" width="400"/>
