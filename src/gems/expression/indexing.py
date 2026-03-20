@@ -170,10 +170,10 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return visit(node.operand, self)
 
     def maximum(self, node: MaxNode) -> IndexingStructure:
-        return self._combine([node.left, node.right])
+        return self._combine(node.operands)
 
     def minimum(self, node: MinNode) -> IndexingStructure:
-        return self._combine([node.left, node.right])
+        return self._combine(node.operands)
 
 
 def compute_indexation(

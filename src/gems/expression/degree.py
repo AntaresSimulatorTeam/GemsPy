@@ -123,14 +123,10 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         return 0 if d == 0 else math.inf
 
     def maximum(self, node: MaxNode) -> int | float:
-        d_l = visit(node.left, self)
-        d_r = visit(node.right, self)
-        return 0 if d_l == 0 and d_r == 0 else math.inf
+        return 0 if all(visit(op, self) == 0 for op in node.operands) else math.inf
 
     def minimum(self, node: MinNode) -> int | float:
-        d_l = visit(node.left, self)
-        d_r = visit(node.right, self)
-        return 0 if d_l == 0 and d_r == 0 else math.inf
+        return 0 if all(visit(op, self) == 0 for op in node.operands) else math.inf
 
 
 def compute_degree(expression: ExpressionNode) -> int | float:

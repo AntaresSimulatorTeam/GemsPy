@@ -130,3 +130,10 @@ def test_floor_ceil_max_min() -> None:
         maximum(literal(0), param("q")), EvaluationVisitor(context)
     ) == pytest.approx(1.3)
     assert visit(maximum(literal(0), -param("p")), EvaluationVisitor(context)) == 0.0
+    # variadic (3+ operands)
+    assert visit(
+        maximum(param("p"), param("q"), literal(5.0)), EvaluationVisitor(context)
+    ) == pytest.approx(5.0)
+    assert visit(
+        minimum(param("p"), param("q"), literal(5.0)), EvaluationVisitor(context)
+    ) == pytest.approx(1.3)

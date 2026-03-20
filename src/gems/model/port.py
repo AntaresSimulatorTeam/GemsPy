@@ -176,10 +176,12 @@ class _PortFieldExpressionChecker(ExpressionVisitor[None]):
         visit(node.operand, self)
 
     def maximum(self, node: MaxNode) -> None:
-        self._visit_binary_op(node)
+        for op in node.operands:
+            visit(op, self)
 
     def minimum(self, node: MinNode) -> None:
-        self._visit_binary_op(node)
+        for op in node.operands:
+            visit(op, self)
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> None:
         raise ValueError("Port definition cannot contain port field aggregation.")

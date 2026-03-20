@@ -151,10 +151,10 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
         return float(math.ceil(visit(node.operand, self)))
 
     def maximum(self, node: MaxNode) -> float:
-        return max(visit(node.left, self), visit(node.right, self))
+        return max(visit(op, self) for op in node.operands)
 
     def minimum(self, node: MinNode) -> float:
-        return min(visit(node.left, self), visit(node.right, self))
+        return min(visit(op, self) for op in node.operands)
 
 
 def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:

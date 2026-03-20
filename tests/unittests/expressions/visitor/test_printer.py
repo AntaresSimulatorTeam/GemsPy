@@ -36,3 +36,6 @@ def test_floor_ceil_max_min_printer() -> None:
         visit(maximum(param("a"), (p / q).ceil()), PrinterVisitor())
         == "max(a, ceil((p / q)))"
     )
+    # variadic (3+ operands)
+    assert visit(maximum(p, q, param("r")), PrinterVisitor()) == "max(p, q, r)"
+    assert visit(minimum(p, q, param("r")), PrinterVisitor()) == "min(p, q, r)"

@@ -234,10 +234,14 @@ class EqualityVisitor:
         return self.visit(left.operand, right.operand)
 
     def maximum(self, left: MaxNode, right: MaxNode) -> bool:
-        return self._visit_operands(left, right)
+        return len(left.operands) == len(right.operands) and all(
+            self.visit(l, r) for l, r in zip(left.operands, right.operands)
+        )
 
     def minimum(self, left: MinNode, right: MinNode) -> bool:
-        return self._visit_operands(left, right)
+        return len(left.operands) == len(right.operands) and all(
+            self.visit(l, r) for l, r in zip(left.operands, right.operands)
+        )
 
 
 def expressions_equal(

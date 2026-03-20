@@ -162,25 +162,23 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     # Visit a parse tree produced by ExprParser#function.
     def visitFunction(self, ctx: ExprParser.FunctionContext) -> ExpressionNode:
         function_name: str = ctx.IDENTIFIER().getText()  # type: ignore
-        operand: ExpressionNode = ctx.expr().accept(self)  # type: ignore
-        fn = _FUNCTIONS.get(function_name, None)
-        if fn is None:
-            raise ValueError(f"Encountered invalid function name {function_name}")
-        return fn(operand)
-
-    # Visit a parse tree produced by ExprParser#binaryFunction.
-    def visitBinaryFunction(
-        self, ctx: ExprParser.BinaryFunctionContext
-    ) -> ExpressionNode:
-        function_name: str = ctx.IDENTIFIER().getText()  # type: ignore
-        left: ExpressionNode = ctx.expr(0).accept(self)  # type: ignore
-        right: ExpressionNode = ctx.expr(1).accept(self)  # type: ignore
-        fn = _BINARY_FUNCTIONS.get(function_name, None)
-        if fn is None:
-            raise ValueError(
-                f"Encountered invalid binary function name {function_name}"
-            )
-        return fn(left, right)
+        arg_list = ctx.argList()  # type: ignore
+        args: list[ExpressionNode] = (
+            [expr.accept(self) for expr in arg_list.expr()]  # type: ignore
+            if arg_list is not None
+            else []
+        )
+        if function_name in _FUNCTIONS:
+            if len(args) != 1:
+                raise ValueError(
+                    f"Function {function_name} requires exactly 1 argument, got {len(args)}"
+                )
+            return _FUNCTIONS[function_name](args[0])
+        if function_name == "max":
+            return maximum(*args)
+        if function_name == "min":
+            return minimum(*args)
+        raise ValueError(f"Encountered invalid function name {function_name}")
 
     # Visit a parse tree produced by ExprParser#shift.
     def visitShift(self, ctx: ExprParser.ShiftContext) -> ExpressionNode:
@@ -253,11 +251,6 @@ _FUNCTIONS = {
     "expec": ExpressionNode.expec,
     "floor": ExpressionNode.floor,
     "ceil": ExpressionNode.ceil,
-}
-
-_BINARY_FUNCTIONS = {
-    "max": maximum,
-    "min": minimum,
 }
 
 

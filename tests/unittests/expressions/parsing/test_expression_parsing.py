@@ -155,6 +155,18 @@ from gems.expression.parsing.parse_expression import (
             "max(0, ceil(p/q))",
             maximum(literal(0), (param("p") / param("q")).ceil()),
         ),
+        (
+            {},
+            {"a", "b", "c"},
+            "max(a, b, c)",
+            maximum(param("a"), param("b"), param("c")),
+        ),
+        (
+            {},
+            {"a", "b", "c"},
+            "min(a, b, c)",
+            minimum(param("a"), param("b"), param("c")),
+        ),
     ],
 )
 def test_parsing_visitor(

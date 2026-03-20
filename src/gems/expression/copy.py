@@ -106,10 +106,10 @@ class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
         return CeilNode(visit(node.operand, self))
 
     def maximum(self, node: MaxNode) -> ExpressionNode:
-        return MaxNode(visit(node.left, self), visit(node.right, self))
+        return MaxNode([visit(op, self) for op in node.operands])
 
     def minimum(self, node: MinNode) -> ExpressionNode:
-        return MinNode(visit(node.left, self), visit(node.right, self))
+        return MinNode([visit(op, self) for op in node.operands])
 
 
 def copy_expression(expression: ExpressionNode) -> ExpressionNode:

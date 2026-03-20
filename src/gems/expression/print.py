@@ -141,10 +141,10 @@ class PrinterVisitor(ExpressionVisitor[str]):
         return f"ceil({visit(node.operand, self)})"
 
     def maximum(self, node: MaxNode) -> str:
-        return f"max({visit(node.left, self)}, {visit(node.right, self)})"
+        return "max(" + ", ".join(visit(op, self) for op in node.operands) + ")"
 
     def minimum(self, node: MinNode) -> str:
-        return f"min({visit(node.left, self)}, {visit(node.right, self)})"
+        return "min(" + ", ".join(visit(op, self) for op in node.operands) + ")"
 
 
 def print_expr(expression: ExpressionNode) -> str:

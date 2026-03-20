@@ -418,21 +418,21 @@ class DivisionNode(BinaryOperatorNode):
 
 
 @dataclass(frozen=True, eq=False)
-class MaxNode(BinaryOperatorNode):
-    pass
+class MaxNode(ExpressionNode):
+    operands: List[ExpressionNode]
 
 
 @dataclass(frozen=True, eq=False)
-class MinNode(BinaryOperatorNode):
-    pass
+class MinNode(ExpressionNode):
+    operands: List[ExpressionNode]
 
 
-def maximum(left: "ExpressionNode", right: "ExpressionNode") -> "MaxNode":
-    return MaxNode(left, right)
+def maximum(*operands: "ExpressionNode") -> "MaxNode":
+    return MaxNode(list(operands))
 
 
-def minimum(left: "ExpressionNode", right: "ExpressionNode") -> "MinNode":
-    return MinNode(left, right)
+def minimum(*operands: "ExpressionNode") -> "MinNode":
+    return MinNode(list(operands))
 
 
 @dataclass(frozen=True, eq=False)
