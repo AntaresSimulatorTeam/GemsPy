@@ -33,9 +33,7 @@ from tests.e2e.functional.libs.standard import (
 def generate_scalar_matrix_data(
     value: float, horizon: int, scenarios: int
 ) -> TimeScenarioSeriesData:
-    data = pd.DataFrame(index=range(horizon), columns=range(scenarios))
-
-    data.fillna(value, inplace=True)
+    data = pd.DataFrame(value, index=range(horizon), columns=range(scenarios))
 
     return TimeScenarioSeriesData(time_scenario_series=data)
 

@@ -13,7 +13,7 @@ import typing
 from dataclasses import dataclass
 from typing import List, Optional
 
-from pydantic import Field, ValidationError
+from pydantic import ConfigDict, Field, ValidationError
 from yaml import safe_load
 
 from gems.utils import ModifiedBaseModel
@@ -41,8 +41,7 @@ class InputVariable(ModifiedBaseModel):
     upper_bound: Optional[str] = None
     variable_type: str = "continuous"
 
-    class Config(ModifiedBaseModel.Config):
-        coerce_numbers_to_str = True
+    model_config = ConfigDict(**ModifiedBaseModel.model_config, coerce_numbers_to_str=True)
 
 
 class InputConstraint(ModifiedBaseModel):

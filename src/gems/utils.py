@@ -17,7 +17,7 @@ import json
 import pathlib
 from typing import Any, Callable, Dict, Optional, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -83,7 +83,4 @@ def _to_kebab(snake: str) -> str:
 
 
 class ModifiedBaseModel(BaseModel):
-    class Config:
-        alias_generator = _to_kebab
-        extra = "forbid"
-        populate_by_name = True
+    model_config = ConfigDict(alias_generator=_to_kebab, extra="forbid", populate_by_name=True)

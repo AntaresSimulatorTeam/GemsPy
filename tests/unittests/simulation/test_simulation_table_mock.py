@@ -123,19 +123,19 @@ def test_simulation_table_builder_manual(tmp_path):
         },
         {
             SimulationColumns.BLOCK: 1,
-            SimulationColumns.COMPONENT: pd.NA,
+            SimulationColumns.COMPONENT: None,
             SimulationColumns.OUTPUT: "objective-value",
-            SimulationColumns.ABSOLUTE_TIME_INDEX: pd.NA,
-            SimulationColumns.BLOCK_TIME_INDEX: pd.NA,
-            SimulationColumns.SCENARIO_INDEX: pd.NA,
+            SimulationColumns.ABSOLUTE_TIME_INDEX: None,
+            SimulationColumns.BLOCK_TIME_INDEX: None,
+            SimulationColumns.SCENARIO_INDEX: None,
             SimulationColumns.VALUE: 42.0,
-            SimulationColumns.BASIS_STATUS: pd.NA,
+            SimulationColumns.BASIS_STATUS: None,
         },
     ]
-    expected_df = pd.DataFrame(expected_rows).fillna(pd.NA)
+    expected_df = pd.DataFrame(expected_rows)
 
     pd.testing.assert_frame_equal(
-        df.reset_index(drop=True).fillna(pd.NA),
+        df.reset_index(drop=True),
         expected_df,
         check_dtype=False,
     )

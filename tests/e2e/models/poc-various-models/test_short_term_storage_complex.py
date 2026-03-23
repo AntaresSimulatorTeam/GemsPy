@@ -30,7 +30,7 @@ def generate_data(
     for scenario in range(scenarios):
         # Create a column name based on the scenario number
         column_name = f"scenario_{scenario}"
-        data[column_name] = 0  # Initialize the column with zeros
+        data[column_name] = 0.0  # Initialize the column with zeros
 
         for absolute_timestep in range(horizon):
             if absolute_timestep == 0:
