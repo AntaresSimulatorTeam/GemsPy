@@ -41,7 +41,9 @@ class InputVariable(ModifiedBaseModel):
     upper_bound: Optional[str] = None
     variable_type: str = "continuous"
 
-    model_config = ConfigDict(**ModifiedBaseModel.model_config, coerce_numbers_to_str=True)
+    model_config = ConfigDict(
+        **ModifiedBaseModel.model_config, coerce_numbers_to_str=True
+    )
 
 
 class InputConstraint(ModifiedBaseModel):

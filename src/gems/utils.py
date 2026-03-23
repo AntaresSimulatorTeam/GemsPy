@@ -83,4 +83,6 @@ def _to_kebab(snake: str) -> str:
 
 
 class ModifiedBaseModel(BaseModel):
-    model_config = ConfigDict(alias_generator=_to_kebab, extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(
+        alias_generator=_to_kebab, extra="forbid", populate_by_name=True
+    )
