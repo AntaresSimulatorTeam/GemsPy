@@ -167,6 +167,34 @@ from gems.expression.parsing.parse_expression import (
             "min(a, b, c)",
             minimum(param("a"), param("b"), param("c")),
         ),
+        (
+            {"x", "y"},
+            {},
+            "(x + y)[t-1]",
+            (var("x") + var("y")).shift(-literal(1)),
+        ),
+        (
+            {},
+            {"p", "q"},
+            "(ceil(p/q))[t]",
+            (param("p") / param("q")).ceil(),
+        ),
+        (
+            {},
+            {"p_max_cluster", "p_max_unit"},
+            "max(0, (ceil(p_max_cluster/p_max_unit))[t-1] - (ceil(p_max_cluster/p_max_unit)))",
+            maximum(
+                literal(0),
+                (param("p_max_cluster") / param("p_max_unit")).ceil().shift(-literal(1))
+                - (param("p_max_cluster") / param("p_max_unit")).ceil(),
+            ),
+        ),
+        (
+            {"x", "y"},
+            {},
+            "(x + y)[1]",
+            (var("x") + var("y")).eval(literal(1)),
+        ),
     ],
 )
 def test_parsing_visitor(

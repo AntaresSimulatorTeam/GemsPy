@@ -149,6 +149,18 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             return shifted_expr
         return shifted_expr.shift(time_shift)
 
+    def visitTimeShiftExpr(self, ctx: ExprParser.TimeShiftExprContext) -> ExpressionNode:
+        shifted_expr = ctx.expr().accept(self)  # type: ignore
+        time_shift = ctx.shift().accept(self)  # type: ignore
+        if expressions_equal(time_shift, literal(0)):
+            return shifted_expr
+        return shifted_expr.shift(time_shift)
+
+    def visitTimeIndexExpr(self, ctx: ExprParser.TimeIndexExprContext) -> ExpressionNode:
+        expr = ctx.expr(0).accept(self)  # type: ignore
+        eval_time = ctx.expr(1).accept(self)  # type: ignore
+        return expr.eval(eval_time)
+
     def visitTimeSum(self, ctx: ExprParser.TimeSumContext) -> ExpressionNode:
         shifted_expr = ctx.expr().accept(self)  # type: ignore
         from_shift = ctx.from_.accept(self)  # type: ignore
