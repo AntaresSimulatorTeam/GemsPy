@@ -21,6 +21,8 @@ from gems.expression.expression import (
     TimeShift,
     comp_param,
     comp_var,
+    maximum,
+    minimum,
     problem_var,
 )
 from gems.expression.indexing import IndexingStructureProvider
@@ -160,3 +162,43 @@ def test_invalid_division() -> None:
     expression = literal(1) / x
     with pytest.raises(ValueError, match="constant"):
         linearize_expression(expression, 0, 0, params)
+
+
+def test_floor_of_constant() -> None:
+    assert linearize_expression(literal(2.7).floor(), timestep=0, scenario=0) == constant(2)
+
+
+def test_ceil_of_constant() -> None:
+    assert linearize_expression(literal(2.3).ceil(), timestep=0, scenario=0) == constant(3)
+
+
+def test_max_of_constants() -> None:
+    assert linearize_expression(maximum(literal(3), literal(5)), timestep=0, scenario=0) == constant(5)
+
+
+def test_min_of_constants() -> None:
+    assert linearize_expression(minimum(literal(3), literal(5)), timestep=0, scenario=0) == constant(3)
+
+
+def test_floor_of_variable_raises() -> None:
+    x = problem_var("c", "x", time_index=TimeShift(0), scenario_index=CurrentScenarioIndex())
+    with pytest.raises(ValueError, match="non-constant"):
+        linearize_expression(x.floor(), timestep=0, scenario=0)
+
+
+def test_ceil_of_variable_raises() -> None:
+    x = problem_var("c", "x", time_index=TimeShift(0), scenario_index=CurrentScenarioIndex())
+    with pytest.raises(ValueError, match="non-constant"):
+        linearize_expression(x.ceil(), timestep=0, scenario=0)
+
+
+def test_max_with_variable_raises() -> None:
+    x = problem_var("c", "x", time_index=TimeShift(0), scenario_index=CurrentScenarioIndex())
+    with pytest.raises(ValueError, match="non-constant"):
+        linearize_expression(maximum(x, literal(5)), timestep=0, scenario=0)
+
+
+def test_min_with_variable_raises() -> None:
+    x = problem_var("c", "x", time_index=TimeShift(0), scenario_index=CurrentScenarioIndex())
+    with pytest.raises(ValueError, match="non-constant"):
+        linearize_expression(minimum(x, literal(5)), timestep=0, scenario=0)

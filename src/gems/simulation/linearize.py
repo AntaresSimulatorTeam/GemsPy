@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
@@ -205,16 +206,36 @@ class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
         return LinearExpressionData([], node.value)
 
     def floor(self, node: FloorNode) -> LinearExpressionData:
-        raise ValueError("Linear expression cannot contain a floor operator.")
+        operand = visit(node.operand, self)
+        if operand.terms:
+            raise ValueError(
+                "Linear expression cannot contain a floor operator on a non-constant expression."
+            )
+        return LinearExpressionData([], math.floor(operand.constant))
 
     def ceil(self, node: CeilNode) -> LinearExpressionData:
-        raise ValueError("Linear expression cannot contain a ceil operator.")
+        operand = visit(node.operand, self)
+        if operand.terms:
+            raise ValueError(
+                "Linear expression cannot contain a ceil operator on a non-constant expression."
+            )
+        return LinearExpressionData([], math.ceil(operand.constant))
 
     def maximum(self, node: MaxNode) -> LinearExpressionData:
-        raise ValueError("Linear expression cannot contain a max operator.")
+        operands = [visit(op, self) for op in node.operands]
+        if any(op.terms for op in operands):
+            raise ValueError(
+                "Linear expression cannot contain a max operator on a non-constant expression."
+            )
+        return LinearExpressionData([], max(op.constant for op in operands))
 
     def minimum(self, node: MinNode) -> LinearExpressionData:
-        raise ValueError("Linear expression cannot contain a min operator.")
+        operands = [visit(op, self) for op in node.operands]
+        if any(op.terms for op in operands):
+            raise ValueError(
+                "Linear expression cannot contain a min operator on a non-constant expression."
+            )
+        return LinearExpressionData([], min(op.constant for op in operands))
 
     def comparison(self, node: ComparisonNode) -> LinearExpressionData:
         raise ValueError("Linear expression cannot contain a comparison operator.")
