@@ -1,3 +1,5 @@
+# Python conventions
+
 ## Code Style & Conventions
 
 - **Formatter**: Black, line-length 88. Never adjust line breaks manually—let Black decide.

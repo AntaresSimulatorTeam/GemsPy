@@ -1,11 +1,11 @@
-## Testing Strategy
+# Testing Strategy
 
-### Philosophy
+## Philosophy
 
 Tests live alongside the module they exercise. Fixtures (YAML snippets, small networks) are kept
 in `tests/` sub-directories. No mocking of the solver—tests use real OR-Tools calls.
 
-### Layers
+## Layers
 
 | Layer | Location | Description |
 |---|---|---|

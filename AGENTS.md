@@ -17,7 +17,7 @@ pip install -r requirements.txt -r requirements-dev.txt
 ```bash
 pytest                                          # run all tests
 pytest tests/path/to/test_file.py::test_name   # run a single test
-pytest --cov antarest --cov-report xml         # with coverage
+pytest --cov gems --cov-report xml         # with coverage
 ```
 
 **Lint & Format:**
