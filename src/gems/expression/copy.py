@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import List, cast
 
 from .expression import (
+    AdditionNode,
     AllTimeSumNode,
     CeilNode,
     ComparisonNode,
@@ -43,6 +44,9 @@ class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
     """
     Simply copies the whole AST.
     """
+
+    def addition(self, node: AdditionNode) -> ExpressionNode:
+        return AdditionNode([visit(o, self) for o in node.operands])
 
     def literal(self, node: LiteralNode) -> ExpressionNode:
         return LiteralNode(node.value)
