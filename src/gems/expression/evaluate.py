@@ -66,6 +66,10 @@ class ValueProvider(ABC):
     def get_component_parameter_value(self, component_id: str, name: str) -> float:
         ...
 
+    @abstractmethod
+    def shift(self, offset: int) -> "ValueProvider":
+        ...
+
 
 @dataclass(frozen=True)
 class EvaluationContext(ValueProvider):
@@ -88,6 +92,9 @@ class EvaluationContext(ValueProvider):
 
     def get_component_parameter_value(self, component_id: str, name: str) -> float:
         raise NotImplementedError()
+
+    def shift(self, offset: int) -> "ValueProvider":
+        return self
 
 
 @dataclass(frozen=True)
@@ -124,7 +131,8 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
         raise ValueError("Should not reach here.")
 
     def time_shift(self, node: TimeShiftNode) -> float:
-        raise NotImplementedError()
+        shift = int(visit(node.time_shift, self))
+        return visit(node.operand, EvaluationVisitor(self.context.shift(shift)))
 
     def time_eval(self, node: TimeEvalNode) -> float:
         raise NotImplementedError()

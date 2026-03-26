@@ -91,3 +91,6 @@ class ExtraOutputValueProvider(ValueProvider):
 
     def get_component_parameter_value(self, component_id: str, name: str) -> float:
         return self.context[name]
+
+    def shift(self, offset: int) -> "ValueProvider":
+        return self

@@ -103,6 +103,10 @@ def _make_value_provider(
                 "Parameter must be associated to its component before resolution."
             )
 
+        def shift(self, offset: int) -> ValueProvider:
+            new_timestep = (block_timestep + offset) if block_timestep is not None else None
+            return _make_value_provider(context, new_timestep, scenario)
+
     return Impl()
 
 
@@ -414,6 +418,9 @@ class OptimizationContext:
                 raise ValueError(
                     "Parameter must be associated to its component before resolution."
                 )
+
+            def shift(self, offset: int) -> ValueProvider:
+                return self
 
         return Impl()
 
