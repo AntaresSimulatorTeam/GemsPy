@@ -11,7 +11,7 @@
 # This file is part of the Antares project.
 
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Iterable
 
 import pytest
 
@@ -70,6 +70,12 @@ class ComponentEvaluationContext(ValueProvider):
 
     def shift(self, offset: int) -> "ValueProvider":
         return self
+
+    def eval_at(self, timestep: int) -> "ValueProvider":
+        return self
+
+    def all_block_timesteps(self) -> Iterable[int]:
+        return range(1)
 
 
 def test_comp_parameter() -> None:

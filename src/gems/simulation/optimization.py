@@ -104,8 +104,16 @@ def _make_value_provider(
             )
 
         def shift(self, offset: int) -> ValueProvider:
-            new_timestep = (block_timestep + offset) if block_timestep is not None else None
+            new_timestep = (
+                (block_timestep + offset) if block_timestep is not None else None
+            )
             return _make_value_provider(context, new_timestep, scenario)
+
+        def eval_at(self, timestep: int) -> ValueProvider:
+            return _make_value_provider(context, timestep, scenario)
+
+        def all_block_timesteps(self) -> Iterable[int]:
+            return range(context.block_length())
 
     return Impl()
 
@@ -421,6 +429,12 @@ class OptimizationContext:
 
             def shift(self, offset: int) -> ValueProvider:
                 return self
+
+            def eval_at(self, timestep: int) -> ValueProvider:
+                return self
+
+            def all_block_timesteps(self) -> Iterable[int]:
+                return range(1)
 
         return Impl()
 
@@ -896,11 +910,9 @@ def fusion_problems(
                 root_var = root_vars[var.name()]
                 root_var.SetLb(var.lb())
                 root_var.SetUb(var.ub())
-                root_master.context._solver_variables[
-                    var.name()
-                ].is_in_objective = context._solver_variables[
-                    var.name()
-                ].is_in_objective
+                root_master.context._solver_variables[var.name()].is_in_objective = (
+                    context._solver_variables[var.name()].is_in_objective
+                )
 
             for cstr in master.solver.constraints():
                 coeff = cstr.GetCoefficient(var)

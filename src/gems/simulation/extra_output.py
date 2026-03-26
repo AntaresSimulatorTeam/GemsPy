@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 from gems.expression.evaluate import ValueProvider
 from gems.simulation.optimization import OptimizationProblem
@@ -94,3 +94,9 @@ class ExtraOutputValueProvider(ValueProvider):
 
     def shift(self, offset: int) -> "ValueProvider":
         return self
+
+    def eval_at(self, timestep: int) -> "ValueProvider":
+        return self
+
+    def all_block_timesteps(self) -> Iterable[int]:
+        return range(1)

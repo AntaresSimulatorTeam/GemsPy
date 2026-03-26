@@ -13,7 +13,7 @@
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Iterable
 
 from gems.expression.expression import (
     AllTimeSumNode,
@@ -51,24 +51,25 @@ class ValueProvider(ABC):
     """
 
     @abstractmethod
-    def get_variable_value(self, name: str) -> float:
-        ...
+    def get_variable_value(self, name: str) -> float: ...
 
     @abstractmethod
-    def get_parameter_value(self, name: str) -> float:
-        ...
+    def get_parameter_value(self, name: str) -> float: ...
 
     @abstractmethod
-    def get_component_variable_value(self, component_id: str, name: str) -> float:
-        ...
+    def get_component_variable_value(self, component_id: str, name: str) -> float: ...
 
     @abstractmethod
-    def get_component_parameter_value(self, component_id: str, name: str) -> float:
-        ...
+    def get_component_parameter_value(self, component_id: str, name: str) -> float: ...
 
     @abstractmethod
-    def shift(self, offset: int) -> "ValueProvider":
-        ...
+    def shift(self, offset: int) -> "ValueProvider": ...
+
+    @abstractmethod
+    def eval_at(self, timestep: int) -> "ValueProvider": ...
+
+    @abstractmethod
+    def all_block_timesteps(self) -> Iterable[int]: ...
 
 
 @dataclass(frozen=True)
@@ -95,6 +96,12 @@ class EvaluationContext(ValueProvider):
 
     def shift(self, offset: int) -> "ValueProvider":
         return self
+
+    def eval_at(self, timestep: int) -> "ValueProvider":
+        return self
+
+    def all_block_timesteps(self) -> Iterable[int]:
+        return range(1)
 
 
 @dataclass(frozen=True)
@@ -135,13 +142,22 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
         return visit(node.operand, EvaluationVisitor(self.context.shift(shift)))
 
     def time_eval(self, node: TimeEvalNode) -> float:
-        raise NotImplementedError()
+        timestep = int(visit(node.eval_time, self))
+        return visit(node.operand, EvaluationVisitor(self.context.eval_at(timestep)))
 
     def time_sum(self, node: TimeSumNode) -> float:
-        raise NotImplementedError()
+        from_shift = int(visit(node.from_time, self))
+        to_shift = int(visit(node.to_time, self))
+        return sum(
+            visit(node.operand, EvaluationVisitor(self.context.shift(t)))
+            for t in range(from_shift, to_shift + 1)
+        )
 
     def all_time_sum(self, node: AllTimeSumNode) -> float:
-        raise NotImplementedError()
+        return sum(
+            visit(node.operand, EvaluationVisitor(self.context.eval_at(t)))
+            for t in self.context.all_block_timesteps()
+        )
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> float:
         raise NotImplementedError()
