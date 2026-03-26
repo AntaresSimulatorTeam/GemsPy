@@ -454,8 +454,6 @@ def _create_constraint(
     Adds a component-related constraint to the solver.
     """
     expanded = context.expand_operators(constraint.expression)
-    expanded_lb = context.expand_operators(constraint.lower_bound)
-    expanded_ub = context.expand_operators(constraint.upper_bound)
     constraint_indexing = _compute_indexing(context, constraint)
 
     for block_timestep in context.get_time_indices(constraint_indexing):
@@ -464,20 +462,21 @@ def _create_constraint(
                 expanded, block_timestep, scenario
             )
 
-            lb_linear = context.linearize_expression(expanded_lb, block_timestep, scenario)
-            if lb_linear.terms:
-                raise ValueError(
-                    f"Lower bound of constraint '{constraint.name}' must be a constant expression (no decision variables)."
-                )
-            ub_linear = context.linearize_expression(expanded_ub, block_timestep, scenario)
-            if ub_linear.terms:
-                raise ValueError(
-                    f"Upper bound of constraint '{constraint.name}' must be a constant expression (no decision variables)."
-                )
+            # What happens if there is some time_operator in the bounds ?
             constraint_data = ConstraintData(
                 name=constraint.name,
-                lower_bound=lb_linear.constant,
-                upper_bound=ub_linear.constant,
+                lower_bound=_compute_expression_value(
+                    constraint.lower_bound,
+                    context,
+                    block_timestep,
+                    scenario,
+                ),
+                upper_bound=_compute_expression_value(
+                    constraint.upper_bound,
+                    context,
+                    block_timestep,
+                    scenario,
+                ),
                 expression=linear_expr_at_t,
             )
             make_constraint(
