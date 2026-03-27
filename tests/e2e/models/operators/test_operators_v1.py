@@ -39,25 +39,31 @@ def results_dir(data_dir: Path) -> Path:
 def systems_dir(data_dir: Path) -> Path:
     return data_dir / "input"
 
+
 @pytest.fixture
 def system_file(data_dir: Path) -> Path:
     return data_dir / "input" / "system.yml"
+
 
 @pytest.fixture
 def series_dir(data_dir: Path) -> Path:
     return data_dir / "input" / "data-series"
 
+
 @pytest.fixture
 def optim_result_file(results_dir: Path) -> Path:
     return results_dir / "simulation_table--20260323-1953.csv"
+
 
 @pytest.fixture
 def batch() -> int:
     return 1
 
+
 @pytest.fixture
 def relative_accuracy() -> float:
     return 1e-6
+
 
 @pytest.fixture
 def input_libraries(data_dir: Path) -> List[InputLibrary]:
@@ -76,7 +82,6 @@ def input_libraries(data_dir: Path) -> List[InputLibrary]:
     ],
     indirect=True,
 )
-
 def test_model_behaviour(
     system_file: str,
     optim_result_file: str,
@@ -88,7 +93,7 @@ def test_model_behaviour(
     series_dir: Path,
     data_dir: Path,
 ) -> None:
-    
+
     scenarios = 1
 
     # Hardcoded timestep range
@@ -98,7 +103,7 @@ def test_model_behaviour(
 
     with open(systems_dir / system_file) as compo_file:
         input_component = parse_yaml_components(compo_file)
-    
+
     result_lib = resolve_library(input_libraries)
     components_input = resolve_system(input_component, result_lib)
     database = build_data_base(input_component, Path(series_dir))
@@ -106,11 +111,13 @@ def test_model_behaviour(
     df_ref = pd.read_csv(results_dir / optim_result_file)
     expected_objective = df_ref[df_ref["output"] == "OBJECTIVE_VALUE"]["value"].iloc[0]
     ref_gen3 = (
-        df_ref[(df_ref["component"] == "unique_prod3") & (df_ref["output"] == "generation")]
+        df_ref[
+            (df_ref["component"] == "unique_prod3") & (df_ref["output"] == "generation")
+        ]
         .sort_values("block_time_index")["value"]
         .tolist()
-        )
-    
+    )
+
     for _ in range(0, batch):
         problem = build_problem(
             network,
@@ -134,7 +141,7 @@ def test_model_behaviour(
         output = OutputValues(problem)
         gen3_values = output.component("unique_prod3").var("generation").value[0]
 
-        print("\n gen3_values:\n",gen3_values)
+        print("\n gen3_values:\n", gen3_values)
 
         for t, (ref_val, sol_val) in enumerate(zip(ref_gen3, gen3_values)):
             assert math.isclose(
@@ -142,4 +149,3 @@ def test_model_behaviour(
                 sol_val,
                 rel_tol=relative_accuracy,
             ), f"unique_prod3.generation mismatch at timestep {t}: expected {ref_val}, got {sol_val}"
-    
