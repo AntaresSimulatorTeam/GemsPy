@@ -91,7 +91,7 @@ def test_model_behaviour(
     results_dir: Path,
     systems_dir: Path,
     series_dir: Path,
-    ) -> None:
+) -> None:
     scenarios = 1
 
     # Hardcoded timestep range
