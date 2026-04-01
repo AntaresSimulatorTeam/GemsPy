@@ -91,8 +91,7 @@ def test_model_behaviour(
     results_dir: Path,
     systems_dir: Path,
     series_dir: Path,
-    data_dir: Path,
-) -> None:
+    ) -> None:
     scenarios = 1
 
     # Hardcoded timestep range
@@ -139,8 +138,6 @@ def test_model_behaviour(
 
         output = OutputValues(problem)
         gen3_values = output.component("unique_prod3").var("generation").value[0]
-
-        print("\n gen3_values:\n", gen3_values)
 
         for t, (ref_val, sol_val) in enumerate(zip(ref_gen3, gen3_values)):
             assert math.isclose(
