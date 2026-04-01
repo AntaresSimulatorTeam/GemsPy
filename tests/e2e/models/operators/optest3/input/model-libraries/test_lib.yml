@@ -11,7 +11,7 @@
 # This file is part of the Antares project.
 library:
   id: test_lib
-  description: Antares historic model library
+  description: This library aims at testing the correct handling of complex expressions of bounds of variables, which requires an "expression expansion" step in the code. The test is successful if the optimization problem is solved without errors and the optimal solution is correct.
 
 
   port-types:

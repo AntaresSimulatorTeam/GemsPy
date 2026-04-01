@@ -1,4 +1,5 @@
-system:
+system: #This system aims at testing the correct handling of complex expressions of bounds of variables, which requires an "expression expansion" step in the code. The test is successful if the optimization problem is solved without errors and the optimal solution is correct.
+
   components:
   - id: unique_prod
     model: test_lib.thermal
