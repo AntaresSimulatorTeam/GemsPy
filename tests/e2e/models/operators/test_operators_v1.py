@@ -36,18 +36,18 @@ def results_dir(data_dir: Path) -> Path:
 
 
 @pytest.fixture
-def systems_dir(data_dir: Path) -> Path:
+def input_dir(data_dir: Path) -> Path:
     return data_dir / "input"
 
 
 @pytest.fixture
-def system_file(data_dir: Path) -> Path:
-    return data_dir / "input" / "system.yml"
+def system_file(input_dir: Path) -> Path:
+    return input_dir / "system.yml"
 
 
 @pytest.fixture
-def series_dir(data_dir: Path) -> Path:
-    return data_dir / "input" / "data-series"
+def series_dir(input_dir: Path) -> Path:
+    return input_dir / "data-series"
 
 
 @pytest.fixture
@@ -66,8 +66,8 @@ def relative_accuracy() -> float:
 
 
 @pytest.fixture
-def input_libraries(data_dir: Path) -> List[InputLibrary]:
-    libs_dir = data_dir / "input" / "model-libraries"
+def input_libraries(input_dir: Path) -> List[InputLibrary]:
+    libs_dir = input_dir / "model-libraries"
     with open(libs_dir / "test_lib.yml") as lib_file:
         lib_new = parse_yaml_library(lib_file)
     return [lib_new]
@@ -83,7 +83,7 @@ def input_libraries(data_dir: Path) -> List[InputLibrary]:
     indirect=True,
 )
 def test_model_behaviour(
-    system_file: str,
+    system_file: Path,
     optim_result_file: str,
     batch: int,
     relative_accuracy: float,
@@ -100,7 +100,7 @@ def test_model_behaviour(
     last_timestep = 167
     timesteps = list(range(first_timestep, last_timestep + 1))
 
-    with open(systems_dir / system_file) as compo_file:
+    with open(system_file) as compo_file:
         input_component = parse_yaml_components(compo_file)
 
     result_lib = resolve_library(input_libraries)
