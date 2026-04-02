@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gemspy"
-version = "0.0.5"
+version = "0.0.6"
 description = "Python interpreter for GEMS: modelling and simulation of complex energy systems under uncertainty"
 readme = "README.md"
 license = { file = "LICENSE" }
