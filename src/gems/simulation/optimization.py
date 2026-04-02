@@ -462,7 +462,6 @@ def _create_constraint(
                 expanded, block_timestep, scenario
             )
 
-            # What happens if there is some time_operator in the bounds ?
             constraint_data = ConstraintData(
                 name=constraint.name,
                 lower_bound=_compute_expression_value(
