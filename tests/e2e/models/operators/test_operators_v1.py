@@ -89,7 +89,6 @@ def test_model_behaviour(
     relative_accuracy: float,
     input_libraries: List[InputLibrary],
     results_dir: Path,
-    systems_dir: Path,
     series_dir: Path,
 ) -> None:
     scenarios = 1
