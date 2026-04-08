@@ -23,8 +23,6 @@ from gems.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
-    ProblemParameterNode,
-    ProblemVariableNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -83,12 +81,6 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         return 1
 
     def comp_parameter(self, node: ComponentParameterNode) -> int | float:
-        return 0
-
-    def pb_variable(self, node: ProblemVariableNode) -> int | float:
-        return 1
-
-    def pb_parameter(self, node: ProblemParameterNode) -> int | float:
         return 0
 
     def time_shift(self, node: TimeShiftNode) -> int | float:

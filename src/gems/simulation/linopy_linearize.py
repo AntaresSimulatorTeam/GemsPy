@@ -47,8 +47,6 @@ from gems.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
-    ProblemParameterNode,
-    ProblemVariableNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -495,14 +493,4 @@ class VectorizedLinopyBuilder(ExpressionVisitor[LinopyExpression]):
     def comp_variable(self, node: ComponentVariableNode) -> LinopyExpression:
         raise ValueError(
             f"ComponentVariableNode {node!r} should not appear in a model-level AST."
-        )
-
-    def pb_parameter(self, node: ProblemParameterNode) -> LinopyExpression:
-        raise ValueError(
-            f"ProblemParameterNode {node!r} should not appear in a model-level AST."
-        )
-
-    def pb_variable(self, node: ProblemVariableNode) -> LinopyExpression:
-        raise ValueError(
-            f"ProblemVariableNode {node!r} should not appear in a model-level AST."
         )

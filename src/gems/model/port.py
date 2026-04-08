@@ -36,8 +36,6 @@ from gems.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
-    ProblemParameterNode,
-    ProblemVariableNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -137,16 +135,6 @@ class _PortFieldExpressionChecker(ExpressionVisitor[None]):
         )
 
     def comp_variable(self, node: ComponentVariableNode) -> None:
-        raise ValueError(
-            "Port definition must not contain a variable associated to a component."
-        )
-
-    def pb_parameter(self, node: ProblemParameterNode) -> None:
-        raise ValueError(
-            "Port definition must not contain a parameter associated to a component."
-        )
-
-    def pb_variable(self, node: ProblemVariableNode) -> None:
         raise ValueError(
             "Port definition must not contain a variable associated to a component."
         )

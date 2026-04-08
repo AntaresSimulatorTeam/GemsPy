@@ -47,8 +47,6 @@ from gems.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
-    ProblemParameterNode,
-    ProblemVariableNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -261,14 +259,4 @@ class VectorizedExtraOutputBuilder(ExpressionVisitor[xr.DataArray]):
     def comp_variable(self, node: ComponentVariableNode) -> xr.DataArray:
         raise ValueError(
             f"ComponentVariableNode {node!r} should not appear in a model-level AST."
-        )
-
-    def pb_parameter(self, node: ProblemParameterNode) -> xr.DataArray:
-        raise ValueError(
-            f"ProblemParameterNode {node!r} should not appear in a model-level AST."
-        )
-
-    def pb_variable(self, node: ProblemVariableNode) -> xr.DataArray:
-        raise ValueError(
-            f"ProblemVariableNode {node!r} should not appear in a model-level AST."
         )

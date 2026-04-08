@@ -36,8 +36,6 @@ from gems.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
-    ProblemParameterNode,
-    ProblemVariableNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -89,14 +87,6 @@ class EqualityVisitor:
             right, ComponentParameterNode
         ):
             return self.comp_parameter(left, right)
-        if isinstance(left, ProblemVariableNode) and isinstance(
-            right, ProblemVariableNode
-        ):
-            return self.problem_variable(left, right)
-        if isinstance(left, ProblemParameterNode) and isinstance(
-            right, ProblemParameterNode
-        ):
-            return self.problem_parameter(left, right)
         if isinstance(left, TimeShiftNode) and isinstance(right, TimeShiftNode):
             return self.time_shift(left, right)
         if isinstance(left, TimeEvalNode) and isinstance(right, TimeEvalNode):
@@ -171,26 +161,6 @@ class EqualityVisitor:
         self, left: ComponentParameterNode, right: ComponentParameterNode
     ) -> bool:
         return left.name == right.name and left.component_id == right.component_id
-
-    def problem_variable(
-        self, left: ProblemVariableNode, right: ProblemVariableNode
-    ) -> bool:
-        return (
-            left.name == right.name
-            and left.component_id == right.component_id
-            and left.time_index == right.time_index
-            and left.scenario_index == right.scenario_index
-        )
-
-    def problem_parameter(
-        self, left: ProblemParameterNode, right: ProblemParameterNode
-    ) -> bool:
-        return (
-            left.name == right.name
-            and left.component_id == right.component_id
-            and left.time_index == right.time_index
-            and left.scenario_index == right.scenario_index
-        )
 
     def time_shift(self, left: TimeShiftNode, right: TimeShiftNode) -> bool:
         return self.visit(left.time_shift, right.time_shift) and self.visit(

@@ -34,8 +34,6 @@ from .expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
-    ProblemParameterNode,
-    ProblemVariableNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -126,16 +124,6 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
     def comp_parameter(self, node: ComponentParameterNode) -> IndexingStructure:
         return self.context.get_component_parameter_structure(
             node.component_id, node.name
-        )
-
-    def pb_variable(self, node: ProblemVariableNode) -> IndexingStructure:
-        raise ValueError(
-            "Not relevant to compute indexation on already instantiated problem variables."
-        )
-
-    def pb_parameter(self, node: ProblemParameterNode) -> IndexingStructure:
-        raise ValueError(
-            "Not relevant to compute indexation on already instantiated problem parameters."
         )
 
     def time_shift(self, node: TimeShiftNode) -> IndexingStructure:
