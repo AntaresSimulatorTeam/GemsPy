@@ -15,27 +15,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: 3.11
-          cache: pip
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+        run: uv pip install -e ".[dev]"
 
       - name: Check imports sort order
         uses: isort/isort-action@v1
         with:
           sort-paths: src, tests
           configuration: --profile black --check-only --diff
-          requirements-files: "requirements.txt requirements-dev.txt"
 
       - name: Check formatting
         uses: psf/black@stable
         with:
-          # Version of Black should match the versions set in `requirements-dev.txt`
-          version: "~=23.7.0"
+          version: "~=24.0"
           options: --check --diff
 
       - name: Check typing
@@ -51,4 +47,3 @@ jobs:
         with:
           name: python-code-coverage-report
           path: coverage.xml
-

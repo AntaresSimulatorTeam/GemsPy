@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Install:**
 ```bash
-pip install -r requirements.txt -r requirements-dev.txt
+pip install -e ".[dev]"
 ```
 
 **Test:**
