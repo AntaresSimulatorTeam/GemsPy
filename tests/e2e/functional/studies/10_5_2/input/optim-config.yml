@@ -1,0 +1,11 @@
+time-scope:
+  first-time-step: 0
+  last-time-step: 2
+
+solver-options:
+  name: highs
+  logs: true
+  parameters: "THREADS 1"
+
+scenario-scope:
+  nb-scenarios: 1
