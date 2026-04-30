@@ -26,6 +26,7 @@ from gems.study.data import (
     LazyScenarioSeriesData,
     LazyTimeScenarioSeriesData,
     LazyTimeSeriesData,
+    MaterializedTimeScenarioSeriesData,
     ScenarioSeriesData,
     TimeScenarioSeriesData,
     TimeSeriesData,
@@ -36,7 +37,6 @@ from gems.study.data import (
 from gems.study.parsing import parse_yaml_components
 from gems.study.resolve_components import _build_data, build_data_base
 from gems.study.scenario_builder import ScenarioBuilder
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -57,6 +57,7 @@ def _write_time_series_parquet(path: Path, values: list[float]) -> None:
 def _write_scenario_series_parquet(path: Path, values: list[float], n_rows: int = 3) -> None:
     """Write an S-column parquet where every row holds the same scenario values."""
     pl.DataFrame({str(c): [v] * n_rows for c, v in enumerate(values)}).write_parquet(path)
+
 
 # ---------------------------------------------------------------------------
 # load_ts_from_file
@@ -374,11 +375,14 @@ def test_lazy_time_scenario_series_data_column_pruning(tmp_path: Path) -> None:
     """Reads only the requested columns and rows."""
     p = tmp_path / "tss.parquet"
     # 3 timesteps × 4 scenarios
-    _write_time_scenario_parquet(p, [
-        [1.0, 2.0, 3.0, 4.0],
-        [5.0, 6.0, 7.0, 8.0],
-        [9.0, 10.0, 11.0, 12.0],
-    ])
+    _write_time_scenario_parquet(
+        p,
+        [
+            [1.0, 2.0, 3.0, 4.0],
+            [5.0, 6.0, 7.0, 8.0],
+            [9.0, 10.0, 11.0, 12.0],
+        ],
+    )
     lazy = LazyTimeScenarioSeriesData(str(p))
     result = lazy.get_value([0, 2], np.array([1, 3]))
     assert result.shape == (2, 2)
@@ -477,3 +481,132 @@ def test_build_data_parquet_takes_precedence_over_txt(tmp_path: Path) -> None:
         timeseries_dir=tmp_path,
     )
     assert isinstance(result, LazyTimeScenarioSeriesData)
+
+
+# ---------------------------------------------------------------------------
+# MaterializedTimeScenarioSeriesData
+# ---------------------------------------------------------------------------
+
+
+def test_materialized_time_scenario_get_value_basic() -> None:
+    """get_value returns the correct (T, S) slice from selectively pre-loaded data.
+
+    Original file had 3 columns (0, 1, 2); only cols 0 and 2 were loaded.
+    Position 0 in data → original col 0, position 1 → original col 2.
+    """
+    # data holds only the two loaded columns (original cols 0 and 2)
+    data = np.array([[1.0, 3.0], [4.0, 6.0], [7.0, 9.0]])
+    col_pos = {0: 0, 2: 1}
+    mat = MaterializedTimeScenarioSeriesData(data=data, col_pos=col_pos)
+    result = mat.get_value([0, 2], np.array([0, 2]))
+    np.testing.assert_array_equal(result, [[1.0, 3.0], [7.0, 9.0]])
+
+
+def test_materialized_time_scenario_get_value_duplicate_scenarios() -> None:
+    """Duplicate scenario indices are handled via col_pos remapping."""
+    data = np.array([[10.0, 20.0]])
+    col_pos = {0: 0, 5: 1}
+    mat = MaterializedTimeScenarioSeriesData(data=data, col_pos=col_pos)
+    result = mat.get_value([0], np.array([5, 0, 5]))
+    np.testing.assert_array_equal(result, [[20.0, 10.0, 20.0]])
+
+
+def test_materialized_time_scenario_requires_timestep() -> None:
+    mat = MaterializedTimeScenarioSeriesData(data=np.zeros((2, 2)), col_pos={0: 0, 1: 1})
+    with pytest.raises(KeyError):
+        mat.get_value(None, np.array([0]))
+
+
+def test_materialized_time_scenario_requires_scenario() -> None:
+    mat = MaterializedTimeScenarioSeriesData(data=np.zeros((2, 2)), col_pos={0: 0, 1: 1})
+    with pytest.raises(KeyError):
+        mat.get_value([0], None)
+
+
+def test_materialized_time_scenario_check_requirement() -> None:
+    mat = MaterializedTimeScenarioSeriesData(data=np.zeros((1, 1)), col_pos={0: 0})
+    assert mat.check_requirement(time=True, scenario=True) is True
+    assert mat.check_requirement(time=False, scenario=True) is False
+    assert mat.check_requirement(time=True, scenario=False) is False
+
+
+# ---------------------------------------------------------------------------
+# DataBase.materialize
+# ---------------------------------------------------------------------------
+
+
+def test_database_materialize_lazy_time_scenario_becomes_materialized(tmp_path: Path) -> None:
+    """LazyTimeScenarioSeriesData entries are replaced by MaterializedTimeScenarioSeriesData."""
+    p = tmp_path / "s.parquet"
+    _write_time_scenario_parquet(p, [[1.0, 2.0], [3.0, 4.0]])
+    db = DataBase()
+    db.add_data("C", "p", LazyTimeScenarioSeriesData(str(p)))
+    mat_db = db.materialize([0])
+    entry = mat_db.get_data("C", "p")
+    assert isinstance(entry, MaterializedTimeScenarioSeriesData)
+    result = entry.get_value([0, 1], np.array([0]))
+    np.testing.assert_allclose(result, [[1.0], [3.0]])
+
+
+def test_database_materialize_lazy_time_series_becomes_eager(tmp_path: Path) -> None:
+    """LazyTimeSeriesData entries are replaced by TimeSeriesData."""
+    p = tmp_path / "s.parquet"
+    _write_time_series_parquet(p, [10.0, 20.0])
+    db = DataBase()
+    db.add_data("C", "p", LazyTimeSeriesData(str(p)))
+    mat_db = db.materialize([0])
+    assert isinstance(mat_db.get_data("C", "p"), TimeSeriesData)
+
+
+def test_database_materialize_lazy_scenario_series_becomes_eager(tmp_path: Path) -> None:
+    """LazyScenarioSeriesData entries are replaced by ScenarioSeriesData."""
+    p = tmp_path / "s.parquet"
+    _write_scenario_series_parquet(p, [5.0, 10.0])
+    db = DataBase()
+    db.add_data("C", "p", LazyScenarioSeriesData(str(p)))
+    mat_db = db.materialize([0, 1])
+    assert isinstance(mat_db.get_data("C", "p"), ScenarioSeriesData)
+
+
+def test_database_materialize_eager_entries_carried_over() -> None:
+    """Eager entries are carried over unchanged."""
+    db = DataBase()
+    db.add_data("C", "p", ConstantData(42.0))
+    mat_db = db.materialize([0])
+    assert isinstance(mat_db.get_data("C", "p"), ConstantData)
+
+
+def test_database_materialize_does_not_mutate_original(tmp_path: Path) -> None:
+    """materialize() returns a new DataBase; the original keeps lazy entries."""
+    p = tmp_path / "s.parquet"
+    _write_time_series_parquet(p, [1.0, 2.0])
+    db = DataBase()
+    db.add_data("C", "p", LazyTimeSeriesData(str(p)))
+    _ = db.materialize([0])
+    assert isinstance(db.get_data("C", "p"), LazyTimeSeriesData)
+
+
+def test_database_materialize_selective_columns(tmp_path: Path) -> None:
+    """Only the scenario columns needed by mc_scenario_ids are loaded."""
+    p = tmp_path / "s.parquet"
+    _write_time_scenario_parquet(p, [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    db = DataBase()
+    db.add_data("C", "p", LazyTimeScenarioSeriesData(str(p)))
+    mat_db = db.materialize([2])  # only mc scenario 2 → data col 2
+    entry = mat_db.get_data("C", "p")
+    assert isinstance(entry, MaterializedTimeScenarioSeriesData)
+    assert set(entry.col_pos.keys()) == {2}
+
+
+def test_database_materialize_with_scenario_builder(tmp_path: Path) -> None:
+    """ScenarioBuilder column resolution feeds the selective materialization."""
+    p = tmp_path / "s.parquet"
+    _write_time_scenario_parquet(p, [[10.0, 20.0], [30.0, 40.0]])
+    # MC scenarios 0,1,2 → data cols 1,0,1 (both cols 0 and 1 needed)
+    builder = ScenarioBuilder({"grp": np.array([1, 0, 1])})
+    db = DataBase(scenario_builder=builder)
+    db.add_data("C", "p", LazyTimeScenarioSeriesData(str(p)), scenario_group="grp")
+    mat_db = db.materialize([0, 1, 2])
+    entry = mat_db.get_data("C", "p")
+    assert isinstance(entry, MaterializedTimeScenarioSeriesData)
+    assert set(entry.col_pos.keys()) == {0, 1}

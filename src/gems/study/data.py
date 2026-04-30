@@ -169,7 +169,7 @@ class LazyTimeSeriesData(AbstractDataStructure):
             return np.broadcast_to(result[:, np.newaxis], (len(timestep), len(scenario)))
         return result
 
-    def materialize(self, scenario_cols: Set[int]) -> "TimeSeriesData":
+    def materialize(self) -> "TimeSeriesData":
         arr = pl.scan_parquet(self.uri).select("0").collect().to_numpy().ravel()
         return TimeSeriesData(pd.Series(arr))
 
@@ -204,7 +204,7 @@ class LazyScenarioSeriesData(AbstractDataStructure):
             return np.broadcast_to(result[np.newaxis, :], (len(timestep), len(scenario)))
         return result
 
-    def materialize(self, scenario_cols: Set[int]) -> "ScenarioSeriesData":
+    def materialize(self) -> "ScenarioSeriesData":
         row = pl.scan_parquet(self.uri).collect().to_numpy()[0]
         return ScenarioSeriesData(row)
 
@@ -400,10 +400,9 @@ class DataBase:
         """
         new_db = DataBase(scenario_builder=self._scenario_builder)
         mc_arr = np.asarray(mc_scenario_ids, dtype=int)
-        lazy_types = (LazyTimeSeriesData, LazyScenarioSeriesData, LazyTimeScenarioSeriesData)
         for idx, raw_data in self._data.items():
             group = self._scenario_groups.get(idx)
-            if isinstance(raw_data, lazy_types):
+            if isinstance(raw_data, LazyTimeScenarioSeriesData):
                 if self._scenario_builder is not None and group is not None:
                     scenario_cols = set(
                         self._scenario_builder.resolve_vectorized(group, mc_arr).tolist()
@@ -411,6 +410,8 @@ class DataBase:
                 else:
                     scenario_cols = set(mc_arr.tolist())
                 materialized: AbstractDataStructure = raw_data.materialize(scenario_cols)
+            elif isinstance(raw_data, (LazyTimeSeriesData, LazyScenarioSeriesData)):
+                materialized = raw_data.materialize()
             else:
                 materialized = raw_data
             new_db.add_data(

@@ -34,14 +34,21 @@ import pytest
 
 from gems.model.parsing import parse_yaml_library
 from gems.model.resolve_library import resolve_library
+from gems.optim_config.parsing import OptimConfig
+from gems.session.session import SimulationSession
 from gems.simulation import TimeBlock, build_problem
 from gems.study.data import (
     LazyScenarioSeriesData,
     LazyTimeScenarioSeriesData,
     LazyTimeSeriesData,
+    MaterializedTimeScenarioSeriesData,
 )
 from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import build_data_base, consistency_check, resolve_system
+from gems.study.resolve_components import (
+    build_data_base,
+    consistency_check,
+    resolve_system,
+)
 from gems.study.scenario_builder import ScenarioBuilder
 from gems.study.study import Study
 
@@ -80,9 +87,7 @@ def test_parquet_time_series_same_result_as_txt(tmp_path: Path) -> None:
 
     Parquet layout: single column "0", two rows [50.0, 50.0].
     """
-    pl.DataFrame({"0": [50.0, 50.0]}).write_parquet(
-        tmp_path / "loads-time-only.parquet"
-    )
+    pl.DataFrame({"0": [50.0, 50.0]}).write_parquet(tmp_path / "loads-time-only.parquet")
 
     study, database = _build_study("study_time_only_series.yml", tmp_path)
 
@@ -143,15 +148,11 @@ def test_parquet_time_scenario_series_same_result_as_txt(tmp_path: Path) -> None
 
     Parquet layout: columns "0" and "1", two rows (one per timestep).
     """
-    pl.DataFrame({"0": [50.0, 50.0], "1": [100.0, 100.0]}).write_parquet(
-        tmp_path / "loads.parquet"
-    )
+    pl.DataFrame({"0": [50.0, 50.0], "1": [100.0, 100.0]}).write_parquet(tmp_path / "loads.parquet")
     shutil.copy(_SERIES_DIR / "modeler-scenariobuilder.dat", tmp_path)
     scenario_builder = ScenarioBuilder.load(tmp_path / "modeler-scenariobuilder.dat")
 
-    study, database = _build_study(
-        "with_scenarization.yml", tmp_path, scenario_builder
-    )
+    study, database = _build_study("with_scenarization.yml", tmp_path, scenario_builder)
 
     assert isinstance(
         database.get_data("D", "demand"), LazyTimeScenarioSeriesData
@@ -175,12 +176,8 @@ def test_parquet_takes_precedence_when_both_formats_present(tmp_path: Path) -> N
     same content, then verifies that the lazy structure is used and the result
     is unchanged.
     """
-    shutil.copy(
-        _SERIES_DIR / "loads-time-only.txt", tmp_path / "loads-time-only.txt"
-    )
-    pl.DataFrame({"0": [50.0, 50.0]}).write_parquet(
-        tmp_path / "loads-time-only.parquet"
-    )
+    shutil.copy(_SERIES_DIR / "loads-time-only.txt", tmp_path / "loads-time-only.txt")
+    pl.DataFrame({"0": [50.0, 50.0]}).write_parquet(tmp_path / "loads-time-only.parquet")
 
     study, database = _build_study("study_time_only_series.yml", tmp_path)
 
@@ -192,3 +189,45 @@ def test_parquet_takes_precedence_when_both_formats_present(tmp_path: Path) -> N
     problem.solve(solver_name="highs")
     assert problem.termination_condition == "optimal"
     assert problem.objective_value == pytest.approx(10_000)
+
+
+# ---------------------------------------------------------------------------
+# materialize_per_worker
+# ---------------------------------------------------------------------------
+
+
+def test_materialize_per_worker_same_result_as_lazy(tmp_path: Path) -> None:
+    """materialize_per_worker=True produces the same objective as the lazy path.
+
+    Uses sequential-subproblems with block-length=1 over a 2-timestep horizon
+    so that materialize() is called once per scenario worker.
+    Verifies that the working database entry becomes MaterializedTimeScenarioSeriesData
+    and that the resulting objective is numerically identical to the lazy run.
+    """
+    pl.DataFrame({"0": [50.0, 50.0], "1": [100.0, 100.0]}).write_parquet(tmp_path / "loads.parquet")
+    shutil.copy(_SERIES_DIR / "modeler-scenariobuilder.dat", tmp_path)
+    scenario_builder = ScenarioBuilder.load(tmp_path / "modeler-scenariobuilder.dat")
+
+    study, database = _build_study("with_scenarization.yml", tmp_path, scenario_builder)
+    assert isinstance(database.get_data("D", "demand"), LazyTimeScenarioSeriesData)
+
+    optim_config = OptimConfig.model_validate(
+        {
+            "time-scope": {"first-time-step": 0, "last-time-step": 1},
+            "scenario-scope": {"nb-scenarios": 3},
+            "resolution": {"mode": "sequential-subproblems", "block-length": 1},
+        }
+    )
+
+    lazy_table = SimulationSession(study=study, optim_config=optim_config).run()
+    mat_table = SimulationSession(
+        study=study, optim_config=optim_config, materialize_per_worker=True
+    ).run()
+
+    # Verify materialization produces MaterializedTimeScenarioSeriesData
+    mat_db = study.database.materialize([0])
+    assert isinstance(mat_db.get_data("D", "demand"), MaterializedTimeScenarioSeriesData)
+
+    obj_rows_lazy = lazy_table.data.loc[lazy_table.data["output"] == "objective-value", "value"]
+    obj_rows_mat = mat_table.data.loc[mat_table.data["output"] == "objective-value", "value"]
+    assert obj_rows_lazy.sum() == pytest.approx(obj_rows_mat.sum(), rel=1e-6)

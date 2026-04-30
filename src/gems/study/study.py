@@ -38,6 +38,13 @@ class Study:
     database: DataBase
     scenario_builder: ScenarioBuilder = field(default_factory=ScenarioBuilder)
 
+    def __post_init__(self) -> None:
+        # Pre-populate both cached properties at construction time so that
+        # concurrent worker threads only ever perform reads, never a racy
+        # first-write through cached_property.__set_name__.
+        _ = self.model_components
+        _ = self.models
+
     @cached_property
     def model_components(self) -> Dict[str, List[Component]]:
         """Components grouped by their model.id."""
@@ -49,9 +56,7 @@ class Study:
     @cached_property
     def models(self) -> Dict[str, Model]:
         """All unique models in the system, keyed by model.id."""
-        return {
-            mk: components[0].model for mk, components in self.model_components.items()
-        }
+        return {mk: components[0].model for mk, components in self.model_components.items()}
 
     def check_consistency(self) -> None:
         """Validate that the database supplies data for every parameter of every
