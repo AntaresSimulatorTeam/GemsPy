@@ -12,7 +12,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Union
 
 import numpy as np
 import pandas as pd
@@ -86,9 +86,7 @@ class TimeSeriesData(AbstractDataStructure):
             raise KeyError("Time series data requires a time index.")
         result: np.ndarray = np.asarray(self.time_series.values)[np.asarray(timestep)]
         if scenario is not None:
-            return np.broadcast_to(
-                result[:, np.newaxis], (len(timestep), len(scenario))
-            )
+            return np.broadcast_to(result[:, np.newaxis], (len(timestep), len(scenario)))
         return result
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
@@ -115,9 +113,7 @@ class ScenarioSeriesData(AbstractDataStructure):
             raise KeyError("Scenario series data requires a scenario index.")
         result = self.scenario_series[scenario]  # (S,)
         if timestep is not None:
-            return np.broadcast_to(
-                result[np.newaxis, :], (len(timestep), len(scenario))
-            )
+            return np.broadcast_to(result[np.newaxis, :], (len(timestep), len(scenario)))
         return result
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
@@ -170,10 +166,12 @@ class LazyTimeSeriesData(AbstractDataStructure):
         arr = pl.scan_parquet(self.uri).select("0").collect().to_numpy().ravel()
         result = arr[np.asarray(timestep)]
         if scenario is not None:
-            return np.broadcast_to(
-                result[:, np.newaxis], (len(timestep), len(scenario))
-            )
+            return np.broadcast_to(result[:, np.newaxis], (len(timestep), len(scenario)))
         return result
+
+    def materialize(self, scenario_cols: Set[int]) -> "TimeSeriesData":
+        arr = pl.scan_parquet(self.uri).select("0").collect().to_numpy().ravel()
+        return TimeSeriesData(pd.Series(arr))
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         return time
@@ -203,10 +201,12 @@ class LazyScenarioSeriesData(AbstractDataStructure):
         col_pos = {c: i for i, c in enumerate(unique_cols)}
         result = row[[col_pos[c] for c in cols]]
         if timestep is not None:
-            return np.broadcast_to(
-                result[np.newaxis, :], (len(timestep), len(scenario))
-            )
+            return np.broadcast_to(result[np.newaxis, :], (len(timestep), len(scenario)))
         return result
+
+    def materialize(self, scenario_cols: Set[int]) -> "ScenarioSeriesData":
+        row = pl.scan_parquet(self.uri).collect().to_numpy()[0]
+        return ScenarioSeriesData(row)
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         return scenario
@@ -240,13 +240,49 @@ class LazyTimeScenarioSeriesData(AbstractDataStructure):
         data = df.to_numpy()[:, [col_pos[c] for c in cols]]
         return data[np.asarray(timestep), :]
 
+    def materialize(self, scenario_cols: Set[int]) -> "MaterializedTimeScenarioSeriesData":
+        str_cols = [str(c) for c in sorted(scenario_cols)]
+        df = pl.scan_parquet(self.uri).select(str_cols).collect()
+        col_pos = {int(c): i for i, c in enumerate(str_cols)}
+        return MaterializedTimeScenarioSeriesData(data=df.to_numpy(), col_pos=col_pos)
+
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         return time and scenario
 
 
-def load_ts_from_file(
-    timeseries_name: Optional[str], path_to_file: Optional[Path]
-) -> pd.DataFrame:
+@dataclass(frozen=True)
+class MaterializedTimeScenarioSeriesData(AbstractDataStructure):
+    """Pre-loaded subset of a time×scenario parquet file.
+
+    Holds only the data-series columns required by the current worker.
+    col_pos maps each original data-series column index to its position
+    in the in-memory data array, enabling the same deduplication /
+    re-expansion logic as the lazy counterpart.
+    """
+
+    data: np.ndarray  # shape (T, n_loaded_cols)
+    col_pos: Dict[int, int]  # original col idx → position in data
+
+    def get_value(
+        self,
+        timestep: Optional[List[int]],
+        scenario: Optional[np.ndarray],
+    ) -> np.ndarray:
+        if timestep is None:
+            raise KeyError("Time scenario data requires a time index.")
+        if scenario is None:
+            raise KeyError("Time scenario data requires a scenario index.")
+        positions = [self.col_pos[s] for s in scenario]
+        unique_pos = list(dict.fromkeys(positions))
+        pos_map = {p: i for i, p in enumerate(unique_pos)}
+        result = self.data[np.ix_(np.asarray(timestep), np.asarray(unique_pos))]
+        return result[:, [pos_map[p] for p in positions]]
+
+    def check_requirement(self, time: bool, scenario: bool) -> bool:
+        return time and scenario
+
+
+def load_ts_from_file(timeseries_name: Optional[str], path_to_file: Optional[Path]) -> pd.DataFrame:
     if path_to_file is None or timeseries_name is None:
         raise FileNotFoundError(f"File '{timeseries_name}' does not exist")
 
@@ -265,9 +301,7 @@ def load_ts_from_file(
             break
 
     if last_exc is not None:
-        raise Exception(
-            f"An error has arrived when processing '{candidate}': {last_exc}"
-        )
+        raise Exception(f"An error has arrived when processing '{candidate}': {last_exc}")
 
     raise FileNotFoundError(
         f"File '{timeseries_name}.txt' or '{timeseries_name}.tsv' does not exist"
@@ -356,6 +390,33 @@ class DataBase:
             )
 
         return raw_data.get_value(timesteps, cols)
+
+    def materialize(self, mc_scenario_ids: List[int]) -> "DataBase":
+        """Return a new DataBase with every lazy entry replaced by pre-loaded in-memory data.
+
+        Only the data-series columns that the given MC scenario IDs map to are
+        loaded from each parquet file (via ScenarioBuilder when present).
+        Eager entries are carried over as-is.  The original DataBase is never mutated.
+        """
+        new_db = DataBase(scenario_builder=self._scenario_builder)
+        mc_arr = np.asarray(mc_scenario_ids, dtype=int)
+        lazy_types = (LazyTimeSeriesData, LazyScenarioSeriesData, LazyTimeScenarioSeriesData)
+        for idx, raw_data in self._data.items():
+            group = self._scenario_groups.get(idx)
+            if isinstance(raw_data, lazy_types):
+                if self._scenario_builder is not None and group is not None:
+                    scenario_cols = set(
+                        self._scenario_builder.resolve_vectorized(group, mc_arr).tolist()
+                    )
+                else:
+                    scenario_cols = set(mc_arr.tolist())
+                materialized: AbstractDataStructure = raw_data.materialize(scenario_cols)
+            else:
+                materialized = raw_data
+            new_db.add_data(
+                idx.component_id, idx.parameter_name, materialized, scenario_group=group
+            )
+        return new_db
 
     def get_value(
         self, index: ComponentParameterIndex, timestep: int, scenario: int

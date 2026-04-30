@@ -11,7 +11,7 @@
 # This file is part of the Antares project.
 
 from concurrent.futures import Executor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
@@ -35,6 +35,7 @@ class SimulationSession:
     study: Study
     optim_config: OptimConfig
     executor: Optional[Executor] = None
+    materialize_per_worker: bool = False
     run_id: str = field(default_factory=lambda: str(uuid4()))
     output_dir: Optional[Path] = None
 
@@ -78,6 +79,10 @@ class SimulationSession:
         block_overlap: int = cfg.block_overlap
 
         def _run_one_scenario_sequential(scenario_id: int) -> SimulationTable:
+            effective_study = self.study
+            if self.materialize_per_worker:
+                mat_db = self.study.database.materialize([scenario_id])
+                effective_study = replace(self.study, database=mat_db)
             t_start = self.optim_config.time_scope.first_time_step
             block_id = 0
             carry_over: Dict[Tuple[str, str], xr.DataArray] = {}
@@ -93,6 +98,7 @@ class SimulationSession:
                     block,
                     scenario_ids=[scenario_id],
                     initial_values=carry_over or None,
+                    study=effective_study,
                 )
                 block_tables.append(table)
                 carry_over = self._extract_carry_over(problem, local_index=len(timesteps) - 1)
@@ -179,6 +185,7 @@ class SimulationSession:
         block: TimeBlock,
         scenario_ids: List[int],
         initial_values: Optional[Dict[Tuple[str, str], xr.DataArray]] = None,
+        study: Optional[Study] = None,
     ) -> Tuple[OptimizationProblem, SimulationTable]:
         """MAP: build and solve one block, then convert to a SimulationTable.
 
@@ -187,8 +194,9 @@ class SimulationSession:
         scenario_ids_remap equals scenario_ids because the list of MC scenario IDs
         IS the mapping from internal 0-based position to actual MC identifier.
         """
+        effective_study = study if study is not None else self.study
         problem = build_problem(
-            self.study,
+            effective_study,
             block,
             scenario_ids,
             optim_config=self.optim_config,
@@ -206,7 +214,12 @@ class SimulationSession:
 
     def _run_batch(self, batch: List[Tuple[TimeBlock, List[int]]]) -> List[SimulationTable]:
         """Run a list of independent (block, scenario_ids) pairs on one worker."""
-        return [self._run_block(block, sids)[1] for block, sids in batch]
+        study = self.study
+        if self.materialize_per_worker:
+            scenario_id = batch[0][1][0]
+            mat_db = study.database.materialize([scenario_id])
+            study = replace(study, database=mat_db)
+        return [self._run_block(block, sids, study=study)[1] for block, sids in batch]
 
     def _reduce(self, tables: List[SimulationTable]) -> SimulationTable:
         """REDUCE: merge SimulationTables from one scenario's blocks into one."""

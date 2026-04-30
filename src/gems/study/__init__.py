@@ -16,6 +16,7 @@ from .data import (
     LazyScenarioSeriesData,
     LazyTimeScenarioSeriesData,
     LazyTimeSeriesData,
+    MaterializedTimeScenarioSeriesData,
     ScenarioIndex,
     ScenarioSeriesData,
     TimeIndex,
