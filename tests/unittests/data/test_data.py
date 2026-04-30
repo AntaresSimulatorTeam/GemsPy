@@ -17,11 +17,15 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import pytest
 
 from gems.study.data import (
     ConstantData,
     DataBase,
+    LazyScenarioSeriesData,
+    LazyTimeScenarioSeriesData,
+    LazyTimeSeriesData,
     ScenarioSeriesData,
     TimeScenarioSeriesData,
     TimeSeriesData,
@@ -32,6 +36,27 @@ from gems.study.data import (
 from gems.study.parsing import parse_yaml_components
 from gems.study.resolve_components import _build_data, build_data_base
 from gems.study.scenario_builder import ScenarioBuilder
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _write_time_scenario_parquet(path: Path, data: list[list[float]]) -> None:
+    """Write a T×S parquet with columns named "0", "1", …"""
+    n_cols = len(data[0])
+    pl.DataFrame({str(c): [row[c] for row in data] for c in range(n_cols)}).write_parquet(path)
+
+
+def _write_time_series_parquet(path: Path, values: list[float]) -> None:
+    """Write a T×1 parquet with a single column named "0"."""
+    pl.DataFrame({"0": values}).write_parquet(path)
+
+
+def _write_scenario_series_parquet(path: Path, values: list[float], n_rows: int = 3) -> None:
+    """Write an S-column parquet where every row holds the same scenario values."""
+    pl.DataFrame({str(c): [v] * n_rows for c, v in enumerate(values)}).write_parquet(path)
 
 # ---------------------------------------------------------------------------
 # load_ts_from_file
@@ -262,3 +287,193 @@ def test_database_get_data_missing_key_raises() -> None:
     db = DataBase()
     with pytest.raises(KeyError):
         db.get_data("unknown", "param")
+
+
+# ---------------------------------------------------------------------------
+# LazyTimeSeriesData
+# ---------------------------------------------------------------------------
+
+
+def test_lazy_time_series_data_basic(tmp_path: Path) -> None:
+    """Reads the requested timesteps from a parquet file."""
+    p = tmp_path / "ts.parquet"
+    _write_time_series_parquet(p, [10.0, 20.0, 30.0, 40.0])
+    lazy = LazyTimeSeriesData(str(p))
+    result = lazy.get_value([0, 2], None)
+    np.testing.assert_array_equal(result, [10.0, 30.0])
+
+
+def test_lazy_time_series_data_broadcast_over_scenarios(tmp_path: Path) -> None:
+    """Broadcasts time values across scenarios when scenario array is provided."""
+    p = tmp_path / "ts.parquet"
+    _write_time_series_parquet(p, [1.0, 2.0, 3.0])
+    lazy = LazyTimeSeriesData(str(p))
+    result = lazy.get_value([0, 1], np.array([0, 1, 2]))
+    assert result.shape == (2, 3)
+    np.testing.assert_array_equal(result[:, 0], [1.0, 2.0])
+    np.testing.assert_array_equal(result[:, 2], [1.0, 2.0])
+
+
+def test_lazy_time_series_data_requires_timestep(tmp_path: Path) -> None:
+    p = tmp_path / "ts.parquet"
+    _write_time_series_parquet(p, [1.0, 2.0])
+    with pytest.raises(KeyError):
+        LazyTimeSeriesData(str(p)).get_value(None, None)
+
+
+def test_lazy_time_series_data_check_requirement() -> None:
+    lazy = LazyTimeSeriesData("irrelevant.parquet")
+    assert lazy.check_requirement(time=True, scenario=False) is True
+    assert lazy.check_requirement(time=False, scenario=True) is False
+
+
+# ---------------------------------------------------------------------------
+# LazyScenarioSeriesData
+# ---------------------------------------------------------------------------
+
+
+def test_lazy_scenario_series_data_column_pruning(tmp_path: Path) -> None:
+    """Reads only the requested scenario columns."""
+    p = tmp_path / "sc.parquet"
+    _write_scenario_series_parquet(p, [100.0, 200.0, 300.0])
+    lazy = LazyScenarioSeriesData(str(p))
+    result = lazy.get_value(None, np.array([2, 0]))
+    np.testing.assert_array_equal(result, [300.0, 100.0])
+
+
+def test_lazy_scenario_series_data_broadcast_over_time(tmp_path: Path) -> None:
+    """Broadcasts scenario values across timesteps when timestep list is provided."""
+    p = tmp_path / "sc.parquet"
+    _write_scenario_series_parquet(p, [5.0, 10.0])
+    lazy = LazyScenarioSeriesData(str(p))
+    result = lazy.get_value([0, 1, 2], np.array([0, 1]))
+    assert result.shape == (3, 2)
+    np.testing.assert_array_equal(result[0], [5.0, 10.0])
+    np.testing.assert_array_equal(result[2], [5.0, 10.0])
+
+
+def test_lazy_scenario_series_data_requires_scenario(tmp_path: Path) -> None:
+    p = tmp_path / "sc.parquet"
+    _write_scenario_series_parquet(p, [1.0])
+    with pytest.raises(KeyError):
+        LazyScenarioSeriesData(str(p)).get_value([0], None)
+
+
+def test_lazy_scenario_series_data_check_requirement() -> None:
+    lazy = LazyScenarioSeriesData("irrelevant.parquet")
+    assert lazy.check_requirement(time=False, scenario=True) is True
+    assert lazy.check_requirement(time=True, scenario=False) is False
+
+
+# ---------------------------------------------------------------------------
+# LazyTimeScenarioSeriesData
+# ---------------------------------------------------------------------------
+
+
+def test_lazy_time_scenario_series_data_column_pruning(tmp_path: Path) -> None:
+    """Reads only the requested columns and rows."""
+    p = tmp_path / "tss.parquet"
+    # 3 timesteps × 4 scenarios
+    _write_time_scenario_parquet(p, [
+        [1.0, 2.0, 3.0, 4.0],
+        [5.0, 6.0, 7.0, 8.0],
+        [9.0, 10.0, 11.0, 12.0],
+    ])
+    lazy = LazyTimeScenarioSeriesData(str(p))
+    result = lazy.get_value([0, 2], np.array([1, 3]))
+    assert result.shape == (2, 2)
+    np.testing.assert_array_equal(result, [[2.0, 4.0], [10.0, 12.0]])
+
+
+def test_lazy_time_scenario_series_data_requires_timestep(tmp_path: Path) -> None:
+    p = tmp_path / "tss.parquet"
+    _write_time_scenario_parquet(p, [[1.0, 2.0]])
+    with pytest.raises(KeyError):
+        LazyTimeScenarioSeriesData(str(p)).get_value(None, np.array([0]))
+
+
+def test_lazy_time_scenario_series_data_requires_scenario(tmp_path: Path) -> None:
+    p = tmp_path / "tss.parquet"
+    _write_time_scenario_parquet(p, [[1.0, 2.0]])
+    with pytest.raises(KeyError):
+        LazyTimeScenarioSeriesData(str(p)).get_value([0], None)
+
+
+def test_lazy_time_scenario_series_data_check_requirement() -> None:
+    lazy = LazyTimeScenarioSeriesData("irrelevant.parquet")
+    assert lazy.check_requirement(time=True, scenario=True) is True
+    assert lazy.check_requirement(time=True, scenario=False) is False
+    assert lazy.check_requirement(time=False, scenario=True) is False
+
+
+# ---------------------------------------------------------------------------
+# _build_data — parquet format detection and backward compat
+# ---------------------------------------------------------------------------
+
+
+def test_build_data_detects_parquet_time_scenario(tmp_path: Path) -> None:
+    """Returns LazyTimeScenarioSeriesData when a .parquet file is present."""
+    p = tmp_path / "series.parquet"
+    _write_time_scenario_parquet(p, [[1.0, 2.0], [3.0, 4.0]])
+    result = _build_data(
+        time_dependent=True,
+        scenario_dependent=True,
+        param_value="series",
+        timeseries_dir=tmp_path,
+    )
+    assert isinstance(result, LazyTimeScenarioSeriesData)
+    assert result.uri == str(p)
+
+
+def test_build_data_detects_parquet_time_only(tmp_path: Path) -> None:
+    """Returns LazyTimeSeriesData when a .parquet file is present."""
+    p = tmp_path / "series.parquet"
+    _write_time_series_parquet(p, [1.0, 2.0, 3.0])
+    result = _build_data(
+        time_dependent=True,
+        scenario_dependent=False,
+        param_value="series",
+        timeseries_dir=tmp_path,
+    )
+    assert isinstance(result, LazyTimeSeriesData)
+    assert result.uri == str(p)
+
+
+def test_build_data_detects_parquet_scenario_only(tmp_path: Path) -> None:
+    """Returns LazyScenarioSeriesData when a .parquet file is present."""
+    p = tmp_path / "series.parquet"
+    _write_scenario_series_parquet(p, [10.0, 20.0])
+    result = _build_data(
+        time_dependent=False,
+        scenario_dependent=True,
+        param_value="series",
+        timeseries_dir=tmp_path,
+    )
+    assert isinstance(result, LazyScenarioSeriesData)
+    assert result.uri == str(p)
+
+
+def test_build_data_falls_back_to_txt_when_no_parquet(tmp_path: Path) -> None:
+    """Falls back to eager TimeScenarioSeriesData when only a .txt file exists."""
+    (tmp_path / "series.txt").write_text("1 2\n3 4\n")
+    result = _build_data(
+        time_dependent=True,
+        scenario_dependent=True,
+        param_value="series",
+        timeseries_dir=tmp_path,
+    )
+    assert isinstance(result, TimeScenarioSeriesData)
+
+
+def test_build_data_parquet_takes_precedence_over_txt(tmp_path: Path) -> None:
+    """Parquet file wins when both .parquet and .txt exist."""
+    (tmp_path / "series.txt").write_text("1 2\n3 4\n")
+    p = tmp_path / "series.parquet"
+    _write_time_scenario_parquet(p, [[1.0, 2.0], [3.0, 4.0]])
+    result = _build_data(
+        time_dependent=True,
+        scenario_dependent=True,
+        param_value="series",
+        timeseries_dir=tmp_path,
+    )
+    assert isinstance(result, LazyTimeScenarioSeriesData)

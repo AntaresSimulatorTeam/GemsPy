@@ -13,6 +13,9 @@
 from .data import (
     ConstantData,
     DataBase,
+    LazyScenarioSeriesData,
+    LazyTimeScenarioSeriesData,
+    LazyTimeSeriesData,
     ScenarioIndex,
     ScenarioSeriesData,
     TimeIndex,

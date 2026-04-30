@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 if TYPE_CHECKING:
     from gems.study.scenario_builder import ScenarioBuilder
@@ -145,6 +146,97 @@ class TimeScenarioSeriesData(AbstractDataStructure):
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, TimeScenarioSeriesData):
             raise ValueError("Invalid data type for TimeScenarioSeriesData")
+        return time and scenario
+
+
+@dataclass(frozen=True)
+class LazyTimeSeriesData(AbstractDataStructure):
+    """Polars-backed time series: defers parquet I/O to get_value call time.
+
+    Parquet layout: one column named ``"0"``, T rows (one per timestep).
+    Column pruning is not applicable here (single column), but row indexing
+    is still deferred until the optimizer requests a specific time block.
+    """
+
+    uri: str
+
+    def get_value(
+        self,
+        timestep: Optional[List[int]],
+        scenario: Optional[np.ndarray],
+    ) -> np.ndarray:
+        if timestep is None:
+            raise KeyError("Time series data requires a time index.")
+        arr = pl.scan_parquet(self.uri).select("0").collect().to_numpy().ravel()
+        result = arr[np.asarray(timestep)]
+        if scenario is not None:
+            return np.broadcast_to(
+                result[:, np.newaxis], (len(timestep), len(scenario))
+            )
+        return result
+
+    def check_requirement(self, time: bool, scenario: bool) -> bool:
+        return time
+
+
+@dataclass(frozen=True)
+class LazyScenarioSeriesData(AbstractDataStructure):
+    """Polars-backed scenario series: defers parquet I/O to get_value call time.
+
+    Parquet layout: S columns named ``"0"`` … ``"S-1"``, T rows all identical
+    (Parquet RLE compresses this to near-zero overhead).  Only the requested
+    scenario columns are read from disk.
+    """
+
+    uri: str
+
+    def get_value(
+        self,
+        timestep: Optional[List[int]],
+        scenario: Optional[np.ndarray],
+    ) -> np.ndarray:
+        if scenario is None:
+            raise KeyError("Scenario series data requires a scenario index.")
+        cols = [str(s) for s in scenario]
+        result = (
+            pl.scan_parquet(self.uri).select(cols).head(1).collect().to_numpy()[0]
+        )
+        if timestep is not None:
+            return np.broadcast_to(
+                result[np.newaxis, :], (len(timestep), len(scenario))
+            )
+        return result
+
+    def check_requirement(self, time: bool, scenario: bool) -> bool:
+        return scenario
+
+
+@dataclass(frozen=True)
+class LazyTimeScenarioSeriesData(AbstractDataStructure):
+    """Polars-backed time×scenario series: defers parquet I/O to get_value call time.
+
+    Parquet layout: S columns named ``"0"`` … ``"S-1"``, T rows (one per
+    timestep).  Polars column pruning reads only the requested scenario columns;
+    row indexing is applied after collection.  This is the primary beneficiary
+    of parquet lazy loading — only B/S columns are read per worker batch.
+    """
+
+    uri: str
+
+    def get_value(
+        self,
+        timestep: Optional[List[int]],
+        scenario: Optional[np.ndarray],
+    ) -> np.ndarray:
+        if timestep is None:
+            raise KeyError("Time scenario data requires a time index.")
+        if scenario is None:
+            raise KeyError("Time scenario data requires a scenario index.")
+        cols = [str(s) for s in scenario]
+        data = pl.scan_parquet(self.uri).select(cols).collect().to_numpy()
+        return data[np.asarray(timestep), :]
+
+    def check_requirement(self, time: bool, scenario: bool) -> bool:
         return time and scenario
 
 

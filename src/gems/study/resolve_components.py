@@ -26,6 +26,9 @@ from gems.study import (
 )
 from gems.study.data import (
     AbstractDataStructure,
+    LazyScenarioSeriesData,
+    LazyTimeScenarioSeriesData,
+    LazyTimeSeriesData,
     ScenarioSeriesData,
     TimeScenarioSeriesData,
     TimeSeriesData,
@@ -138,6 +141,20 @@ def _build_data(
     timeseries_dir: Optional[Path],
 ) -> AbstractDataStructure:
     if isinstance(param_value, str):
+        if timeseries_dir is not None:
+            parquet_path = timeseries_dir / f"{param_value}.parquet"
+            if parquet_path.exists():
+                uri = str(parquet_path)
+                if time_dependent and scenario_dependent:
+                    return LazyTimeScenarioSeriesData(uri)
+                elif time_dependent:
+                    return LazyTimeSeriesData(uri)
+                elif scenario_dependent:
+                    return LazyScenarioSeriesData(uri)
+                else:
+                    raise ValueError(
+                        f"A float value is expected for constant data, got {param_value}"
+                    )
         ts_data = load_ts_from_file(param_value, timeseries_dir)
         if time_dependent and scenario_dependent:
             return TimeScenarioSeriesData(ts_data)

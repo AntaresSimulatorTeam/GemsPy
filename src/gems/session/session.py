@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 
+from concurrent.futures import Executor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -33,6 +34,7 @@ from gems.study.study import Study
 class SimulationSession:
     study: Study
     optim_config: OptimConfig
+    executor: Optional[Executor] = None
     run_id: str = field(default_factory=lambda: str(uuid4()))
     output_dir: Optional[Path] = None
 
@@ -106,15 +108,15 @@ class SimulationSession:
         cfg = self.optim_config.resolution
         block_length: int = cfg.block_length  # type: ignore[assignment]
 
-        tables: List[SimulationTable] = []
+        work_items: List[Tuple[TimeBlock, List[int]]] = []
         for scenario_id in self.scenario_ids:
             starts = range(
                 self.optim_config.time_scope.first_time_step,
                 self.optim_config.time_scope.last_time_step + 1,
                 block_length,
             )
-            blocks = [
-                TimeBlock(
+            for i, t in enumerate(starts):
+                block = TimeBlock(
                     i,
                     list(
                         range(
@@ -126,11 +128,19 @@ class SimulationSession:
                         )
                     ),
                 )
-                for i, t in enumerate(starts)
+                work_items.append((block, [scenario_id]))
+
+        if self.executor is not None:
+            futures = [
+                self.executor.submit(self._run_block, block, scenario_ids)
+                for block, scenario_ids in work_items
             ]
-            for block in blocks:
-                _, table = self._run_block(block, scenario_ids=[scenario_id])
-                tables.append(table)
+            tables = [f.result()[1] for f in futures]
+        else:
+            tables = [
+                self._run_block(block, scenario_ids)[1]
+                for block, scenario_ids in work_items
+            ]
 
         return self._reduce(tables)
 
