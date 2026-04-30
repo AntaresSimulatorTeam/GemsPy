@@ -115,10 +115,9 @@ class SimulationSession:
 
         return self._reduce(scenario_tables)
 
-    def _run_parallel(self) -> SimulationTable:
+    def _run_parallel(self, blocks_per_batch: int = 1) -> SimulationTable:
         cfg = self.optim_config.resolution
         block_length: int = cfg.block_length  # type: ignore[assignment]
-        blocks_per_batch: int = cfg.blocks_per_batch
 
         t_end = self.optim_config.time_scope.last_time_step + 1
         all_block_starts = list(
