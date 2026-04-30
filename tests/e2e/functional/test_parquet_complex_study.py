@@ -35,8 +35,8 @@ import shutil
 from pathlib import Path
 
 import polars as pl
-from polars.testing import assert_frame_equal
 import pytest
+from polars.testing import assert_frame_equal
 
 from gems.study.data import LazyTimeScenarioSeriesData
 from gems.study.folder import load_study
@@ -118,9 +118,9 @@ def test_7_4_parquet_coexisting_with_tsv_same_result(tmp_path: Path) -> None:
     study = load_study(pq_dir)
     for comp_id, param_id in _TS_PARAMS:
         ds = study.database.get_data(comp_id, param_id)
-        assert isinstance(ds, LazyTimeScenarioSeriesData), (
-            f"{comp_id}.{param_id}: expected LazyTimeScenarioSeriesData, got {type(ds).__name__}"
-        )
+        assert isinstance(
+            ds, LazyTimeScenarioSeriesData
+        ), f"{comp_id}.{param_id}: expected LazyTimeScenarioSeriesData, got {type(ds).__name__}"
 
     _compare_simulation_tables(ref_csv, pq_csv)
 
@@ -157,8 +157,8 @@ def test_7_4_parquet_only_same_result_as_tsv(tmp_path: Path) -> None:
     study = load_study(pq_dir)
     for comp_id, param_id in _TS_PARAMS:
         ds = study.database.get_data(comp_id, param_id)
-        assert isinstance(ds, LazyTimeScenarioSeriesData), (
-            f"{comp_id}.{param_id}: expected LazyTimeScenarioSeriesData, got {type(ds).__name__}"
-        )
+        assert isinstance(
+            ds, LazyTimeScenarioSeriesData
+        ), f"{comp_id}.{param_id}: expected LazyTimeScenarioSeriesData, got {type(ds).__name__}"
 
     _compare_simulation_tables(ref_csv, pq_csv)

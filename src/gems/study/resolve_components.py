@@ -45,9 +45,7 @@ def resolve_system(input_system: SystemSchema, libraries: dict[str, Library]) ->
     Resolves:
     - components to be used for study
     - connections between components"""
-    components_list = [
-        _resolve_component(libraries, m) for m in input_system.components
-    ]
+    components_list = [_resolve_component(libraries, m) for m in input_system.components]
 
     s = System("study")
     for component in components_list:
@@ -61,9 +59,7 @@ def resolve_system(input_system: SystemSchema, libraries: dict[str, Library]) ->
     return s
 
 
-def _resolve_component(
-    libraries: dict[str, Library], component: ComponentSchema
-) -> Component:
+def _resolve_component(libraries: dict[str, Library], component: ComponentSchema) -> Component:
     lib_id, model_id = component.model.split(".")
     model = libraries[lib_id].models[f"{lib_id}.{model_id}"]
 
@@ -81,14 +77,10 @@ def _resolve_port_refs(
     component_1 = _get_component_by_id(all_components, connection.component1)
     component_2 = _get_component_by_id(all_components, connection.component2)
     assert component_1 is not None and component_2 is not None
-    return PortRef(component_1, connection.port1), PortRef(
-        component_2, connection.port2
-    )
+    return PortRef(component_1, connection.port1), PortRef(component_2, connection.port2)
 
 
-def _get_component_by_id(
-    all_components: List[Component], component_id: str
-) -> Optional[Component]:
+def _get_component_by_id(all_components: List[Component], component_id: str) -> Optional[Component]:
     components_dict = {component.id: component for component in all_components}
     return components_dict.get(component_id)
 
@@ -163,9 +155,7 @@ def _build_data(
         elif scenario_dependent:
             return ScenarioSeriesData(dataframe_to_scenario_series(ts_data))
         else:
-            raise ValueError(
-                f"A float value is expected for constant data, got {param_value}"
-            )
+            raise ValueError(f"A float value is expected for constant data, got {param_value}")
     else:
         if time_dependent or scenario_dependent:
             raise ValueError(
