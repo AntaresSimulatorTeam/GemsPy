@@ -81,6 +81,7 @@ class ResolutionConfig(ModifiedBaseModel):
     mode: ResolutionMode = ResolutionMode.FRONTAL
     block_length: Optional[int] = None
     block_overlap: int = 0
+    blocks_per_batch: int = 1
 
     @model_validator(mode="after")
     def _block_length_required_for_windowed_modes(self) -> "ResolutionConfig":

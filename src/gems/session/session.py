@@ -77,12 +77,11 @@ class SimulationSession:
         block_length: int = cfg.block_length  # type: ignore[assignment]
         block_overlap: int = cfg.block_overlap
 
-        tables: List[SimulationTable] = []
-        for scenario_id in self.scenario_ids:
+        def _run_one_scenario_sequential(scenario_id: int) -> SimulationTable:
             t_start = self.optim_config.time_scope.first_time_step
             block_id = 0
             carry_over: Dict[Tuple[str, str], xr.DataArray] = {}
-
+            block_tables: List[SimulationTable] = []
             while t_start < self.optim_config.time_scope.last_time_step:
                 end = min(
                     t_start + block_length,
@@ -95,52 +94,57 @@ class SimulationSession:
                     scenario_ids=[scenario_id],
                     initial_values=carry_over or None,
                 )
-                tables.append(table)
+                block_tables.append(table)
                 carry_over = self._extract_carry_over(
                     problem, local_index=len(timesteps) - 1
                 )
                 t_start += block_length - block_overlap
                 block_id += 1
+            return self._reduce(block_tables)
 
-        return self._reduce(tables)
+        if self.executor is not None:
+            futures = [
+                self.executor.submit(_run_one_scenario_sequential, sid)
+                for sid in self.scenario_ids
+            ]
+            scenario_tables = [f.result() for f in futures]
+        else:
+            scenario_tables = [
+                _run_one_scenario_sequential(sid) for sid in self.scenario_ids
+            ]
+
+        return self._reduce(scenario_tables)
 
     def _run_parallel(self) -> SimulationTable:
         cfg = self.optim_config.resolution
         block_length: int = cfg.block_length  # type: ignore[assignment]
+        blocks_per_batch: int = cfg.blocks_per_batch
 
-        work_items: List[Tuple[TimeBlock, List[int]]] = []
+        t_end = self.optim_config.time_scope.last_time_step + 1
+        all_block_starts = list(
+            range(self.optim_config.time_scope.first_time_step, t_end, block_length)
+        )
+
+        # Build batches: each batch is a list of independent (TimeBlock, scenario_ids) pairs
+        # that will be executed on the same worker.
+        batches: List[List[Tuple[TimeBlock, List[int]]]] = []
         for scenario_id in self.scenario_ids:
-            starts = range(
-                self.optim_config.time_scope.first_time_step,
-                self.optim_config.time_scope.last_time_step + 1,
-                block_length,
-            )
-            for i, t in enumerate(starts):
-                block = TimeBlock(
-                    i,
-                    list(
-                        range(
-                            t,
-                            min(
-                                t + block_length,
-                                self.optim_config.time_scope.last_time_step + 1,
-                            ),
-                        )
-                    ),
-                )
-                work_items.append((block, [scenario_id]))
+            for i in range(0, len(all_block_starts), blocks_per_batch):
+                batch = []
+                for block_idx, bs in enumerate(
+                    all_block_starts[i : i + blocks_per_batch], start=i
+                ):
+                    timesteps = list(range(bs, min(bs + block_length, t_end)))
+                    batch.append((TimeBlock(block_idx, timesteps), [scenario_id]))
+                batches.append(batch)
 
         if self.executor is not None:
             futures = [
-                self.executor.submit(self._run_block, block, scenario_ids)
-                for block, scenario_ids in work_items
+                self.executor.submit(self._run_batch, batch) for batch in batches
             ]
-            tables = [f.result()[1] for f in futures]
+            tables = [t for f in futures for t in f.result()]
         else:
-            tables = [
-                self._run_block(block, scenario_ids)[1]
-                for block, scenario_ids in work_items
-            ]
+            tables = [t for batch in batches for t in self._run_batch(batch)]
 
         return self._reduce(tables)
 
@@ -211,6 +215,12 @@ class SimulationSession:
             problem, scenario_ids_remap=scenario_ids, table_id=self.run_id
         )
         return problem, table
+
+    def _run_batch(
+        self, batch: List[Tuple[TimeBlock, List[int]]]
+    ) -> List[SimulationTable]:
+        """Run a list of independent (block, scenario_ids) pairs on one worker."""
+        return [self._run_block(block, sids)[1] for block, sids in batch]
 
     def _reduce(self, tables: List[SimulationTable]) -> SimulationTable:
         """REDUCE: merge SimulationTables from one scenario's blocks into one."""
