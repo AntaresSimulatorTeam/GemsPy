@@ -17,6 +17,7 @@ defining parameters, variables, and equations.
 """
 
 import itertools
+import warnings
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, Optional
 
@@ -31,29 +32,59 @@ from gems.model.variable import Variable
 
 
 # TODO: Introduce bool_variable ?
-def _make_structure_provider(model: "Model") -> IndexingStructureProvider:
+def _make_structure_provider(
+    parameters: Dict[str, Parameter],
+    variables: Dict[str, Variable],
+) -> IndexingStructureProvider:
     class Provider(IndexingStructureProvider):
         def get_parameter_structure(self, name: str) -> IndexingStructure:
-            return model.parameters[name].structure
+            return parameters[name].structure
 
         def get_variable_structure(self, name: str) -> IndexingStructure:
-            return model.variables[name].structure
-
-        def get_component_parameter_structure(
-            self, component_id: str, name: str
-        ) -> IndexingStructure:
-            raise NotImplementedError(
-                "Cannot have parameters associated to components in models."
-            )
-
-        def get_component_variable_structure(
-            self, component_id: str, name: str
-        ) -> IndexingStructure:
-            raise NotImplementedError(
-                "Cannot have variables associated to components in models."
-            )
+            return variables[name].structure
 
     return Provider()
+
+
+def _normalize_objective_contributions(
+    contributions: Dict[str, ExpressionNode],
+    parameters: Dict[str, Parameter],
+    variables: Dict[str, Variable],
+) -> Dict[str, ExpressionNode]:
+    """
+    Tolerate absence of expec() in objective contributions that carry a residual
+    scenario dimension (IndexingStructure(time=False, scenario=True)).
+
+    Such contributions are automatically wrapped with expec(), applying
+    expectation (average-over-scenarios) semantics, and a UserWarning is emitted
+    so authors can add expec() explicitly at their convenience.
+
+    Contributions that are already fully scalar, or already wrapped in expec(),
+    are returned unchanged with no warning.
+
+    This implements the iso-format behaviour of Antares Simulator v10.0.0 (Issue #76).
+
+    TODO: This auto-wrapping is a temporary compatibility shim. Once Antares Simulator
+    natively supports the expec() operator in objective contributions, this function
+    should be removed and authors should be required to write expec() explicitly.
+    """
+
+    provider = _make_structure_provider(parameters, variables)
+    result: Dict[str, ExpressionNode] = {}
+    for contrib_id, expr in contributions.items():
+        structure = compute_indexation(expr, provider)
+        if structure == IndexingStructure(time=False, scenario=True):
+            warnings.warn(
+                f"Objective contribution '{contrib_id}' has a scenario dimension "
+                "but no explicit expec() operator. "
+                "Expectation semantics (average over scenarios) are applied "
+                "automatically. Add expec() explicitly to suppress this warning.",
+                UserWarning,
+                stacklevel=4,
+            )
+            expr = expr.expec()
+        result[contrib_id] = expr
+    return result
 
 
 def _is_objective_contribution_valid(
@@ -62,7 +93,9 @@ def _is_objective_contribution_valid(
     if not is_linear(objective_contribution):
         raise ValueError("Objective contribution must be a linear expression.")
 
-    data_structure_provider = _make_structure_provider(model)
+    data_structure_provider = _make_structure_provider(
+        model.parameters, model.variables
+    )
     objective_structure = compute_indexation(
         objective_contribution, data_structure_provider
     )
@@ -103,8 +136,6 @@ class Model:
     parameters: Dict[str, Parameter] = field(default_factory=dict)
     variables: Dict[str, Variable] = field(default_factory=dict)
     objective_contributions: Optional[Dict[str, ExpressionNode]] = None
-    objective_operational_contribution: Optional[ExpressionNode] = None
-    objective_investment_contribution: Optional[ExpressionNode] = None
     ports: Dict[str, ModelPort] = field(default_factory=dict)
     port_fields_definitions: Dict[PortFieldId, PortFieldDefinition] = field(
         default_factory=dict
@@ -112,15 +143,6 @@ class Model:
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None
 
     def __post_init__(self) -> None:
-        if self.objective_operational_contribution:
-            _is_objective_contribution_valid(
-                self, self.objective_operational_contribution
-            )
-
-        if self.objective_investment_contribution:
-            _is_objective_contribution_valid(
-                self, self.objective_investment_contribution
-            )
         # Validate each contribution if present
         if self.objective_contributions:
             for expr in self.objective_contributions.values():
@@ -157,8 +179,6 @@ def model(
     parameters: Optional[Iterable[Parameter]] = None,
     variables: Optional[Iterable[Variable]] = None,
     objective_contributions: Optional[Dict[str, ExpressionNode]] = None,
-    objective_operational_contribution: Optional[ExpressionNode] = None,
-    objective_investment_contribution: Optional[ExpressionNode] = None,
     inter_block_dyn: bool = False,
     ports: Optional[Iterable[ModelPort]] = None,
     port_fields_definitions: Optional[Iterable[PortFieldDefinition]] = None,
@@ -167,6 +187,17 @@ def model(
     """
     Utility method to create Models from relaxed arguments
     """
+    # Build dicts upfront so we can inspect indexing structure before Model construction.
+    params_dict = {p.name: p for p in parameters} if parameters else {}
+    vars_dict = {v.name: v for v in variables} if variables else {}
+
+    # Auto-wrap any objective contribution that has a residual scenario dimension
+    # without an explicit expec() (Issue #76 / Antares Simulator v10.0.0 iso-format).
+    if objective_contributions:
+        objective_contributions = _normalize_objective_contributions(
+            objective_contributions, params_dict, vars_dict
+        )
+
     existing_port_names = {}
     if ports:
         for port in ports:
@@ -183,11 +214,9 @@ def model(
         binding_constraints=(
             {c.name: c for c in binding_constraints} if binding_constraints else {}
         ),
-        parameters={p.name: p for p in parameters} if parameters else {},
-        variables={v.name: v for v in variables} if variables else {},
+        parameters=params_dict,
+        variables=vars_dict,
         objective_contributions=objective_contributions,
-        objective_investment_contribution=objective_investment_contribution,
-        objective_operational_contribution=objective_operational_contribution,
         inter_block_dyn=inter_block_dyn,
         ports=existing_port_names,
         port_fields_definitions=(

@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - "**"
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   ci:
@@ -15,40 +17,29 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: 3.11
-          cache: pip
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+        run: uv sync --group dev
 
       - name: Check imports sort order
-        uses: isort/isort-action@v1
-        with:
-          sort-paths: src, tests
-          configuration: --profile black --check-only --diff
-          requirements-files: "requirements.txt requirements-dev.txt"
+        run: uv run isort --profile black --check-only --diff src tests
 
       - name: Check formatting
-        uses: psf/black@stable
-        with:
-          # Version of Black should match the versions set in `requirements-dev.txt`
-          version: "~=23.7.0"
-          options: --check --diff
+        run: uv run black --check --diff src tests
 
       - name: Check typing
-        run: |
-          python -m mypy
+        run: uv run mypy
 
       - name: Test
-        run: |
-          pytest --cov antarest --cov-report xml
+        run: uv run pytest --cov gems --cov-report xml
 
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
         with:
           name: python-code-coverage-report
           path: coverage.xml
-

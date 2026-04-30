@@ -23,26 +23,29 @@ from gems.model import (
     Constraint,
     Model,
     ModelPort,
-    ProblemContext,
     float_parameter,
     float_variable,
     int_variable,
     model,
 )
 from gems.model.port import PortFieldDefinition, PortFieldId
-from gems.simulation import (
-    MergedProblemStrategy,
-    OutputValues,
-    TimeBlock,
-    build_problem,
+from gems.optim_config.parsing import (
+    ElementLocation,
+    ElementLocationConfig,
+    ModelDecompositionConfig,
+    ModelOptimConfig,
+    OptimConfig,
+    validate_optim_config,
 )
+from gems.simulation import TimeBlock, build_problem
+from gems.simulation.simulation_table import SimulationTableBuilder
 from gems.study import (
     Component,
     ConstantData,
     DataBase,
-    Network,
-    Node,
     PortRef,
+    Study,
+    System,
     TimeScenarioSeriesData,
     create_component,
 )
@@ -56,15 +59,11 @@ from tests.e2e.functional.libs.standard import (
 
 FREE = IndexingStructure(True, True)
 
-INVESTMENT = ProblemContext.INVESTMENT
-OPERATIONAL = ProblemContext.OPERATIONAL
-COUPLING = ProblemContext.COUPLING
-
 
 @pytest.fixture
 def thermal_candidate() -> Model:
     THERMAL_CANDIDATE = model(
-        id="GEN",
+        id="THERMAL_CANDIDATE",
         parameters=[
             float_parameter("op_cost", CONSTANT),
             float_parameter("invest_cost", CONSTANT),
@@ -76,7 +75,6 @@ def thermal_candidate() -> Model:
                 lower_bound=literal(0),
                 upper_bound=literal(1000),
                 structure=CONSTANT,
-                context=COUPLING,
             ),
         ],
         ports=[ModelPort(port_type=BALANCE_PORT_TYPE, port_name="balance_port")],
@@ -91,12 +89,39 @@ def thermal_candidate() -> Model:
                 name="Max generation", expression=var("generation") <= var("p_max")
             )
         ],
-        objective_operational_contribution=(param("op_cost") * var("generation"))
-        .time_sum()
-        .expec(),
-        objective_investment_contribution=param("invest_cost") * var("p_max"),
+        objective_contributions={
+            "operational": (param("op_cost") * var("generation")).time_sum().expec(),
+            "investment": param("invest_cost") * var("p_max"),
+        },
     )
     return THERMAL_CANDIDATE
+
+
+@pytest.fixture
+def thermal_candidate_optim_config() -> OptimConfig:
+    return OptimConfig(
+        models=[
+            ModelOptimConfig(
+                id="THERMAL_CANDIDATE",
+                model_decomposition=ModelDecompositionConfig(
+                    variables=[
+                        ElementLocationConfig(
+                            id="p_max",
+                            location=ElementLocation.MASTER_AND_SUBPROBLEMS,
+                        ),
+                    ],
+                    objective_contributions=[
+                        ElementLocationConfig(
+                            id="investment", location=ElementLocation.MASTER
+                        ),
+                        ElementLocationConfig(
+                            id="operational", location=ElementLocation.SUBPROBLEMS
+                        ),
+                    ],
+                ),
+            )
+        ]
+    )
 
 
 @pytest.fixture
@@ -114,14 +139,12 @@ def discrete_candidate() -> Model:
                 "p_max",
                 lower_bound=literal(0),
                 structure=CONSTANT,
-                context=COUPLING,
             ),
             int_variable(
                 "nb_units",
                 lower_bound=literal(0),
                 upper_bound=literal(10),
                 structure=CONSTANT,
-                context=INVESTMENT,
             ),
         ],
         ports=[ModelPort(port_type=BALANCE_PORT_TYPE, port_name="balance_port")],
@@ -138,15 +161,49 @@ def discrete_candidate() -> Model:
             Constraint(
                 name="Max investment",
                 expression=var("p_max") == param("p_max_per_unit") * var("nb_units"),
-                context=INVESTMENT,
             ),
         ],
-        objective_operational_contribution=(param("op_cost") * var("generation"))
-        .time_sum()
-        .expec(),
-        objective_investment_contribution=param("invest_cost") * var("p_max"),
+        objective_contributions={
+            "operational": (param("op_cost") * var("generation")).time_sum().expec(),
+            "investment": param("invest_cost") * var("p_max"),
+        },
     )
     return DISCRETE_CANDIDATE
+
+
+@pytest.fixture
+def discrete_candidate_optim_config() -> OptimConfig:
+    return OptimConfig(
+        models=[
+            ModelOptimConfig(
+                id="DISCRETE",
+                model_decomposition=ModelDecompositionConfig(
+                    variables=[
+                        ElementLocationConfig(
+                            id="p_max",
+                            location=ElementLocation.MASTER_AND_SUBPROBLEMS,
+                        ),
+                        ElementLocationConfig(
+                            id="nb_units", location=ElementLocation.MASTER
+                        ),
+                    ],
+                    constraints=[
+                        ElementLocationConfig(
+                            id="Max investment", location=ElementLocation.MASTER
+                        ),
+                    ],
+                    objective_contributions=[
+                        ElementLocationConfig(
+                            id="investment", location=ElementLocation.MASTER
+                        ),
+                        ElementLocationConfig(
+                            id="operational", location=ElementLocation.SUBPROBLEMS
+                        ),
+                    ],
+                ),
+            )
+        ]
+    )
 
 
 @pytest.fixture
@@ -180,6 +237,7 @@ def test_generation_xpansion_single_time_step_single_scenario(
     generator: Component,
     candidate: Component,
     demand: Component,
+    thermal_candidate_optim_config: OptimConfig,
 ) -> None:
     """
     Simple generation expansion problem on one node. One timestep, one scenario, one thermal cluster candidate.
@@ -209,40 +267,38 @@ def test_generation_xpansion_single_time_step_single_scenario(
     database.add_data("CAND", "invest_cost", ConstantData(490))
     database.add_data("CAND", "max_invest", ConstantData(1000))
 
-    node = Node(model=NODE_BALANCE_MODEL, id="N")
-    network = Network("test")
-    network.add_node(node)
-    network.add_component(demand)
-    network.add_component(generator)
-    network.add_component(candidate)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(generator, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(candidate, "balance_port"), PortRef(node, "balance_port"))
+    node = Component(model=NODE_BALANCE_MODEL, id="N")
+    system = System("test")
+    system.add_component(node)
+    system.add_component(demand)
+    system.add_component(generator)
+    system.add_component(candidate)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(generator, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(candidate, "balance_port"), PortRef(node, "balance_port"))
+
+    validate_optim_config(thermal_candidate_optim_config, system)
 
     scenarios = 1
     problem = build_problem(
-        network,
-        database,
+        Study(system, database),
         TimeBlock(1, [0]),
-        scenarios,
-        build_strategy=MergedProblemStrategy(),
+        list(range(scenarios)),
     )
-    status = problem.solver.Solve()
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == pytest.approx(490 * 100 + 100 * 10 + 200 * 40)
 
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == pytest.approx(
-        490 * 100 + 100 * 10 + 200 * 40
-    )
-
-    output = OutputValues(problem)
-    expected_output = OutputValues()
-    expected_output.component("G1").var("generation").value = 200.0
-    expected_output.component("CAND").var("generation").value = 100.0
-    expected_output.component("CAND").var("p_max").value = 100.0
-    expected_output.component("N")
-    expected_output.component("D")
-
-    assert output == expected_output, f"Output differs from expected: {output}"
+    df = SimulationTableBuilder().build(problem)
+    assert df.component("G1").output("generation").value(
+        time_index=0, scenario_index=0
+    ) == pytest.approx(200.0)
+    assert df.component("CAND").output("generation").value(
+        time_index=0, scenario_index=0
+    ) == pytest.approx(100.0)
+    assert df.component("CAND").output("p_max").value(
+        time_index=0, scenario_index=0
+    ) == pytest.approx(100.0)
 
 
 def test_two_candidates_xpansion_single_time_step_single_scenario(
@@ -250,6 +306,8 @@ def test_two_candidates_xpansion_single_time_step_single_scenario(
     candidate: Component,
     cluster_candidate: Component,
     demand: Component,
+    thermal_candidate_optim_config: OptimConfig,
+    discrete_candidate_optim_config: OptimConfig,
 ) -> None:
     """
     As before, simple generation expansion problem on one node, one timestep and one scenario
@@ -286,47 +344,60 @@ def test_two_candidates_xpansion_single_time_step_single_scenario(
     database.add_data("DISCRETE", "invest_cost", ConstantData(200))
     database.add_data("DISCRETE", "p_max_per_unit", ConstantData(10))
 
-    node = Node(model=NODE_BALANCE_MODEL, id="N")
-    network = Network("test")
-    network.add_node(node)
-    network.add_component(demand)
-    network.add_component(generator)
-    network.add_component(candidate)
-    network.add_component(cluster_candidate)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(generator, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(candidate, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(
+    node = Component(model=NODE_BALANCE_MODEL, id="N")
+    system = System("test")
+    system.add_component(node)
+    system.add_component(demand)
+    system.add_component(generator)
+    system.add_component(candidate)
+    system.add_component(cluster_candidate)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(generator, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(candidate, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(
         PortRef(cluster_candidate, "balance_port"), PortRef(node, "balance_port")
     )
     scenarios = 1
 
-    problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
+    validate_optim_config(thermal_candidate_optim_config, system)
+    validate_optim_config(discrete_candidate_optim_config, system)
 
-    status = problem.solver.Solve()
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), list(range(scenarios))
+    )
 
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == pytest.approx(
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == pytest.approx(
         (45 * 200) + (490 * 100 + 10 * 100) + (200 * 100 + 10 * 100)
     )
 
-    output = OutputValues(problem)
-    expected_output = OutputValues()
-    expected_output.component("G1").var("generation").value = 200.0
-    expected_output.component("CAND").var("generation").value = 100.0
-    expected_output.component("CAND").var("p_max").value = 100.0
-    expected_output.component("DISCRETE").var("generation").value = 100.0
-    expected_output.component("DISCRETE").var("p_max").value = 100.0
-    expected_output.component("DISCRETE").var("nb_units").value = 10.0
-    expected_output.component("D")
-    expected_output.component("N")
-    assert output == expected_output, f"Output differs from expected: {output}"
+    df = SimulationTableBuilder().build(problem)
+    assert df.component("G1").output("generation").value(
+        time_index=0, scenario_index=0
+    ) == pytest.approx(200.0)
+    assert df.component("CAND").output("generation").value(
+        time_index=0, scenario_index=0
+    ) == pytest.approx(100.0)
+    assert df.component("CAND").output("p_max").value(
+        time_index=0, scenario_index=0
+    ) == pytest.approx(100.0)
+    assert df.component("DISCRETE").output("generation").value(
+        time_index=0, scenario_index=0
+    ) == pytest.approx(100.0)
+    assert df.component("DISCRETE").output("p_max").value(
+        time_index=0, scenario_index=0
+    ) == pytest.approx(100.0)
+    assert df.component("DISCRETE").output("nb_units").value(
+        time_index=0, scenario_index=0
+    ) == pytest.approx(10.0)
 
 
 def test_generation_xpansion_two_time_steps_two_scenarios(
     generator: Component,
     candidate: Component,
     demand: Component,
+    thermal_candidate_optim_config: OptimConfig,
 ) -> None:
     """
     Same as previous example but with two timesteps and two scenarios, in order to test the correct instantiation of the objective function
@@ -369,43 +440,45 @@ def test_generation_xpansion_two_time_steps_two_scenarios(
     database.add_data("CAND", "invest_cost", ConstantData(490))
     database.add_data("CAND", "max_invest", ConstantData(1000))
 
-    node = Node(model=NODE_BALANCE_MODEL, id="N")
-    network = Network("test")
-    network.add_node(node)
-    network.add_component(demand)
-    network.add_component(generator)
-    network.add_component(candidate)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(generator, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(candidate, "balance_port"), PortRef(node, "balance_port"))
+    node = Component(model=NODE_BALANCE_MODEL, id="N")
+    system = System("test")
+    system.add_component(node)
+    system.add_component(demand)
+    system.add_component(generator)
+    system.add_component(candidate)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(generator, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(candidate, "balance_port"), PortRef(node, "balance_port"))
 
-    problem = build_problem(network, database, time_block, scenarios)
-    status = problem.solver.Solve()
+    validate_optim_config(thermal_candidate_optim_config, system)
 
-    assert status == problem.solver.OPTIMAL
+    problem = build_problem(Study(system, database), time_block, list(range(scenarios)))
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
     # assert problem.solver.NumVariables() == 2 * scenarios * horizon + 1
     # assert (
     #     problem.solver.NumConstraints() == 3 * scenarios * horizon
     # )  # Flow balance, Max generation for each cluster
-    assert problem.solver.Objective().Value() == pytest.approx(
+    assert problem.objective_value == pytest.approx(
         490 * 300
         + 0.5 * (10 * 300 + 10 * 300 + 40 * 200)
         + 0.5 * (10 * 200 + 10 * 300 + 40 * 100)
     )
 
-    output = OutputValues(problem)
-    expected_output = OutputValues()
-    expected_output.component("G1").var("generation").value = [
-        [0.0, 200.0],
-        [0.0, 100.0],
-    ]
-    expected_output.component("CAND").var("generation").value = [
-        [300.0, 300.0],
-        [200.0, 300.0],
-    ]
-    expected_output.component("CAND").var("p_max").value = 300.0
+    df = SimulationTableBuilder().build(problem)
 
-    expected_output.component("N")
-    expected_output.component("D")
+    g1_view = df.component("G1").output("generation")
+    assert g1_view.value(time_index=0, scenario_index=0) == pytest.approx(0.0)
+    assert g1_view.value(time_index=1, scenario_index=0) == pytest.approx(200.0)
+    assert g1_view.value(time_index=0, scenario_index=1) == pytest.approx(0.0)
+    assert g1_view.value(time_index=1, scenario_index=1) == pytest.approx(100.0)
 
-    assert output == expected_output, f"Output differs from expected: {output}"
+    cand_view = df.component("CAND").output("generation")
+    assert cand_view.value(time_index=0, scenario_index=0) == pytest.approx(300.0)
+    assert cand_view.value(time_index=1, scenario_index=0) == pytest.approx(300.0)
+    assert cand_view.value(time_index=0, scenario_index=1) == pytest.approx(200.0)
+    assert cand_view.value(time_index=1, scenario_index=1) == pytest.approx(300.0)
+
+    assert df.component("CAND").output("p_max").value(
+        time_index=0, scenario_index=0
+    ) == pytest.approx(300.0)

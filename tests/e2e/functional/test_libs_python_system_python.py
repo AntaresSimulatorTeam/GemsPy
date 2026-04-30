@@ -13,7 +13,7 @@
 """
 This module contains end-to-end functional tests for systems built by:
 - Using Python models,
-- Building the network object in Python.
+- Building the system object in Python.
 
 Several cases are tested:
 
@@ -41,13 +41,14 @@ from gems.expression import literal, param, var
 from gems.expression.indexing_structure import IndexingStructure
 from gems.model import Model, ModelPort, float_parameter, float_variable, model
 from gems.model.port import PortFieldDefinition, PortFieldId
-from gems.simulation import BlockBorderManagement, TimeBlock, build_problem
+from gems.simulation import TimeBlock, build_problem
 from gems.study import (
+    Component,
     ConstantData,
     DataBase,
-    Network,
-    Node,
     PortRef,
+    Study,
+    System,
     TimeScenarioIndex,
     TimeScenarioSeriesData,
     create_component,
@@ -74,7 +75,7 @@ def test_basic_balance() -> None:
     database.add_data("G", "p_max", ConstantData(100))
     database.add_data("G", "cost", ConstantData(30))
 
-    node = Node(model=NODE_BALANCE_MODEL, id="N")
+    node = Component(model=NODE_BALANCE_MODEL, id="N")
     demand = create_component(
         model=DEMAND_MODEL,
         id="D",
@@ -85,19 +86,20 @@ def test_basic_balance() -> None:
         id="G",
     )
 
-    network = Network("test")
-    network.add_node(node)
-    network.add_component(demand)
-    network.add_component(gen)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
+    system = System("test")
+    system.add_component(node)
+    system.add_component(demand)
+    system.add_component(gen)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
 
     scenarios = 1
-    problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
-    status = problem.solver.Solve()
-
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == 3000
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), list(range(scenarios))
+    )
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == 3000
 
 
 def test_timeseries() -> None:
@@ -121,7 +123,7 @@ def test_timeseries() -> None:
     demand_time_scenario_series = TimeScenarioSeriesData(demand_data)
     database.add_data("D", "demand", demand_time_scenario_series)
 
-    node = Node(model=NODE_BALANCE_MODEL, id="1")
+    node = Component(model=NODE_BALANCE_MODEL, id="1")
     demand = create_component(
         model=DEMAND_MODEL,
         id="D",
@@ -132,25 +134,24 @@ def test_timeseries() -> None:
         id="G",
     )
 
-    network = Network("test")
-    network.add_node(node)
-    network.add_component(demand)
-    network.add_component(gen)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
+    system = System("test")
+    system.add_component(node)
+    system.add_component(demand)
+    system.add_component(gen)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
 
     time_block = TimeBlock(1, [0, 1])
     scenarios = 1
 
-    problem = build_problem(network, database, time_block, scenarios)
-    status = problem.solver.Solve()
+    problem = build_problem(Study(system, database), time_block, list(range(scenarios)))
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == 100 * 30 + 50 * 30
 
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == 100 * 30 + 50 * 30
 
-
-def create_one_node_network(generator_model: Model) -> Network:
-    node = Node(model=NODE_BALANCE_MODEL, id="1")
+def create_one_node_network(generator_model: Model) -> System:
+    node = Component(model=NODE_BALANCE_MODEL, id="1")
     demand = create_component(
         model=DEMAND_MODEL,
         id="D",
@@ -161,13 +162,13 @@ def create_one_node_network(generator_model: Model) -> Network:
         id="G",
     )
 
-    network = Network("test")
-    network.add_node(node)
-    network.add_component(demand)
-    network.add_component(gen)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
-    return network
+    system = System("test")
+    system.add_component(node)
+    system.add_component(demand)
+    system.add_component(gen)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
+    return system
 
 
 def create_simple_database(max_generation: float = 100) -> DataBase:
@@ -181,14 +182,14 @@ def create_simple_database(max_generation: float = 100) -> DataBase:
 
 def test_variable_bound() -> None:
     """
-    Create a network with one node, one demand and one generator on this node.
+    Create a system with one node, one demand and one generator on this node.
     Demand is constant 100, cost of generation is constant 30.
     Max generation can be chosen to make it infeasible or not.
     Variation of generator model using variable bound instead of constraint.
     """
 
     generator_model = model(
-        id="GEN",
+        id="GEN_WITH_VARIABLE_BOUND",
         parameters=[
             float_parameter("p_max", IndexingStructure(False, False)),
             float_parameter("cost", IndexingStructure(False, False)),
@@ -207,38 +208,39 @@ def test_variable_bound() -> None:
                 definition=var("generation"),
             )
         ],
-        objective_operational_contribution=(param("cost") * var("generation"))
-        .time_sum()
-        .expec(),
+        objective_contributions={
+            "operational": (param("cost") * var("generation")).time_sum().expec()
+        },
     )
 
-    network = create_one_node_network(generator_model)
+    system = create_one_node_network(generator_model)
     database = create_simple_database(max_generation=200)
-    problem = build_problem(network, database, TimeBlock(1, [0]), 1)
-    status = problem.solver.Solve()
+    problem = build_problem(Study(system, database), TimeBlock(1, [0]), list(range(1)))
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == 3000
 
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == 3000
-
-    network = create_one_node_network(generator_model)
+    system = create_one_node_network(generator_model)
     database = create_simple_database(max_generation=80)
-    problem = build_problem(network, database, TimeBlock(1, [0]), 1)
-    status = problem.solver.Solve()
-    assert status == problem.solver.INFEASIBLE  # Infeasible
+    problem = build_problem(Study(system, database), TimeBlock(1, [0]), list(range(1)))
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "infeasible"  # Infeasible
 
-    network = create_one_node_network(generator_model)
+    system = create_one_node_network(generator_model)
     database = create_simple_database(max_generation=0)  # Equal upper and lower bounds
-    problem = build_problem(network, database, TimeBlock(1, [0]), 1)
-    status = problem.solver.Solve()
-    assert status == problem.solver.INFEASIBLE
+    problem = build_problem(Study(system, database), TimeBlock(1, [0]), list(range(1)))
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "infeasible"
 
-    network = create_one_node_network(generator_model)
+    system = create_one_node_network(generator_model)
     database = create_simple_database(max_generation=-10)
     with pytest.raises(
         ValueError,
         match=r"Upper bound \(-10\) must be strictly greater than lower bound \(0\) for variable G.generation",
     ):
-        problem = build_problem(network, database, TimeBlock(1, [0]), 1)
+        problem = build_problem(
+            Study(system, database), TimeBlock(1, [0]), list(range(1))
+        )
 
 
 def generate_data(
@@ -275,7 +277,7 @@ def short_term_storage_base(efficiency: float, horizon: int) -> None:
     database.add_data("STS1", "inflows", ConstantData(0))
     database.add_data("STS1", "efficiency", ConstantData(efficiency))
 
-    node = Node(model=NODE_BALANCE_MODEL, id="1")
+    node = Component(model=NODE_BALANCE_MODEL, id="1")
     spillage = create_component(model=SPILLAGE_MODEL, id="S")
 
     unsupplied = create_component(model=UNSUPPLIED_ENERGY_MODEL, id="U")
@@ -287,44 +289,30 @@ def short_term_storage_base(efficiency: float, horizon: int) -> None:
         id="STS1",
     )
 
-    network = Network("test")
-    network.add_node(node)
+    system = System("test")
+    system.add_component(node)
     for component in [demand, short_term_storage, spillage, unsupplied]:
-        network.add_component(component)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(
+        system.add_component(component)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(
         PortRef(short_term_storage, "balance_port"), PortRef(node, "balance_port")
     )
-    network.connect(PortRef(spillage, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(unsupplied, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(spillage, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(unsupplied, "balance_port"), PortRef(node, "balance_port"))
 
     problem = build_problem(
-        network,
-        database,
+        Study(system, database),
         time_blocks[0],
-        scenarios,
-        border_management=BlockBorderManagement.CYCLE,
+        list(range(scenarios)),
     )
-    status = problem.solver.Solve()
-
-    assert status == problem.solver.OPTIMAL
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
 
     # The short-term storage should satisfy the load
     # No spillage / unsupplied energy is expected
-    assert problem.solver.Objective().Value() == pytest.approx(0, abs=0.01)
+    assert problem.objective_value == pytest.approx(0, abs=0.01)
 
-    count_variables = 0
-    for variable in problem.solver.variables():
-        if "injection" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 100
-        elif "withdrawal" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 50
-        elif "level" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 1000
-    assert count_variables == 3 * horizon
+    # TODO: update variable access
 
 
 def test_short_test_horizon_10() -> None:

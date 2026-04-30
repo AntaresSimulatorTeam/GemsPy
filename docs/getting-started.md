@@ -158,7 +158,33 @@ You can directly clone the [GitHub repo](https://github.com/AntaresSimulatorTeam
 
 Here is an example of how to load component and library files, resolve the system, and solve the optimisation problem using the ***GemsPy*** package.
 
-### Loading the library, the system and the timeseries:
+### Option A — directory-based (recommended)
+
+If your inputs are organised in a study directory (see [Reading input files](user-guide/inputs.md)), the simplest way is:
+
+~~~ python
+from pathlib import Path
+from gems.study.folder import load_study
+from gems.session import SimulationSession
+from gems.optim_config import load_optim_config
+
+study = load_study(Path("my_study"))
+optim_config = load_optim_config(Path("my_study/input/optim-config.yml"))
+
+session = SimulationSession(study=study, optim_config=optim_config)
+results = session.run()
+~~~
+
+Or, in a single call:
+
+~~~ python
+from pathlib import Path
+from gems.study.runner import run_study
+
+run_study(Path("my_study"))
+~~~
+
+### Option B — file-by-file (programmatic)
 
 Here is the GemsPy syntax to read a test case described by
 
@@ -167,33 +193,31 @@ Here is the GemsPy syntax to read a test case described by
 -  A set of timeseries located in the directory: `series_dir`.
 
 ~~~ python
-with open("library.yml") as compo_file:
-    input_system = parse_yaml_components(compo_file)
-
-with open("system.yml") as lib_file:
+with open("library.yml") as lib_file:
     input_libraries = [parse_yaml_library(lib_file)]
 
+with open("system.yml") as compo_file:
+    input_system = parse_yaml_components(compo_file)
+
 result_lib = resolve_library(input_libraries)
-components_input = resolve_system(input_system, result_lib)
+system = resolve_system(input_system, result_lib)
 database = build_data_base(input_system, Path(series_dir))
 ~~~
 
 ### Building the optimisation problem
 
 ~~~ python
-
-network = build_network(components_input)
+from gems.study import Study
 
 problem = build_problem(
-    network,
-    database,
-    TimeBlock(1, [i for i in range(0, timespan)]),
-    scenarios,
+    Study(system, database),
+    TimeBlock(1, list(range(timespan))),
+    scenario_ids=list(range(nb_scenarios)),
 )
 ~~~
 
 ### Solving the optimisation problem
 ~~~ python
-status = problem.solver.Solve()
-print(problem.solver.Objective().Value())
+problem.solve()
+print(problem.objective_value)
 ~~~

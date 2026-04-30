@@ -4,7 +4,7 @@ This page aims at providing useful information for contributors.
 
 ## Install dev requirements
 
-Install dev requirements with `pip install -r requirements-dev.txt`
+Install dev requirements with `uv sync` (or `pip install -e ".[dev]"` for pip users)
 
 ## Linting and formatting
 

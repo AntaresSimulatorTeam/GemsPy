@@ -10,6 +10,8 @@
 #
 # This file is part of the Antares project.
 
+"""Wrappers for AntaresXpansion external binaries (benders, merge_mps)."""
+
 import os
 import pathlib
 import subprocess
@@ -17,7 +19,7 @@ import sys
 from typing import List
 
 
-class CommandRunner:
+class AntaresXpansionCommandRunner:
     def __init__(
         self,
         binary_path: pathlib.Path,
@@ -56,11 +58,11 @@ class CommandRunner:
         return res.returncode
 
 
-class BendersRunner(CommandRunner):
+class BendersRunner(AntaresXpansionCommandRunner):
     def __init__(self, emplacement: pathlib.Path) -> None:
         super().__init__(pathlib.Path("bin/benders"), ["options.json"], emplacement)
 
 
-class MergeMPSRunner(CommandRunner):
+class MergeMPSRunner(AntaresXpansionCommandRunner):
     def __init__(self, emplacement: pathlib.Path) -> None:
         super().__init__(pathlib.Path("bin/merge_mps"), ["options.json"], emplacement)

@@ -165,4 +165,3 @@ system: #This system aims at testing the correct handling of complex expressions
     port1: balance_port
     port2: balance_port
   id: e2e_general_test_177428933315
-  nodes: []

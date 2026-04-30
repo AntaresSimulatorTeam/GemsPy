@@ -17,12 +17,13 @@ from typing import List
 import pandas as pd
 import pytest
 
-from gems.model.parsing import InputLibrary, parse_yaml_library
+from gems.model.parsing import LibrarySchema, parse_yaml_library
 from gems.model.resolve_library import resolve_library
-from gems.simulation.optimization import build_problem
+from gems.simulation import build_problem
 from gems.simulation.time_block import TimeBlock
+from gems.study import Study
 from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import build_data_base, build_network, resolve_system
+from gems.study.resolve_components import build_data_base, resolve_system
 
 
 @pytest.fixture
@@ -46,7 +47,7 @@ def series_dir(data_dir: Path) -> Path:
 
 
 @pytest.fixture
-def input_libraries(data_dir: Path) -> List[InputLibrary]:
+def input_libraries(data_dir: Path) -> List[LibrarySchema]:
     libs_dir = data_dir / "libs"
     with open(libs_dir / "antares_historic.yml") as lib_file:
         lib_historic = parse_yaml_library(lib_file)
@@ -115,7 +116,7 @@ def test_model_behaviour(
     timespan: int,
     batch: int,
     relative_accuracy: float,
-    input_libraries: List[InputLibrary],
+    input_libraries: List[LibrarySchema],
     results_dir: Path,
     systems_dir: Path,
     series_dir: Path,
@@ -124,26 +125,19 @@ def test_model_behaviour(
     with open(systems_dir / system_file) as compo_file:
         input_component = parse_yaml_components(compo_file)
     result_lib = resolve_library(input_libraries)
-    components_input = resolve_system(input_component, result_lib)
+    system_input = resolve_system(input_component, result_lib)
     database = build_data_base(input_component, Path(series_dir))
-    network = build_network(components_input)
     reference_values = pd.read_csv(results_dir / optim_result_file, header=None).values
     for k in range(batch):
         problem = build_problem(
-            network,
-            database,
+            Study(system_input, database),
             TimeBlock(1, [i for i in range(k * timespan, (k + 1) * timespan)]),
-            scenarios,
+            list(range(scenarios)),
         )
-        status = problem.solver.Solve()
-        assert status == problem.solver.OPTIMAL
-        assert math.isclose(
-            problem.solver.Objective().Value(),
-            problem.solver.Objective().BestBound(),
-            rel_tol=relative_accuracy,
-        )
+        problem.solve(solver_name="highs")
+        assert problem.termination_condition == "optimal"
         assert math.isclose(
             reference_values[k, 0],
-            problem.solver.Objective().Value(),
+            problem.objective_value,
             rel_tol=relative_accuracy,
         )

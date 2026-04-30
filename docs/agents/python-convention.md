@@ -2,18 +2,19 @@
 
 ## Code Style & Conventions
 
-- **Formatter**: Black, line-length 88. Never adjust line breaks manually—let Black decide.
-- **Import order**: isort with `profile = "black"`. One `import` block, no manual blank lines between
-  groups.
-- **Type annotations**: All functions and methods **must** have full type annotations. mypy is run in
-  strict mode (`disallow_untyped_defs`, `disallow_untyped_calls`).
+- **Formatter**: Black `23.7.0`, line-length 88. Never adjust line breaks manually—let Black decide.
+- **Import order**: isort `5.12.0` with `profile = "black"`. One `import` block, no manual blank
+  lines between groups.
+- **Type annotations**: All functions and methods **must** have full type annotations. mypy `1.7.1`
+  is run with `disallow_untyped_defs = true` and `disallow_untyped_calls = true` (see `mypy.ini`).
 - **Dataclasses**: Prefer `@dataclass(frozen=True)` for value objects (expression nodes, model
   definitions). Mutability must be justified explicitly.
 - **Pydantic**: Use `ConfigDict(alias_generator=to_camel)` or kebab-case alias generation for YAML
   round-tripping; use Pydantic v2 APIs only.
 - **Naming**:
   - Classes: `PascalCase`
-  - Functions / variables: `snake_case`
+  - Functions / variables: `snake_case` — use descriptive names; avoid single-letter or two-letter
+    names except for well-established loop indices (`i`, `j`) or type parameters (`T`).
   - Constants / type-level aliases: `UPPER_SNAKE_CASE`
   - YAML keys: `kebab-case`
 - **Commit messages**: Follow Conventional Commits — `<type>(<scope>): <summary>`, e.g.

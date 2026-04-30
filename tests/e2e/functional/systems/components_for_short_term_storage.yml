@@ -11,11 +11,9 @@
 # This file is part of the Antares project.
 system:
   model-libraries: basic
-  nodes:
+  components:
     - id: N
       model: basic.node
-
-  components:
     - id: D
       model: basic.demand
       parameters:

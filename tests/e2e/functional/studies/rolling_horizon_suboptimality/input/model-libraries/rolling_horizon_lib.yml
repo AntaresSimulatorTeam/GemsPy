@@ -1,0 +1,121 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# Minimal model library for the rolling_horizon_suboptimality e2e test.
+#
+# System: 1 generator (capacity-capped, constant cost) + 1 load (oscillating)
+#         + 1 storage (drop-mode SoC balance) + 1 bus (power balance + unserved).
+#
+# The bus carries an `unsupplied` variable (energy not served) penalised at a
+# large cost.  This allows the sequential mode to remain feasible when the
+# storage is empty at a peak-demand step while still incurring a high objective
+# penalty compared with the frontal mode.
+#
+# The storage soc_balance constraint uses soc[t-1] and must be declared with
+# mode: drop in the optim-config so that the carry-over equality constraint
+# (injected in Phase 5 of build_problem) provides the initial state for each
+# sequential block.
+
+library:
+  id: rolling-horizon-lib
+  description: Minimal 4-model library for rolling-horizon suboptimality test
+
+  port-types:
+    - id: flow
+      description: Single-field power flow port
+      fields:
+        - id: flow
+
+  models:
+
+    - id: generator
+      parameters:
+        - id: gen_cost
+          time-dependent: false
+          scenario-dependent: false
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: p
+          lower-bound: 0
+          upper-bound: p_max
+      ports:
+        - id: balance
+          type: flow
+      port-field-definitions:
+        - port: balance
+          field: flow
+          definition: p
+      objective-contributions:
+        - id: generation_cost
+          expression: expec(sum(gen_cost * p))
+
+    - id: load
+      parameters:
+        - id: demand
+          time-dependent: true
+          scenario-dependent: false
+      ports:
+        - id: balance
+          type: flow
+      port-field-definitions:
+        - port: balance
+          field: flow
+          definition: -demand
+
+    - id: storage
+      parameters:
+        - id: capacity
+          time-dependent: false
+          scenario-dependent: false
+        - id: max_rate
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: charge
+          lower-bound: 0
+          upper-bound: max_rate
+        - id: discharge
+          lower-bound: 0
+          upper-bound: max_rate
+        - id: soc
+          lower-bound: 0
+          upper-bound: capacity
+      ports:
+        - id: balance
+          type: flow
+      port-field-definitions:
+        - port: balance
+          field: flow
+          definition: discharge - charge
+      constraints:
+        - id: soc_balance
+          expression: soc = soc[t-1] + charge - discharge
+
+    - id: bus
+      parameters:
+        - id: ens_cost
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: unsupplied
+          lower-bound: 0
+      ports:
+        - id: balance
+          type: flow
+      binding-constraints:
+        - id: flow_balance
+          expression: sum_connections(balance.flow) + unsupplied = 0
+      objective-contributions:
+        - id: ens_penalty
+          expression: expec(sum(ens_cost * unsupplied))

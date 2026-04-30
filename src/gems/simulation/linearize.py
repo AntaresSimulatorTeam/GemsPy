@@ -10,324 +10,144 @@
 #
 # This file is part of the Antares project.
 
-import math
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+"""
+Vectorized linopy expression builder.
 
-from gems.expression import (
-    AdditionNode,
-    DivisionNode,
-    ExpressionVisitor,
-    MultiplicationNode,
-    NegationNode,
-)
+Provides :class:`VectorizedLinearExprBuilder`, a concrete subclass of
+:class:`~gems.simulation.vectorized_builder.VectorizedBuilderBase` that
+resolves ``VariableNode`` to a pre-solve ``linopy.Variable`` and overrides
+arithmetic / nonlinear methods with linopy-specific behaviour.
+
+Also re-exports :data:`~gems.simulation.vectorized_builder.VectorizedExpr`
+and :func:`~gems.simulation.vectorized_builder._linopy_add` for backward
+compatibility with callers that import them from this module.
+"""
+
+from dataclasses import dataclass
+from typing import Dict, Tuple
+
+import linopy
+import numpy as np
+import xarray as xr
+
 from gems.expression.expression import (
-    AllTimeSumNode,
+    AdditionNode,
     CeilNode,
-    ComparisonNode,
-    ComponentParameterNode,
-    ComponentVariableNode,
-    CurrentScenarioIndex,
-    ExpressionNode,
     FloorNode,
-    LiteralNode,
     MaxNode,
     MinNode,
-    NoScenarioIndex,
-    NoTimeIndex,
-    OneScenarioIndex,
-    ParameterNode,
-    PortFieldAggregatorNode,
-    PortFieldNode,
-    ProblemParameterNode,
-    ProblemVariableNode,
-    ScenarioIndex,
-    ScenarioOperatorNode,
-    TimeEvalNode,
-    TimeIndex,
-    TimeShift,
-    TimeShiftNode,
-    TimeStep,
-    TimeSumNode,
     VariableNode,
 )
 from gems.expression.visitor import visit
-from gems.simulation.linear_expression import LinearExpression, Term, TermKey
+from gems.model.port import PortFieldId
+from gems.simulation.vectorized_builder import (
+    VectorizedBuilderBase,
+    VectorizedExpr,
+    _linopy_add,
+)
 
 
-class ParameterGetter(ABC):
-    @abstractmethod
-    def get_parameter_value(
-        self,
-        component_id: str,
-        parameter_name: str,
-        timestep: Optional[int],
-        scenario: Optional[int],
-    ) -> float:
-        pass
-
-
-@dataclass
-class MutableTerm:
-    coefficient: float
-    component_id: str
-    variable_name: str
-    time_index: Optional[int]
-    scenario_index: Optional[int]
-
-    def to_key(self) -> TermKey:
-        return TermKey(
-            self.component_id,
-            self.variable_name,
-            self.time_index,
-            self.scenario_index,
-        )
-
-    def to_term(self) -> Term:
-        return Term(
-            self.coefficient,
-            self.component_id,
-            self.variable_name,
-            self.time_index,
-            self.scenario_index,
-        )
-
-
-@dataclass
-class LinearExpressionData:
-    terms: List[MutableTerm]
-    constant: float
-
-    def build(self) -> LinearExpression:
-        res_terms: Dict[TermKey, Any] = {}
-        for t in self.terms:
-            k = t.to_key()
-            if k in res_terms:
-                current_t = res_terms[k]
-                current_t.coefficient += t.coefficient
-            else:
-                res_terms[k] = t
-        for k, v in res_terms.items():
-            res_terms[k] = v.to_term()
-        return LinearExpression(res_terms, self.constant)
-
-
-@dataclass(frozen=True)
-class LinearExpressionBuilder(ExpressionVisitor[LinearExpressionData]):
+@dataclass(kw_only=True)
+class VectorizedLinearExprBuilder(VectorizedBuilderBase[VectorizedExpr]):
     """
-    Reduces a generic expression to a linear expression.
+    Builds a linopy LinearExpression from a model-level AST.
 
-    The input expression must respect the constraints of the output of
-    the operators expansion expression:
-    it must only contain `ProblemVariableNode` for variables
-    and `ProblemParameterNode` parameters. It cannot contain anymore
-    time aggregators or scenario aggregators, nor port-related nodes.
+    Receives pre-computed linopy variables, parameter DataArrays, and port arrays
+    indexed on the [component, time, scenario] dimensions (or a subset thereof).
+    Produces a result with the same combined dimensions.
+
+    Parameters
+    ----------
+    model_id:
+        The model.id string of the Model object whose AST is being visited.
+    linopy_vars:
+        Mapping from (model_id, var_name) to the corresponding linopy Variable,
+        with dims at least [component] and optionally [time, scenario].
+    param_arrays:
+        Mapping from (model_id, param_name) to a DataArray of parameter values,
+        with dims in {component, time, scenario} (or a subset).
+    port_arrays:
+        Pre-computed linopy expressions for each PortFieldId of this model,
+        resulting from the incidence-matrix port resolution pass.
+        Keyed by PortFieldId(port_name, field_name).
+    block_length:
+        Number of time steps in the current time block.
     """
 
-    # TODO: linear expressions should be re-usable for different timesteps and scenarios
-    timestep: Optional[int]
-    scenario: Optional[int]
-    value_provider: Optional[ParameterGetter] = None
+    linopy_vars: Dict[Tuple[str, str], linopy.Variable]
 
-    def negation(self, node: NegationNode) -> LinearExpressionData:
-        operand = visit(node.operand, self)
-        operand.constant = -operand.constant
-        for t in operand.terms:
-            t.coefficient = -t.coefficient
-        return operand
+    # ------------------------------------------------------------------ #
+    # Abstract method implementation                                        #
+    # ------------------------------------------------------------------ #
 
-    def addition(self, node: AdditionNode) -> LinearExpressionData:
-        operands = [visit(o, self) for o in node.operands]
-        terms = []
-        constant: float = 0
-        for o in operands:
-            constant += o.constant
-            terms.extend(o.terms)
-        return LinearExpressionData(terms=terms, constant=constant)
-
-    def multiplication(self, node: MultiplicationNode) -> LinearExpressionData:
-        lhs = visit(node.left, self)
-        rhs = visit(node.right, self)
-        if not lhs.terms:
-            multiplier = lhs.constant
-            actual_expr = rhs
-        elif not rhs.terms:
-            multiplier = rhs.constant
-            actual_expr = lhs
-        else:
-            raise ValueError(
-                "At least one operand of a multiplication must be a constant expression."
+    def variable(self, node: VariableNode) -> linopy.Variable:
+        key = (self.model_id, node.name)
+        if key not in self.linopy_vars:
+            raise KeyError(
+                f"Variable {node.name!r} not found for model {self.model_id!r}. "
+                "Ensure all linopy variables are created before building constraints."
             )
-        actual_expr.constant *= multiplier
-        for t in actual_expr.terms:
-            t.coefficient *= multiplier
-        return actual_expr
+        return self.linopy_vars[key]
 
-    def division(self, node: DivisionNode) -> LinearExpressionData:
-        lhs = visit(node.left, self)
-        rhs = visit(node.right, self)
-        if rhs.terms:
-            raise ValueError(
-                "The second operand of a division must be a constant expression."
-            )
-        divider = rhs.constant
-        actual_expr = lhs
-        actual_expr.constant /= divider
-        for t in actual_expr.terms:
-            t.coefficient /= divider
-        return actual_expr
+    # ------------------------------------------------------------------ #
+    # Overrides: arithmetic                                                 #
+    # ------------------------------------------------------------------ #
 
-    def _get_timestep(self, time_index: TimeIndex) -> Optional[int]:
-        if isinstance(time_index, TimeShift):
-            if self.timestep is None:
-                raise ValueError("Cannot shift a time-independent expression.")
-            return self.timestep + time_index.timeshift
-        if isinstance(time_index, TimeStep):
-            return time_index.timestep
-        if isinstance(time_index, NoTimeIndex):
-            return None
-        else:
-            raise TypeError(f"Type {type(time_index)} is not a valid TimeIndex type.")
+    def addition(self, node: AdditionNode) -> VectorizedExpr:
+        """Left-to-right addition with linopy-aware operand swapping.
 
-    def _get_scenario(self, scenario_index: ScenarioIndex) -> Optional[int]:
-        if isinstance(scenario_index, OneScenarioIndex):
-            return scenario_index.scenario
-        elif isinstance(scenario_index, CurrentScenarioIndex):
-            return self.scenario
-        elif isinstance(scenario_index, NoScenarioIndex):
-            return None
-        else:
-            raise TypeError(
-                f"Type {type(scenario_index)} is not a valid ScenarioIndex type."
-            )
-
-    def literal(self, node: LiteralNode) -> LinearExpressionData:
-        return LinearExpressionData([], node.value)
-
-    def floor(self, node: FloorNode) -> LinearExpressionData:
-        operand = visit(node.operand, self)
-        if operand.terms:
-            raise ValueError(
-                "Linear expression cannot contain a floor operator on a non-constant expression."
-            )
-        return LinearExpressionData([], math.floor(operand.constant))
-
-    def ceil(self, node: CeilNode) -> LinearExpressionData:
-        operand = visit(node.operand, self)
-        if operand.terms:
-            raise ValueError(
-                "Linear expression cannot contain a ceil operator on a non-constant expression."
-            )
-        return LinearExpressionData([], math.ceil(operand.constant))
-
-    def maximum(self, node: MaxNode) -> LinearExpressionData:
+        ``xr.DataArray.__add__(linopy_type)`` fails because xarray does not
+        recognise linopy objects.  :func:`_linopy_add` puts the linopy type on
+        the left so linopy's ``__add__`` / ``__radd__`` handles DataArrays.
+        """
         operands = [visit(op, self) for op in node.operands]
-        if any(op.terms for op in operands):
-            raise ValueError(
-                "Linear expression cannot contain a max operator on a non-constant expression."
-            )
-        return LinearExpressionData([], max(op.constant for op in operands))
+        result: VectorizedExpr = operands[0]
+        for op in operands[1:]:
+            result = _linopy_add(result, op)
+        return result
 
-    def minimum(self, node: MinNode) -> LinearExpressionData:
+    # ------------------------------------------------------------------ #
+    # Overrides: nonlinear math functions (guard — variables not allowed)   #
+    # ------------------------------------------------------------------ #
+
+    def floor(self, node: FloorNode) -> VectorizedExpr:
+        operand = visit(node.operand, self)
+        if isinstance(operand, xr.DataArray):
+            return np.floor(operand)  # type: ignore[return-value]
+        raise NotImplementedError(
+            "floor() is only supported for parameter (DataArray) expressions; "
+            "it cannot be used with decision variables in a linear programme."
+        )
+
+    def ceil(self, node: CeilNode) -> VectorizedExpr:
+        operand = visit(node.operand, self)
+        if isinstance(operand, xr.DataArray):
+            return np.ceil(operand)  # type: ignore[return-value]
+        raise NotImplementedError(
+            "ceil() is only supported for parameter (DataArray) expressions; "
+            "it cannot be used with decision variables in a linear programme."
+        )
+
+    def maximum(self, node: MaxNode) -> VectorizedExpr:
         operands = [visit(op, self) for op in node.operands]
-        if any(op.terms for op in operands):
-            raise ValueError(
-                "Linear expression cannot contain a min operator on a non-constant expression."
-            )
-        return LinearExpressionData([], min(op.constant for op in operands))
-
-    def comparison(self, node: ComparisonNode) -> LinearExpressionData:
-        raise ValueError("Linear expression cannot contain a comparison operator.")
-
-    def variable(self, node: VariableNode) -> LinearExpressionData:
-        raise ValueError(
-            "Variables need to be associated with their component ID before linearization."
+        if all(isinstance(op, xr.DataArray) for op in operands):
+            result: xr.DataArray = operands[0]  # type: ignore[assignment]
+            for op in operands[1:]:
+                result = xr.where(result >= op, result, op)  # type: ignore[no-untyped-call]
+            return result
+        raise NotImplementedError(
+            "maximum() is only supported for parameter (DataArray) expressions; "
+            "it cannot be used with decision variables in a linear programme."
         )
 
-    def parameter(self, node: ParameterNode) -> LinearExpressionData:
-        raise ValueError("Parameters must be evaluated before linearization.")
-
-    def comp_variable(self, node: ComponentVariableNode) -> LinearExpressionData:
-        raise ValueError(
-            "Variables need to be associated with their timestep/scenario before linearization."
+    def minimum(self, node: MinNode) -> VectorizedExpr:
+        operands = [visit(op, self) for op in node.operands]
+        if all(isinstance(op, xr.DataArray) for op in operands):
+            result = operands[0]
+            for op in operands[1:]:
+                result = xr.where(result <= op, result, op)  # type: ignore[no-untyped-call,assignment]
+            return result
+        raise NotImplementedError(
+            "minimum() is only supported for parameter (DataArray) expressions; "
+            "it cannot be used with decision variables in a linear programme."
         )
-
-    def pb_variable(self, node: ProblemVariableNode) -> LinearExpressionData:
-        return LinearExpressionData(
-            [
-                MutableTerm(
-                    1,
-                    node.component_id,
-                    node.name,
-                    time_index=self._get_timestep(node.time_index),
-                    scenario_index=self._get_scenario(node.scenario_index),
-                )
-            ],
-            0,
-        )
-
-    def comp_parameter(self, node: ComponentParameterNode) -> LinearExpressionData:
-        raise ValueError(
-            "Parameters need to be associated with their timestep/scenario before linearization."
-        )
-
-    def pb_parameter(self, node: ProblemParameterNode) -> LinearExpressionData:
-        # TODO SL: not the best place to do this.
-        # in the future, we should evaluate coefficients of variables as time vectors once for all timesteps
-        time_index = self._get_timestep(node.time_index)
-        scenario_index = self._get_scenario(node.scenario_index)
-        return LinearExpressionData(
-            [],
-            self._value_provider().get_parameter_value(
-                node.component_id, node.name, time_index, scenario_index
-            ),
-        )
-
-    def time_eval(self, node: TimeEvalNode) -> LinearExpressionData:
-        raise ValueError("Time operators need to be expanded before linearization.")
-
-    def time_shift(self, node: TimeShiftNode) -> LinearExpressionData:
-        raise ValueError("Time operators need to be expanded before linearization.")
-
-    def time_sum(self, node: TimeSumNode) -> LinearExpressionData:
-        raise ValueError("Time operators need to be expanded before linearization.")
-
-    def all_time_sum(self, node: AllTimeSumNode) -> LinearExpressionData:
-        raise ValueError("Time operators need to be expanded before linearization.")
-
-    def _value_provider(self) -> ParameterGetter:
-        if self.value_provider is None:
-            raise ValueError(
-                "A value provider must be specified to linearize a time operator node."
-                " This is required in order to evaluate the value of potential parameters"
-                " used to specified the time ids on which the time operator applies."
-            )
-        return self.value_provider
-
-    def scenario_operator(self, node: ScenarioOperatorNode) -> LinearExpressionData:
-        raise ValueError("Scenario operators need to be expanded before linearization.")
-
-    def port_field(self, node: PortFieldNode) -> LinearExpressionData:
-        raise ValueError("Port fields must be replaced before linearization.")
-
-    def port_field_aggregator(
-        self, node: PortFieldAggregatorNode
-    ) -> LinearExpressionData:
-        raise ValueError(
-            "Port fields aggregators must be replaced before linearization."
-        )
-
-
-def linearize_expression(
-    expression: ExpressionNode,
-    timestep: Optional[int],
-    scenario: Optional[int],
-    value_provider: Optional[ParameterGetter] = None,
-) -> LinearExpression:
-    return visit(
-        expression,
-        LinearExpressionBuilder(
-            value_provider=value_provider, timestep=timestep, scenario=scenario
-        ),
-    ).build()

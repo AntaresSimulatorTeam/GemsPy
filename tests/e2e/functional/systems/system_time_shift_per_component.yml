@@ -1,0 +1,103 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# System used to test component-dependent time shift.
+#
+# Two lagged-storage components (STS_lag1, STS_lag2) connected to the same
+# balance node, with lag=1 and lag=2 respectively.
+#
+# Demand is time-varying: [20, 0, 20, 0] — concentrated at even time steps.
+#
+# With CYCLE border management over H=4 steps and inflows=5/step:
+#   - lag=1 (STS_lag1): all four steps are linked; the storage can
+#     concentrate its 20 units of forced withdrawal at the even demand
+#     steps (10 per step) → contributes 20 to even-step supply.
+#   - lag=2 (STS_lag2): even {0,2} and odd {1,3} groups are decoupled;
+#     even-group sum=10 and odd-group sum=10.  The 10 odd-group units
+#     must be discharged at t=1 or t=3 where demand=0 → forced spillage=10.
+#     Even-group provides at most 10 to even demand steps.
+#
+# Total even-step supply: 20 (lag1) + 10 (lag2) = 30 < 40 (demand) → 10 unsupplied.
+# Odd-step spillage: 10 (forced by lag=2 group structure).
+#
+# Expected objective = 10 * unsupplied_cost(100) + 10 * spillage_cost(1) = 1010.
+system:
+  model-libraries: time_shift_test
+
+  components:
+    - id: N
+      model: time_shift_test.node
+    - id: D
+      model: time_shift_test.demand
+      parameters:
+        - id: demand
+          time-dependent: true
+          scenario-dependent: false
+          value: demand_shift_test
+
+    - id: S
+      model: time_shift_test.spillage
+      parameters:
+        - id: cost
+          value: 1
+
+    - id: U
+      model: time_shift_test.unsupplied
+      parameters:
+        - id: cost
+          value: 100
+
+    - id: STS_lag1
+      model: time_shift_test.lagged-storage
+      parameters:
+        - id: lag
+          value: 1
+        - id: p_max
+          value: 10
+        - id: level_max
+          value: 100
+        - id: inflows
+          value: 5
+
+    - id: STS_lag2
+      model: time_shift_test.lagged-storage
+      parameters:
+        - id: lag
+          value: 2
+        - id: p_max
+          value: 10
+        - id: level_max
+          value: 100
+        - id: inflows
+          value: 5
+
+  connections:
+    - component1: N
+      port1: injection_port
+      component2: D
+      port2: injection_port
+    - component1: N
+      port1: injection_port
+      component2: S
+      port2: injection_port
+    - component1: N
+      port1: injection_port
+      component2: U
+      port2: injection_port
+    - component1: N
+      port1: injection_port
+      component2: STS_lag1
+      port2: injection_port
+    - component1: N
+      port1: injection_port
+      component2: STS_lag2
+      port2: injection_port

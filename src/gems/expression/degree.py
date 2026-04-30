@@ -16,15 +16,11 @@ import gems.expression.scenario_operator
 from gems.expression.expression import (
     AllTimeSumNode,
     CeilNode,
-    ComponentParameterNode,
-    ComponentVariableNode,
     FloorNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
-    ProblemParameterNode,
-    ProblemVariableNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -77,18 +73,6 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         return 1
 
     def parameter(self, node: ParameterNode) -> int | float:
-        return 0
-
-    def comp_variable(self, node: ComponentVariableNode) -> int | float:
-        return 1
-
-    def comp_parameter(self, node: ComponentParameterNode) -> int | float:
-        return 0
-
-    def pb_variable(self, node: ProblemVariableNode) -> int | float:
-        return 1
-
-    def pb_parameter(self, node: ProblemParameterNode) -> int | float:
         return 0
 
     def time_shift(self, node: TimeShiftNode) -> int | float:

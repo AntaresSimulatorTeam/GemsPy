@@ -1,0 +1,114 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# System used to test thermal clusters with component-dependent d_min_down.
+#
+# Two thermal clusters (G_0 and G_1) use the `thermal-cluster-dhd` model,
+# whose Min-down-time constraint contains both a component-dependent time sum
+# and a component-dependent time shift:
+#
+#   sum(t - d_min_down + 1 .. t, nb_stop) <= nb_units_max[t - d_min_down] - nb_on
+#
+# G_0 has d_min_down=3 and G_1 has d_min_down=5, so the constraint's shift
+# values differ per component, exercising the per-component aggregation path.
+#
+# Demand pattern: [100,100,100,0,0,0,100,100,100,100]
+# Both G_0 and G_1 have p_min=50 and p_max=50, so they MUST be off when demand=0.
+# They stop at t=3 and cannot restart until their min-down-time is satisfied:
+#   G_0 (d_min_down=3): off at t=3,4,5 → restarts at t=6
+#   G_1 (d_min_down=5): off at t=3,4,5,6,7 → restarts at t=8
+#
+# At t=6 and t=7, demand=100 but G_1 cannot restart yet → G_2 covers 50 each step.
+# The fact that objective=12250 (not lower) proves d_min_down=5 is binding for G_1.
+#
+# Expected objective:
+#   G_0: 7 steps × 50 × cost_10  =  3500
+#   G_1: 5 steps × 50 × cost_15  =  3750
+#   G_2: 2 steps × 50 × cost_50  =  5000
+#   Total                         = 12250
+system:
+  model-libraries: basic
+  components:
+    - id: N
+      model: basic.node
+    - id: G_0
+      model: basic.thermal-cluster-dhd
+      parameters:
+        - id: cost
+          value: 10
+        - id: p_max
+          value: 50
+        - id: p_min
+          value: 50
+        - id: d_min_up
+          value: 2
+        - id: d_min_down
+          value: 3
+        - id: nb_units_max
+          value: 1
+        - id: nb_failures
+          value: 0
+
+    - id: G_1
+      model: basic.thermal-cluster-dhd
+      parameters:
+        - id: cost
+          value: 15
+        - id: p_max
+          value: 50
+        - id: p_min
+          value: 50
+        - id: d_min_up
+          value: 5
+        - id: d_min_down
+          value: 5
+        - id: nb_units_max
+          value: 1
+        - id: nb_failures
+          value: 0
+
+    - id: G_2
+      model: basic.generator
+      parameters:
+        - id: cost
+          value: 50
+        - id: p_max
+          value: 100
+
+    - id: D
+      model: basic.demand
+      parameters:
+        - id: demand
+          time-dependent: true
+          scenario-dependent: false
+          value: demand_var_down_time
+
+  connections:
+    - component1: N
+      port1: injection_port
+      component2: D
+      port2: injection_port
+
+    - component1: N
+      port1: injection_port
+      component2: G_0
+      port2: injection_port
+
+    - component1: N
+      port1: injection_port
+      component2: G_1
+      port2: injection_port
+
+    - component1: N
+      port1: injection_port
+      component2: G_2
+      port2: injection_port

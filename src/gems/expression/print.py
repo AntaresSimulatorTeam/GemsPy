@@ -16,16 +16,12 @@ from typing import Dict
 from gems.expression.expression import (
     AllTimeSumNode,
     CeilNode,
-    ComponentParameterNode,
-    ComponentVariableNode,
     ExpressionNode,
     FloorNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
-    ProblemParameterNode,
-    ProblemVariableNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -98,20 +94,6 @@ class PrinterVisitor(ExpressionVisitor[str]):
 
     def parameter(self, node: ParameterNode) -> str:
         return node.name
-
-    def comp_variable(self, node: ComponentVariableNode) -> str:
-        return f"{node.component_id}.{node.name}"
-
-    def comp_parameter(self, node: ComponentParameterNode) -> str:
-        return f"{node.component_id}.{node.name}"
-
-    def pb_variable(self, node: ProblemVariableNode) -> str:
-        # TODO
-        return f"{node.component_id}.{node.name}"
-
-    def pb_parameter(self, node: ProblemParameterNode) -> str:
-        # TODO
-        return f"{node.component_id}.{node.name}"
 
     def time_shift(self, node: TimeShiftNode) -> str:
         return f"({visit(node.operand, self)}.shift({visit(node.time_shift, self)}))"

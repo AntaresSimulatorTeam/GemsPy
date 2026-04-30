@@ -19,8 +19,17 @@ import math
 from libs.standard import DEMAND_MODEL, LINK_MODEL, NODE_BALANCE_MODEL
 from libs.standard_sc import C02_POWER_MODEL, QUOTA_CO2_MODEL
 
-from gems.simulation import OutputValues, TimeBlock, build_problem
-from gems.study import ConstantData, DataBase, Network, Node, PortRef, create_component
+from gems.simulation import TimeBlock, build_problem
+from gems.simulation.simulation_table import SimulationTableBuilder
+from gems.study import (
+    Component,
+    ConstantData,
+    DataBase,
+    PortRef,
+    Study,
+    System,
+    create_component,
+)
 
 
 def test_quota_co2() -> None:
@@ -36,30 +45,30 @@ def test_quota_co2() -> None:
     QuotaCO2
 
     Test of a generation of energy and co2 with a quota to limit the emission"""
-    n1 = Node(model=NODE_BALANCE_MODEL, id="N1")
-    n2 = Node(model=NODE_BALANCE_MODEL, id="N2")
+    n1 = Component(model=NODE_BALANCE_MODEL, id="N1")
+    n2 = Component(model=NODE_BALANCE_MODEL, id="N2")
     oil1 = create_component(model=C02_POWER_MODEL, id="Oil1")
     coal1 = create_component(model=C02_POWER_MODEL, id="Coal1")
     l12 = create_component(model=LINK_MODEL, id="L12")
     demand = create_component(model=DEMAND_MODEL, id="Demand")
     monQuotaCO2 = create_component(model=QUOTA_CO2_MODEL, id="QuotaCO2")
 
-    network = Network("test")
-    network.add_node(n1)
-    network.add_node(n2)
-    network.add_component(oil1)
-    network.add_component(coal1)
-    network.add_component(l12)
-    network.add_component(demand)
-    network.add_component(monQuotaCO2)
+    system = System("test")
+    system.add_component(n1)
+    system.add_component(n2)
+    system.add_component(oil1)
+    system.add_component(coal1)
+    system.add_component(l12)
+    system.add_component(demand)
+    system.add_component(monQuotaCO2)
 
-    network.connect(PortRef(demand, "balance_port"), PortRef(n2, "balance_port"))
-    network.connect(PortRef(n2, "balance_port"), PortRef(l12, "balance_port_from"))
-    network.connect(PortRef(l12, "balance_port_to"), PortRef(n1, "balance_port"))
-    network.connect(PortRef(n1, "balance_port"), PortRef(oil1, "FlowP"))
-    network.connect(PortRef(n2, "balance_port"), PortRef(coal1, "FlowP"))
-    network.connect(PortRef(oil1, "OutCO2"), PortRef(monQuotaCO2, "emissionCO2"))
-    network.connect(PortRef(coal1, "OutCO2"), PortRef(monQuotaCO2, "emissionCO2"))
+    system.connect(PortRef(demand, "balance_port"), PortRef(n2, "balance_port"))
+    system.connect(PortRef(n2, "balance_port"), PortRef(l12, "balance_port_from"))
+    system.connect(PortRef(l12, "balance_port_to"), PortRef(n1, "balance_port"))
+    system.connect(PortRef(n1, "balance_port"), PortRef(oil1, "FlowP"))
+    system.connect(PortRef(n2, "balance_port"), PortRef(coal1, "FlowP"))
+    system.connect(PortRef(oil1, "OutCO2"), PortRef(monQuotaCO2, "emissionCO2"))
+    system.connect(PortRef(coal1, "OutCO2"), PortRef(monQuotaCO2, "emissionCO2"))
 
     database = DataBase()
     database.add_data("Demand", "demand", ConstantData(100))
@@ -75,16 +84,21 @@ def test_quota_co2() -> None:
     database.add_data("QuotaCO2", "quota", ConstantData(150))
 
     scenarios = 1
-    problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
-    status = problem.solver.Solve()
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), list(range(scenarios))
+    )
+    problem.solve(solver_name="highs")
 
-    output = OutputValues(problem)
-    oil1_p = output.component("Oil1").var("p").value
-    coal1_p = output.component("Coal1").var("p").value
-    l12_flow = output.component("L12").var("flow").value
+    assert problem.termination_condition == "optimal"
+    assert math.isclose(problem.objective_value, 5500)
 
-    assert status == problem.solver.OPTIMAL
-    assert math.isclose(problem.solver.Objective().Value(), 5500)
-    assert math.isclose(oil1_p, 50)  # type: ignore
-    assert math.isclose(coal1_p, 50)  # type: ignore
-    assert math.isclose(l12_flow, -50)  # type: ignore
+    df = SimulationTableBuilder().build(problem)
+    assert math.isclose(
+        df.component("Oil1").output("p").value(time_index=0, scenario_index=0), 50
+    )
+    assert math.isclose(
+        df.component("Coal1").output("p").value(time_index=0, scenario_index=0), 50
+    )
+    assert math.isclose(
+        df.component("L12").output("flow").value(time_index=0, scenario_index=0), -50
+    )

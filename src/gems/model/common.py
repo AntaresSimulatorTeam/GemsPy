@@ -20,10 +20,4 @@ from enum import Enum
 class ValueType(Enum):
     CONTINUOUS = "CONTINUOUS"
     INTEGER = "INTEGER"
-    BOOLEAN = "BOOLEAN"
-
-
-class ProblemContext(Enum):
-    OPERATIONAL = 0
-    INVESTMENT = 1
-    COUPLING = 2
+    BINARY = "BINARY"

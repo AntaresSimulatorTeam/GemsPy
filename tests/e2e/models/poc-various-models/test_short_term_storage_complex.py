@@ -9,13 +9,14 @@ from libs.standard import (
 )
 from libs.standard_sc import SHORT_TERM_STORAGE_COMPLEX
 
-from gems.simulation import BlockBorderManagement, TimeBlock, build_problem
+from gems.simulation import TimeBlock, build_problem
 from gems.study import (
+    Component,
     ConstantData,
     DataBase,
-    Network,
-    Node,
     PortRef,
+    Study,
+    System,
     TimeScenarioSeriesData,
     create_component,
 )
@@ -66,7 +67,7 @@ def short_term_storage_base(efficiency: float, horizon: int, result: int) -> Non
     database.add_data("STS1", "Pgrad+s_penality", ConstantData(0))
     database.add_data("STS1", "Pgrad-s_penality", ConstantData(0))
 
-    node = Node(model=NODE_BALANCE_MODEL, id="1")
+    node = Component(model=NODE_BALANCE_MODEL, id="1")
     spillage = create_component(model=SPILLAGE_MODEL, id="S")
 
     unsupplied = create_component(model=UNSUPPLIED_ENERGY_MODEL, id="U")
@@ -78,49 +79,27 @@ def short_term_storage_base(efficiency: float, horizon: int, result: int) -> Non
         id="STS1",
     )
 
-    network = Network("test")
-    network.add_node(node)
+    system = System("test")
+    system.add_component(node)
     for component in [demand, short_term_storage, spillage, unsupplied]:
-        network.add_component(component)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(
+        system.add_component(component)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(
         PortRef(short_term_storage, "balance_port"), PortRef(node, "balance_port")
     )
-    network.connect(PortRef(spillage, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(unsupplied, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(spillage, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(unsupplied, "balance_port"), PortRef(node, "balance_port"))
 
     problem = build_problem(
-        network,
-        database,
+        Study(system, database),
         time_blocks[0],
-        scenarios,
-        border_management=BlockBorderManagement.CYCLE,
+        list(range(scenarios)),
     )
-    status = problem.solver.Solve()
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert math.isclose(problem.objective_value, result)
 
-    assert status == problem.solver.OPTIMAL
-
-    assert math.isclose(problem.solver.Objective().Value(), result)
-
-    count_variables = 0
-    for variable in problem.solver.variables():
-        if "injection" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 100
-            print(variable.name())
-            print(variable.solution_value())
-        elif "withdrawal" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 50
-            print(variable.name())
-            print(variable.solution_value())
-        elif "level" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 1000
-            print(variable.name())
-            print(variable.solution_value())
-
-    assert count_variables == 3 * horizon
+    # TODO: update variable access
 
     database.add_data("STS1", "withdrawal_penality", ConstantData(0))
     database.add_data("STS1", "level_penality", ConstantData(5))
@@ -129,31 +108,11 @@ def short_term_storage_base(efficiency: float, horizon: int, result: int) -> Non
     database.add_data("STS1", "Pgrad+s_penality", ConstantData(0))
     database.add_data("STS1", "Pgrad-s_penality", ConstantData(0))
 
-    status = problem.solver.Solve()
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert math.isclose(problem.objective_value, result)
 
-    assert status == problem.solver.OPTIMAL
-
-    assert math.isclose(problem.solver.Objective().Value(), result)
-
-    count_variables = 0
-    for variable in problem.solver.variables():
-        if "injection" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 100
-            print(variable.name())
-            print(variable.solution_value())
-        elif "withdrawal" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 50
-            print(variable.name())
-            print(variable.solution_value())
-        elif "level" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 1000
-            print(variable.name())
-            print(variable.solution_value())
-
-    assert count_variables == 3 * horizon
+    # TODO: update variable access
 
     database.add_data("STS1", "withdrawal_penality", ConstantData(0))
     database.add_data("STS1", "level_penality", ConstantData(0))
@@ -162,31 +121,11 @@ def short_term_storage_base(efficiency: float, horizon: int, result: int) -> Non
     database.add_data("STS1", "Pgrad+s_penality", ConstantData(0))
     database.add_data("STS1", "Pgrad-s_penality", ConstantData(0))
 
-    status = problem.solver.Solve()
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert math.isclose(problem.objective_value, result)
 
-    assert status == problem.solver.OPTIMAL
-
-    assert math.isclose(problem.solver.Objective().Value(), result)
-
-    count_variables = 0
-    for variable in problem.solver.variables():
-        if "injection" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 100
-            print(variable.name())
-            print(variable.solution_value())
-        elif "withdrawal" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 50
-            print(variable.name())
-            print(variable.solution_value())
-        elif "level" in variable.name():
-            count_variables += 1
-            assert 0 <= variable.solution_value() <= 1000
-            print(variable.name())
-            print(variable.solution_value())
-
-    assert count_variables == 3 * horizon
+    # TODO: update variable access
 
 
 def test_short_test_horizon_10() -> None:

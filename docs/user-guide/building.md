@@ -1,42 +1,46 @@
 # Building systems with the Python API
 
-Instead of reading a .yml file, one can build a system with GemsPy by using the API of the package.
+Instead of reading a `.yml` file, one can also build a system with GemsPy by using the API of the package.
+
+The Pydantic schema classes used to describe systems programmatically follow the `*Schema` naming convention.
 
 
-## Defining an InputComponent
+## Defining a ComponentSchema
 
 The syntax to build components with the GemsPy API is the following:
 
 ~~~ python
+from gems.study.parsing import ComponentSchema, ComponentParameterSchema
+
 components = []
 
 components.append(
-    InputComponent(
+    ComponentSchema(
         id="bus_de",
         model="simple_library.bus",
         parameters=[
-            InputComponentParameter(
+            ComponentParameterSchema(
                 id="ens_cost",
                 time_dependent=False,
                 scenario_dependent=False,
-                value=40000 #€/MWh
+                value=40000  # €/MWh
             ),
-            InputComponentParameter(
-                id="ens_cost",
+            ComponentParameterSchema(
+                id="spillage_cost",
                 time_dependent=False,
                 scenario_dependent=False,
-                value=3000 #€/MWh
+                value=3000  # €/MWh
             ),
         ],
     )
 )
 
 components.append(
-    InputComponent(
+    ComponentSchema(
         id="load_de",
         model="simple_library.load",
         parameters=[
-            InputComponentParameter(
+            ComponentParameterSchema(
                 id="load",
                 time_dependent=True,
                 scenario_dependent=True,
@@ -46,39 +50,38 @@ components.append(
 )
 
 components.append(
-    InputComponent(
+    ComponentSchema(
         id="gen_de",
         model="simple_library.generator",
         parameters=[
-            InputComponentParameter(
+            ComponentParameterSchema(
                 id="marginal_cost",
                 time_dependent=False,
                 scenario_dependent=False,
-                value=70 #€/MWh
+                value=70  # €/MWh
             ),
-            InputComponentParameter(
+            ComponentParameterSchema(
                 id="pmax",
                 time_dependent=False,
                 scenario_dependent=False,
-                value=700 #MWh
+                value=700  # MWh
             ),
         ],
     )
 )
-
-
 ~~~
 
-## Defining an InputPortConnection
+## Defining a PortConnectionsSchema
 
 The syntax to build connections between components with the GemsPy API is the following:
 
-
 ~~~ python
+from gems.study.parsing import PortConnectionsSchema
+
 connections = []
 
 connections.append(
-    InputPortConnections(
+    PortConnectionsSchema(
         component1="bus_de",
         port1="balance_port",
         component2="gen_de",
@@ -87,7 +90,7 @@ connections.append(
 )
 
 connections.append(
-    InputPortConnections(
+    PortConnectionsSchema(
         component1="bus_de",
         port1="balance_port",
         component2="load_de",
@@ -96,13 +99,15 @@ connections.append(
 )
 ~~~
 
-## Defining an InputSystem
+## Defining a SystemSchema
 
 ~~~ python
-input_system = InputSystem(
-            components=components,
-            connections=connections,
-        )
+from gems.study.parsing import SystemSchema
+
+input_system = SystemSchema(
+    components=components,
+    connections=connections,
+)
 ~~~
 
-Then, the input_system variable can be used in the same way as when it was created using the [parse_yaml_components](inputs.md) method.
+The `input_system` variable can then be used in the same way as when it was created using the [parse_yaml_components](inputs.md) method.
