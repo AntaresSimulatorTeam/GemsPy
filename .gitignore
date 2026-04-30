@@ -14,3 +14,4 @@ outputs
 build
 src/gems.egg-info/
 src/gemspy.egg-info/
+build_time_scalability.csv

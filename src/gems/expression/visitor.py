@@ -23,8 +23,6 @@ from gems.expression.expression import (
     AllTimeSumNode,
     CeilNode,
     ComparisonNode,
-    ComponentParameterNode,
-    ComponentVariableNode,
     DivisionNode,
     ExpressionNode,
     FloorNode,
@@ -36,8 +34,6 @@ from gems.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
-    ProblemParameterNode,
-    ProblemVariableNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -58,96 +54,61 @@ class ExpressionVisitor(ABC, Generic[T]):
     """
 
     @abstractmethod
-    def literal(self, node: LiteralNode) -> T:
-        ...
+    def literal(self, node: LiteralNode) -> T: ...
 
     @abstractmethod
-    def negation(self, node: NegationNode) -> T:
-        ...
+    def negation(self, node: NegationNode) -> T: ...
 
     @abstractmethod
-    def addition(self, node: AdditionNode) -> T:
-        ...
+    def addition(self, node: AdditionNode) -> T: ...
 
     @abstractmethod
-    def multiplication(self, node: MultiplicationNode) -> T:
-        ...
+    def multiplication(self, node: MultiplicationNode) -> T: ...
 
     @abstractmethod
-    def division(self, node: DivisionNode) -> T:
-        ...
+    def division(self, node: DivisionNode) -> T: ...
 
     @abstractmethod
-    def comparison(self, node: ComparisonNode) -> T:
-        ...
+    def comparison(self, node: ComparisonNode) -> T: ...
 
     @abstractmethod
-    def variable(self, node: VariableNode) -> T:
-        ...
+    def variable(self, node: VariableNode) -> T: ...
 
     @abstractmethod
-    def parameter(self, node: ParameterNode) -> T:
-        ...
+    def parameter(self, node: ParameterNode) -> T: ...
 
     @abstractmethod
-    def comp_parameter(self, node: ComponentParameterNode) -> T:
-        ...
+    def time_shift(self, node: TimeShiftNode) -> T: ...
 
     @abstractmethod
-    def comp_variable(self, node: ComponentVariableNode) -> T:
-        ...
+    def time_eval(self, node: TimeEvalNode) -> T: ...
 
     @abstractmethod
-    def pb_parameter(self, node: ProblemParameterNode) -> T:
-        ...
+    def time_sum(self, node: TimeSumNode) -> T: ...
 
     @abstractmethod
-    def pb_variable(self, node: ProblemVariableNode) -> T:
-        ...
+    def all_time_sum(self, node: AllTimeSumNode) -> T: ...
 
     @abstractmethod
-    def time_shift(self, node: TimeShiftNode) -> T:
-        ...
+    def scenario_operator(self, node: ScenarioOperatorNode) -> T: ...
 
     @abstractmethod
-    def time_eval(self, node: TimeEvalNode) -> T:
-        ...
+    def port_field(self, node: PortFieldNode) -> T: ...
 
     @abstractmethod
-    def time_sum(self, node: TimeSumNode) -> T:
-        ...
+    def port_field_aggregator(self, node: PortFieldAggregatorNode) -> T: ...
 
     @abstractmethod
-    def all_time_sum(self, node: AllTimeSumNode) -> T:
-        ...
+    def floor(self, node: FloorNode) -> T: ...
 
     @abstractmethod
-    def scenario_operator(self, node: ScenarioOperatorNode) -> T:
-        ...
+    def ceil(self, node: CeilNode) -> T: ...
 
     @abstractmethod
-    def port_field(self, node: PortFieldNode) -> T:
-        ...
+    def maximum(self, node: MaxNode) -> T: ...
 
     @abstractmethod
-    def port_field_aggregator(self, node: PortFieldAggregatorNode) -> T:
-        ...
-
-    @abstractmethod
-    def floor(self, node: FloorNode) -> T:
-        ...
-
-    @abstractmethod
-    def ceil(self, node: CeilNode) -> T:
-        ...
-
-    @abstractmethod
-    def maximum(self, node: MaxNode) -> T:
-        ...
-
-    @abstractmethod
-    def minimum(self, node: MinNode) -> T:
-        ...
+    def minimum(self, node: MinNode) -> T: ...
 
 
 def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
@@ -162,14 +123,6 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
         return visitor.variable(root)
     elif isinstance(root, ParameterNode):
         return visitor.parameter(root)
-    elif isinstance(root, ComponentParameterNode):
-        return visitor.comp_parameter(root)
-    elif isinstance(root, ComponentVariableNode):
-        return visitor.comp_variable(root)
-    elif isinstance(root, ProblemParameterNode):
-        return visitor.pb_parameter(root)
-    elif isinstance(root, ProblemVariableNode):
-        return visitor.pb_variable(root)
     elif isinstance(root, AdditionNode):
         return visitor.addition(root)
     elif isinstance(root, MultiplicationNode):

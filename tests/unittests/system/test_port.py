@@ -15,7 +15,7 @@ import pytest
 from gems.expression import literal
 from gems.expression.expression import port_field
 from gems.model import Constraint, ModelPort, PortType, model
-from gems.study import Node, PortRef, PortsConnection, create_component
+from gems.study import Component, PortRef, PortsConnection, create_component
 from tests.unittests.system.libs.standard import DEMAND_MODEL
 
 
@@ -32,7 +32,7 @@ def test_port_type_compatibility_ko() -> None:
             )
         ],
     )
-    node = Node(id="N", model=NODE_BALANCE_MODEL_FAKE)
+    node = Component(id="N", model=NODE_BALANCE_MODEL_FAKE)
     demand = create_component(
         model=DEMAND_MODEL,
         id="D",

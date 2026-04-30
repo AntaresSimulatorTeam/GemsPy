@@ -17,7 +17,6 @@ The standard module contains the definition of standard models.
 from gems.expression import literal, param, var
 from gems.expression.expression import port_field
 from gems.expression.indexing_structure import IndexingStructure
-from gems.model.common import ProblemContext
 from gems.model.constraint import Constraint
 from gems.model.model import ModelPort, model
 from gems.model.parameter import float_parameter, int_parameter
@@ -58,12 +57,14 @@ NODE_WITH_SPILL_AND_ENS = model(
             == var("spillage") - var("unsupplied_energy"),
         )
     ],
-    objective_operational_contribution=(
-        param("spillage_cost") * var("spillage")
-        + param("ens_cost") * var("unsupplied_energy")
-    )
-    .time_sum()
-    .expec(),
+    objective_contributions={
+        "operational": (
+            param("spillage_cost") * var("spillage")
+            + param("ens_cost") * var("unsupplied_energy")
+        )
+        .time_sum()
+        .expec()
+    },
 )
 
 """
@@ -130,13 +131,13 @@ GENERATOR_MODEL = model(
             name="Max generation", expression=var("generation") <= param("p_max")
         ),
     ],
-    objective_operational_contribution=(param("cost") * var("generation"))
-    .time_sum()
-    .expec(),
+    objective_contributions={
+        "operational": (param("cost") * var("generation")).time_sum().expec()
+    },
 )
 
 GENERATOR_MODEL_WITH_PMIN = model(
-    id="GEN",
+    id="GEN_WITH_PMIN",
     parameters=[
         float_parameter("p_max", CONSTANT),
         float_parameter("p_min", CONSTANT),
@@ -160,9 +161,9 @@ GENERATOR_MODEL_WITH_PMIN = model(
             lower_bound=literal(0),
         ),  # To test both ways of setting constraints
     ],
-    objective_operational_contribution=(param("cost") * var("generation"))
-    .time_sum()
-    .expec(),
+    objective_contributions={
+        "operational": (param("cost") * var("generation")).time_sum().expec()
+    },
 )
 
 """
@@ -170,7 +171,7 @@ A model for a linear cost generation limited by a maximum generation per time-st
 and total generation in whole period. It considers a full storage with no replenishing
 """
 GENERATOR_MODEL_WITH_STORAGE = model(
-    id="GEN",
+    id="GEN_WITH_STORAGE",
     parameters=[
         float_parameter("p_max", CONSTANT),
         float_parameter("cost", CONSTANT),
@@ -193,14 +194,14 @@ GENERATOR_MODEL_WITH_STORAGE = model(
             expression=var("generation").time_sum() <= param("full_storage"),
         ),
     ],
-    objective_operational_contribution=(param("cost") * var("generation"))
-    .time_sum()
-    .expec(),
+    objective_contributions={
+        "operational": (param("cost") * var("generation")).time_sum().expec()
+    },
 )
 
 # For now, no starting cost
 THERMAL_CLUSTER_MODEL_HD = model(
-    id="GEN",
+    id="THERMAL_CLUSTER_HD",
     parameters=[
         float_parameter("p_max", CONSTANT),  # p_max of a single unit
         float_parameter("p_min", CONSTANT),
@@ -265,14 +266,14 @@ THERMAL_CLUSTER_MODEL_HD = model(
             <= param("nb_units_max").shift(-param("d_min_down")) - var("nb_on"),
         ),
     ],
-    objective_operational_contribution=(param("cost") * var("generation"))
-    .time_sum()
-    .expec(),
+    objective_contributions={
+        "operational": (param("cost") * var("generation")).time_sum().expec()
+    },
 )
 
 # Same model as previous one, except that starting/stopping variables are now non anticipative
 THERMAL_CLUSTER_MODEL_DHD = model(
-    id="GEN",
+    id="THERMAL_CLUSTER_DHD",
     parameters=[
         float_parameter("p_max", CONSTANT),  # p_max of a single unit
         float_parameter("p_min", CONSTANT),
@@ -337,9 +338,9 @@ THERMAL_CLUSTER_MODEL_DHD = model(
             <= param("nb_units_max").shift(-param("d_min_down")) - var("nb_on"),
         ),
     ],
-    objective_operational_contribution=(param("cost") * var("generation"))
-    .time_sum()
-    .expec(),
+    objective_contributions={
+        "operational": (param("cost") * var("generation")).time_sum().expec()
+    },
 )
 
 SPILLAGE_MODEL = model(
@@ -353,9 +354,9 @@ SPILLAGE_MODEL = model(
             definition=-var("spillage"),
         )
     ],
-    objective_operational_contribution=(param("cost") * var("spillage"))
-    .time_sum()
-    .expec(),
+    objective_contributions={
+        "operational": (param("cost") * var("spillage")).time_sum().expec()
+    },
 )
 
 UNSUPPLIED_ENERGY_MODEL = model(
@@ -369,9 +370,9 @@ UNSUPPLIED_ENERGY_MODEL = model(
             definition=var("unsupplied_energy"),
         )
     ],
-    objective_operational_contribution=(param("cost") * var("unsupplied_energy"))
-    .time_sum()
-    .expec(),
+    objective_contributions={
+        "operational": (param("cost") * var("unsupplied_energy")).time_sum().expec()
+    },
 )
 
 # Simplified model
@@ -418,12 +419,12 @@ SHORT_TERM_STORAGE_SIMPLE = model(
             == param("inflows"),
         ),
     ],
-    objective_operational_contribution=literal(0),  # Implcitement nul ?
+    objective_contributions={"operational": literal(0)},  # Implcitement nul ?
 )
 
 """ Simple thermal unit that can be invested on"""
 THERMAL_CANDIDATE = model(
-    id="GEN",
+    id="THERMAL_CANDIDATE",
     parameters=[
         float_parameter("op_cost", CONSTANT),
         float_parameter("invest_cost", CONSTANT),
@@ -436,7 +437,6 @@ THERMAL_CANDIDATE = model(
             lower_bound=literal(0),
             upper_bound=param("max_invest"),
             structure=CONSTANT,
-            context=ProblemContext.COUPLING,
         ),
     ],
     ports=[ModelPort(port_type=BALANCE_PORT_TYPE, port_name="balance_port")],
@@ -449,15 +449,15 @@ THERMAL_CANDIDATE = model(
     constraints=[
         Constraint(name="Max generation", expression=var("generation") <= var("p_max"))
     ],
-    objective_operational_contribution=(param("op_cost") * var("generation"))
-    .time_sum()
-    .expec(),
-    objective_investment_contribution=param("invest_cost") * var("p_max"),
+    objective_contributions={
+        "operational": (param("op_cost") * var("generation")).time_sum().expec(),
+        "investment": param("invest_cost") * var("p_max"),
+    },
 )
 
 """ Simple thermal unit that can be invested on and with already installed capacity"""
 THERMAL_CANDIDATE_WITH_ALREADY_INSTALLED_CAPA = model(
-    id="GEN",
+    id="THERMAL_CANDIDATE_WITH_ALREADY_INSTALLED_CAPA",
     parameters=[
         float_parameter("op_cost", CONSTANT),
         float_parameter("invest_cost", CONSTANT),
@@ -471,7 +471,6 @@ THERMAL_CANDIDATE_WITH_ALREADY_INSTALLED_CAPA = model(
             lower_bound=literal(0),
             upper_bound=param("max_invest"),
             structure=CONSTANT,
-            context=ProblemContext.COUPLING,
         ),
     ],
     ports=[ModelPort(port_type=BALANCE_PORT_TYPE, port_name="balance_port")],
@@ -488,8 +487,8 @@ THERMAL_CANDIDATE_WITH_ALREADY_INSTALLED_CAPA = model(
             <= param("already_installed_capa") + var("invested_capa"),
         )
     ],
-    objective_operational_contribution=(param("op_cost") * var("generation"))
-    .time_sum()
-    .expec(),
-    objective_investment_contribution=param("invest_cost") * var("invested_capa"),
+    objective_contributions={
+        "operational": (param("op_cost") * var("generation")).time_sum().expec(),
+        "investment": param("invest_cost") * var("invested_capa"),
+    },
 )

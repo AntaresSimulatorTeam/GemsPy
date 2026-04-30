@@ -10,9 +10,6 @@
 #
 # This file is part of the Antares project.
 
-from dataclasses import dataclass, field
-from typing import Dict
-
 import pytest
 
 from gems.expression import (
@@ -33,52 +30,6 @@ from gems.expression import (
     visit,
 )
 from gems.expression.equality import expressions_equal
-from gems.expression.expression import ComponentParameterNode, ComponentVariableNode
-
-
-@dataclass(frozen=True)
-class ComponentValueKey:
-    component_id: str
-    variable_name: str
-
-
-def comp_key(component_id: str, variable_name: str) -> ComponentValueKey:
-    return ComponentValueKey(component_id, variable_name)
-
-
-@dataclass(frozen=True)
-class ComponentEvaluationContext(ValueProvider):
-    """
-    Simple value provider relying on dictionaries.
-    Does not support component variables/parameters.
-    """
-
-    variables: Dict[ComponentValueKey, float] = field(default_factory=dict)
-    parameters: Dict[ComponentValueKey, float] = field(default_factory=dict)
-
-    def get_variable_value(self, name: str) -> float:
-        raise NotImplementedError()
-
-    def get_parameter_value(self, name: str) -> float:
-        raise NotImplementedError()
-
-    def get_component_variable_value(self, component_id: str, name: str) -> float:
-        return self.variables[comp_key(component_id, name)]
-
-    def get_component_parameter_value(self, component_id: str, name: str) -> float:
-        return self.parameters[comp_key(component_id, name)]
-
-
-def test_comp_parameter() -> None:
-    add_node = AdditionNode([LiteralNode(1), ComponentVariableNode("comp1", "x")])
-    expr = DivisionNode(add_node, ComponentParameterNode("comp1", "p"))
-
-    assert visit(expr, PrinterVisitor()) == "((1 + comp1.x) / comp1.p)"
-
-    context = ComponentEvaluationContext(
-        variables={comp_key("comp1", "x"): 3}, parameters={comp_key("comp1", "p"): 4}
-    )
-    assert visit(expr, EvaluationVisitor(context)) == 1
 
 
 def test_ast() -> None:

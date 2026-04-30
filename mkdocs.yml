@@ -9,6 +9,8 @@ nav:
     - 'Building systems with the Python API': 'user-guide/building.md'
     - 'Optimization: building and solving problems': 'user-guide/optimisation.md'
     - 'Retrieving outputs': 'user-guide/outputs.md'
+    - 'Optimisation configuration & resolution modes': 'user-guide/optim-config.md'
+    - 'Scenario builder': 'user-guide/scenario-builder.md'
     - 'Data converters': 'user-guide/converters.md'
   - Developer guide: developer-guide.md
   - Changelog: CHANGELOG.md

@@ -13,8 +13,17 @@
 import math
 
 from gems.model.library import Library
-from gems.simulation import OutputValues, TimeBlock, build_problem
-from gems.study import ConstantData, DataBase, Network, Node, PortRef, create_component
+from gems.simulation import TimeBlock, build_problem
+from gems.simulation.simulation_table import SimulationTableBuilder
+from gems.study import (
+    Component,
+    ConstantData,
+    DataBase,
+    PortRef,
+    Study,
+    System,
+    create_component,
+)
 
 """
 This file tests various modellings for an electrolyser with multiple inputs. The models are read from a YAML model file.
@@ -54,20 +63,20 @@ def test_electrolyzer_n_inputs_1(
 
     """
 
-    gen_model = lib_dict["basic"].models["generator"]
-    node_model = lib_dict["basic"].models["node"]
-    convertor_model = lib_dict_sc["basic"].models["convertor"]
-    demand_model = lib_dict["basic"].models["demand"]
+    gen_model = lib_dict["basic"].models["basic.generator"]
+    node_model = lib_dict["basic"].models["basic.node"]
+    convertor_model = lib_dict_sc["basic"].models["basic.convertor"]
+    demand_model = lib_dict["basic"].models["basic.demand"]
 
-    elec_node_1 = Node(model=node_model, id="e1")
+    elec_node_1 = Component(model=node_model, id="e1")
     electric_prod_1 = create_component(model=gen_model, id="ep1")
     electrolyzer1 = create_component(model=convertor_model, id="ez1")
 
-    elec_node_2 = Node(model=node_model, id="e2")
+    elec_node_2 = Component(model=node_model, id="e2")
     electric_prod_2 = create_component(model=gen_model, id="ep2")
     electrolyzer2 = create_component(model=convertor_model, id="ez2")
 
-    gaz_node = Node(model=node_model, id="g")
+    gaz_node = Component(model=node_model, id="g")
     gaz_prod = create_component(model=gen_model, id="gp")
     gaz_demand = create_component(model=demand_model, id="gd")
 
@@ -85,62 +94,66 @@ def test_electrolyzer_n_inputs_1(
     database.add_data("gp", "p_max", ConstantData(30))
     database.add_data("gp", "cost", ConstantData(15))
 
-    network = Network("test")
-    network.add_node(elec_node_1)
-    network.add_component(electric_prod_1)
-    network.add_component(electrolyzer1)
-    network.add_node(elec_node_2)
-    network.add_component(electric_prod_2)
-    network.add_component(electrolyzer2)
-    network.add_node(gaz_node)
-    network.add_component(gaz_prod)
-    network.add_component(gaz_demand)
+    system = System("test")
+    system.add_component(elec_node_1)
+    system.add_component(electric_prod_1)
+    system.add_component(electrolyzer1)
+    system.add_component(elec_node_2)
+    system.add_component(electric_prod_2)
+    system.add_component(electrolyzer2)
+    system.add_component(gaz_node)
+    system.add_component(gaz_prod)
+    system.add_component(gaz_demand)
 
-    network.connect(
+    system.connect(
         PortRef(electric_prod_1, "injection_port"),
         PortRef(elec_node_1, "injection_port"),
     )
-    network.connect(
+    system.connect(
         PortRef(elec_node_1, "injection_port"), PortRef(electrolyzer1, "input_port")
     )
-    network.connect(
+    system.connect(
         PortRef(electrolyzer1, "output_port"), PortRef(gaz_node, "injection_port")
     )
-    network.connect(
+    system.connect(
         PortRef(electric_prod_2, "injection_port"),
         PortRef(elec_node_2, "injection_port"),
     )
-    network.connect(
+    system.connect(
         PortRef(elec_node_2, "injection_port"), PortRef(electrolyzer2, "input_port")
     )
-    network.connect(
+    system.connect(
         PortRef(electrolyzer2, "output_port"), PortRef(gaz_node, "injection_port")
     )
-    network.connect(
+    system.connect(
         PortRef(gaz_node, "injection_port"), PortRef(gaz_demand, "injection_port")
     )
-    network.connect(
+    system.connect(
         PortRef(gaz_prod, "injection_port"), PortRef(gaz_node, "injection_port")
     )
 
     scenarios = 1
-    problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
-    status = problem.solver.Solve()
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), list(range(scenarios))
+    )
+    problem.solve(solver_name="highs")
 
-    output = OutputValues(problem)
-    ep1_gen = output.component("ep1").var("generation").value
-    ep2_gen = output.component("ep2").var("generation").value
-    gp_gen = output.component("gp").var("generation").value
-    print(ep1_gen)
-    print(ep2_gen)
-    print(gp_gen)
+    assert problem.termination_condition == "optimal"
+    assert math.isclose(problem.objective_value, 1990)
 
-    assert math.isclose(ep1_gen, 70)  # type: ignore
-    assert math.isclose(ep2_gen, 42)  # type: ignore
-    assert math.isclose(gp_gen, 30)  # type: ignore
-
-    assert status == problem.solver.OPTIMAL
-    assert math.isclose(problem.solver.Objective().Value(), 1990)
+    df = SimulationTableBuilder().build(problem)
+    assert math.isclose(
+        df.component("ep1").output("generation").value(time_index=0, scenario_index=0),
+        70,
+    )
+    assert math.isclose(
+        df.component("ep2").output("generation").value(time_index=0, scenario_index=0),
+        42,
+    )
+    assert math.isclose(
+        df.component("gp").output("generation").value(time_index=0, scenario_index=0),
+        30,
+    )
 
 
 def test_electrolyzer_n_inputs_2(
@@ -157,14 +170,14 @@ def test_electrolyzer_n_inputs_2(
     total gaz production = flow_ep1 * alpha1_ez + flow_ep2 * alpha2_ez + flow_gp
     """
 
-    gen_model = lib_dict["basic"].models["generator"]
-    node_model = lib_dict["basic"].models["node"]
-    convertor_model = lib_dict_sc["basic"].models["two_input_convertor"]
-    demand_model = lib_dict["basic"].models["demand"]
+    gen_model = lib_dict["basic"].models["basic.generator"]
+    node_model = lib_dict["basic"].models["basic.node"]
+    convertor_model = lib_dict_sc["basic"].models["basic.two_input_convertor"]
+    demand_model = lib_dict["basic"].models["basic.demand"]
 
-    elec_node_1 = Node(model=node_model, id="e1")
-    elec_node_2 = Node(model=node_model, id="e2")
-    gaz_node = Node(model=node_model, id="g")
+    elec_node_1 = Component(model=node_model, id="e1")
+    elec_node_2 = Component(model=node_model, id="e2")
+    gaz_node = Component(model=node_model, id="g")
 
     electric_prod_1 = create_component(model=gen_model, id="ep1")
     electric_prod_2 = create_component(model=gen_model, id="ep2")
@@ -189,58 +202,62 @@ def test_electrolyzer_n_inputs_2(
     database.add_data("gp", "p_max", ConstantData(30))
     database.add_data("gp", "cost", ConstantData(15))
 
-    network = Network("test")
-    network.add_node(elec_node_1)
-    network.add_node(elec_node_2)
-    network.add_node(gaz_node)
-    network.add_component(electric_prod_1)
-    network.add_component(electric_prod_2)
-    network.add_component(gaz_prod)
-    network.add_component(gaz_demand)
-    network.add_component(electrolyzer)
+    system = System("test")
+    system.add_component(elec_node_1)
+    system.add_component(elec_node_2)
+    system.add_component(gaz_node)
+    system.add_component(electric_prod_1)
+    system.add_component(electric_prod_2)
+    system.add_component(gaz_prod)
+    system.add_component(gaz_demand)
+    system.add_component(electrolyzer)
 
-    network.connect(
+    system.connect(
         PortRef(electric_prod_1, "injection_port"),
         PortRef(elec_node_1, "injection_port"),
     )
-    network.connect(
+    system.connect(
         PortRef(elec_node_1, "injection_port"), PortRef(electrolyzer, "input_port1")
     )
-    network.connect(
+    system.connect(
         PortRef(electric_prod_2, "injection_port"),
         PortRef(elec_node_2, "injection_port"),
     )
-    network.connect(
+    system.connect(
         PortRef(elec_node_2, "injection_port"), PortRef(electrolyzer, "input_port2")
     )
-    network.connect(
+    system.connect(
         PortRef(electrolyzer, "output_port"), PortRef(gaz_node, "injection_port")
     )
-    network.connect(
+    system.connect(
         PortRef(gaz_node, "injection_port"), PortRef(gaz_demand, "injection_port")
     )
-    network.connect(
+    system.connect(
         PortRef(gaz_prod, "injection_port"), PortRef(gaz_node, "injection_port")
     )
 
     scenarios = 1
-    problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
-    status = problem.solver.Solve()
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), list(range(scenarios))
+    )
+    problem.solve(solver_name="highs")
 
-    output = OutputValues(problem)
-    ep1_gen = output.component("ep1").var("generation").value
-    ep2_gen = output.component("ep2").var("generation").value
-    gp_gen = output.component("gp").var("generation").value
-    print(ep1_gen)
-    print(ep2_gen)
-    print(gp_gen)
+    assert problem.termination_condition == "optimal"
+    assert math.isclose(problem.objective_value, 1990)
 
-    assert math.isclose(ep1_gen, 70)  # type: ignore
-    assert math.isclose(ep2_gen, 42)  # type: ignore
-    assert math.isclose(gp_gen, 30)  # type: ignore
-
-    assert status == problem.solver.OPTIMAL
-    assert math.isclose(problem.solver.Objective().Value(), 1990)
+    df = SimulationTableBuilder().build(problem)
+    assert math.isclose(
+        df.component("ep1").output("generation").value(time_index=0, scenario_index=0),
+        70,
+    )
+    assert math.isclose(
+        df.component("ep2").output("generation").value(time_index=0, scenario_index=0),
+        42,
+    )
+    assert math.isclose(
+        df.component("gp").output("generation").value(time_index=0, scenario_index=0),
+        30,
+    )
 
 
 def test_electrolyzer_n_inputs_3(
@@ -259,15 +276,17 @@ def test_electrolyzer_n_inputs_3(
     The result is different since we only have one alpha at 0.7
     """
 
-    gen_model = lib_dict["basic"].models["generator"]
-    node_model = lib_dict["basic"].models["node"]
-    convertor_model = lib_dict_sc["basic"].models["convertor"]
-    demand_model = lib_dict["basic"].models["demand"]
-    decompose_flow_model = lib_dict_sc["basic"].models["decompose_1_flow_into_2_flow"]
+    gen_model = lib_dict["basic"].models["basic.generator"]
+    node_model = lib_dict["basic"].models["basic.node"]
+    convertor_model = lib_dict_sc["basic"].models["basic.convertor"]
+    demand_model = lib_dict["basic"].models["basic.demand"]
+    decompose_flow_model = lib_dict_sc["basic"].models[
+        "basic.decompose_1_flow_into_2_flow"
+    ]
 
-    elec_node_1 = Node(model=node_model, id="e1")
-    elec_node_2 = Node(model=node_model, id="e2")
-    gaz_node = Node(model=node_model, id="g")
+    elec_node_1 = Component(model=node_model, id="e1")
+    elec_node_2 = Component(model=node_model, id="e2")
+    gaz_node = Component(model=node_model, id="g")
 
     electric_prod_1 = create_component(model=gen_model, id="ep1")
     electric_prod_2 = create_component(model=gen_model, id="ep2")
@@ -292,62 +311,69 @@ def test_electrolyzer_n_inputs_3(
     database.add_data("gp", "p_max", ConstantData(30))
     database.add_data("gp", "cost", ConstantData(15))
 
-    network = Network("test")
-    network.add_node(elec_node_1)
-    network.add_node(elec_node_2)
-    network.add_node(gaz_node)
-    network.add_component(electric_prod_1)
-    network.add_component(electric_prod_2)
-    network.add_component(gaz_prod)
-    network.add_component(gaz_demand)
-    network.add_component(electrolyzer)
-    network.add_component(consumption_electrolyzer)
+    system = System("test")
+    system.add_component(elec_node_1)
+    system.add_component(elec_node_2)
+    system.add_component(gaz_node)
+    system.add_component(electric_prod_1)
+    system.add_component(electric_prod_2)
+    system.add_component(gaz_prod)
+    system.add_component(gaz_demand)
+    system.add_component(electrolyzer)
+    system.add_component(consumption_electrolyzer)
 
-    network.connect(
+    system.connect(
         PortRef(electric_prod_1, "injection_port"),
         PortRef(elec_node_1, "injection_port"),
     )
-    network.connect(
+    system.connect(
         PortRef(elec_node_1, "injection_port"),
         PortRef(consumption_electrolyzer, "input_port1"),
     )
-    network.connect(
+    system.connect(
         PortRef(electric_prod_2, "injection_port"),
         PortRef(elec_node_2, "injection_port"),
     )
-    network.connect(
+    system.connect(
         PortRef(elec_node_2, "injection_port"),
         PortRef(consumption_electrolyzer, "input_port2"),
     )
-    network.connect(
+    system.connect(
         PortRef(consumption_electrolyzer, "output_port"),
         PortRef(electrolyzer, "input_port"),
     )
-    network.connect(
+    system.connect(
         PortRef(electrolyzer, "output_port"), PortRef(gaz_node, "injection_port")
     )
-    network.connect(
+    system.connect(
         PortRef(gaz_node, "injection_port"), PortRef(gaz_demand, "injection_port")
     )
-    network.connect(
+    system.connect(
         PortRef(gaz_prod, "injection_port"), PortRef(gaz_node, "injection_port")
     )
 
     scenarios = 1
-    problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
-    status = problem.solver.Solve()
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), list(range(scenarios))
+    )
+    problem.solve(solver_name="highs")
 
-    output = OutputValues(problem)
-    ep1_gen = output.component("ep1").var("generation").value
-    ep2_gen = output.component("ep2").var("generation").value
-    gp_gen = output.component("gp").var("generation").value
+    assert problem.termination_condition == "optimal"
+    assert math.isclose(problem.objective_value, 1750)
 
-    assert math.isclose(ep1_gen, 70)  # type: ignore
-    assert math.isclose(ep2_gen, 30)  # type: ignore
-    assert math.isclose(gp_gen, 30)  # type: ignore
-
-    assert status == problem.solver.OPTIMAL
-    assert math.isclose(problem.solver.Objective().Value(), 1750)
+    df = SimulationTableBuilder().build(problem)
+    assert math.isclose(
+        df.component("ep1").output("generation").value(time_index=0, scenario_index=0),
+        70,
+    )
+    assert math.isclose(
+        df.component("ep2").output("generation").value(time_index=0, scenario_index=0),
+        30,
+    )
+    assert math.isclose(
+        df.component("gp").output("generation").value(time_index=0, scenario_index=0),
+        30,
+    )
 
 
 def test_electrolyzer_n_inputs_4(
@@ -366,15 +392,15 @@ def test_electrolyzer_n_inputs_4(
     same as test 3, the result is different than the first two since we only have one alpha at 0.7
     """
 
-    gen_model = lib_dict["basic"].models["generator"]
-    node_model = lib_dict["basic"].models["node"]
-    node_mod_model = lib_dict_sc["basic"].models["node_mod"]
-    convertor_model = lib_dict_sc["basic"].models["convertor_receive_in"]
-    demand_model = lib_dict["basic"].models["demand"]
+    gen_model = lib_dict["basic"].models["basic.generator"]
+    node_model = lib_dict["basic"].models["basic.node"]
+    node_mod_model = lib_dict_sc["basic"].models["basic.node_mod"]
+    convertor_model = lib_dict_sc["basic"].models["basic.convertor_receive_in"]
+    demand_model = lib_dict["basic"].models["basic.demand"]
 
-    elec_node_1 = Node(model=node_mod_model, id="e1")
-    elec_node_2 = Node(model=node_mod_model, id="e2")
-    gaz_node = Node(model=node_model, id="g")
+    elec_node_1 = Component(model=node_mod_model, id="e1")
+    elec_node_2 = Component(model=node_mod_model, id="e2")
+    gaz_node = Component(model=node_model, id="g")
 
     electric_prod_1 = create_component(model=gen_model, id="ep1")
     electric_prod_2 = create_component(model=gen_model, id="ep2")
@@ -398,54 +424,60 @@ def test_electrolyzer_n_inputs_4(
     database.add_data("gp", "p_max", ConstantData(30))
     database.add_data("gp", "cost", ConstantData(15))
 
-    network = Network("test")
-    network.add_node(elec_node_1)
-    network.add_node(elec_node_2)
-    network.add_node(gaz_node)
-    network.add_component(electric_prod_1)
-    network.add_component(electric_prod_2)
-    network.add_component(gaz_prod)
-    network.add_component(gaz_demand)
-    network.add_component(electrolyzer)
+    system = System("test")
+    system.add_component(elec_node_1)
+    system.add_component(elec_node_2)
+    system.add_component(gaz_node)
+    system.add_component(electric_prod_1)
+    system.add_component(electric_prod_2)
+    system.add_component(gaz_prod)
+    system.add_component(gaz_demand)
+    system.add_component(electrolyzer)
 
-    network.connect(
+    system.connect(
         PortRef(electric_prod_1, "injection_port"),
         PortRef(elec_node_1, "injection_port_n"),
     )
-    network.connect(
+    system.connect(
         PortRef(elec_node_1, "injection_port_e"), PortRef(electrolyzer, "input_port")
     )
-    network.connect(
+    system.connect(
         PortRef(electric_prod_2, "injection_port"),
         PortRef(elec_node_2, "injection_port_n"),
     )
-    network.connect(
+    system.connect(
         PortRef(elec_node_2, "injection_port_e"), PortRef(electrolyzer, "input_port")
     )
-    network.connect(
+    system.connect(
         PortRef(electrolyzer, "output_port"), PortRef(gaz_node, "injection_port")
     )
-    network.connect(
+    system.connect(
         PortRef(gaz_node, "injection_port"), PortRef(gaz_demand, "injection_port")
     )
-    network.connect(
+    system.connect(
         PortRef(gaz_prod, "injection_port"), PortRef(gaz_node, "injection_port")
     )
 
     scenarios = 1
-    problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
-    status = problem.solver.Solve()
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), list(range(scenarios))
+    )
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
 
-    assert status == problem.solver.OPTIMAL
+    assert problem.termination_condition == "optimal"
+    assert math.isclose(problem.objective_value, 1750)
 
-    output = OutputValues(problem)
-    ep1_gen = output.component("ep1").var("generation").value
-    ep2_gen = output.component("ep2").var("generation").value
-    gp_gen = output.component("gp").var("generation").value
-
-    assert math.isclose(ep1_gen, 70)  # type: ignore
-    assert math.isclose(ep2_gen, 30)  # type: ignore
-    assert math.isclose(gp_gen, 30)  # type: ignore
-
-    assert status == problem.solver.OPTIMAL
-    assert math.isclose(problem.solver.Objective().Value(), 1750)
+    df = SimulationTableBuilder().build(problem)
+    assert math.isclose(
+        df.component("ep1").output("generation").value(time_index=0, scenario_index=0),
+        70,
+    )
+    assert math.isclose(
+        df.component("ep2").output("generation").value(time_index=0, scenario_index=0),
+        30,
+    )
+    assert math.isclose(
+        df.component("gp").output("generation").value(time_index=0, scenario_index=0),
+        30,
+    )

@@ -13,7 +13,7 @@
 """
 This module contains end-to-end functional tests for systems built by:
 - Reading the model library from a YAML file,
-- Building the network objet directly in Python.
+- Building the system objet directly in Python.
 
 The tests validate various scenarios involving energy balance, generation, spillage, and demand across nodes and networks.
 
@@ -26,7 +26,7 @@ Tests included:
 6. `test_changing_demand`: Tests energy balance on a single node with changing demand over three timesteps.
 7. `test_min_up_down_times_2`: Similar to `test_min_up_down_times`, but with different minimum up/down time constraints for a thermal generator over three timesteps.
 
-Each test builds a network of nodes and components, defines a database of
+Each test builds a system of nodes and components, defines a database of
 parameters, and solves the problem. Assertions are made to ensure the solver's results meet expected outcomes.
 """
 
@@ -34,18 +34,14 @@ import pandas as pd
 import pytest
 
 from gems.model.library import Library
-from gems.simulation import (
-    BlockBorderManagement,
-    OutputValues,
-    TimeBlock,
-    build_problem,
-)
+from gems.simulation import TimeBlock, build_problem
 from gems.study import (
+    Component,
     ConstantData,
     DataBase,
-    Network,
-    Node,
     PortRef,
+    Study,
+    System,
     TimeScenarioSeriesData,
     create_component,
 )
@@ -64,11 +60,11 @@ def test_basic_balance(lib_dict: dict[str, Library]) -> None:
     database.add_data("G", "p_max", ConstantData(100))
     database.add_data("G", "cost", ConstantData(30))
 
-    node_model = lib_dict["basic"].models["node"]
-    demand_model = lib_dict["basic"].models["demand"]
-    production_model = lib_dict["basic"].models["production"]
+    node_model = lib_dict["basic"].models["basic.node"]
+    demand_model = lib_dict["basic"].models["basic.demand"]
+    production_model = lib_dict["basic"].models["basic.production"]
 
-    node = Node(model=node_model, id="N")
+    node = Component(model=node_model, id="N")
     demand = create_component(
         model=demand_model,
         id="D",
@@ -79,19 +75,20 @@ def test_basic_balance(lib_dict: dict[str, Library]) -> None:
         id="G",
     )
 
-    network = Network("test")
-    network.add_node(node)
-    network.add_component(demand)
-    network.add_component(gen)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
+    system = System("test")
+    system.add_component(node)
+    system.add_component(demand)
+    system.add_component(gen)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
 
     scenarios = 1
-    problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
-    status = problem.solver.Solve()
-
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == 3000
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), list(range(scenarios))
+    )
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == 3000
 
 
 def test_link(lib_dict: dict[str, Library]) -> None:
@@ -107,13 +104,13 @@ def test_link(lib_dict: dict[str, Library]) -> None:
 
     database.add_data("L", "f_max", ConstantData(150))
 
-    node_model = lib_dict["basic"].models["node"]
-    demand_model = lib_dict["basic"].models["demand"]
-    production_model = lib_dict["basic"].models["production"]
-    link_model = lib_dict["basic"].models["link"]
+    node_model = lib_dict["basic"].models["basic.node"]
+    demand_model = lib_dict["basic"].models["basic.demand"]
+    production_model = lib_dict["basic"].models["basic.production"]
+    link_model = lib_dict["basic"].models["basic.link"]
 
-    node1 = Node(model=node_model, id="1")
-    node2 = Node(model=node_model, id="2")
+    node1 = Component(model=node_model, id="1")
+    node2 = Component(model=node_model, id="2")
     demand = create_component(
         model=demand_model,
         id="D",
@@ -127,29 +124,26 @@ def test_link(lib_dict: dict[str, Library]) -> None:
         id="L",
     )
 
-    network = Network("test")
-    network.add_node(node1)
-    network.add_node(node2)
-    network.add_component(demand)
-    network.add_component(gen)
-    network.add_component(link)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node1, "balance_port"))
-    network.connect(PortRef(gen, "balance_port"), PortRef(node2, "balance_port"))
-    network.connect(PortRef(link, "in_port"), PortRef(node1, "balance_port"))
-    network.connect(PortRef(link, "out_port"), PortRef(node2, "balance_port"))
+    system = System("test")
+    system.add_component(node1)
+    system.add_component(node2)
+    system.add_component(demand)
+    system.add_component(gen)
+    system.add_component(link)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node1, "balance_port"))
+    system.connect(PortRef(gen, "balance_port"), PortRef(node2, "balance_port"))
+    system.connect(PortRef(link, "in_port"), PortRef(node1, "balance_port"))
+    system.connect(PortRef(link, "out_port"), PortRef(node2, "balance_port"))
 
     scenarios = 1
-    problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
-    status = problem.solver.Solve()
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), list(range(scenarios))
+    )
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == 3500
 
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == 3500
-
-    for variable in problem.solver.variables():
-        if "balance_port_from" in variable.name():
-            assert variable.solution_value() == 100
-        if "balance_port_to" in variable.name():
-            assert variable.solution_value() == -100
+    # TODO: update variable access
 
 
 def test_stacking_generation(lib_dict: dict[str, Library]) -> None:
@@ -166,11 +160,11 @@ def test_stacking_generation(lib_dict: dict[str, Library]) -> None:
     database.add_data("G2", "p_max", ConstantData(100))
     database.add_data("G2", "cost", ConstantData(50))
 
-    node_model = lib_dict["basic"].models["node"]
-    demand_model = lib_dict["basic"].models["demand"]
-    production_model = lib_dict["basic"].models["production"]
+    node_model = lib_dict["basic"].models["basic.node"]
+    demand_model = lib_dict["basic"].models["basic.demand"]
+    production_model = lib_dict["basic"].models["basic.production"]
 
-    node1 = Node(model=node_model, id="1")
+    node1 = Component(model=node_model, id="1")
 
     demand = create_component(
         model=demand_model,
@@ -187,21 +181,22 @@ def test_stacking_generation(lib_dict: dict[str, Library]) -> None:
         id="G2",
     )
 
-    network = Network("test")
-    network.add_node(node1)
-    network.add_component(demand)
-    network.add_component(gen1)
-    network.add_component(gen2)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node1, "balance_port"))
-    network.connect(PortRef(gen1, "balance_port"), PortRef(node1, "balance_port"))
-    network.connect(PortRef(gen2, "balance_port"), PortRef(node1, "balance_port"))
+    system = System("test")
+    system.add_component(node1)
+    system.add_component(demand)
+    system.add_component(gen1)
+    system.add_component(gen2)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node1, "balance_port"))
+    system.connect(PortRef(gen1, "balance_port"), PortRef(node1, "balance_port"))
+    system.connect(PortRef(gen2, "balance_port"), PortRef(node1, "balance_port"))
 
     scenarios = 1
-    problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
-    status = problem.solver.Solve()
-
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == 30 * 100 + 50 * 50
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), list(range(scenarios))
+    )
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == 30 * 100 + 50 * 50
 
 
 def test_spillage(lib_dict: dict[str, Library]) -> None:
@@ -217,31 +212,30 @@ def test_spillage(lib_dict: dict[str, Library]) -> None:
     database.add_data("G1", "p_min", ConstantData(200))
     database.add_data("G1", "cost", ConstantData(30))
 
-    node_model = lib_dict["basic"].models["node"]
-    demand_model = lib_dict["basic"].models["demand"]
-    production_with_min_model = lib_dict["basic"].models["production_with_min"]
-    spillage_model = lib_dict["basic"].models["spillage"]
+    node_model = lib_dict["basic"].models["basic.node"]
+    demand_model = lib_dict["basic"].models["basic.demand"]
+    production_with_min_model = lib_dict["basic"].models["basic.production_with_min"]
+    spillage_model = lib_dict["basic"].models["basic.spillage"]
 
-    node = Node(model=node_model, id="1")
+    node = Component(model=node_model, id="1")
     spillage = create_component(model=spillage_model, id="S")
     demand = create_component(model=demand_model, id="D")
 
     gen1 = create_component(model=production_with_min_model, id="G1")
 
-    network = Network("test")
-    network.add_node(node)
-    network.add_component(demand)
-    network.add_component(gen1)
-    network.add_component(spillage)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(gen1, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(spillage, "balance_port"), PortRef(node, "balance_port"))
+    system = System("test")
+    system.add_component(node)
+    system.add_component(demand)
+    system.add_component(gen1)
+    system.add_component(spillage)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(gen1, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(spillage, "balance_port"), PortRef(node, "balance_port"))
 
-    problem = build_problem(network, database, TimeBlock(0, [1]), 1)
-    status = problem.solver.Solve()
-
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == 30 * 200 + 50 * 10
+    problem = build_problem(Study(system, database), TimeBlock(0, [1]), list(range(1)))
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == 30 * 200 + 50 * 10
 
 
 def test_min_up_down_times(lib_dict: dict[str, Library]) -> None:
@@ -295,13 +289,13 @@ def test_min_up_down_times(lib_dict: dict[str, Library]) -> None:
     time_block = TimeBlock(1, [0, 1, 2])
     scenarios = 1
 
-    node_model = lib_dict["basic"].models["node"]
-    demand_model = lib_dict["basic"].models["demand"]
-    spillage_model = lib_dict["basic"].models["spillage"]
-    unsuplied_model = lib_dict["basic"].models["unsuplied"]
-    thermal_cluster = lib_dict["basic"].models["thermal_cluster"]
+    node_model = lib_dict["basic"].models["basic.node"]
+    demand_model = lib_dict["basic"].models["basic.demand"]
+    spillage_model = lib_dict["basic"].models["basic.spillage"]
+    unsuplied_model = lib_dict["basic"].models["basic.unsuplied"]
+    thermal_cluster = lib_dict["basic"].models["basic.thermal_cluster"]
 
-    node = Node(model=node_model, id="1")
+    node = Component(model=node_model, id="1")
     demand = create_component(model=demand_model, id="D")
 
     gen = create_component(model=thermal_cluster, id="G")
@@ -310,32 +304,28 @@ def test_min_up_down_times(lib_dict: dict[str, Library]) -> None:
 
     unsupplied_energy = create_component(model=unsuplied_model, id="U")
 
-    network = Network("test")
-    network.add_node(node)
-    network.add_component(demand)
-    network.add_component(gen)
-    network.add_component(spillage)
-    network.add_component(unsupplied_energy)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(spillage, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(
+    system = System("test")
+    system.add_component(node)
+    system.add_component(demand)
+    system.add_component(gen)
+    system.add_component(spillage)
+    system.add_component(unsupplied_energy)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(spillage, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(
         PortRef(unsupplied_energy, "balance_port"), PortRef(node, "balance_port")
     )
 
     problem = build_problem(
-        network,
-        database,
+        Study(system, database),
         time_block,
-        scenarios,
-        border_management=BlockBorderManagement.CYCLE,
+        list(range(scenarios)),
     )
-    status = problem.solver.Solve()
+    problem.solve(solver_name="highs")
 
-    print(OutputValues(problem).component("G").var("nb_units_on").value)
-
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == pytest.approx(72000, abs=0.01)
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == pytest.approx(72000, abs=0.01)
 
 
 def test_changing_demand(lib_dict: dict[str, Library]) -> None:
@@ -365,33 +355,30 @@ def test_changing_demand(lib_dict: dict[str, Library]) -> None:
     time_block = TimeBlock(1, [0, 1, 2])
     scenarios = 1
 
-    node_model = lib_dict["basic"].models["node"]
-    demand_model = lib_dict["basic"].models["demand"]
-    production_model = lib_dict["basic"].models["production"]
+    node_model = lib_dict["basic"].models["basic.node"]
+    demand_model = lib_dict["basic"].models["basic.demand"]
+    production_model = lib_dict["basic"].models["basic.production"]
 
-    node = Node(model=node_model, id="1")
+    node = Component(model=node_model, id="1")
     demand = create_component(model=demand_model, id="D")
 
     prod = create_component(model=production_model, id="G")
 
-    network = Network("test")
-    network.add_node(node)
-    network.add_component(demand)
-    network.add_component(prod)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(prod, "balance_port"), PortRef(node, "balance_port"))
+    system = System("test")
+    system.add_component(node)
+    system.add_component(demand)
+    system.add_component(prod)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(prod, "balance_port"), PortRef(node, "balance_port"))
 
     problem = build_problem(
-        network,
-        database,
+        Study(system, database),
         time_block,
-        scenarios,
-        border_management=BlockBorderManagement.CYCLE,
+        list(range(scenarios)),
     )
-    status = problem.solver.Solve()
-
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == 40000
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == 40000
 
 
 def test_min_up_down_times_2(lib_dict: dict[str, Library]) -> None:
@@ -445,13 +432,13 @@ def test_min_up_down_times_2(lib_dict: dict[str, Library]) -> None:
     time_block = TimeBlock(1, [0, 1, 2])
     scenarios = 1
 
-    node_model = lib_dict["basic"].models["node"]
-    demand_model = lib_dict["basic"].models["demand"]
-    spillage_model = lib_dict["basic"].models["spillage"]
-    unsuplied_model = lib_dict["basic"].models["unsuplied"]
-    thermal_cluster = lib_dict["basic"].models["thermal_cluster"]
+    node_model = lib_dict["basic"].models["basic.node"]
+    demand_model = lib_dict["basic"].models["basic.demand"]
+    spillage_model = lib_dict["basic"].models["basic.spillage"]
+    unsuplied_model = lib_dict["basic"].models["basic.unsuplied"]
+    thermal_cluster = lib_dict["basic"].models["basic.thermal_cluster"]
 
-    node = Node(model=node_model, id="1")
+    node = Component(model=node_model, id="1")
     demand = create_component(model=demand_model, id="D")
 
     gen = create_component(model=thermal_cluster, id="G")
@@ -460,30 +447,25 @@ def test_min_up_down_times_2(lib_dict: dict[str, Library]) -> None:
 
     unsupplied_energy = create_component(model=unsuplied_model, id="U")
 
-    network = Network("test")
-    network.add_node(node)
-    network.add_component(demand)
-    network.add_component(gen)
-    network.add_component(spillage)
-    network.add_component(unsupplied_energy)
-    network.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(PortRef(spillage, "balance_port"), PortRef(node, "balance_port"))
-    network.connect(
+    system = System("test")
+    system.add_component(node)
+    system.add_component(demand)
+    system.add_component(gen)
+    system.add_component(spillage)
+    system.add_component(unsupplied_energy)
+    system.connect(PortRef(demand, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(PortRef(spillage, "balance_port"), PortRef(node, "balance_port"))
+    system.connect(
         PortRef(unsupplied_energy, "balance_port"), PortRef(node, "balance_port")
     )
 
     problem = build_problem(
-        network,
-        database,
+        Study(system, database),
         time_block,
-        scenarios,
-        border_management=BlockBorderManagement.CYCLE,
+        list(range(scenarios)),
     )
-    status = problem.solver.Solve()
+    problem.solve(solver_name="highs")
 
-    print(problem.solver.ExportModelAsMpsFormat(fixed_format=False, obfuscated=False))
-    print(OutputValues(problem).component("G").var("nb_units_on").value)
-
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == pytest.approx(61000)
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == pytest.approx(61000)

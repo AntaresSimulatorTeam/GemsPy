@@ -171,7 +171,9 @@ C02_POWER_MODEL = model(
             definition=var("p") * param("emission_rate"),
         ),
     ],
-    objective_operational_contribution=(param("cost") * var("p")).time_sum().expec(),
+    objective_contributions={
+        "operational": (param("cost") * var("p")).time_sum().expec()
+    },
 )
 
 """
@@ -279,14 +281,16 @@ SHORT_TERM_STORAGE_COMPLEX = model(
             var("Pgrad-s") >= var("withdrawal").shift(-1) - var("withdrawal"),
         ),
     ],
-    objective_operational_contribution=(
-        param("level_penality") * var("level")
-        + param("withdrawal_penality") * var("withdrawal")
-        + param("Pgrad+i_penality") * var("Pgrad+i")
-        + param("Pgrad-i_penality") * var("Pgrad-i")
-        + param("Pgrad+s_penality") * var("Pgrad+s")
-        + param("Pgrad-s_penality") * var("Pgrad-s")
-    )
-    .time_sum()
-    .expec(),
+    objective_contributions={
+        "operational": (
+            param("level_penality") * var("level")
+            + param("withdrawal_penality") * var("withdrawal")
+            + param("Pgrad+i_penality") * var("Pgrad+i")
+            + param("Pgrad-i_penality") * var("Pgrad-i")
+            + param("Pgrad+s_penality") * var("Pgrad+s")
+            + param("Pgrad-s_penality") * var("Pgrad-s")
+        )
+        .time_sum()
+        .expec()
+    },
 )

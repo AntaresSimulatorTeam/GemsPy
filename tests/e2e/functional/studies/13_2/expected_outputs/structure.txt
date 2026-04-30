@@ -1,0 +1,4 @@
+                  master                    discrete_generator_candidate        1
+              subproblem                    discrete_generator_candidate        5
+                  master                  continuous_generator_candidate        0
+              subproblem                  continuous_generator_candidate        3

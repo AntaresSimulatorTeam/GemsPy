@@ -10,19 +10,23 @@
 #
 # This file is part of the Antares project.
 
+import warnings
+
 import pytest
 
 from gems.expression.expression import (
     ExpressionNode,
-    comp_param,
-    comp_var,
+    ScenarioOperatorNode,
     literal,
     param,
     port_field,
     var,
 )
+from gems.expression.indexing_structure import IndexingStructure
 from gems.model import Constraint, float_variable, model
+from gems.model.common import ValueType
 from gems.model.port import port_field_def
+from gems.model.variable import bool_var, int_variable
 
 
 @pytest.mark.parametrize(
@@ -187,7 +191,7 @@ def test_instantiating_a_model_with_non_linear_scenario_operator_in_the_objectiv
         _ = model(
             id="model_with_non_linear_op",
             variables=[float_variable("generation")],
-            objective_operational_contribution=var("generation").variance(),
+            objective_contributions={"operational": var("generation").variance()},
         )
     assert str(exc.value) == "Objective contribution must be a linear expression."
 
@@ -196,8 +200,6 @@ def test_instantiating_a_model_with_non_linear_scenario_operator_in_the_objectiv
     "expression",
     [
         var("x") <= 0,
-        comp_var("c", "x"),
-        comp_param("c", "x"),
         port_field("p", "f"),
         port_field("p", "f").sum_connections(),
     ],
@@ -215,3 +217,121 @@ def test_constraint_equals() -> None:
     assert Constraint(name="c", expression=var("x") <= param("p")) != Constraint(
         name="c", expression=var("y") <= param("p")
     )
+
+
+# --- Issue #76: tolerate absence of expec() in objective contributions ---
+
+
+def test_objective_without_expec_on_scenario_var_emits_warning_and_wraps() -> None:
+    """
+    When a scenario-dependent variable is used in an objective contribution
+    without expec(), the model() factory should auto-wrap with expec() and
+    emit a UserWarning.
+    """
+    scenario_var = float_variable("generation", structure=IndexingStructure(True, True))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        m = model(
+            id="auto_wrap_model",
+            variables=[scenario_var],
+            objective_contributions={"operational": var("generation").time_sum()},
+        )
+    user_warnings = [w for w in caught if issubclass(w.category, UserWarning)]
+    assert len(user_warnings) == 1
+    assert "expec()" in str(user_warnings[0].message)
+    assert "operational" in str(user_warnings[0].message)
+    # The stored expression must now be wrapped in expec()
+    stored = m.objective_contributions["operational"]
+    assert isinstance(stored, ScenarioOperatorNode)
+    assert stored.name == "Expectation"
+
+
+def test_objective_with_explicit_expec_emits_no_warning() -> None:
+    """
+    When expec() is already present in the objective contribution,
+    no warning should be emitted and the expression is not double-wrapped.
+    """
+    scenario_var = float_variable("generation", structure=IndexingStructure(True, True))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        m = model(
+            id="explicit_expec_model",
+            variables=[scenario_var],
+            objective_contributions={
+                "operational": var("generation").time_sum().expec()
+            },
+        )
+    user_warnings = [w for w in caught if issubclass(w.category, UserWarning)]
+    assert len(user_warnings) == 0
+    stored = m.objective_contributions["operational"]
+    assert isinstance(stored, ScenarioOperatorNode)
+    assert stored.name == "Expectation"
+    # Must not be double-wrapped
+    assert not isinstance(stored.operand, ScenarioOperatorNode)
+
+
+def test_objective_with_non_scenario_var_emits_no_warning() -> None:
+    """
+    When the objective contribution is already a scalar (no scenario dimension),
+    no auto-wrapping or warning should occur.
+    """
+    non_scenario_var = float_variable(
+        "generation", structure=IndexingStructure(True, False)
+    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        model(
+            id="non_scenario_model",
+            variables=[non_scenario_var],
+            objective_contributions={"operational": var("generation").time_sum()},
+        )
+    user_warnings = [w for w in caught if issubclass(w.category, UserWarning)]
+    assert len(user_warnings) == 0
+
+
+def test_objective_with_time_dimension_remaining_is_still_rejected() -> None:
+    """
+    Auto-wrapping only applies when scenario=True and time=False.
+    If time dimension is still present (missing time_sum()), validation must fail.
+    """
+    scenario_var = float_variable("generation", structure=IndexingStructure(True, True))
+    with pytest.raises(ValueError, match="real-valued expression"):
+        model(
+            id="bad_time_model",
+            variables=[scenario_var],
+            # No time_sum() — still has time dimension → rejected regardless
+            objective_contributions={"operational": var("generation")},
+        )
+
+
+# --- Variable factory functions ---
+
+
+def test_bool_var_has_binary_type_and_unit_bounds() -> None:
+    """bool_var() creates a Variable with BINARY type and bounds [0, 1]."""
+    v = bool_var("on_off")
+    assert v.name == "on_off"
+    assert v.data_type == ValueType.BINARY
+    assert v.lower_bound == literal(0)
+    assert v.upper_bound == literal(1)
+
+
+def test_bool_var_default_structure_is_time_and_scenario() -> None:
+    v = bool_var("flag")
+    assert v.structure == IndexingStructure(True, True)
+
+
+def test_int_variable_has_integer_type() -> None:
+    """int_variable() creates a Variable with INTEGER type."""
+    v = int_variable("count", lower_bound=literal(0), upper_bound=literal(10))
+    assert v.data_type == ValueType.INTEGER
+    assert v.lower_bound == literal(0)
+    assert v.upper_bound == literal(10)
+
+
+def test_variable_eq_with_non_variable_returns_false() -> None:
+    """Variable.__eq__ returns False when compared with a non-Variable object."""
+    v = float_variable("x")
+    assert v != "x"
+    assert v != 42
+    assert v != None  # noqa: E711

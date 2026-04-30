@@ -19,21 +19,21 @@ from yaml import safe_load
 from gems.utils import ModifiedBaseModel
 
 
-def parse_yaml_library(input: typing.TextIO) -> "InputLibrary":
+def parse_yaml_library(input: typing.TextIO) -> "LibrarySchema":
     tree = safe_load(input)
     try:
-        return InputLibrary.model_validate(tree["library"])
+        return LibrarySchema.model_validate(tree["library"])
     except ValidationError as e:
         raise ValueError(f"An error occurred during parsing: {e}")
 
 
-class InputParameter(ModifiedBaseModel):
+class ParameterSchema(ModifiedBaseModel):
     id: str
     time_dependent: bool = False
     scenario_dependent: bool = False
 
 
-class InputVariable(ModifiedBaseModel):
+class VariableSchema(ModifiedBaseModel):
     id: str
     time_dependent: bool = True
     scenario_dependent: bool = True
@@ -46,63 +46,65 @@ class InputVariable(ModifiedBaseModel):
     )
 
 
-class InputConstraint(ModifiedBaseModel):
+class ConstraintSchema(ModifiedBaseModel):
     id: str
     expression: str
     lower_bound: Optional[str] = None
     upper_bound: Optional[str] = None
 
 
-class InputField(ModifiedBaseModel):
+class FieldSchema(ModifiedBaseModel):
     id: str
 
 
-class InputPortType(ModifiedBaseModel):
+class PortTypeSchema(ModifiedBaseModel):
     id: str
-    fields: List[InputField] = Field(default_factory=list)
+    fields: List[FieldSchema] = Field(default_factory=list)
     description: Optional[str] = None
 
 
-class InputModelPort(ModifiedBaseModel):
+class ModelPortSchema(ModifiedBaseModel):
     id: str
     type: str
 
 
-class InputPortFieldDefinition(ModifiedBaseModel):
+class PortFieldDefinitionSchema(ModifiedBaseModel):
     port: str
     field: str
     definition: str
 
 
-class InputObjectiveContribution(ModifiedBaseModel):
+class ObjectiveContributionSchema(ModifiedBaseModel):
     id: str
     expression: str
 
 
 @dataclass
-class InputExtraOutput(ModifiedBaseModel):
+class ExtraOutputSchema(ModifiedBaseModel):
     id: str
     expression: str
 
 
-class InputModel(ModifiedBaseModel):
+class ModelSchema(ModifiedBaseModel):
     id: str
-    parameters: List[InputParameter] = Field(default_factory=list)
-    variables: List[InputVariable] = Field(default_factory=list)
-    ports: List[InputModelPort] = Field(default_factory=list)
-    port_field_definitions: List[InputPortFieldDefinition] = Field(default_factory=list)
-    binding_constraints: List[InputConstraint] = Field(default_factory=list)
-    constraints: List[InputConstraint] = Field(default_factory=list)
-    objective_contributions: List[InputObjectiveContribution] = Field(
+    parameters: List[ParameterSchema] = Field(default_factory=list)
+    variables: List[VariableSchema] = Field(default_factory=list)
+    ports: List[ModelPortSchema] = Field(default_factory=list)
+    port_field_definitions: List[PortFieldDefinitionSchema] = Field(
+        default_factory=list
+    )
+    binding_constraints: List[ConstraintSchema] = Field(default_factory=list)
+    constraints: List[ConstraintSchema] = Field(default_factory=list)
+    objective_contributions: List[ObjectiveContributionSchema] = Field(
         default_factory=list, alias="objective-contributions"
     )
     description: Optional[str] = None
-    extra_outputs: Optional[List[InputExtraOutput]] = None
+    extra_outputs: Optional[List[ExtraOutputSchema]] = None
 
 
-class InputLibrary(ModifiedBaseModel):
+class LibrarySchema(ModifiedBaseModel):
     id: str
     dependencies: List[str] = Field(default_factory=list)
-    port_types: List[InputPortType] = Field(default_factory=list)
-    models: List[InputModel] = Field(default_factory=list)
+    port_types: List[PortTypeSchema] = Field(default_factory=list)
+    models: List[ModelSchema] = Field(default_factory=list)
     description: Optional[str] = None

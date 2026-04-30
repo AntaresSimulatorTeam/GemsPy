@@ -19,7 +19,7 @@ As energy systems become more complex and dynamic, we need to improve energy pla
 
 ## About GEMS
 
-The [GEMS](https://gems-energy.readthedocs.io/en/latest/) framework consists of an **algebraic modelling language**, close to mathematical syntax, and a **data structure** for describing energy systems.
+The [**GEMS**](https://gems-energy.readthedocs.io/en/latest/) (Generic Energy Systems Modelling Schema) framework consists of an **algebraic modelling language**, close to mathematical syntax, and a **data structure** for describing energy systems.
 
 For further information regarding the language, please consult the [GEMS documentation](https://gems-energy.readthedocs.io/en/latest/) website:
 

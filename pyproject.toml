@@ -30,14 +30,16 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "numpy",
-    "ortools",
-    "scipy>=1.10",
-    "antlr4-python3-runtime>=4.13",
-    "PyYAML>=6.0",
+    "numpy>=1.26",
+    "antlr4-python3-runtime>=4.13.2",
+    "PyYAML>=6.0.2",
     "pydantic>=2.0",
-    "antares_craft>=0.3",
-    "anytree>=2.12",
+    "anytree>=2.13",
+    "linopy>=0.6",
+    "xarray>=2025.3",
+    "highspy>=1.14",
+    "pandas>=2.2",
+    "attrs>=26.0",
 ]
 classifiers = [
    #    Classifiers here: https://pypi.org/classifiers/
@@ -49,6 +51,13 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 
+[project.optional-dependencies]
+doc = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocs-material-extensions",
+    "mkdocstrings-python",
+]
 
 [project.scripts]
 gemspy = "gems.main.main:main_cli"
@@ -61,14 +70,47 @@ Repository = "https://github.com/AntaresSimulatorTeam/GemsPy"
 # All the following settings are optional:
 where = ["src"]
 
+[dependency-groups]
+dev = [
+    "pyarrow",
+    "pytest>=9.0.3",
+    "mypy>=1.7",
+    "black>=24.0",
+    "isort>=5.12",
+    "pytest-cov",
+    "pre-commit>=3.5",
+    "types-PyYAML>=6.0.12",
+    "antlr4-tools>=0.2.1",
+    "pandas-stubs",
+]
+
 [tool.black]
 line-length = 88
-include = '\.pyi?$'
-exclude = '''
+target-version = ["py311"]
+extend-exclude = '''
 /(
-  ^(?!(src)).*
+  \.venv
 )/
 '''
 
 [tool.isort]
 profile = "black"
+
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]
+testpaths = ["tests"]
+log_cli = true
+
+[tool.mypy]
+mypy_path = "src"
+packages = ["gems"]
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+
+[[tool.mypy.overrides]]
+module = ["anytree.*", "linopy.*", "xarray.*", "antlr4.*", "pytest.*", "pydantic.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["gems.expression.parsing.antlr.*"]
+ignore_errors = true

@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
+import io
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,7 @@ from gems.model import (
     ModelPort,
     PortField,
     PortType,
+    ValueType,
     float_parameter,
     float_variable,
     model,
@@ -48,9 +50,9 @@ def test_library_parsing(libs_dir: Path) -> None:
     assert len(lib[input_lib.id].port_types) == 1
     port_type = lib[input_lib.id].port_types["flow"]
     assert port_type == PortType(id="flow", fields=[PortField(name="flow")])
-    gen_model = lib[input_lib.id].models["generator"]
+    gen_model = lib[input_lib.id].models["basic.generator"]
     assert gen_model == model(
-        id="generator",
+        id="basic.generator",
         parameters=[
             float_parameter("cost", structure=CONSTANT),
             float_parameter("p_max", structure=CONSTANT),
@@ -71,9 +73,9 @@ def test_library_parsing(libs_dir: Path) -> None:
             "operational": (param("cost") * var("generation")).time_sum().expec()
         },
     )
-    short_term_storage = lib[input_lib.id].models["short-term-storage"]
+    short_term_storage = lib[input_lib.id].models["basic.short-term-storage"]
     assert short_term_storage == model(
-        id="short-term-storage",
+        id="basic.short-term-storage",
         parameters=[
             float_parameter("efficiency", structure=CONSTANT),
             float_parameter("level_min", structure=CONSTANT),
@@ -119,6 +121,22 @@ def test_library_parsing(libs_dir: Path) -> None:
     )
 
 
+def test_binary_variable_parsing() -> None:
+    yaml_content = """
+library:
+  id: test
+  models:
+    - id: binary_model
+      variables:
+        - id: on_off
+          variable-type: binary
+"""
+    input_lib = parse_yaml_library(io.StringIO(yaml_content))
+    lib = resolve_library([input_lib])
+    on_off = lib["test"].models["test.binary_model"].variables["on_off"]
+    assert on_off.data_type == ValueType.BINARY
+
+
 def test_library_error_parsing(libs_dir: Path) -> None:
     lib_file = libs_dir / "model_port_definition_ko.yml"
 
@@ -142,9 +160,9 @@ def test_library_port_model_ok_parsing(libs_dir: Path) -> None:
     lib = resolve_library([input_lib])
     port_type = lib[input_lib.id].port_types["flow"]
     assert port_type == PortType(id="flow", fields=[PortField(name="flow")])
-    short_term_storage = lib[input_lib.id].models["short-term-storage-2"]
+    short_term_storage = lib[input_lib.id].models["basic.short-term-storage-2"]
     assert short_term_storage == model(
-        id="short-term-storage-2",
+        id="basic.short-term-storage-2",
         parameters=[
             float_parameter("p_max_withdrawal", structure=CONSTANT),
             float_parameter("p_max_injection", structure=CONSTANT),

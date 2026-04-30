@@ -17,7 +17,7 @@ from gems.expression import ExpressionNode, literal
 from gems.expression.degree import is_constant
 from gems.expression.equality import expressions_equal_if_present
 from gems.expression.indexing_structure import IndexingStructure
-from gems.model.common import ProblemContext, ValueType
+from gems.model.common import ValueType
 
 
 @dataclass
@@ -31,7 +31,6 @@ class Variable:
     lower_bound: Optional[ExpressionNode]
     upper_bound: Optional[ExpressionNode]
     structure: IndexingStructure
-    context: ProblemContext
 
     def __post_init__(self) -> None:
         if self.lower_bound and not is_constant(self.lower_bound):
@@ -59,19 +58,15 @@ def int_variable(
     lower_bound: Optional[ExpressionNode] = None,
     upper_bound: Optional[ExpressionNode] = None,
     structure: IndexingStructure = IndexingStructure(True, True),
-    context: ProblemContext = ProblemContext.OPERATIONAL,
 ) -> Variable:
-    return Variable(
-        name, ValueType.INTEGER, lower_bound, upper_bound, structure, context
-    )
+    return Variable(name, ValueType.INTEGER, lower_bound, upper_bound, structure)
 
 
 def bool_var(
     name: str,
     structure: IndexingStructure = IndexingStructure(True, True),
-    context: ProblemContext = ProblemContext.OPERATIONAL,
 ) -> Variable:
-    return Variable(name, ValueType.BOOLEAN, literal(0), literal(1), structure, context)
+    return Variable(name, ValueType.BINARY, literal(0), literal(1), structure)
 
 
 def float_variable(
@@ -79,8 +74,5 @@ def float_variable(
     lower_bound: Optional[ExpressionNode] = None,
     upper_bound: Optional[ExpressionNode] = None,
     structure: IndexingStructure = IndexingStructure(True, True),
-    context: ProblemContext = ProblemContext.OPERATIONAL,
 ) -> Variable:
-    return Variable(
-        name, ValueType.CONTINUOUS, lower_bound, upper_bound, structure, context
-    )
+    return Variable(name, ValueType.CONTINUOUS, lower_bound, upper_bound, structure)

@@ -25,7 +25,15 @@ from gems.model import (
 )
 from gems.model.port import PortFieldDefinition, PortFieldId
 from gems.simulation import TimeBlock, build_problem
-from gems.study import ConstantData, DataBase, Network, Node, PortRef, create_component
+from gems.study import (
+    Component,
+    ConstantData,
+    DataBase,
+    PortRef,
+    Study,
+    System,
+    create_component,
+)
 
 ELECTRICAL_PORT = PortType(id="electrical_port", fields=[PortField("flow")])
 
@@ -42,7 +50,7 @@ ELECTRICAL_NODE_MODEL = model(
 )
 
 ELECTRICAL_GENERATOR_MODEL = model(
-    id="GEN",
+    id="ELECTRICAL_GEN",
     parameters=[
         float_parameter("p_max", CONSTANT),
         float_parameter("cost", CONSTANT),
@@ -57,9 +65,9 @@ ELECTRICAL_GENERATOR_MODEL = model(
             definition=var("generation"),
         )
     ],
-    objective_operational_contribution=(param("cost") * var("generation"))
-    .time_sum()
-    .expec(),
+    objective_contributions={
+        "operational": (param("cost") * var("generation")).time_sum().expec()
+    },
 )
 
 H2_PORT = PortType(id="h2_port", fields=[PortField("flow")])
@@ -123,8 +131,8 @@ ELECTROLYZER = model(
 
 
 def test_electrolyzer() -> None:
-    elec_node = Node(model=ELECTRICAL_NODE_MODEL, id="1")
-    h2_node = Node(model=H2_NODE_MODEL, id="2")
+    elec_node = Component(model=ELECTRICAL_NODE_MODEL, id="1")
+    h2_node = Component(model=H2_NODE_MODEL, id="2")
 
     electric_gen = create_component(
         model=ELECTRICAL_GENERATOR_MODEL,
@@ -148,24 +156,26 @@ def test_electrolyzer() -> None:
     database.add_data("G", "cost", ConstantData(30))
     database.add_data("E", "efficiency", ConstantData(0.7))
 
-    network = Network("test")
-    network.add_node(elec_node)
-    network.add_node(h2_node)
-    network.add_component(demand_h2)
-    network.add_component(electric_gen)
-    network.add_component(electrolyzer)
-    network.connect(PortRef(demand_h2, "h2_port"), PortRef(h2_node, "h2_port"))
-    network.connect(PortRef(h2_node, "h2_port"), PortRef(electrolyzer, "h2_port"))
-    network.connect(
+    system = System("test")
+    system.add_component(elec_node)
+    system.add_component(h2_node)
+    system.add_component(demand_h2)
+    system.add_component(electric_gen)
+    system.add_component(electrolyzer)
+    system.connect(PortRef(demand_h2, "h2_port"), PortRef(h2_node, "h2_port"))
+    system.connect(PortRef(h2_node, "h2_port"), PortRef(electrolyzer, "h2_port"))
+    system.connect(
         PortRef(elec_node, "electrical_port"), PortRef(electrolyzer, "electrical_port")
     )
-    network.connect(
+    system.connect(
         PortRef(elec_node, "electrical_port"),
         PortRef(electric_gen, "electrical_port"),
     )
 
     scenarios = 1
-    problem = build_problem(network, database, TimeBlock(1, [0]), scenarios)
-    status = problem.solver.Solve()
-    assert status == problem.solver.OPTIMAL
-    assert problem.solver.Objective().Value() == 3000
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), list(range(scenarios))
+    )
+    problem.solve(solver_name="highs")
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == 3000

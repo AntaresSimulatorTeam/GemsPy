@@ -10,13 +10,15 @@
 #
 # This file is part of the Antares project.
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Mapping, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
+import numpy as np
 import pandas as pd
 
-from gems.study.network import Network
+if TYPE_CHECKING:
+    from gems.study.scenario_builder import ScenarioBuilder
 
 
 @dataclass(frozen=True)
@@ -36,32 +38,18 @@ class ScenarioIndex:
 
 
 @dataclass(frozen=True)
-class Scenarization:
-    _scenarization: Dict[int, int]
-
-    def get_scenario_for_year(self, year: int) -> int:
-        return self._scenarization[year]
-
-    def add_year(self, year: int, scenario: int) -> None:
-        if year in self._scenarization:
-            raise ValueError(f"the year {year} is already defined")
-        self._scenarization[year] = scenario
-
-
-@dataclass(frozen=True)
 class AbstractDataStructure(ABC):
     @abstractmethod
     def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
-    ) -> float:
+        self,
+        timestep: Optional[List[int]],
+        scenario: Optional[np.ndarray],
+    ) -> Union[float, np.ndarray]:
         raise NotImplementedError()
 
     @abstractmethod
     def check_requirement(self, time: bool, scenario: bool) -> bool:
-        """
-        Check if the data structure meets certain requirements.
-        Implement this method in subclasses as needed.
-        """
+        """Check if the data structure meets certain requirements."""
         pass
 
 
@@ -70,11 +58,12 @@ class ConstantData(AbstractDataStructure):
     value: float
 
     def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
+        self,
+        timestep: Optional[List[int]],
+        scenario: Optional[np.ndarray],
     ) -> float:
         return self.value
 
-    # ConstantData can be used for time varying or constant models
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, ConstantData):
             raise ValueError("Invalid data type for ConstantData")
@@ -83,53 +72,80 @@ class ConstantData(AbstractDataStructure):
 
 @dataclass(frozen=True)
 class TimeSeriesData(AbstractDataStructure):
-    """
-    Container for identifiable timeseries data.
-    When a model is instantiated as a component, property values
-    can be defined by referencing one of those timeseries by its ID.
-    """
+    """Time-only series: one value per timestep, scenario-independent."""
 
-    time_series: Mapping[TimeIndex, float]
+    time_series: pd.Series
 
     def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
-    ) -> float:
+        self,
+        timestep: Optional[List[int]],
+        scenario: Optional[np.ndarray],
+    ) -> np.ndarray:
         if timestep is None:
             raise KeyError("Time series data requires a time index.")
-        return self.time_series[TimeIndex(timestep)]
+        result: np.ndarray = np.asarray(self.time_series.values)[np.asarray(timestep)]
+        if scenario is not None:
+            return np.broadcast_to(
+                result[:, np.newaxis], (len(timestep), len(scenario))
+            )
+        return result
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, TimeSeriesData):
             raise ValueError("Invalid data type for TimeSeriesData")
-
         return time
 
 
 @dataclass(frozen=True)
 class ScenarioSeriesData(AbstractDataStructure):
-    """
-    Container for identifiable timeseries data.
-    When a model is instantiated as a component, property values
-    can be defined by referencing one of those timeseries by its ID.
+    """Scenario-only series: one value per data-series column, time-independent.
+
+    ``scenario_series`` is a 1-D numpy array indexed by 0-based column index.
     """
 
-    scenario_series: Mapping[ScenarioIndex, float]
-    scenarization: Optional[Scenarization] = None
+    scenario_series: np.ndarray
 
     def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
-    ) -> float:
+        self,
+        timestep: Optional[List[int]],
+        scenario: Optional[np.ndarray],
+    ) -> np.ndarray:
         if scenario is None:
             raise KeyError("Scenario series data requires a scenario index.")
-        if self.scenarization:
-            scenario = self.scenarization.get_scenario_for_year(scenario)
-        return self.scenario_series[ScenarioIndex(scenario)]
+        result = self.scenario_series[scenario]  # (S,)
+        if timestep is not None:
+            return np.broadcast_to(
+                result[np.newaxis, :], (len(timestep), len(scenario))
+            )
+        return result
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, ScenarioSeriesData):
-            raise ValueError("Invalid data type for TimeSeriesData")
-
+            raise ValueError("Invalid data type for ScenarioSeriesData")
         return scenario
+
+
+@dataclass(frozen=True)
+class TimeScenarioSeriesData(AbstractDataStructure):
+    """Time × scenario series: values for every (timestep, column) pair."""
+
+    time_scenario_series: pd.DataFrame
+
+    def get_value(
+        self,
+        timestep: Optional[List[int]],
+        scenario: Optional[np.ndarray],
+    ) -> np.ndarray:
+        if timestep is None:
+            raise KeyError("Time scenario data requires a time index.")
+        if scenario is None:
+            raise KeyError("Time scenario data requires a scenario index.")
+        return self.time_scenario_series.values[np.ix_(np.asarray(timestep), scenario)]
+
+    def check_requirement(self, time: bool, scenario: bool) -> bool:
+        if not isinstance(self, TimeScenarioSeriesData):
+            raise ValueError("Invalid data type for TimeScenarioSeriesData")
+        return time and scenario
 
 
 def load_ts_from_file(
@@ -162,78 +178,21 @@ def load_ts_from_file(
     )
 
 
-def dataframe_to_time_series(ts_dataframe: pd.DataFrame) -> Dict[TimeIndex, float]:
+def dataframe_to_time_series(ts_dataframe: pd.DataFrame) -> pd.Series:
     if ts_dataframe.shape[1] != 1:
         raise ValueError(
             f"Could not convert input data to time series data. Expect data series with exactly one column, got shape {ts_dataframe.shape}"
         )
-    df_index = ts_dataframe.index.astype(int)  # Only for mypy
-    return {
-        TimeIndex(index): float(value)
-        for index, value in zip(df_index, ts_dataframe.iloc[:, 0].values)
-    }
+    return ts_dataframe.iloc[:, 0]
 
 
-def dataframe_to_scenario_series(
-    ts_dataframe: pd.DataFrame,
-) -> Dict[ScenarioIndex, float]:
+def dataframe_to_scenario_series(ts_dataframe: pd.DataFrame) -> np.ndarray:
+    """Return a 1-D numpy array of floats indexed by 0-based column index."""
     if ts_dataframe.shape[0] != 1:
         raise ValueError(
             f"Could not convert input data to scenario series data. Expect data series with exactly one line, got shape {ts_dataframe.shape}"
         )
-
-    return {
-        ScenarioIndex(col_id): float(value)
-        for col_id, value in zip(
-            list(range(ts_dataframe.shape[1])), ts_dataframe.iloc[0, :].values
-        )
-    }
-
-
-@dataclass(frozen=True)
-class TimeScenarioSeriesData(AbstractDataStructure):
-    """
-    Container for identifiable timeseries data.
-    When a model is instantiated as a component, property values
-    can be defined by referencing one of those timeseries by its ID.
-    """
-
-    time_scenario_series: pd.DataFrame
-    scenarization: Optional[Scenarization] = None
-
-    def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
-    ) -> float:
-        if timestep is None:
-            raise KeyError("Time scenario data requires a time index.")
-        if scenario is None:
-            raise KeyError("Time scenario data requires a scenario index.")
-        if self.scenarization:
-            scenario = self.scenarization.get_scenario_for_year(scenario)
-        value = str(self.time_scenario_series.iloc[timestep, scenario])
-        return float(value)
-
-    def check_requirement(self, time: bool, scenario: bool) -> bool:
-        if not isinstance(self, TimeScenarioSeriesData):
-            raise ValueError("Invalid data type for TimeScenarioSeriesData")
-
-        return time and scenario
-
-
-@dataclass(frozen=True)
-class TreeData(AbstractDataStructure):
-    data: Mapping[str, AbstractDataStructure]
-
-    def get_value(
-        self, timestep: Optional[int], scenario: Optional[int], node_id: str = ""
-    ) -> float:
-        return self.data[node_id].get_value(timestep, scenario)
-
-    def check_requirement(self, time: bool, scenario: bool) -> bool:
-        return all(
-            node_data.check_requirement(time, scenario)
-            for node_data in self.data.values()
-        )
+    return ts_dataframe.iloc[0, :].to_numpy(dtype=float)
 
 
 @dataclass(frozen=True)
@@ -243,43 +202,75 @@ class ComponentParameterIndex:
 
 
 class DataBase:
-    """
-    Container for identifiable data.
-    When a model is instantiated as a component, property values
-    can be defined by referencing one of those data by its ID.
-    Data can have different structure : constant, varying in time or scenarios.
+    """Container for component parameter data.
+
+    Resolves MC scenario indices to data-series column indices at use time
+    via the optional ``ScenarioBuilder``.  The mapping is vectorized: a
+    single numpy array index per call, no Python loop over scenarios.
     """
 
-    _data: Dict[ComponentParameterIndex, AbstractDataStructure]
-
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        scenario_builder: Optional["ScenarioBuilder"] = None,
+    ) -> None:
         self._data: Dict[ComponentParameterIndex, AbstractDataStructure] = {}
+        self._scenario_groups: Dict[ComponentParameterIndex, Optional[str]] = {}
+        self._scenario_builder = scenario_builder
 
     def get_data(self, component_id: str, parameter_name: str) -> AbstractDataStructure:
         return self._data[ComponentParameterIndex(component_id, parameter_name)]
 
     def add_data(
-        self, component_id: str, parameter_name: str, data: AbstractDataStructure
+        self,
+        component_id: str,
+        parameter_name: str,
+        data: AbstractDataStructure,
+        scenario_group: Optional[str] = None,
     ) -> None:
-        self._data[ComponentParameterIndex(component_id, parameter_name)] = data
+        idx = ComponentParameterIndex(component_id, parameter_name)
+        self._data[idx] = data
+        self._scenario_groups[idx] = scenario_group
+
+    def get_values(
+        self,
+        component_id: str,
+        parameter_name: str,
+        timesteps: Optional[List[int]],
+        mc_scenarios: Optional[List[int]],
+    ) -> Union[float, np.ndarray]:
+        """Return parameter data for all requested timesteps and MC scenarios.
+
+        MC scenario → col_idx resolution happens here (use-time, vectorized):
+        a single numpy array index, no Python loop over S.
+
+        Returns shape ``(T, S)``, ``(T,)``, ``(S,)``, or scalar depending on
+        the underlying data type.
+        """
+        idx = ComponentParameterIndex(component_id, parameter_name)
+        raw_data = self._data[idx]
+        group = self._scenario_groups.get(idx)
+
+        cols: Optional[np.ndarray] = None
+        if mc_scenarios is not None:
+            mc_arr = np.asarray(mc_scenarios, dtype=int)
+            cols = (
+                self._scenario_builder.resolve_vectorized(group, mc_arr)
+                if self._scenario_builder
+                else mc_arr
+            )
+
+        return raw_data.get_value(timesteps, cols)
 
     def get_value(
         self, index: ComponentParameterIndex, timestep: int, scenario: int
-    ) -> float:
-        if index in self._data:
-            return self._data[index].get_value(timestep, scenario)
-        else:
-            raise KeyError(f"Index {index} not found.")
-
-    def requirements_consistency(self, network: Network) -> None:
-        for component in network.components:
-            for param in component.model.parameters.values():
-                data_structure = self.get_data(component.id, param.name)
-
-                if not data_structure.check_requirement(
-                    component.model.parameters[param.name].structure.time,
-                    component.model.parameters[param.name].structure.scenario,
-                ):
-                    raise ValueError(
-                        f"Data inconsistency for component: {component.id}, parameter: {param.name}. Requirement not met."
-                    )
+    ) -> Union[float, np.ndarray]:
+        """Scalar convenience wrapper used by tests."""
+        result = self.get_values(
+            index.component_id,
+            index.parameter_name,
+            [timestep],
+            [scenario],
+        )
+        if isinstance(result, np.ndarray):
+            return result.flat[0]
+        return result

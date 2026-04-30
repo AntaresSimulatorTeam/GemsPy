@@ -24,7 +24,6 @@ from gems.expression.expression import (
     literal,
 )
 from gems.expression.print import print_expr
-from gems.model.common import ProblemContext
 
 
 @dataclass
@@ -39,7 +38,6 @@ class Constraint:
     expression: ExpressionNode
     lower_bound: ExpressionNode = field(default=literal(-float("inf")))
     upper_bound: ExpressionNode = field(default=literal(float("inf")))
-    context: ProblemContext = field(default=ProblemContext.OPERATIONAL)
 
     def __post_init__(
         self,

@@ -1,93 +1,118 @@
-from dataclasses import dataclass
-from typing import Any, Dict, Optional
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
 
-from gems.expression.evaluate import ValueProvider
-from gems.simulation.optimization import OptimizationProblem
-from gems.simulation.output_values_base import BaseOutputValue
-from gems.study.data import ComponentParameterIndex, TimeScenarioIndex
+"""
+Extra output storage and vectorized evaluation.
+
+Provides :class:`ExtraOutput` for storing post-solve expression values and
+:class:`VectorizedExtraOutputBuilder`, a concrete subclass of
+:class:`~gems.simulation.vectorized_builder.VectorizedBuilderBase` that
+resolves ``VariableNode`` to an ``xr.DataArray`` of solved values, enabling
+nonlinear operations (products of variables, floor, ceil, min, max) that
+are not permitted during pre-solve constraint building.
+
+Port arrays for ``sum_connections`` support are built by calling
+:func:`~gems.simulation.optimization.build_port_arrays` with a
+:class:`VectorizedExtraOutputBuilder` factory.
+"""
+
+from dataclasses import dataclass, field
+from typing import Dict, Optional, Tuple
+
+import numpy as np
+import xarray as xr
+
+from gems.expression.expression import VariableNode
+from gems.model.port import PortFieldId
+from gems.simulation.vectorized_builder import VectorizedBuilderBase
+from gems.study.system import Component
 
 
 @dataclass
-class ExtraOutput(BaseOutputValue):
+class ExtraOutput:
     """
-    Stores evaluated outputs (from ExpressionNodes), not solver variables.
-    Inherits all common fields (_name, _value, _size, ignore) and methods
-    (__eq__, is_close, __str__, value property) from BaseOutputValue.
+    Stores a post-solve extra output expression as a vectorized xr.DataArray
+    with dims ⊆ {component, time, scenario}.
     """
 
-    def _set(
+    _name: str
+    _data: Optional[xr.DataArray] = field(init=False, default=None)
+    ignore: bool = field(default=False, init=False)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ExtraOutput):
+            return NotImplemented
+        return self.is_close(other, rel_tol=0.0, abs_tol=0.0)
+
+    def is_close(
         self,
-        timestep: Optional[int],
-        scenario: Optional[int],
-        value: float,
-    ) -> None:
-        timestep = 0 if timestep is None else timestep
-        scenario = 0 if scenario is None else scenario
-        key = TimeScenarioIndex(timestep, scenario)
+        other: "ExtraOutput",
+        *,
+        rel_tol: float = 1.0e-9,
+        abs_tol: float = 0.0,
+    ) -> bool:
+        if not isinstance(other, ExtraOutput):
+            return NotImplemented  # type: ignore[return-value]
+        if self.ignore or other.ignore:
+            return True
+        if (self._data is None) != (other._data is None):
+            return False
+        if self._data is None:
+            return True
+        assert other._data is not None  # narrowing: both non-None by checks above
+        try:
+            lhs, rhs = xr.align(self._data, other._data, join="exact")
+        except ValueError:
+            return False
+        return bool(np.allclose(lhs.values, rhs.values, rtol=rel_tol, atol=abs_tol))
 
-        if key not in self._value:
-            size_s = max(self._size[0], scenario + 1)
-            size_t = max(self._size[1], timestep + 1)
-            self._size = (size_s, size_t)
-
-        self._value[key] = value
+    def __str__(self) -> str:
+        return f"{self._name} : {self._data!r} {'(ignored)' if self.ignore else ''}"
 
 
-class ExtraOutputValueProvider(ValueProvider):
-    # ... (content remains the same, as it only interacts with public methods/inherited fields like _value) ...
-    """Provides variable and parameter values for extra output expressions."""
+@dataclass(kw_only=True)
+class VectorizedExtraOutputBuilder(VectorizedBuilderBase[xr.DataArray]):
+    """
+    Evaluates a model-level extra output expression as a vectorized xr.DataArray.
 
-    def __init__(
-        self,
-        component: Any,
-        problem: OptimizationProblem,
-        idx: TimeScenarioIndex,
-    ) -> None:
-        self.component = component
-        self.problem = problem
-        self.idx = idx
-        self.context = self._build_context()
+    A concrete subclass of :class:`VectorizedBuilderBase` that resolves
+    decision variables to their post-solve optimal values (``xr.DataArray``),
+    enabling nonlinear operations such as products of variables, floor, ceil,
+    min, and max that are forbidden during pre-solve constraint building.
 
-    def _build_context(self) -> Dict[str, float]:
-        ctx: Dict[str, float] = {}
+    Parameters
+    ----------
+    model_id:
+        The model.id string of the Model object whose AST is being visited.
+    param_arrays:
+        Mapping from (model_id, param_name) to a DataArray of parameter values,
+        with dims in {component, time, scenario} (or a subset).
+    var_solution_arrays:
+        Mapping from (model_id, var_name) to a DataArray of solution values,
+        with dims in {component, time, scenario} (or a subset).
+    port_arrays:
+        Pre-computed xr.DataArray for each PortFieldId of this model.
+        Keyed by PortFieldId(port_name, field_name).
+    block_length:
+        Number of time steps in the current time block.
+    """
 
-        # --- Variables ---
-        if hasattr(self.component, "_variables"):
-            for vname, vobj in self.component._variables.items():
-                if hasattr(vobj, "_value"):
-                    val = vobj._value.get(self.idx)
-                    if val is not None:
-                        ctx[vname] = val
-                        if hasattr(self.component, "_id"):
-                            ctx[f"{self.component._id}.{vname}"] = val
+    var_solution_arrays: Dict[Tuple[str, str], xr.DataArray]
 
-        # --- Parameters ---
-        model = getattr(self.component, "model", None)
-        if model is not None and hasattr(model, "parameters"):
-            for pname in model.parameters:
-                try:
-                    val = self.problem.context.database.get_value(
-                        ComponentParameterIndex(self.component._id, pname),
-                        self.idx.time,
-                        self.idx.scenario,
-                    )
-                    ctx[pname] = val
-                    if hasattr(self.component, "_id"):
-                        ctx[f"{self.component._id}.{pname}"] = val
-                except KeyError:
-                    continue
-
-        return ctx
-
-    # ValueProvider interface
-    def get_variable_value(self, name: str) -> float:
-        return self.context[name]
-
-    def get_parameter_value(self, name: str) -> float:
-        return self.context[name]
-
-    def get_component_variable_value(self, component_id: str, name: str) -> float:
-        return self.context[name]
-
-    def get_component_parameter_value(self, component_id: str, name: str) -> float:
-        return self.context[name]
+    def variable(self, node: VariableNode) -> xr.DataArray:
+        key = (self.model_id, node.name)
+        if key not in self.var_solution_arrays:
+            raise KeyError(
+                f"Variable {node.name!r} not found in solution for model "
+                f"{self.model_id!r}."
+            )
+        return self.var_solution_arrays[key]

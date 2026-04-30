@@ -21,8 +21,6 @@ from .expression import (
     AllTimeSumNode,
     CeilNode,
     ComparisonNode,
-    ComponentParameterNode,
-    ComponentVariableNode,
     DivisionNode,
     ExpressionNode,
     FloorNode,
@@ -34,8 +32,6 @@ from .expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
-    ProblemParameterNode,
-    ProblemVariableNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -47,24 +43,10 @@ from .visitor import ExpressionVisitor, T, visit
 
 class IndexingStructureProvider(ABC):
     @abstractmethod
-    def get_parameter_structure(self, name: str) -> IndexingStructure:
-        ...
+    def get_parameter_structure(self, name: str) -> IndexingStructure: ...
 
     @abstractmethod
-    def get_variable_structure(self, name: str) -> IndexingStructure:
-        ...
-
-    @abstractmethod
-    def get_component_variable_structure(
-        self, component_id: str, name: str
-    ) -> IndexingStructure:
-        ...
-
-    @abstractmethod
-    def get_component_parameter_structure(
-        self, component_id: str, name: str
-    ) -> IndexingStructure:
-        ...
+    def get_variable_structure(self, name: str) -> IndexingStructure: ...
 
 
 @dataclass(frozen=True)
@@ -117,26 +99,6 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         time = self.context.get_parameter_structure(node.name).time == True
         scenario = self.context.get_parameter_structure(node.name).scenario == True
         return IndexingStructure(time, scenario)
-
-    def comp_variable(self, node: ComponentVariableNode) -> IndexingStructure:
-        return self.context.get_component_variable_structure(
-            node.component_id, node.name
-        )
-
-    def comp_parameter(self, node: ComponentParameterNode) -> IndexingStructure:
-        return self.context.get_component_parameter_structure(
-            node.component_id, node.name
-        )
-
-    def pb_variable(self, node: ProblemVariableNode) -> IndexingStructure:
-        raise ValueError(
-            "Not relevant to compute indexation on already instantiated problem variables."
-        )
-
-    def pb_parameter(self, node: ProblemParameterNode) -> IndexingStructure:
-        raise ValueError(
-            "Not relevant to compute indexation on already instantiated problem parameters."
-        )
 
     def time_shift(self, node: TimeShiftNode) -> IndexingStructure:
         return visit(node.operand, self)

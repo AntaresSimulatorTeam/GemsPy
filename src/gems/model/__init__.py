@@ -10,7 +10,7 @@
 #
 # This file is part of the Antares project.
 
-from .common import ProblemContext, ValueType
+from .common import ValueType
 from .constraint import Constraint
 from .model import Model, ModelPort, model
 from .parameter import Parameter, float_parameter, int_parameter
