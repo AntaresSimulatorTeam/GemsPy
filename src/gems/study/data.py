@@ -198,9 +198,10 @@ class LazyScenarioSeriesData(AbstractDataStructure):
         if scenario is None:
             raise KeyError("Scenario series data requires a scenario index.")
         cols = [str(s) for s in scenario]
-        result = (
-            pl.scan_parquet(self.uri).select(cols).head(1).collect().to_numpy()[0]
-        )
+        unique_cols = list(dict.fromkeys(cols))
+        row = pl.scan_parquet(self.uri).select(unique_cols).head(1).collect().to_numpy()[0]
+        col_pos = {c: i for i, c in enumerate(unique_cols)}
+        result = row[[col_pos[c] for c in cols]]
         if timestep is not None:
             return np.broadcast_to(
                 result[np.newaxis, :], (len(timestep), len(scenario))
@@ -233,7 +234,10 @@ class LazyTimeScenarioSeriesData(AbstractDataStructure):
         if scenario is None:
             raise KeyError("Time scenario data requires a scenario index.")
         cols = [str(s) for s in scenario]
-        data = pl.scan_parquet(self.uri).select(cols).collect().to_numpy()
+        unique_cols = list(dict.fromkeys(cols))
+        df = pl.scan_parquet(self.uri).select(unique_cols).collect()
+        col_pos = {c: i for i, c in enumerate(unique_cols)}
+        data = df.to_numpy()[:, [col_pos[c] for c in cols]]
         return data[np.asarray(timestep), :]
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
