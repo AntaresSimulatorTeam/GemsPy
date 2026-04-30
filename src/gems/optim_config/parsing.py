@@ -202,9 +202,7 @@ def _check_id_existence(
 ) -> None:
     for variable_config in decomposition.variables:
         if variable_config.id not in model.variables:
-            errors.append(
-                f"Variable '{variable_config.id}' not found in model '{model_config_id}'"
-            )
+            errors.append(f"Variable '{variable_config.id}' not found in model '{model_config_id}'")
     for constraint_config in decomposition.constraints:
         if (
             constraint_config.id not in model.constraints
@@ -229,10 +227,7 @@ def _check_master_variables_not_time_dependent(
 ) -> None:
     """Variables assigned to master or master-and-subproblems must not depend on time."""
     for variable_config in decomposition.variables:
-        if (
-            variable_config.location in _MASTER_LOCS
-            and variable_config.id in model.variables
-        ):
+        if variable_config.location in _MASTER_LOCS and variable_config.id in model.variables:
             if model.variables[variable_config.id].structure.time:
                 errors.append(
                     f"Variable '{variable_config.id}' in model '{model_config_id}' is time-dependent "
@@ -251,8 +246,7 @@ def _check_master_constraints_use_master_variables(
     master_var_ids = {
         variable_config.id
         for variable_config in decomposition.variables
-        if variable_config.location in _MASTER_LOCS
-        and variable_config.id in model.variables
+        if variable_config.location in _MASTER_LOCS and variable_config.id in model.variables
     }
     for constraint_config in decomposition.constraints:
         if constraint_config.location == ElementLocation.MASTER:
@@ -279,8 +273,7 @@ def _check_master_objectives_use_master_variables(
     master_var_ids = {
         variable_config.id
         for variable_config in decomposition.variables
-        if variable_config.location in _MASTER_LOCS
-        and variable_config.id in model.variables
+        if variable_config.location in _MASTER_LOCS and variable_config.id in model.variables
     }
     obj_contribs = model.objective_contributions or {}
     for obj_config in decomposition.objective_contributions:
@@ -331,6 +324,4 @@ def validate_optim_config(config: OptimConfig, system: "System") -> None:
                 )
 
     if errors:
-        raise ValueError(
-            f"Errors in optim config file:\n" + "\n".join(f"  - {e}" for e in errors)
-        )
+        raise ValueError(f"Errors in optim config file:\n" + "\n".join(f"  - {e}" for e in errors))

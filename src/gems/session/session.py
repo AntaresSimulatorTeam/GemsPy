@@ -95,23 +95,18 @@ class SimulationSession:
                     initial_values=carry_over or None,
                 )
                 block_tables.append(table)
-                carry_over = self._extract_carry_over(
-                    problem, local_index=len(timesteps) - 1
-                )
+                carry_over = self._extract_carry_over(problem, local_index=len(timesteps) - 1)
                 t_start += block_length - block_overlap
                 block_id += 1
             return self._reduce(block_tables)
 
         if self.executor is not None:
             futures = [
-                self.executor.submit(_run_one_scenario_sequential, sid)
-                for sid in self.scenario_ids
+                self.executor.submit(_run_one_scenario_sequential, sid) for sid in self.scenario_ids
             ]
             scenario_tables = [f.result() for f in futures]
         else:
-            scenario_tables = [
-                _run_one_scenario_sequential(sid) for sid in self.scenario_ids
-            ]
+            scenario_tables = [_run_one_scenario_sequential(sid) for sid in self.scenario_ids]
 
         return self._reduce(scenario_tables)
 
@@ -130,17 +125,13 @@ class SimulationSession:
         for scenario_id in self.scenario_ids:
             for i in range(0, len(all_block_starts), blocks_per_batch):
                 batch = []
-                for block_idx, bs in enumerate(
-                    all_block_starts[i : i + blocks_per_batch], start=i
-                ):
+                for block_idx, bs in enumerate(all_block_starts[i : i + blocks_per_batch], start=i):
                     timesteps = list(range(bs, min(bs + block_length, t_end)))
                     batch.append((TimeBlock(block_idx, timesteps), [scenario_id]))
                 batches.append(batch)
 
         if self.executor is not None:
-            futures = [
-                self.executor.submit(self._run_batch, batch) for batch in batches
-            ]
+            futures = [self.executor.submit(self._run_batch, batch) for batch in batches]
             tables = [t for f in futures for t in f.result()]
         else:
             tables = [t for batch in batches for t in self._run_batch(batch)]
@@ -171,9 +162,7 @@ class SimulationSession:
         )
 
         if decomposed.master is not None and self.output_dir is not None:
-            dump_couplings(
-                build_couplings(decomposed, self.optim_config), self.output_dir
-            )
+            dump_couplings(build_couplings(decomposed, self.optim_config), self.output_dir)
             BendersRunner(emplacement=self.output_dir).run()
         else:
             raise RuntimeError(
@@ -215,9 +204,7 @@ class SimulationSession:
         )
         return problem, table
 
-    def _run_batch(
-        self, batch: List[Tuple[TimeBlock, List[int]]]
-    ) -> List[SimulationTable]:
+    def _run_batch(self, batch: List[Tuple[TimeBlock, List[int]]]) -> List[SimulationTable]:
         """Run a list of independent (block, scenario_ids) pairs on one worker."""
         return [self._run_block(block, sids)[1] for block, sids in batch]
 
