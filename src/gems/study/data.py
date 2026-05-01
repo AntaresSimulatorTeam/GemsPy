@@ -195,11 +195,10 @@ class LazyScenarioSeriesData(AbstractDataStructure):
     ) -> np.ndarray:
         if scenario is None:
             raise KeyError("Scenario series data requires a scenario index.")
-        cols = [str(s) for s in scenario]
-        unique_cols = list(dict.fromkeys(cols))
+        unique_scenarios, inverse = np.unique(scenario, return_inverse=True)
+        unique_cols = [str(s) for s in unique_scenarios]
         row = pl.scan_parquet(self.uri).select(unique_cols).head(1).collect().to_numpy()[0]
-        col_pos = {c: i for i, c in enumerate(unique_cols)}
-        result = row[[col_pos[c] for c in cols]]
+        result = row[inverse]
         if timestep is not None:
             return np.broadcast_to(result[np.newaxis, :], (len(timestep), len(scenario)))
         return result
@@ -233,12 +232,10 @@ class LazyTimeScenarioSeriesData(AbstractDataStructure):
             raise KeyError("Time scenario data requires a time index.")
         if scenario is None:
             raise KeyError("Time scenario data requires a scenario index.")
-        cols = [str(s) for s in scenario]
-        unique_cols = list(dict.fromkeys(cols))
+        unique_scenarios, inverse = np.unique(scenario, return_inverse=True)
+        unique_cols = [str(s) for s in unique_scenarios]
         df = pl.scan_parquet(self.uri).select(unique_cols).collect()
-        col_pos = {c: i for i, c in enumerate(unique_cols)}
-        data = df.to_numpy()[:, [col_pos[c] for c in cols]]
-        return data[np.asarray(timestep), :]
+        return df.to_numpy()[np.asarray(timestep)][:, inverse]
 
     def materialize(self, scenario_cols: Set[int]) -> "MaterializedTimeScenarioSeriesData":
         str_cols = [str(c) for c in sorted(scenario_cols)]
@@ -258,10 +255,18 @@ class MaterializedTimeScenarioSeriesData(AbstractDataStructure):
     col_pos maps each original data-series column index to its position
     in the in-memory data array, enabling the same deduplication /
     re-expansion logic as the lazy counterpart.
+    _lookup is a pre-built dense array for O(1) vectorized col_pos lookups.
     """
 
     data: np.ndarray  # shape (T, n_loaded_cols)
     col_pos: Dict[int, int]  # original col idx → position in data
+    _lookup: np.ndarray = field(init=False, repr=False, hash=False, compare=False)
+
+    def __post_init__(self) -> None:
+        lookup = np.full(max(self.col_pos) + 1, -1, dtype=np.intp)
+        for orig, pos in self.col_pos.items():
+            lookup[orig] = pos
+        object.__setattr__(self, "_lookup", lookup)
 
     def get_value(
         self,
@@ -272,11 +277,10 @@ class MaterializedTimeScenarioSeriesData(AbstractDataStructure):
             raise KeyError("Time scenario data requires a time index.")
         if scenario is None:
             raise KeyError("Time scenario data requires a scenario index.")
-        positions = [self.col_pos[s] for s in scenario]
-        unique_pos = list(dict.fromkeys(positions))
-        pos_map = {p: i for i, p in enumerate(unique_pos)}
-        result = self.data[np.ix_(np.asarray(timestep), np.asarray(unique_pos))]
-        return result[:, [pos_map[p] for p in positions]]
+        positions = self._lookup[scenario]
+        unique_pos, inverse = np.unique(positions, return_inverse=True)
+        result = self.data[np.ix_(np.asarray(timestep), unique_pos)]
+        return result[:, inverse]
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         return time and scenario
