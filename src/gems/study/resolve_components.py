@@ -21,7 +21,6 @@ from gems.study import (
     ConstantData,
     DataBase,
     PortRef,
-    PortsConnection,
     System,
 )
 from gems.study.data import (
