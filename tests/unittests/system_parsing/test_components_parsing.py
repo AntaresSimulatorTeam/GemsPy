@@ -1,6 +1,8 @@
+import io
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 from yaml import dump, safe_load
 
 from gems.model.parsing import LibrarySchema, parse_yaml_library
@@ -92,3 +94,100 @@ def test_consistency_check_ko(
         match=r"Error: Component G has invalid model ID: basic.generator",
     ):
         consistency_check(result_comp, result_lib["basic"].models)
+
+
+_SYSTEM_WITH_COMPONENT_PROPERTIES = """\
+system:
+  id: basic_example
+  components:
+    - id: load
+      model: basic.demand
+      parameters:
+        - id: demand
+          time-dependent: true
+          scenario-dependent: true
+          value: load_data
+    - id: nuclear_1
+      model: basic.generator
+      properties:
+        - key: technology
+          value: nuclear
+        - key: company
+          value: rhonepower
+"""
+
+
+def test_parse_yaml_components_properties_optional_and_normalized() -> None:
+    system = parse_yaml_components(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
+    props_by_id = {c.id: c.properties for c in system.components}
+    assert props_by_id["load"] is None
+    raw = props_by_id["nuclear_1"]
+    assert isinstance(raw, list) and len(raw) == 2
+    assert [p.model_dump() for p in raw] == [
+        {"key": "technology", "value": "nuclear"},
+        {"key": "company", "value": "rhonepower"},
+    ]
+
+
+def test_resolve_system_normalizes_list_properties_to_dict(
+    input_library: LibrarySchema,
+) -> None:
+    system = parse_yaml_components(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
+    lib_dict = resolve_library([input_library])
+    resolved = resolve_system(system, lib_dict)
+    assert resolved.get_component("nuclear_1").properties == {
+        "technology": "nuclear",
+        "company": "rhonepower",
+    }
+
+
+_SYSTEM_WITH_PROPERTIES_MISSING_KEY = """\
+system:
+  components:
+    - id: A
+      model: basic.area
+      properties:
+        - value: nuclear
+"""
+
+
+def test_parse_yaml_components_properties_missing_key_raises() -> None:
+    with pytest.raises(ValidationError):
+        parse_yaml_components(io.StringIO(_SYSTEM_WITH_PROPERTIES_MISSING_KEY))
+
+
+_SYSTEM_WITH_PROPERTIES_DUPLICATE_KEYS = """\
+system:
+  components:
+    - id: A
+      model: basic.node
+      properties:
+        - key: technology
+          value: nuclear
+        - key: technology
+          value: gas
+"""
+
+
+def test_resolve_component_properties_duplicate_keys_raises(
+    input_library: LibrarySchema,
+) -> None:
+    system = parse_yaml_components(io.StringIO(_SYSTEM_WITH_PROPERTIES_DUPLICATE_KEYS))
+    lib_dict = resolve_library([input_library])
+    with pytest.raises(ValueError, match="duplicate properties key"):
+        resolve_system(system, lib_dict)
+
+
+_SYSTEM_WITH_SYSTEM_LEVEL_PROPERTIES = """\
+system:
+  properties:
+    technology: nuclear
+  components:
+    - id: A
+      model: basic.area
+"""
+
+
+def test_parse_yaml_components_system_level_properties_rejected() -> None:
+    with pytest.raises(ValidationError):
+        parse_yaml_components(io.StringIO(_SYSTEM_WITH_SYSTEM_LEVEL_PROPERTIES))

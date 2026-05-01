@@ -55,11 +55,17 @@ class ComponentParameterSchema(ModifiedBaseModel):
     scenario_group: Optional[str] = None
 
 
+class ComponentPropertySchema(ModifiedBaseModel):
+    key: str
+    value: str
+
+
 class ComponentSchema(ModifiedBaseModel):
     id: str
     model: str
     scenario_group: Optional[str] = None
     parameters: Optional[List[ComponentParameterSchema]] = None
+    properties: Optional[List[ComponentPropertySchema]] = None
 
 
 class SystemSchema(ModifiedBaseModel):
