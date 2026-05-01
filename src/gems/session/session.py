@@ -12,6 +12,7 @@
 
 from concurrent.futures import Executor
 from dataclasses import dataclass, field, replace
+from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
@@ -30,12 +31,18 @@ from gems.study.folder import load_study
 from gems.study.study import Study
 
 
+class MaterializationStrategy(str, Enum):
+    NONE = "none"
+    UPFRONT = "upfront"
+    PER_WORKER = "per-worker"
+
+
 @dataclass
 class SimulationSession:
     study: Study
     optim_config: OptimConfig
     executor: Optional[Executor] = None
-    materialize_per_worker: bool = False
+    materialization: MaterializationStrategy = MaterializationStrategy.NONE
     run_id: str = field(default_factory=lambda: str(uuid4()))
     output_dir: Optional[Path] = None
 
@@ -78,11 +85,16 @@ class SimulationSession:
         block_length: int = cfg.block_length  # type: ignore[assignment]
         block_overlap: int = cfg.block_overlap
 
+        base_study = self.study
+        if self.materialization == MaterializationStrategy.UPFRONT:
+            mat_db = self.study.database.materialize(self.scenario_ids)
+            base_study = replace(self.study, database=mat_db)
+
         def _run_one_scenario_sequential(scenario_id: int) -> SimulationTable:
-            effective_study = self.study
-            if self.materialize_per_worker:
-                mat_db = self.study.database.materialize([scenario_id])
-                effective_study = replace(self.study, database=mat_db)
+            effective_study = base_study
+            if self.materialization == MaterializationStrategy.PER_WORKER:
+                mat_db = base_study.database.materialize([scenario_id])
+                effective_study = replace(base_study, database=mat_db)
             t_start = self.optim_config.time_scope.first_time_step
             block_id = 0
             carry_over: Dict[Tuple[str, str], xr.DataArray] = {}
@@ -120,6 +132,11 @@ class SimulationSession:
         cfg = self.optim_config.resolution
         block_length: int = cfg.block_length  # type: ignore[assignment]
 
+        base_study = self.study
+        if self.materialization == MaterializationStrategy.UPFRONT:
+            mat_db = self.study.database.materialize(self.scenario_ids)
+            base_study = replace(self.study, database=mat_db)
+
         t_end = self.optim_config.time_scope.last_time_step + 1
         all_block_starts = list(
             range(self.optim_config.time_scope.first_time_step, t_end, block_length)
@@ -137,10 +154,10 @@ class SimulationSession:
                 batches.append(batch)
 
         if self.executor is not None:
-            futures = [self.executor.submit(self._run_batch, batch) for batch in batches]
+            futures = [self.executor.submit(self._run_batch, batch, base_study) for batch in batches]
             tables = [t for f in futures for t in f.result()]
         else:
-            tables = [t for batch in batches for t in self._run_batch(batch)]
+            tables = [t for batch in batches for t in self._run_batch(batch, base_study)]
 
         return self._reduce(tables)
 
@@ -212,10 +229,9 @@ class SimulationSession:
         )
         return problem, table
 
-    def _run_batch(self, batch: List[Tuple[TimeBlock, List[int]]]) -> List[SimulationTable]:
+    def _run_batch(self, batch: List[Tuple[TimeBlock, List[int]]], study: Study) -> List[SimulationTable]:
         """Run a list of independent (block, scenario_ids) pairs on one worker."""
-        study = self.study
-        if self.materialize_per_worker:
+        if self.materialization == MaterializationStrategy.PER_WORKER:
             scenario_id = batch[0][1][0]
             mat_db = study.database.materialize([scenario_id])
             study = replace(study, database=mat_db)

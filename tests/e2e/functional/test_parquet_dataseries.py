@@ -35,7 +35,7 @@ import pytest
 from gems.model.parsing import parse_yaml_library
 from gems.model.resolve_library import resolve_library
 from gems.optim_config.parsing import OptimConfig
-from gems.session.session import SimulationSession
+from gems.session.session import MaterializationStrategy, SimulationSession
 from gems.simulation import TimeBlock, build_problem
 from gems.study.data import (
     LazyScenarioSeriesData,
@@ -196,22 +196,18 @@ def test_parquet_takes_precedence_when_both_formats_present(tmp_path: Path) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_materialize_per_worker_same_result_as_lazy(tmp_path: Path) -> None:
-    """materialize_per_worker=True produces the same objective as the lazy path.
-
-    Uses sequential-subproblems with block-length=1 over a 2-timestep horizon
-    so that materialize() is called once per scenario worker.
-    Verifies that the working database entry becomes MaterializedTimeScenarioSeriesData
-    and that the resulting objective is numerically identical to the lazy run.
-    """
+def _make_scenarized_study(tmp_path: Path):
+    """Shared setup: 2-column parquet + ScenarioBuilder mapping 3 MC scenarios to 2 columns."""
     pl.DataFrame({"0": [50.0, 50.0], "1": [100.0, 100.0]}).write_parquet(tmp_path / "loads.parquet")
     shutil.copy(_SERIES_DIR / "modeler-scenariobuilder.dat", tmp_path)
     scenario_builder = ScenarioBuilder.load(tmp_path / "modeler-scenariobuilder.dat")
-
     study, database = _build_study("with_scenarization.yml", tmp_path, scenario_builder)
     assert isinstance(database.get_data("D", "demand"), LazyTimeScenarioSeriesData)
+    return study
 
-    optim_config = OptimConfig.model_validate(
+
+def _sequential_config() -> OptimConfig:
+    return OptimConfig.model_validate(
         {
             "time-scope": {"first-time-step": 0, "last-time-step": 1},
             "scenario-scope": {"nb-scenarios": 3},
@@ -219,15 +215,48 @@ def test_materialize_per_worker_same_result_as_lazy(tmp_path: Path) -> None:
         }
     )
 
+
+def test_materialize_per_worker_same_result_as_lazy(tmp_path: Path) -> None:
+    """MaterializationStrategy.PER_WORKER produces the same objective as NONE (lazy).
+
+    Uses sequential-subproblems with block-length=1 over a 2-timestep horizon
+    so that materialize() is called once per scenario.
+    Verifies that the database entry becomes MaterializedTimeScenarioSeriesData
+    and that the resulting objective is numerically identical to the lazy run.
+    """
+    study = _make_scenarized_study(tmp_path)
+    optim_config = _sequential_config()
+
     lazy_table = SimulationSession(study=study, optim_config=optim_config).run()
     mat_table = SimulationSession(
-        study=study, optim_config=optim_config, materialize_per_worker=True
+        study=study, optim_config=optim_config, materialization=MaterializationStrategy.PER_WORKER
     ).run()
 
-    # Verify materialization produces MaterializedTimeScenarioSeriesData
     mat_db = study.database.materialize([0])
     assert isinstance(mat_db.get_data("D", "demand"), MaterializedTimeScenarioSeriesData)
 
     obj_rows_lazy = lazy_table.data.loc[lazy_table.data["output"] == "objective-value", "value"]
     obj_rows_mat = mat_table.data.loc[mat_table.data["output"] == "objective-value", "value"]
     assert obj_rows_lazy.sum() == pytest.approx(obj_rows_mat.sum(), rel=1e-6)
+
+
+def test_materialize_upfront_same_result_as_lazy(tmp_path: Path) -> None:
+    """MaterializationStrategy.UPFRONT produces the same objective as NONE (lazy).
+
+    Loads the full database into RAM before the run loop starts.
+    All columns for all scenarios are materialized in one I/O pass.
+    """
+    study = _make_scenarized_study(tmp_path)
+    optim_config = _sequential_config()
+
+    lazy_table = SimulationSession(study=study, optim_config=optim_config).run()
+    upfront_table = SimulationSession(
+        study=study, optim_config=optim_config, materialization=MaterializationStrategy.UPFRONT
+    ).run()
+
+    mat_db = study.database.materialize(list(range(optim_config.scenario_scope.nb_scenarios)))
+    assert isinstance(mat_db.get_data("D", "demand"), MaterializedTimeScenarioSeriesData)
+
+    obj_rows_lazy = lazy_table.data.loc[lazy_table.data["output"] == "objective-value", "value"]
+    obj_rows_up = upfront_table.data.loc[upfront_table.data["output"] == "objective-value", "value"]
+    assert obj_rows_lazy.sum() == pytest.approx(obj_rows_up.sum(), rel=1e-6)
