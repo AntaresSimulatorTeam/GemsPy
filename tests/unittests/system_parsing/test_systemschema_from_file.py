@@ -66,4 +66,3 @@ system:
 
     with pytest.raises(ValidationError):
         _parse_system_file(p)
-        
