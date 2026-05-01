@@ -205,7 +205,7 @@ class LazyScenarioSeriesData(AbstractDataStructure):
         return result
 
     def materialize(self) -> "ScenarioSeriesData":
-        row = pl.scan_parquet(self.uri).collect().to_numpy()[0]
+        row = pl.scan_parquet(self.uri).head(1).collect().to_numpy()[0]
         return ScenarioSeriesData(row)
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
