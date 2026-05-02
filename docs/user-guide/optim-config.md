@@ -26,9 +26,10 @@ time-scope:
   first-time-step: 0
   last-time-step: 8759   # 8760 hourly timesteps → one year
 
-# Number of Monte-Carlo scenarios to run
+# Monte-Carlo scenarios to simulate (1-based, inline form)
 scenario-scope:
-  nb-scenarios: 10
+  include:
+    - "1-10"   # scenarios 1 through 10
 
 # Solver settings
 solver-options:
@@ -66,13 +67,104 @@ The total number of timesteps solved is `last-time-step − first-time-step + 1`
 
 ## `scenario-scope`
 
+Selects which Monte-Carlo scenarios to simulate.  Indices in the YAML are
+**1-based** (matching the scenario-builder convention); GemsPy converts them
+to 0-based indices internally.
+
+Two mutually exclusive forms are supported:
+
+### Inline form (`include` / `exclude`)
+
+Specify scenarios directly in the YAML using individual integers, string
+integers, and inclusive `"a-b"` range strings.
+
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `nb-scenarios` | int | `1` | Number of Monte-Carlo scenarios |
+| `include` | list | — | Scenarios to run (required in inline form) |
+| `exclude` | list | — | Scenarios to remove from the include set (optional) |
 
-Scenario indices run from `0` to `nb-scenarios − 1`.  If a
-[scenario builder](scenario-builder.md) file is present, these indices are
-mapped to data-series columns by that file.
+Each entry in `include` or `exclude` may be:
+
+- An integer: `5` → scenario 5
+- A string integer: `"5"` → scenario 5 (identical to `5`)
+- A range: `"1-10"` → scenarios 1 through 10 (inclusive)
+
+**Examples:**
+
+~~~ yaml
+# Run a single scenario
+scenario-scope:
+  include:
+    - 1
+
+# Run scenarios 1 to 100
+scenario-scope:
+  include:
+    - "1-100"
+
+# Run scenarios 1–20 and 50–60, but skip 10 and 15
+scenario-scope:
+  include:
+    - "1-20"
+    - "50-60"
+  exclude:
+    - 10
+    - 15
+~~~
+
+**Rules:**
+
+- All indices must be ≥ 1.
+- Overlapping entries in `include` are deduplicated automatically.
+- Excludes that do not appear in `include` produce a warning and have no effect.
+- Output is always sorted in ascending order.
+- `exclude` cannot be used without `include`.
+
+**Default behaviour** (no `scenario-scope` key at all, or an empty block):
+runs scenario 1 only.
+
+---
+
+### Playlist-file form (`playlist-file`)
+
+Point to a JSON file containing a flat array of 1-based integer scenario
+indices.  Useful when the list of scenarios is generated programmatically or
+is too large to embed in YAML.
+
+| Key | Type | Description |
+|---|---|---|
+| `playlist-file` | path | Path to a JSON playlist (relative to `optim-config.yml`) |
+
+~~~ yaml
+scenario-scope:
+  playlist-file: mc_playlist.json   # resolved relative to optim-config.yml
+~~~
+
+The referenced file must contain a flat JSON array of positive integers, for
+example:
+
+~~~ json
+[1, 3, 5, 7, 9, 11, 13]
+~~~
+
+GemsPy reads and validates the playlist eagerly when `load_optim_config()` is
+called, so any I/O or format errors surface immediately at load time.
+
+**Rules:**
+
+- The file must be a flat JSON array of integers (no booleans, strings, or objects).
+- All indices must be ≥ 1.
+- Duplicates are silently removed; the result is sorted ascending.
+- `include` / `exclude` and `playlist-file` are mutually exclusive.
+
+---
+
+### ScenarioBuilder cross-validation
+
+If a [scenario builder](scenario-builder.md) file is present,
+`validate_optim_config()` checks that every scenario index in the playlist is
+defined for every scenario group.  Out-of-bounds indices raise a `ValueError`
+listing the affected groups.
 
 ---
 
@@ -238,15 +330,22 @@ from gems.optim_config import (
 # Load from file (returns None if the file does not exist)
 config = load_optim_config(Path("my_study/input/optim-config.yml"))
 
-# Build programmatically
+# Build programmatically — inline form (scenarios 1–10)
 config = OptimConfig(
     time_scope=TimeScopeConfig(first_time_step=0, last_time_step=8759),
-    scenario_scope=ScenarioScopeConfig(nb_scenarios=10),
+    scenario_scope=ScenarioScopeConfig(include=["1-10"]),
     solver_options=SolverOptionsConfig(name="highs", logs=False),
     resolution=ResolutionConfig(
         mode=ResolutionMode.SEQUENTIAL_SUBPROBLEMS,
         block_length=168,
     ),
+)
+
+# Build programmatically — playlist-file form
+from pathlib import Path
+config_pf = OptimConfig(
+    time_scope=TimeScopeConfig(first_time_step=0, last_time_step=8759),
+    scenario_scope=ScenarioScopeConfig(playlist_file=Path("mc_playlist.json")),
 )
 
 # Pass to SimulationSession

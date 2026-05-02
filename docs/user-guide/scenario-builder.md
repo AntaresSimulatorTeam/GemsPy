@@ -8,10 +8,10 @@ scenario index `i` always maps to column `i` of every timeseries file.
 
 ## Motivation
 
-A study with `nb-scenarios = 100` may have some components (e.g. wind farms)
-whose data only has 10 distinct columns, while others (e.g. demand) have 100.
-The scenario builder lets you express this mapping explicitly, so GemsPy reads
-the right column for each component and scenario.
+A study that simulates 100 MC scenarios may have some components (e.g. wind
+farms) whose data only has 10 distinct columns, while others (e.g. demand)
+have 100.  The scenario builder lets you express this mapping explicitly, so
+GemsPy reads the right column for each component and scenario.
 
 ---
 
@@ -55,9 +55,11 @@ demand, 3 = 4
 ```
 
 !!! note
-    All MC scenario indices (`0` to `nb-scenarios - 1`) must be listed for every
-    group that appears in the file.  Missing entries raise a `ValueError` at
-    load time.
+    Every MC scenario index that appears in the simulation playlist must be
+    listed for every group in the file.  Missing entries raise a `ValueError`
+    at load time.  `validate_optim_config()` cross-checks the
+    [scenario-scope playlist](optim-config.md#scenario-scope) against the
+    scenario builder and reports any out-of-bounds indices.
 
 ---
 
