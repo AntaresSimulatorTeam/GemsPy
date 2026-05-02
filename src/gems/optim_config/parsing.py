@@ -195,9 +195,18 @@ class ScenarioScopeConfig(ModifiedBaseModel):
         return self._resolve_inline()
 
     def _load_playlist(self) -> List[int]:
-        with self.playlist_file.open() as f:  # type: ignore[union-attr]
-            data = json.load(f)
-        if not isinstance(data, list) or not all(isinstance(x, int) for x in data):
+        try:
+            with self.playlist_file.open() as f:  # type: ignore[union-attr]
+                data = json.load(f)
+        except FileNotFoundError:
+            raise ValueError(f"Playlist file not found: '{self.playlist_file}'")
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"Invalid JSON in playlist file '{self.playlist_file}': {exc}"
+            ) from exc
+        if not isinstance(data, list) or not all(
+            isinstance(x, int) and not isinstance(x, bool) for x in data
+        ):
             raise ValueError(
                 f"'{self.playlist_file}' must contain a flat JSON array of integers"
             )

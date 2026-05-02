@@ -196,6 +196,28 @@ def test_playlist_file_zero_index_raises(tmp_path: Path) -> None:
         cfg.scenario_ids
 
 
+def test_playlist_file_not_found_raises(tmp_path: Path) -> None:
+    cfg = ScenarioScopeConfig(playlist_file=tmp_path / "missing.json")
+    with pytest.raises(ValueError, match="not found"):
+        cfg.scenario_ids
+
+
+def test_playlist_file_malformed_json_raises(tmp_path: Path) -> None:
+    playlist = tmp_path / "playlist.json"
+    playlist.write_text("not valid json {{")
+    cfg = ScenarioScopeConfig(playlist_file=playlist)
+    with pytest.raises(ValueError, match="Invalid JSON"):
+        cfg.scenario_ids
+
+
+def test_playlist_file_boolean_values_rejected(tmp_path: Path) -> None:
+    playlist = tmp_path / "playlist.json"
+    playlist.write_text(json.dumps([True, 2, 3]))
+    cfg = ScenarioScopeConfig(playlist_file=playlist)
+    with pytest.raises(ValueError, match="flat JSON array of integers"):
+        cfg.scenario_ids
+
+
 # ---------------------------------------------------------------------------
 # YAML round-trip via OptimConfig
 # ---------------------------------------------------------------------------
