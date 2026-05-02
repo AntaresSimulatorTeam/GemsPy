@@ -137,6 +137,22 @@ library:
     assert on_off.data_type == ValueType.BINARY
 
 
+def test_model_taxonomy_category_parses() -> None:
+    yaml_content = """
+library:
+  id: taxo_lib
+  models:
+    - id: bus
+      taxonomy-category: balance
+      parameters:
+        - id: v_nom
+          time-dependent: false
+          scenario-dependent: false
+"""
+    input_lib = parse_yaml_library(io.StringIO(yaml_content))
+    assert input_lib.models[0].taxonomy_category == "balance"
+
+
 def test_library_error_parsing(libs_dir: Path) -> None:
     lib_file = libs_dir / "model_port_definition_ko.yml"
 

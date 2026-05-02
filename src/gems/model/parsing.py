@@ -87,6 +87,7 @@ class ExtraOutputSchema(ModifiedBaseModel):
 
 class ModelSchema(ModifiedBaseModel):
     id: str
+    taxonomy_category: Optional[str] = None  # # Optional or mandatory,open question ?
     parameters: List[ParameterSchema] = Field(default_factory=list)
     variables: List[VariableSchema] = Field(default_factory=list)
     ports: List[ModelPortSchema] = Field(default_factory=list)
