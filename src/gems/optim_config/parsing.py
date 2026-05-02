@@ -17,7 +17,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
 
-from pydantic import Field, ValidationError, model_validator
+from pydantic import Field, PrivateAttr, ValidationError, model_validator
 from yaml import safe_load
 
 from gems.expression.expression import (
@@ -138,19 +138,29 @@ def _expand_entries(entries: List[Union[int, str]]) -> Set[int]:
                 raise ValueError(f"Scenario index must be >= 1 (1-based), got {entry}")
             result.add(entry - 1)
         else:
-            match = re.fullmatch(r"(\d+)-(\d+)", str(entry).strip())
-            if not match:
-                raise ValueError(
-                    f"Invalid range {entry!r}: expected 'a-b' format (e.g. '1-10')"
-                )
-            a, b = int(match.group(1)), int(match.group(2))
-            if a < 1:
-                raise ValueError(
-                    f"Range start must be >= 1 (1-based), got {a} in {entry!r}"
-                )
-            if a > b:
-                raise ValueError(f"Range start must be <= end, got {entry!r}")
-            result.update(range(a - 1, b))
+            s = str(entry).strip()
+            if re.fullmatch(r"\d+", s):
+                val = int(s)
+                if val < 1:
+                    raise ValueError(
+                        f"Scenario index must be >= 1 (1-based), got {val}"
+                    )
+                result.add(val - 1)
+            else:
+                match = re.fullmatch(r"(\d+)-(\d+)", s)
+                if not match:
+                    raise ValueError(
+                        f"Invalid entry {entry!r}: expected an integer or a range 'a-b'"
+                        " (e.g. '5' or '1-10')"
+                    )
+                a, b = int(match.group(1)), int(match.group(2))
+                if a < 1:
+                    raise ValueError(
+                        f"Range start must be >= 1 (1-based), got {a} in {entry!r}"
+                    )
+                if a > b:
+                    raise ValueError(f"Range start must be <= end, got {entry!r}")
+                result.update(range(a - 1, b))
     return result
 
 
@@ -158,6 +168,8 @@ class ScenarioScopeConfig(ModifiedBaseModel):
     include: Optional[List[Union[int, str]]] = None
     exclude: Optional[List[Union[int, str]]] = None
     playlist_file: Optional[Path] = None
+
+    _scenario_ids: Optional[List[int]] = PrivateAttr(default=None)
 
     @model_validator(mode="after")
     def _check_constraints(self) -> "ScenarioScopeConfig":
@@ -171,6 +183,11 @@ class ScenarioScopeConfig(ModifiedBaseModel):
 
     @property
     def scenario_ids(self) -> List[int]:
+        if self._scenario_ids is None:
+            self._scenario_ids = self._compute_scenario_ids()
+        return self._scenario_ids
+
+    def _compute_scenario_ids(self) -> List[int]:
         if self.playlist_file is not None:
             return self._load_playlist()
         if self.include is None:
@@ -178,8 +195,7 @@ class ScenarioScopeConfig(ModifiedBaseModel):
         return self._resolve_inline()
 
     def _load_playlist(self) -> List[int]:
-        assert self.playlist_file is not None
-        with self.playlist_file.open() as f:
+        with self.playlist_file.open() as f:  # type: ignore[union-attr]
             data = json.load(f)
         if not isinstance(data, list) or not all(isinstance(x, int) for x in data):
             raise ValueError(
@@ -230,6 +246,10 @@ def load_optim_config(config_path: Path) -> Optional[OptimConfig]:
     pf = config.scenario_scope.playlist_file
     if pf is not None and not pf.is_absolute():
         config.scenario_scope.playlist_file = config_path.parent / pf
+
+    # Resolve and cache scenario_ids eagerly so that the playlist file is read
+    # exactly once and any I/O or format errors surface at load time.
+    _ = config.scenario_scope.scenario_ids
     return config
 
 

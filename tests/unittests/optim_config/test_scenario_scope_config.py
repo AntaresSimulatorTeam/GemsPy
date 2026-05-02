@@ -109,7 +109,7 @@ def test_include_negative_index_raises() -> None:
 
 
 def test_include_invalid_range_format_raises() -> None:
-    with pytest.raises(ValueError, match="Invalid range"):
+    with pytest.raises(ValueError, match="Invalid entry"):
         ScenarioScopeConfig(include=["abc"]).scenario_ids
 
 
@@ -238,3 +238,96 @@ def test_yaml_nb_scenarios_rejected() -> None:
 
     with pytest.raises(ValueError):
         OptimConfig.model_validate({"scenario-scope": {"nb-scenarios": 1}})
+
+
+# ---------------------------------------------------------------------------
+# String integer entries
+# ---------------------------------------------------------------------------
+
+
+def test_include_string_integer_accepted() -> None:
+    cfg = ScenarioScopeConfig(include=["5"])
+    assert cfg.scenario_ids == [4]
+
+
+def test_include_string_integer_mixed_with_range() -> None:
+    cfg = ScenarioScopeConfig(include=["1-3", "5", "8"])
+    assert cfg.scenario_ids == [0, 1, 2, 4, 7]
+
+
+def test_exclude_string_integer_accepted() -> None:
+    cfg = ScenarioScopeConfig(include=["1-5"], exclude=["3"])
+    assert cfg.scenario_ids == [0, 1, 3, 4]
+
+
+def test_include_string_zero_raises() -> None:
+    with pytest.raises(ValueError, match=">= 1"):
+        ScenarioScopeConfig(include=["0"]).scenario_ids
+
+
+# ---------------------------------------------------------------------------
+# scenario_ids computed and stored only once
+# ---------------------------------------------------------------------------
+
+
+def test_scenario_ids_cached_inline() -> None:
+    cfg = ScenarioScopeConfig(include=["1-5"])
+    first = cfg.scenario_ids
+    second = cfg.scenario_ids
+    assert first is second
+
+
+def test_scenario_ids_cached_playlist_file_via_load_optim_config(
+    tmp_path: Path,
+) -> None:
+    from gems.optim_config.parsing import load_optim_config
+
+    playlist = tmp_path / "playlist.json"
+    playlist.write_text(json.dumps([1, 2, 3]))
+    config_file = tmp_path / "optim-config.yml"
+    config_file.write_text("scenario-scope:\n  playlist-file: playlist.json\n")
+
+    cfg = load_optim_config(config_file)
+    assert cfg is not None
+    playlist.unlink()  # delete the file — ids already cached at load time
+    assert cfg.scenario_scope.scenario_ids == [0, 1, 2]
+    assert cfg.scenario_scope.scenario_ids is cfg.scenario_scope.scenario_ids
+
+
+# ---------------------------------------------------------------------------
+# validate_optim_config — ScenarioBuilder cross-check
+# ---------------------------------------------------------------------------
+
+
+def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
+    import numpy as np
+
+    from gems.optim_config.parsing import OptimConfig, validate_optim_config
+    from gems.study.scenario_builder import ScenarioBuilder
+    from gems.study.system import System
+
+    config = OptimConfig.model_validate(
+        {"scenario-scope": {"include": ["1-5"]}}  # 0-based [0,1,2,3,4]
+    )
+    # ScenarioBuilder defines only 3 scenarios (0-based 0,1,2) for group "load"
+    sb = ScenarioBuilder(_group_arrays={"load": np.array([0, 1, 0])})
+    system = System(id="test")
+
+    with pytest.raises(ValueError, match="not defined for scenario group"):
+        validate_optim_config(config, system, sb)
+
+
+def test_validate_optim_config_scenario_builder_accepts_valid_playlist() -> None:
+    import numpy as np
+
+    from gems.optim_config.parsing import OptimConfig, validate_optim_config
+    from gems.study.scenario_builder import ScenarioBuilder
+    from gems.study.system import System
+
+    config = OptimConfig.model_validate(
+        {"scenario-scope": {"include": ["1-3"]}}  # 0-based [0,1,2]
+    )
+    sb = ScenarioBuilder(_group_arrays={"load": np.array([0, 1, 0])})
+    system = System(id="test")
+
+    validate_optim_config(config, system, sb)  # must not raise
