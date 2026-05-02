@@ -18,7 +18,6 @@ import pytest
 
 from gems.optim_config.parsing import ScenarioScopeConfig
 
-
 # ---------------------------------------------------------------------------
 # Inline form — include only
 # ---------------------------------------------------------------------------
@@ -205,9 +204,7 @@ def test_playlist_file_zero_index_raises(tmp_path: Path) -> None:
 def test_yaml_inline_include_only() -> None:
     from gems.optim_config.parsing import OptimConfig
 
-    cfg = OptimConfig.model_validate(
-        {"scenario-scope": {"include": ["1-3", 5]}}
-    )
+    cfg = OptimConfig.model_validate({"scenario-scope": {"include": ["1-3", 5]}})
     assert cfg.scenario_scope.scenario_ids == [0, 1, 2, 4]
 
 

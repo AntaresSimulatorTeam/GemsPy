@@ -145,7 +145,9 @@ def _expand_entries(entries: List[Union[int, str]]) -> Set[int]:
                 )
             a, b = int(match.group(1)), int(match.group(2))
             if a < 1:
-                raise ValueError(f"Range start must be >= 1 (1-based), got {a} in {entry!r}")
+                raise ValueError(
+                    f"Range start must be >= 1 (1-based), got {a} in {entry!r}"
+                )
             if a > b:
                 raise ValueError(f"Range start must be <= end, got {entry!r}")
             result.update(range(a - 1, b))
@@ -387,7 +389,9 @@ def validate_optim_config(
     errors: List[str] = []
 
     if scenario_builder is not None:
-        errors.extend(scenario_builder.validate_mc_scenarios(config.scenario_scope.scenario_ids))
+        errors.extend(
+            scenario_builder.validate_mc_scenarios(config.scenario_scope.scenario_ids)
+        )
 
     for model_config in config.models:
         model = models_in_system.get(model_config.id)
