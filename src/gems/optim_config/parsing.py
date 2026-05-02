@@ -10,9 +10,12 @@
 #
 # This file is part of the Antares project.
 
+import json
+import re
+import warnings
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
 
 from pydantic import Field, ValidationError, model_validator
 from yaml import safe_load
@@ -30,6 +33,7 @@ from gems.utils import ModifiedBaseModel
 
 if TYPE_CHECKING:
     from gems.model.model import Model
+    from gems.study.scenario_builder import ScenarioBuilder
     from gems.study.system import System
 
 
@@ -125,12 +129,78 @@ class SolverOptionsConfig(ModifiedBaseModel):
         return result
 
 
+def _expand_entries(entries: List[Union[int, str]]) -> Set[int]:
+    """Expand 1-based ints and inclusive 'a-b' range strings into a set of 0-based indices."""
+    result: Set[int] = set()
+    for entry in entries:
+        if isinstance(entry, int):
+            if entry < 1:
+                raise ValueError(f"Scenario index must be >= 1 (1-based), got {entry}")
+            result.add(entry - 1)
+        else:
+            match = re.fullmatch(r"(\d+)-(\d+)", str(entry).strip())
+            if not match:
+                raise ValueError(
+                    f"Invalid range {entry!r}: expected 'a-b' format (e.g. '1-10')"
+                )
+            a, b = int(match.group(1)), int(match.group(2))
+            if a < 1:
+                raise ValueError(f"Range start must be >= 1 (1-based), got {a} in {entry!r}")
+            if a > b:
+                raise ValueError(f"Range start must be <= end, got {entry!r}")
+            result.update(range(a - 1, b))
+    return result
+
+
 class ScenarioScopeConfig(ModifiedBaseModel):
-    nb_scenarios: int = 1
+    include: Optional[List[Union[int, str]]] = None
+    exclude: Optional[List[Union[int, str]]] = None
+    playlist_file: Optional[Path] = None
+
+    @model_validator(mode="after")
+    def _check_constraints(self) -> "ScenarioScopeConfig":
+        has_inline = self.include is not None
+        has_file = self.playlist_file is not None
+        if has_inline and has_file:
+            raise ValueError("'include' and 'playlist-file' are mutually exclusive")
+        if self.exclude is not None and not has_inline:
+            raise ValueError("'exclude' requires 'include'")
+        return self
 
     @property
     def scenario_ids(self) -> List[int]:
-        return list(range(self.nb_scenarios))
+        if self.playlist_file is not None:
+            return self._load_playlist()
+        if self.include is None:
+            return [0]
+        return self._resolve_inline()
+
+    def _load_playlist(self) -> List[int]:
+        assert self.playlist_file is not None
+        with self.playlist_file.open() as f:
+            data = json.load(f)
+        if not isinstance(data, list) or not all(isinstance(x, int) for x in data):
+            raise ValueError(
+                f"'{self.playlist_file}' must contain a flat JSON array of integers"
+            )
+        if any(x < 1 for x in data):
+            raise ValueError(
+                f"'{self.playlist_file}': all scenario indices must be >= 1 (1-based)"
+            )
+        return sorted({x - 1 for x in data})
+
+    def _resolve_inline(self) -> List[int]:
+        included = _expand_entries(self.include or [])
+        excluded = _expand_entries(self.exclude or [])
+        orphans = excluded - included
+        if orphans:
+            warnings.warn(
+                f"Excluded scenario indices {sorted(o + 1 for o in orphans)} "
+                "are not in the include set and have no effect",
+                UserWarning,
+                stacklevel=2,
+            )
+        return sorted(included - excluded)
 
 
 class OptimConfig(ModifiedBaseModel):
@@ -151,9 +221,14 @@ def load_optim_config(config_path: Path) -> Optional[OptimConfig]:
         return None
     try:
         with config_path.open() as config_file:
-            return OptimConfig.model_validate(safe_load(config_file))
+            config = OptimConfig.model_validate(safe_load(config_file))
     except ValidationError as e:
         raise ValueError(f"Invalid {config_path.stem}: {e}")
+
+    pf = config.scenario_scope.playlist_file
+    if pf is not None and not pf.is_absolute():
+        config.scenario_scope.playlist_file = config_path.parent / pf
+    return config
 
 
 _MASTER_LOCS: Set[ElementLocation] = {
@@ -294,16 +369,25 @@ def _check_master_objectives_use_master_variables(
                     )
 
 
-def validate_optim_config(config: OptimConfig, system: "System") -> None:
+def validate_optim_config(
+    config: OptimConfig,
+    system: "System",
+    scenario_builder: Optional["ScenarioBuilder"] = None,
+) -> None:
     """Cross-validate optim-config entries against the resolved system.
 
     Checks that every referenced ID exists, that master variables do not
     depend on time, and that master constraints and objectives only reference
     variables assigned to master or master-and-subproblems.
+    When scenario_builder is provided, also verifies that all scenario indices
+    from the playlist are defined in every scenario group.
     Raises ValueError listing all violations.
     """
     models_in_system = {c.model.id: c.model for c in system.all_components}
     errors: List[str] = []
+
+    if scenario_builder is not None:
+        errors.extend(scenario_builder.validate_mc_scenarios(config.scenario_scope.scenario_ids))
 
     for model_config in config.models:
         model = models_in_system.get(model_config.id)

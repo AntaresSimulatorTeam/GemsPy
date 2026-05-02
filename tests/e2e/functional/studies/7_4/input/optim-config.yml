@@ -8,4 +8,5 @@ solver-options:
   parameters: ""
 
 scenario-scope:
-  nb-scenarios: 1
+  include:
+    - 1

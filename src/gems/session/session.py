@@ -38,7 +38,7 @@ class SimulationSession:
 
     @property
     def scenario_ids(self) -> List[int]:
-        return list(range(self.optim_config.scenario_scope.nb_scenarios))
+        return self.optim_config.scenario_scope.scenario_ids
 
     def run(self) -> SimulationTable:
         """Entry point. Dispatches to the appropriate resolution strategy."""

@@ -41,7 +41,8 @@ _FRONTAL_CONFIG = textwrap.dedent("""\
       logs: false
       parameters: ""
     scenario-scope:
-      nb-scenarios: 1
+      include:
+        - 1
     resolution:
       mode: frontal
 """)
@@ -55,7 +56,8 @@ _PARALLEL_CONFIG = textwrap.dedent("""\
       logs: false
       parameters: ""
     scenario-scope:
-      nb-scenarios: 1
+      include:
+        - 1
     resolution:
       mode: parallel-subproblems
       block-length: 168
@@ -70,7 +72,8 @@ _SEQUENTIAL_CONFIG = textwrap.dedent("""\
       logs: false
       parameters: ""
     scenario-scope:
-      nb-scenarios: 1
+      include:
+        - 1
     resolution:
       mode: sequential-subproblems
       block-length: 168

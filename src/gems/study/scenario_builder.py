@@ -12,7 +12,7 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -66,6 +66,18 @@ class ScenarioBuilder:
                 f"'{scenario_group}' (defined range: 0–{len(arr) - 1})."
             )
         return arr[mc_scenarios]
+
+    def validate_mc_scenarios(self, scenario_ids: List[int]) -> List[str]:
+        """Return error messages for scenario indices not defined in any group."""
+        errors = []
+        for group, arr in self._group_arrays.items():
+            out_of_bounds = [idx for idx in scenario_ids if idx >= len(arr)]
+            if out_of_bounds:
+                errors.append(
+                    f"Scenario indices {[i + 1 for i in out_of_bounds]} (1-based) are not defined "
+                    f"for scenario group '{group}' (defined range: 1–{len(arr)})"
+                )
+        return errors
 
     @classmethod
     def load(cls, path: Path) -> "ScenarioBuilder":
