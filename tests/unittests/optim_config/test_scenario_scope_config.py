@@ -287,6 +287,16 @@ def test_include_string_zero_raises() -> None:
         ScenarioScopeConfig(include=["0"]).scenario_ids
 
 
+def test_include_boolean_raises() -> None:
+    with pytest.raises(ValueError, match="boolean"):
+        ScenarioScopeConfig(include=[True]).scenario_ids
+
+
+def test_exclude_boolean_raises() -> None:
+    with pytest.raises(ValueError, match="boolean"):
+        ScenarioScopeConfig(include=[1, 2], exclude=[False]).scenario_ids
+
+
 # ---------------------------------------------------------------------------
 # scenario_ids computed and stored only once
 # ---------------------------------------------------------------------------

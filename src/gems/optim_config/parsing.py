@@ -17,7 +17,13 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
 
-from pydantic import Field, PrivateAttr, ValidationError, model_validator
+from pydantic import (
+    Field,
+    PrivateAttr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from yaml import safe_load
 
 from gems.expression.expression import (
@@ -170,6 +176,17 @@ class ScenarioScopeConfig(ModifiedBaseModel):
     playlist_file: Optional[Path] = None
 
     _scenario_ids: Optional[List[int]] = PrivateAttr(default=None)
+
+    @field_validator("include", "exclude", mode="before")
+    @classmethod
+    def _reject_booleans(cls, v: object) -> object:
+        if isinstance(v, list):
+            for item in v:
+                if isinstance(item, bool):
+                    raise ValueError(
+                        f"Scenario index must be an integer, got boolean {item!r}"
+                    )
+        return v
 
     @model_validator(mode="after")
     def _check_constraints(self) -> "ScenarioScopeConfig":
