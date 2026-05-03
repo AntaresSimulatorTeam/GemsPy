@@ -26,10 +26,10 @@ time-scope:
   first-time-step: 0
   last-time-step: 8759   # 8760 hourly timesteps → one year
 
-# Monte-Carlo scenarios to simulate (1-based, inline form)
+# Monte-Carlo scenarios to simulate (0-based, inline form)
 scenario-scope:
   include:
-    - "1-10"   # scenarios 1 through 10
+    - "0-9"   # scenarios 0 through 9 (10 scenarios)
 
 # Solver settings
 solver-options:
@@ -67,9 +67,8 @@ The total number of timesteps solved is `last-time-step − first-time-step + 1`
 
 ## `scenario-scope`
 
-Selects which Monte-Carlo scenarios to simulate.  Indices in the YAML are
-**1-based** (matching the scenario-builder convention); GemsPy converts them
-to 0-based indices internally.
+Selects which Monte-Carlo scenarios to simulate.  Indices are **0-based**,
+consistent with the `modeler-scenariobuilder.dat` file convention.
 
 Two mutually exclusive forms are supported:
 
@@ -87,7 +86,7 @@ Each entry in `include` or `exclude` may be:
 
 - An integer: `5` → scenario 5
 - A string integer: `"5"` → scenario 5 (identical to `5`)
-- A range: `"1-10"` → scenarios 1 through 10 (inclusive)
+- A range: `"0-9"` → scenarios 0 through 9 inclusive (10 scenarios)
 
 **Examples:**
 
@@ -95,33 +94,33 @@ Each entry in `include` or `exclude` may be:
 # Run a single scenario
 scenario-scope:
   include:
-    - 1
+    - 0
 
-# Run scenarios 1 to 100
+# Run scenarios 0 to 99
 scenario-scope:
   include:
-    - "1-100"
+    - "0-99"
 
-# Run scenarios 1–20 and 50–60, but skip 10 and 15
+# Run scenarios 0–19 and 49–59, but skip 9 and 14
 scenario-scope:
   include:
-    - "1-20"
-    - "50-60"
+    - "0-19"
+    - "49-59"
   exclude:
-    - 10
-    - 15
+    - 9
+    - 14
 ~~~
 
 **Rules:**
 
-- All indices must be ≥ 1.
+- All indices must be ≥ 0.
 - Overlapping entries in `include` are deduplicated automatically.
 - Excludes that do not appear in `include` produce a warning and have no effect.
 - Output is always sorted in ascending order.
 - `exclude` cannot be used without `include`.
 
 **Default behaviour** (no `scenario-scope` key at all, or an empty block):
-runs scenario 1 only.
+runs scenario 0 only.
 
 ---
 
@@ -153,7 +152,7 @@ called, so any I/O or format errors surface immediately at load time.
 **Rules:**
 
 - The file must be a flat JSON array of integers (no booleans, strings, or objects).
-- All indices must be ≥ 1.
+- All indices must be ≥ 0.
 - Duplicates are silently removed; the result is sorted ascending.
 - `include` / `exclude` and `playlist-file` are mutually exclusive.
 
@@ -330,10 +329,10 @@ from gems.optim_config import (
 # Load from file (returns None if the file does not exist)
 config = load_optim_config(Path("my_study/input/optim-config.yml"))
 
-# Build programmatically — inline form (scenarios 1–10)
+# Build programmatically — inline form (scenarios 0–9)
 config = OptimConfig(
     time_scope=TimeScopeConfig(first_time_step=0, last_time_step=8759),
-    scenario_scope=ScenarioScopeConfig(include=["1-10"]),
+    scenario_scope=ScenarioScopeConfig(include=["0-9"]),
     solver_options=SolverOptionsConfig(name="highs", logs=False),
     resolution=ResolutionConfig(
         mode=ResolutionMode.SEQUENTIAL_SUBPROBLEMS,

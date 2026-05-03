@@ -78,7 +78,7 @@ _BASE_CONFIG = textwrap.dedent("""\
       parameters: ""
     scenario-scope:
       include:
-        - 1
+        - 0
     models:
       - id: rolling-horizon-lib.storage
         out-of-bounds-processing:

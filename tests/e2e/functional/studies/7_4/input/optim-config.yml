@@ -9,4 +9,4 @@ solver-options:
 
 scenario-scope:
   include:
-    - 1
+    - 0

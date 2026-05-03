@@ -136,37 +136,29 @@ class SolverOptionsConfig(ModifiedBaseModel):
 
 
 def _expand_entries(entries: List[Union[int, str]]) -> Set[int]:
-    """Expand 1-based ints and inclusive 'a-b' range strings into a set of 0-based indices."""
+    """Expand 0-based ints and inclusive 'a-b' range strings into a set of 0-based indices."""
     result: Set[int] = set()
     for entry in entries:
         if isinstance(entry, int):
-            if entry < 1:
-                raise ValueError(f"Scenario index must be >= 1 (1-based), got {entry}")
-            result.add(entry - 1)
+            if entry < 0:
+                raise ValueError(f"Scenario index must be >= 0, got {entry}")
+            result.add(entry)
         else:
             s = str(entry).strip()
             if re.fullmatch(r"\d+", s):
                 val = int(s)
-                if val < 1:
-                    raise ValueError(
-                        f"Scenario index must be >= 1 (1-based), got {val}"
-                    )
-                result.add(val - 1)
+                result.add(val)
             else:
                 match = re.fullmatch(r"(\d+)-(\d+)", s)
                 if not match:
                     raise ValueError(
                         f"Invalid entry {entry!r}: expected an integer or a range 'a-b'"
-                        " (e.g. '5' or '1-10')"
+                        " (e.g. '5' or '0-9')"
                     )
                 a, b = int(match.group(1)), int(match.group(2))
-                if a < 1:
-                    raise ValueError(
-                        f"Range start must be >= 1 (1-based), got {a} in {entry!r}"
-                    )
                 if a > b:
                     raise ValueError(f"Range start must be <= end, got {entry!r}")
-                result.update(range(a - 1, b))
+                result.update(range(a, b + 1))
     return result
 
 
@@ -227,11 +219,11 @@ class ScenarioScopeConfig(ModifiedBaseModel):
             raise ValueError(
                 f"'{self.playlist_file}' must contain a flat JSON array of integers"
             )
-        if any(x < 1 for x in data):
+        if any(x < 0 for x in data):
             raise ValueError(
-                f"'{self.playlist_file}': all scenario indices must be >= 1 (1-based)"
+                f"'{self.playlist_file}': all scenario indices must be >= 0"
             )
-        return sorted({x - 1 for x in data})
+        return sorted(set(data))
 
     def _resolve_inline(self) -> List[int]:
         included = _expand_entries(self.include or [])
@@ -239,7 +231,7 @@ class ScenarioScopeConfig(ModifiedBaseModel):
         orphans = excluded - included
         if orphans:
             warnings.warn(
-                f"Excluded scenario indices {sorted(o + 1 for o in orphans)} "
+                f"Excluded scenario indices {sorted(orphans)} "
                 "are not in the include set and have no effect",
                 UserWarning,
                 stacklevel=2,

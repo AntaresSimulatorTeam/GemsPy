@@ -10,21 +10,24 @@ The `scenario-scope` section of `optim-config.yml` now supports a full
 playlist mechanism.  The old `nb-scenarios` integer key is removed and raises
 a validation error if still present.
 
+Scenario indices are **0-based** throughout, consistent with the
+`modeler-scenariobuilder.dat` convention.
+
 **Inline form** — specify scenarios with integers, string-integers, and
 inclusive `"a-b"` range strings:
 
 ~~~ yaml
 scenario-scope:
   include:
-    - "1-50"
-    - 75
-    - "90-100"
+    - "0-49"
+    - 74
+    - "89-99"
   exclude:
-    - 10
-    - 15
+    - 9
+    - 14
 ~~~
 
-**Playlist-file form** — point to a flat JSON array of 1-based integers,
+**Playlist-file form** — point to a flat JSON array of 0-based integers,
 useful for machine-generated playlists:
 
 ~~~ yaml

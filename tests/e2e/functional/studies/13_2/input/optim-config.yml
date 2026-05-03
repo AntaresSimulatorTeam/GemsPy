@@ -20,7 +20,7 @@ solver-options:
 
 scenario-scope:
   include:
-    - 1
+    - 0
 
 models:
   - id: lib_example_13_2.generator_with_discrete_invest

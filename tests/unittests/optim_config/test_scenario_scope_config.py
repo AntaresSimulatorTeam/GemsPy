@@ -24,32 +24,32 @@ from gems.optim_config.parsing import ScenarioScopeConfig
 
 
 def test_include_single_int() -> None:
-    cfg = ScenarioScopeConfig(include=[1])
+    cfg = ScenarioScopeConfig(include=[0])
     assert cfg.scenario_ids == [0]
 
 
 def test_include_multiple_ints() -> None:
-    cfg = ScenarioScopeConfig(include=[1, 3, 5])
+    cfg = ScenarioScopeConfig(include=[0, 2, 4])
     assert cfg.scenario_ids == [0, 2, 4]
 
 
 def test_include_range_string() -> None:
-    cfg = ScenarioScopeConfig(include=["1-5"])
+    cfg = ScenarioScopeConfig(include=["0-4"])
     assert cfg.scenario_ids == [0, 1, 2, 3, 4]
 
 
 def test_include_mixed_ints_and_ranges() -> None:
-    cfg = ScenarioScopeConfig(include=["1-3", 5, "8-10"])
+    cfg = ScenarioScopeConfig(include=["0-2", 4, "7-9"])
     assert cfg.scenario_ids == [0, 1, 2, 4, 7, 8, 9]
 
 
 def test_include_deduplicates_overlapping_entries() -> None:
-    cfg = ScenarioScopeConfig(include=["1-5", 3, "4-6"])
+    cfg = ScenarioScopeConfig(include=["0-4", 2, "3-5"])
     assert cfg.scenario_ids == [0, 1, 2, 3, 4, 5]
 
 
 def test_include_output_is_sorted_ascending() -> None:
-    cfg = ScenarioScopeConfig(include=[5, 2, 8, 1])
+    cfg = ScenarioScopeConfig(include=[4, 1, 7, 0])
     assert cfg.scenario_ids == [0, 1, 4, 7]
 
 
@@ -59,38 +59,38 @@ def test_include_output_is_sorted_ascending() -> None:
 
 
 def test_exclude_ints_from_include() -> None:
-    cfg = ScenarioScopeConfig(include=["1-10"], exclude=[3, 7])
+    cfg = ScenarioScopeConfig(include=["0-9"], exclude=[2, 6])
     assert cfg.scenario_ids == [0, 1, 3, 4, 5, 7, 8, 9]
 
 
 def test_exclude_range_from_include() -> None:
-    cfg = ScenarioScopeConfig(include=["1-10"], exclude=["4-6"])
+    cfg = ScenarioScopeConfig(include=["0-9"], exclude=["3-5"])
     assert cfg.scenario_ids == [0, 1, 2, 6, 7, 8, 9]
 
 
 def test_exclude_mixed_from_include() -> None:
-    cfg = ScenarioScopeConfig(include=["1-10"], exclude=["2-4", 8])
+    cfg = ScenarioScopeConfig(include=["0-9"], exclude=["1-3", 7])
     assert cfg.scenario_ids == [0, 4, 5, 6, 8, 9]
 
 
 def test_exclude_all_leaves_empty_list() -> None:
-    cfg = ScenarioScopeConfig(include=["1-3"], exclude=["1-3"])
+    cfg = ScenarioScopeConfig(include=["0-2"], exclude=["0-2"])
     assert cfg.scenario_ids == []
 
 
 def test_exclude_orphan_raises_warning() -> None:
-    cfg = ScenarioScopeConfig(include=[1, 2], exclude=[5])
+    cfg = ScenarioScopeConfig(include=[0, 1], exclude=[4])
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         result = cfg.scenario_ids
     assert result == [0, 1]
     assert len(caught) == 1
-    assert "5" in str(caught[0].message)
+    assert "4" in str(caught[0].message)
 
 
 def test_exclude_without_include_raises() -> None:
     with pytest.raises(ValueError, match="'exclude' requires 'include'"):
-        ScenarioScopeConfig(exclude=[1])
+        ScenarioScopeConfig(exclude=[0])
 
 
 # ---------------------------------------------------------------------------
@@ -98,14 +98,14 @@ def test_exclude_without_include_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_include_zero_index_raises() -> None:
-    with pytest.raises(ValueError, match=">= 1"):
-        ScenarioScopeConfig(include=[0]).scenario_ids
-
-
 def test_include_negative_index_raises() -> None:
-    with pytest.raises(ValueError, match=">= 1"):
+    with pytest.raises(ValueError, match=">= 0"):
         ScenarioScopeConfig(include=[-1]).scenario_ids
+
+
+def test_include_zero_is_valid() -> None:
+    cfg = ScenarioScopeConfig(include=[0])
+    assert cfg.scenario_ids == [0]
 
 
 def test_include_invalid_range_format_raises() -> None:
@@ -125,7 +125,7 @@ def test_include_reversed_range_raises() -> None:
 
 def test_include_and_playlist_file_mutually_exclusive() -> None:
     with pytest.raises(ValueError, match="mutually exclusive"):
-        ScenarioScopeConfig(include=[1], playlist_file=Path("some.json"))
+        ScenarioScopeConfig(include=[0], playlist_file=Path("some.json"))
 
 
 # ---------------------------------------------------------------------------
@@ -145,27 +145,34 @@ def test_default_returns_single_scenario_zero() -> None:
 
 def test_playlist_file_flat_integers(tmp_path: Path) -> None:
     playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([1, 3, 5]))
+    playlist.write_text(json.dumps([0, 2, 4]))
     cfg = ScenarioScopeConfig(playlist_file=playlist)
     assert cfg.scenario_ids == [0, 2, 4]
 
 
 def test_playlist_file_deduplicates_and_sorts(tmp_path: Path) -> None:
     playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([5, 1, 3, 1, 5]))
+    playlist.write_text(json.dumps([4, 0, 2, 0, 4]))
     cfg = ScenarioScopeConfig(playlist_file=playlist)
     assert cfg.scenario_ids == [0, 2, 4]
 
 
 def test_playlist_file_single_scenario(tmp_path: Path) -> None:
     playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([2]))
+    playlist.write_text(json.dumps([1]))
     cfg = ScenarioScopeConfig(playlist_file=playlist)
     assert cfg.scenario_ids == [1]
 
 
+def test_playlist_file_zero_scenario(tmp_path: Path) -> None:
+    playlist = tmp_path / "playlist.json"
+    playlist.write_text(json.dumps([0]))
+    cfg = ScenarioScopeConfig(playlist_file=playlist)
+    assert cfg.scenario_ids == [0]
+
+
 def test_playlist_file_large_list(tmp_path: Path) -> None:
-    indices = list(range(1, 1001))
+    indices = list(range(1000))
     playlist = tmp_path / "playlist.json"
     playlist.write_text(json.dumps(indices))
     cfg = ScenarioScopeConfig(playlist_file=playlist)
@@ -174,7 +181,7 @@ def test_playlist_file_large_list(tmp_path: Path) -> None:
 
 def test_playlist_file_non_list_raises(tmp_path: Path) -> None:
     playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps({"scenarios": [1, 2]}))
+    playlist.write_text(json.dumps({"scenarios": [0, 1]}))
     cfg = ScenarioScopeConfig(playlist_file=playlist)
     with pytest.raises(ValueError, match="flat JSON array of integers"):
         cfg.scenario_ids
@@ -182,17 +189,17 @@ def test_playlist_file_non_list_raises(tmp_path: Path) -> None:
 
 def test_playlist_file_contains_string_raises(tmp_path: Path) -> None:
     playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([1, "2", 3]))
+    playlist.write_text(json.dumps([0, "1", 2]))
     cfg = ScenarioScopeConfig(playlist_file=playlist)
     with pytest.raises(ValueError, match="flat JSON array of integers"):
         cfg.scenario_ids
 
 
-def test_playlist_file_zero_index_raises(tmp_path: Path) -> None:
+def test_playlist_file_negative_index_raises(tmp_path: Path) -> None:
     playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([0, 1, 2]))
+    playlist.write_text(json.dumps([-1, 0, 1]))
     cfg = ScenarioScopeConfig(playlist_file=playlist)
-    with pytest.raises(ValueError, match=">= 1"):
+    with pytest.raises(ValueError, match=">= 0"):
         cfg.scenario_ids
 
 
@@ -212,7 +219,7 @@ def test_playlist_file_malformed_json_raises(tmp_path: Path) -> None:
 
 def test_playlist_file_boolean_values_rejected(tmp_path: Path) -> None:
     playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([True, 2, 3]))
+    playlist.write_text(json.dumps([True, 1, 2]))
     cfg = ScenarioScopeConfig(playlist_file=playlist)
     with pytest.raises(ValueError, match="flat JSON array of integers"):
         cfg.scenario_ids
@@ -226,7 +233,7 @@ def test_playlist_file_boolean_values_rejected(tmp_path: Path) -> None:
 def test_yaml_inline_include_only() -> None:
     from gems.optim_config.parsing import OptimConfig
 
-    cfg = OptimConfig.model_validate({"scenario-scope": {"include": ["1-3", 5]}})
+    cfg = OptimConfig.model_validate({"scenario-scope": {"include": ["0-2", 4]}})
     assert cfg.scenario_scope.scenario_ids == [0, 1, 2, 4]
 
 
@@ -234,7 +241,7 @@ def test_yaml_inline_include_exclude() -> None:
     from gems.optim_config.parsing import OptimConfig
 
     cfg = OptimConfig.model_validate(
-        {"scenario-scope": {"include": ["1-5"], "exclude": [3]}}
+        {"scenario-scope": {"include": ["0-4"], "exclude": [2]}}
     )
     assert cfg.scenario_scope.scenario_ids == [0, 1, 3, 4]
 
@@ -245,7 +252,7 @@ def test_yaml_playlist_file_relative_resolved_by_load_optim_config(
     from gems.optim_config.parsing import load_optim_config
 
     playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([1, 2, 3]))
+    playlist.write_text(json.dumps([0, 1, 2]))
 
     config_file = tmp_path / "optim-config.yml"
     config_file.write_text("scenario-scope:\n  playlist-file: playlist.json\n")
@@ -268,23 +275,28 @@ def test_yaml_nb_scenarios_rejected() -> None:
 
 
 def test_include_string_integer_accepted() -> None:
-    cfg = ScenarioScopeConfig(include=["5"])
+    cfg = ScenarioScopeConfig(include=["4"])
     assert cfg.scenario_ids == [4]
 
 
+def test_include_string_zero_accepted() -> None:
+    cfg = ScenarioScopeConfig(include=["0"])
+    assert cfg.scenario_ids == [0]
+
+
 def test_include_string_integer_mixed_with_range() -> None:
-    cfg = ScenarioScopeConfig(include=["1-3", "5", "8"])
+    cfg = ScenarioScopeConfig(include=["0-2", "4", "7"])
     assert cfg.scenario_ids == [0, 1, 2, 4, 7]
 
 
 def test_exclude_string_integer_accepted() -> None:
-    cfg = ScenarioScopeConfig(include=["1-5"], exclude=["3"])
+    cfg = ScenarioScopeConfig(include=["0-4"], exclude=["2"])
     assert cfg.scenario_ids == [0, 1, 3, 4]
 
 
-def test_include_string_zero_raises() -> None:
-    with pytest.raises(ValueError, match=">= 1"):
-        ScenarioScopeConfig(include=["0"]).scenario_ids
+# ---------------------------------------------------------------------------
+# Boolean values rejected
+# ---------------------------------------------------------------------------
 
 
 def test_include_boolean_raises() -> None:
@@ -294,7 +306,7 @@ def test_include_boolean_raises() -> None:
 
 def test_exclude_boolean_raises() -> None:
     with pytest.raises(ValueError, match="boolean"):
-        ScenarioScopeConfig(include=[1, 2], exclude=[False]).scenario_ids
+        ScenarioScopeConfig(include=[0, 1], exclude=[False]).scenario_ids
 
 
 # ---------------------------------------------------------------------------
@@ -303,7 +315,7 @@ def test_exclude_boolean_raises() -> None:
 
 
 def test_scenario_ids_cached_inline() -> None:
-    cfg = ScenarioScopeConfig(include=["1-5"])
+    cfg = ScenarioScopeConfig(include=["0-4"])
     first = cfg.scenario_ids
     second = cfg.scenario_ids
     assert first is second
@@ -315,7 +327,7 @@ def test_scenario_ids_cached_playlist_file_via_load_optim_config(
     from gems.optim_config.parsing import load_optim_config
 
     playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([1, 2, 3]))
+    playlist.write_text(json.dumps([0, 1, 2]))
     config_file = tmp_path / "optim-config.yml"
     config_file.write_text("scenario-scope:\n  playlist-file: playlist.json\n")
 
@@ -339,9 +351,9 @@ def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
     from gems.study.system import System
 
     config = OptimConfig.model_validate(
-        {"scenario-scope": {"include": ["1-5"]}}  # 0-based [0,1,2,3,4]
+        {"scenario-scope": {"include": ["0-4"]}}  # scenarios 0,1,2,3,4
     )
-    # ScenarioBuilder defines only 3 scenarios (0-based 0,1,2) for group "load"
+    # ScenarioBuilder defines only 3 scenarios (0,1,2) for group "load"
     sb = ScenarioBuilder(_group_arrays={"load": np.array([0, 1, 0])})
     system = System(id="test")
 
@@ -357,7 +369,7 @@ def test_validate_optim_config_scenario_builder_accepts_valid_playlist() -> None
     from gems.study.system import System
 
     config = OptimConfig.model_validate(
-        {"scenario-scope": {"include": ["1-3"]}}  # 0-based [0,1,2]
+        {"scenario-scope": {"include": ["0-2"]}}  # scenarios 0,1,2
     )
     sb = ScenarioBuilder(_group_arrays={"load": np.array([0, 1, 0])})
     system = System(id="test")
