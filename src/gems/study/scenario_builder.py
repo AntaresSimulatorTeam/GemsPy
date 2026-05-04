@@ -68,7 +68,14 @@ class ScenarioBuilder:
         return arr[mc_scenarios]
 
     def validate_mc_scenarios(self, scenario_ids: List[int]) -> List[str]:
-        """Return error messages for scenario indices not defined in any group."""
+        """Return error messages for scenario indices out of range in any group.
+
+        For each scenario group, checks that every index in ``scenario_ids``
+        is within ``[0, len(group_array) - 1]``.  Returns a list of
+        human-readable error strings (one per offending group); an empty list
+        means all indices are valid.  Does not raise — callers collect errors
+        and raise at the end.
+        """
         errors = []
         for group, arr in self._group_arrays.items():
             out_of_bounds = [idx for idx in scenario_ids if idx >= len(arr)]

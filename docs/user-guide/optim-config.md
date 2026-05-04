@@ -70,7 +70,9 @@ The total number of timesteps solved is `last-time-step − first-time-step + 1`
 Selects which Monte-Carlo scenarios to simulate.  Indices are **0-based**,
 consistent with the `modeler-scenariobuilder.dat` file convention.
 
-Two mutually exclusive forms are supported:
+The base scenario set is defined by exactly one of two mutually exclusive
+keys: `include` (inline) or `playlist-file` (from a JSON file).  `exclude`
+is optional and applies to **either** form.
 
 ### Inline form (`include` / `exclude`)
 
@@ -80,7 +82,7 @@ integers, and inclusive `"a-b"` range strings.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `include` | list | — | Scenarios to run (required in inline form) |
-| `exclude` | list | — | Scenarios to remove from the include set (optional) |
+| `exclude` | list | — | Scenarios to remove from the base set (optional) |
 
 Each entry in `include` or `exclude` may be:
 
@@ -115,9 +117,9 @@ scenario-scope:
 
 - All indices must be ≥ 0.
 - Overlapping entries in `include` are deduplicated automatically.
-- Excludes that do not appear in `include` produce a warning and have no effect.
+- Excludes that do not appear in the base set produce a warning and have no effect.
 - Output is always sorted in ascending order.
-- `exclude` cannot be used without `include`.
+- `exclude` cannot be used without `include` or `playlist-file`.
 
 **Default behaviour** (no `scenario-scope` key at all, or an empty block):
 runs scenario 0 only.
@@ -126,7 +128,7 @@ runs scenario 0 only.
 
 ### Playlist-file form (`playlist-file`)
 
-Point to a JSON file containing a flat array of 1-based integer scenario
+Point to a JSON file containing a flat array of 0-based integer scenario
 indices.  Useful when the list of scenarios is generated programmatically or
 is too large to embed in YAML.
 
@@ -139,11 +141,21 @@ scenario-scope:
   playlist-file: mc_playlist.json   # resolved relative to optim-config.yml
 ~~~
 
-The referenced file must contain a flat JSON array of positive integers, for
-example:
+The referenced file must contain a flat JSON array of non-negative integers:
 
 ~~~ json
-[1, 3, 5, 7, 9, 11, 13]
+[0, 2, 4, 6, 8, 10, 12]
+~~~
+
+`exclude` can be combined with `playlist-file` to subtract specific scenarios
+at run time without modifying the file:
+
+~~~ yaml
+scenario-scope:
+  playlist-file: mc_playlist.json
+  exclude:
+    - 4
+    - "8-10"
 ~~~
 
 GemsPy reads and validates the playlist eagerly when `load_optim_config()` is
@@ -154,7 +166,7 @@ called, so any I/O or format errors surface immediately at load time.
 - The file must be a flat JSON array of integers (no booleans, strings, or objects).
 - All indices must be ≥ 0.
 - Duplicates are silently removed; the result is sorted ascending.
-- `include` / `exclude` and `playlist-file` are mutually exclusive.
+- `include` and `playlist-file` are mutually exclusive.
 
 ---
 

@@ -88,9 +88,49 @@ def test_exclude_orphan_raises_warning() -> None:
     assert "4" in str(caught[0].message)
 
 
-def test_exclude_without_include_raises() -> None:
-    with pytest.raises(ValueError, match="'exclude' requires 'include'"):
+def test_exclude_without_any_base_raises() -> None:
+    with pytest.raises(
+        ValueError, match="'exclude' requires 'include' or 'playlist-file'"
+    ):
         ScenarioScopeConfig(exclude=[0])
+
+
+# ---------------------------------------------------------------------------
+# playlist-file + exclude
+# ---------------------------------------------------------------------------
+
+
+def test_playlist_file_with_exclude(tmp_path: Path) -> None:
+    playlist = tmp_path / "playlist.json"
+    playlist.write_text(json.dumps([0, 1, 2, 3, 4]))
+    cfg = ScenarioScopeConfig(playlist_file=playlist, exclude=[2, 4])
+    assert cfg.scenario_ids == [0, 1, 3]
+
+
+def test_playlist_file_with_exclude_range(tmp_path: Path) -> None:
+    playlist = tmp_path / "playlist.json"
+    playlist.write_text(json.dumps([0, 1, 2, 3, 4, 5, 6]))
+    cfg = ScenarioScopeConfig(playlist_file=playlist, exclude=["2-4"])
+    assert cfg.scenario_ids == [0, 1, 5, 6]
+
+
+def test_playlist_file_with_exclude_all_leaves_empty(tmp_path: Path) -> None:
+    playlist = tmp_path / "playlist.json"
+    playlist.write_text(json.dumps([0, 1, 2]))
+    cfg = ScenarioScopeConfig(playlist_file=playlist, exclude=["0-2"])
+    assert cfg.scenario_ids == []
+
+
+def test_playlist_file_with_exclude_orphan_warns(tmp_path: Path) -> None:
+    playlist = tmp_path / "playlist.json"
+    playlist.write_text(json.dumps([0, 1, 2]))
+    cfg = ScenarioScopeConfig(playlist_file=playlist, exclude=[5])
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = cfg.scenario_ids
+    assert result == [0, 1, 2]
+    assert len(caught) == 1
+    assert "5" in str(caught[0].message)
 
 
 # ---------------------------------------------------------------------------

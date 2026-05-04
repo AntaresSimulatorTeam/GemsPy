@@ -37,6 +37,9 @@ scenario-scope:
 
 Other changes:
 
+- `exclude` is now compatible with both `include` and `playlist-file`.
+  Use it to subtract a few scenarios at run time without modifying the
+  playlist file.
 - `validate_optim_config()` now accepts an optional `scenario_builder`
   argument and cross-checks all playlist indices against every scenario group,
   raising a `ValueError` for out-of-bounds indices.

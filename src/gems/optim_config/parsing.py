@@ -136,7 +136,16 @@ class SolverOptionsConfig(ModifiedBaseModel):
 
 
 def _expand_entries(entries: List[Union[int, str]]) -> Set[int]:
-    """Expand 0-based ints and inclusive 'a-b' range strings into a set of 0-based indices."""
+    """Expand a list of scenario specifiers into a set of 0-based indices.
+
+    Each entry may be:
+    - a non-negative integer (e.g. ``5``),
+    - a string integer (e.g. ``"5"``), or
+    - an inclusive range string (e.g. ``"0-9"``).
+
+    Booleans are rejected upstream by the Pydantic field validator and will
+    never reach this function.
+    """
     result: Set[int] = set()
     for entry in entries:
         if isinstance(entry, int):
@@ -163,6 +172,33 @@ def _expand_entries(entries: List[Union[int, str]]) -> Set[int]:
 
 
 class ScenarioScopeConfig(ModifiedBaseModel):
+    """Declares which Monte-Carlo scenarios to simulate.
+
+    Two mutually exclusive ways to define the base scenario set:
+
+    - **Inline** (``include``): a list of 0-based integers, string-integers,
+      and/or ``"a-b"`` range strings.
+    - **File** (``playlist_file``): path to a flat JSON array of 0-based
+      integers, resolved relative to ``optim-config.yml`` by
+      ``load_optim_config()``.
+
+    ``exclude`` is optional and compatible with *both* forms.  It subtracts a
+    set of scenarios from the base set using the same entry format.  Entries
+    in ``exclude`` that are not in the base set are silently ignored (a
+    ``UserWarning`` is emitted).
+
+    ``include`` and ``playlist_file`` are mutually exclusive.
+    ``exclude`` without any base set raises ``ValueError``.
+
+    All indices are 0-based, consistent with
+    ``modeler-scenariobuilder.dat``.
+
+    The resolved list is computed lazily on first access to
+    ``scenario_ids`` and cached for the lifetime of the object.
+    ``load_optim_config()`` triggers eager resolution so that file I/O
+    errors surface at load time.
+    """
+
     include: Optional[List[Union[int, str]]] = None
     exclude: Optional[List[Union[int, str]]] = None
     playlist_file: Optional[Path] = None
@@ -186,8 +222,8 @@ class ScenarioScopeConfig(ModifiedBaseModel):
         has_file = self.playlist_file is not None
         if has_inline and has_file:
             raise ValueError("'include' and 'playlist-file' are mutually exclusive")
-        if self.exclude is not None and not has_inline:
-            raise ValueError("'exclude' requires 'include'")
+        if self.exclude is not None and not has_inline and not has_file:
+            raise ValueError("'exclude' requires 'include' or 'playlist-file'")
         return self
 
     @property
@@ -198,12 +234,27 @@ class ScenarioScopeConfig(ModifiedBaseModel):
 
     def _compute_scenario_ids(self) -> List[int]:
         if self.playlist_file is not None:
-            return self._load_playlist()
-        if self.include is None:
+            included = self._load_playlist()
+        elif self.include is not None:
+            included = _expand_entries(self.include)
+        else:
             return [0]
-        return self._resolve_inline()
 
-    def _load_playlist(self) -> List[int]:
+        if self.exclude is not None:
+            excluded = _expand_entries(self.exclude)
+            orphans = excluded - included
+            if orphans:
+                warnings.warn(
+                    f"Excluded scenario indices {sorted(orphans)} "
+                    "are not in the base set and have no effect",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            included -= excluded
+
+        return sorted(included)
+
+    def _load_playlist(self) -> Set[int]:
         try:
             with self.playlist_file.open() as f:  # type: ignore[union-attr]
                 data = json.load(f)
@@ -223,20 +274,7 @@ class ScenarioScopeConfig(ModifiedBaseModel):
             raise ValueError(
                 f"'{self.playlist_file}': all scenario indices must be >= 0"
             )
-        return sorted(set(data))
-
-    def _resolve_inline(self) -> List[int]:
-        included = _expand_entries(self.include or [])
-        excluded = _expand_entries(self.exclude or [])
-        orphans = excluded - included
-        if orphans:
-            warnings.warn(
-                f"Excluded scenario indices {sorted(orphans)} "
-                "are not in the include set and have no effect",
-                UserWarning,
-                stacklevel=2,
-            )
-        return sorted(included - excluded)
+        return set(data)
 
 
 class OptimConfig(ModifiedBaseModel):
@@ -416,12 +454,17 @@ def validate_optim_config(
 ) -> None:
     """Cross-validate optim-config entries against the resolved system.
 
-    Checks that every referenced ID exists, that master variables do not
-    depend on time, and that master constraints and objectives only reference
-    variables assigned to master or master-and-subproblems.
-    When scenario_builder is provided, also verifies that all scenario indices
-    from the playlist are defined in every scenario group.
-    Raises ValueError listing all violations.
+    Performs the following checks:
+
+    - Every model ID referenced in ``config.models`` exists in the system.
+    - Master variables are time-independent.
+    - Master constraints and objective contributions only reference variables
+      assigned to ``master`` or ``master-and-subproblems``.
+    - If ``scenario_builder`` is provided, every scenario index in
+      ``config.scenario_scope.scenario_ids`` is defined for every scenario
+      group in the builder.
+
+    Raises ``ValueError`` listing all violations found.
     """
     models_in_system = {c.model.id: c.model for c in system.all_components}
     errors: List[str] = []
