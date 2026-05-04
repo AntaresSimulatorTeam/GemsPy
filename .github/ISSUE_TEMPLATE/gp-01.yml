@@ -1,0 +1,115 @@
+name: "GP-01 — GEMS Language evolution impact on GemsPy"
+description: Track updates to the GemsPy interpreter triggered by a new GEMS Language version
+title: "[GP-01] GEMS Language update — GemsPy impact"
+labels: ["GP-01", "gems-language-update"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Process GP-01** — Triggered by a new GEMS Language version that requires changes to GemsPy parsing, execution, or behavior.
+
+        > **Deviation from standard workflow — Step 4:** introduce version-gated behavior if needed; GemsPy must support multiple GEMS Language versions simultaneously; update parsing and execution layers accordingly.
+
+  - type: input
+    id: gems_new_version
+    attributes:
+      label: New GEMS Language Version
+      placeholder: "e.g. 1.3.0"
+    validations:
+      required: true
+
+  - type: input
+    id: gems_previous_version
+    attributes:
+      label: Previous Tracked Version
+      placeholder: "e.g. 1.2.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: trigger
+    attributes:
+      label: Trigger
+      description: What changed in the new GEMS Language version? Link to the GEMS release notes or changelog.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact Analysis
+      description: |
+        Assess the impact on:
+        - **Grammar** — does `grammar/Expr.g4` need updating?
+        - **Parsing layer** — does the ANTLR-generated parser or expression AST need updating?
+        - **Execution layer** — does model loading, constraint building, or variable resolution need updating?
+        - **Version-gated behavior** — does GemsPy need to support both old and new syntax simultaneously?
+        - **Results** — are solver output values expected to change?
+        - **Compatibility** — breaking vs backward-compatible?
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation_strategy
+    attributes:
+      label: Validation Strategy
+      description: |
+        Describe the regression and E2E validation approach:
+        - Which reference studies cover the new/changed syntax?
+        - Are solver results expected to differ? If yes, why?
+        - How will backward compatibility with old syntax be verified?
+    validations:
+      required: true
+
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Process Checklist
+      value: |
+        ### Step 1 — Issue Creation
+        - [x] Issue created and linked to process GP-01
+
+        ### Step 2 — Triage
+        - [ ] Process confirmed applicable
+        - [ ] Assigned to responsible contributor
+        - [ ] Priority and milestone set (if applicable)
+
+        ### Step 3 — Impact Analysis
+        - [ ] GEMS Language changelog reviewed for GemsPy-relevant changes
+        - [ ] Grammar impact assessed (`grammar/Expr.g4`)
+        - [ ] Parsing layer impact assessed (`expression/`, ANTLR-generated files)
+        - [ ] Execution layer impact assessed (`simulation/`, `study/`)
+        - [ ] Version-gated behavior required? (yes/no — document decision)
+        - [ ] Results impact assessed (solver values expected to change?)
+        - [ ] Breaking vs backward-compatible change identified
+
+        ### Step 4 — Implementation ⚠️ version-gated behavior may be required
+        - [ ] Grammar updated (`grammar/Expr.g4`) if needed — do not edit ANTLR-generated files directly
+        - [ ] ANTLR parser regenerated if grammar changed
+        - [ ] Parsing and execution layers updated (`expression/`, `simulation/`, `study/`)
+        - [ ] Version-gated behavior introduced if GemsPy must support both old and new syntax
+
+        ### Step 5 — Testing & Validation ⚠️ regression suite covering old and new syntax required
+        - [ ] At least one reference E2E study validating new language feature added or updated
+        - [ ] Regression tests covering old syntax still pass
+        - [ ] If results expected to change: before/after comparison documented
+        - [ ] If results must not change: confirmed via tests
+
+        ### Step 6 — CI Validation
+        - [ ] Type checking passes (`mypy`)
+        - [ ] Formatting passes (`black`, `isort`)
+        - [ ] All tests pass in CI (`pytest`)
+
+        ### Step 7 — Review & Merge
+        - [ ] PR reviewed; documentation changes included
+
+        ### Step 8 — Versioning
+        - [ ] `pyproject.toml` version bumped (Major if breaking language change, Minor otherwise)
+
+        ### Step 9 — Documentation & Changelog
+        - [ ] `CHANGELOG.md` entry added
+        - [ ] `COMPATIBILITY.md` updated with new GEMS Language version mapping
+        - [ ] `AGENTS.md` reviewed for impact and updated if needed
+
+        ### Step 10 — Release
+        - [ ] If a release is needed: follow the release process in the Developer Guidelines
