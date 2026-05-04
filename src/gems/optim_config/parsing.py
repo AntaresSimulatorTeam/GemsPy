@@ -286,10 +286,17 @@ class OptimConfig(ModifiedBaseModel):
 
 
 def load_optim_config(config_path: Path) -> Optional[OptimConfig]:
-    """Load optim-config.yml from the same directory as components_path.
+    """Load and fully resolve an ``optim-config.yml`` file.
 
-    Returns None if the file does not exist.
-    Raises ValueError on parsing or validation failure.
+    Returns ``None`` if the file does not exist.
+    Raises ``ValueError`` on any parsing, validation, or playlist I/O failure.
+
+    Beyond plain YAML parsing, this function:
+
+    - Resolves a relative ``playlist-file`` path against the directory that
+      contains the config file.
+    - Eagerly populates ``scenario_ids`` so that playlist file errors surface
+      immediately rather than at first use.
     """
     if not config_path.exists():
         return None

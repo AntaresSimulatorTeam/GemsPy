@@ -81,8 +81,8 @@ class ScenarioBuilder:
             out_of_bounds = [idx for idx in scenario_ids if idx >= len(arr)]
             if out_of_bounds:
                 errors.append(
-                    f"Scenario indices {[i + 1 for i in out_of_bounds]} (1-based) are not defined "
-                    f"for scenario group '{group}' (defined range: 1–{len(arr)})"
+                    f"Scenario indices {out_of_bounds} are not defined "
+                    f"for scenario group '{group}' (defined range: 0–{len(arr) - 1})"
                 )
         return errors
 
