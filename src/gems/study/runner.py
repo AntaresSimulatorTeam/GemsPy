@@ -33,7 +33,7 @@ def run_study(
         study_dir / "input" / "optim-config.yml"
     )
     optim_config = load_optim_config(resolved_config_path) or OptimConfig()
-    validate_optim_config(optim_config, study.system)
+    validate_optim_config(optim_config, study.system, study.scenario_builder)
 
     run_id = datetime.now().strftime("%Y%m%dT%H%M")
     output_dir = study_dir / "output" / run_id

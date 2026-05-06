@@ -2,6 +2,54 @@
 
 All notable changes to GemsPy are documented here.
 
+## [Unreleased]
+
+### Scenario-scope playlist (replaces `nb-scenarios`)
+
+The `scenario-scope` section of `optim-config.yml` now supports a full
+playlist mechanism.  The old `nb-scenarios` integer key is removed and raises
+a validation error if still present.
+
+Scenario indices are **0-based** throughout, consistent with the
+`modeler-scenariobuilder.dat` convention.
+
+**Inline form** — specify scenarios with integers, string-integers, and
+inclusive `"a-b"` range strings:
+
+~~~ yaml
+scenario-scope:
+  include:
+    - "0-49"
+    - 74
+    - "89-99"
+  exclude:
+    - 9
+    - 14
+~~~
+
+**Playlist-file form** — point to a flat JSON array of 0-based integers,
+useful for machine-generated playlists:
+
+~~~ yaml
+scenario-scope:
+  playlist-file: mc_playlist.json
+~~~
+
+Other changes:
+
+- `exclude` is now compatible with both `include` and `playlist-file`.
+  Use it to subtract a few scenarios at run time without modifying the
+  playlist file.
+- `validate_optim_config()` now accepts an optional `scenario_builder`
+  argument and cross-checks all playlist indices against every scenario group,
+  raising a `ValueError` for out-of-bounds indices.
+- The playlist is resolved and cached exactly once at `load_optim_config()`
+  time; I/O and format errors surface immediately as `ValueError`.
+- Boolean values (`true`/`false`) are explicitly rejected in both inline
+  lists and JSON playlist files.
+
+---
+
 ## [0.1.0] - 2026-04-30
 
 ### Study folder structure
@@ -26,7 +74,7 @@ A new `optim-config.yml` file controls all aspects of a simulation run:
 - **`resolution.mode`** — four strategies: `frontal`, `sequential-subproblems`, `parallel-subproblems`, `benders-decomposition`
 - **`resolution.block_length` / `block_overlap`** — time-window size and overlap for sequential/parallel modes
 - **`time_scope`** — `first_time_step` / `last_time_step`
-- **`scenario_scope.nb_scenarios`** — number of Monte-Carlo scenarios to run
+- **`scenario_scope.nb_scenarios`** — number of Monte-Carlo scenarios to run (replaced by the playlist mechanism in a later release)
 - **`solver_options`** — solver name (default: HiGHS), log verbosity, and free-form solver parameters
 - **`models[].model_decomposition`** — per-model assignment of variables, constraints, and objective contributions to `master`, `subproblems`, or `master-and-subproblems` (used for Benders decomposition)
 - **`models[].out_of_bounds_processing`** — per-constraint handling of time indices that fall outside the horizon (`cyclic` or `drop`)
