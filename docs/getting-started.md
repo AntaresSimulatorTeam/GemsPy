@@ -94,7 +94,7 @@ system:
     - id: G1
       model: basic.generator
       properties:
-        - key: technology
+        - id: technology
           value: nuclear
       parameters:
         - id: marginal_cost

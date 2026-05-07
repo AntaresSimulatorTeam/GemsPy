@@ -18,9 +18,9 @@ system:
     - id: nuclear_1
       model: basic.generator
       properties:
-        - key: technology
+        - id: technology
           value: nuclear
-        - key: company
+        - id: company
           value: rhonepower
 """
     p = tmp_path / "system.yml"
@@ -31,8 +31,8 @@ system:
     assert comp.id == "nuclear_1"
     assert comp.properties is not None
     assert [x.model_dump() for x in comp.properties] == [
-        {"key": "technology", "value": "nuclear"},
-        {"key": "company", "value": "rhonepower"},
+        {"id": "technology", "value": "nuclear"},
+        {"id": "company", "value": "rhonepower"},
     ]
 
 

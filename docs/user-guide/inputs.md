@@ -44,7 +44,7 @@ parts of the study from in-memory data.
 ## System YAML: optional component `properties`
 
 In `system.yml`, each component may define an optional `properties` section as a
-list of key/value pairs:
+list of id/value pairs:
 
 ~~~ yaml
 system:
@@ -59,7 +59,7 @@ system:
 ~~~
 
 At resolution time (`resolve_system` / `load_study`), this list is normalized into
-a `dict[str, str]` stored on the resolved `Component`. Duplicate keys are rejected.
+a `dict[str, str]` stored on the resolved `Component`. Duplicate ids are rejected.
 
 ### Loading the library and the system
 

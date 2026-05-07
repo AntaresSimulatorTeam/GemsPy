@@ -124,8 +124,8 @@ def test_parse_yaml_components_properties_optional_and_normalized() -> None:
     raw = props_by_id["nuclear_1"]
     assert isinstance(raw, list) and len(raw) == 2
     assert [p.model_dump() for p in raw] == [
-        {"key": "technology", "value": "nuclear"},
-        {"key": "company", "value": "rhonepower"},
+        {"id": "technology", "value": "nuclear"},
+        {"id": "company", "value": "rhonepower"},
     ]
 
 
@@ -174,7 +174,7 @@ def test_resolve_component_properties_duplicate_keys_raises(
 ) -> None:
     system = parse_yaml_components(io.StringIO(_SYSTEM_WITH_PROPERTIES_DUPLICATE_KEYS))
     lib_dict = resolve_library([input_library])
-    with pytest.raises(ValueError, match="duplicate properties key"):
+    with pytest.raises(ValueError, match="duplicate properties id"):
         resolve_system(system, lib_dict)
 
 
