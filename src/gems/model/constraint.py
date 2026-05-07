@@ -75,6 +75,14 @@ class Constraint:
             if is_unbounded(self.upper_bound) and not is_non_negative(self.upper_bound):
                 raise ValueError("Upper bound should not be -Inf")
 
+    @property
+    def is_equality(self) -> bool:
+        return (
+            not is_unbounded(self.lower_bound)
+            and not is_unbounded(self.upper_bound)
+            and expressions_equal(self.lower_bound, self.upper_bound)
+        )
+
     def replicate(self, /, **changes: Any) -> "Constraint":
         return replace(self, **changes)
 
