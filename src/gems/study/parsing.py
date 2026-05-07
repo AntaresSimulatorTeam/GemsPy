@@ -56,7 +56,7 @@ class ComponentParameterSchema(ModifiedBaseModel):
 
 
 class ComponentPropertySchema(ModifiedBaseModel):
-    key: str
+    id: str
     value: str
 
 

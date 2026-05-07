@@ -110,9 +110,9 @@ system:
     - id: nuclear_1
       model: basic.generator
       properties:
-        - key: technology
+        - id: technology
           value: nuclear
-        - key: company
+        - id: company
           value: rhonepower
 """
 
@@ -162,9 +162,9 @@ system:
     - id: A
       model: basic.node
       properties:
-        - key: technology
+        - id: technology
           value: nuclear
-        - key: technology
+        - id: technology
           value: gas
 """
 

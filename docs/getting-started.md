@@ -29,6 +29,7 @@ library:
 
     - id: generator
       description: A basic generator model
+      taxonomy-category: production
       parameters:
         - id: marginal_cost
           time-dependent: false
@@ -92,6 +93,9 @@ system:
   components:
     - id: G1
       model: basic.generator
+      properties:
+        - key: technology
+          value: nuclear
       parameters:
         - id: marginal_cost
           time-dependent: false

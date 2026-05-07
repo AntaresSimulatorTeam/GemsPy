@@ -12,8 +12,6 @@
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
-import pandas as pd
-
 from gems.model import Model
 from gems.model.library import Library
 from gems.study import (
@@ -50,10 +48,10 @@ def _resolve_properties_raw_to_dict(
         return {}
     properties: Dict[str, str] = {}
     for item in raw:
-        k = item.key
+        k = item.id
         if k in properties:
             raise ValueError(
-                f"Component {component_id!r}: duplicate properties key {k!r}"
+                f"Component {component_id!r}: duplicate properties id {k!r}"
             )
         properties[k] = item.value
     return properties

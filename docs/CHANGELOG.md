@@ -2,6 +2,13 @@
 
 All notable changes to GemsPy are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **System components: `properties`** - introduces optional `properties` on components in `system.yml` (a list of `id`/`value` pairs). These are normalized into a `dict[str, str]` on the resolved `Component` (duplicate keys raise a `ValueError`).
+- **Model schema: `taxonomy-category`** - introduces optional `taxonomy-category` on models in library YAML files, exposed as `ModelSchema.taxonomy_category`.
+
 ## [0.1.0] - 2026-04-30
 
 ### Study folder structure
