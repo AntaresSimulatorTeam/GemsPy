@@ -107,7 +107,6 @@ body:
         - [ ] `pyproject.toml` version bumped (Major if breaking language change, Minor otherwise)
 
         ### Step 9 — Documentation & Changelog
-        - [ ] `CHANGELOG.md` entry added
         - [ ] `AGENTS.md` reviewed for impact and updated if needed
 
         ### Step 10 — Release

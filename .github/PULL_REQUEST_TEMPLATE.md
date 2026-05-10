@@ -20,5 +20,4 @@
 - [ ] Type checking passes (`mypy`)
 - [ ] Formatting passes (`black`, `isort`)
 - [ ] `pyproject.toml` version bumped if applicable
-- [ ] `CHANGELOG.md` entry added
 - [ ] `AGENTS.md` reviewed for impact and updated if needed
