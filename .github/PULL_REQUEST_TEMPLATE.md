@@ -21,5 +21,4 @@
 - [ ] Formatting passes (`black`, `isort`)
 - [ ] `pyproject.toml` version bumped if applicable
 - [ ] `CHANGELOG.md` entry added
-- [ ] `COMPATIBILITY.md` updated if GEMS Language version support changed
 - [ ] `AGENTS.md` reviewed for impact and updated if needed
