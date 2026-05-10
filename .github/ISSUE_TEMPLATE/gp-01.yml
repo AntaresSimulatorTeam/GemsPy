@@ -108,7 +108,6 @@ body:
 
         ### Step 9 — Documentation & Changelog
         - [ ] `CHANGELOG.md` entry added
-        - [ ] `COMPATIBILITY.md` updated with new GEMS Language version mapping
         - [ ] `AGENTS.md` reviewed for impact and updated if needed
 
         ### Step 10 — Release
