@@ -219,6 +219,41 @@ def test_constraint_equals() -> None:
     )
 
 
+def test_is_equality_true_for_equality_comparison() -> None:
+    c = Constraint(name="c", expression=var("x") == param("p"))
+    assert c.is_equality is True
+
+
+def test_is_equality_false_for_inequality_comparison() -> None:
+    assert Constraint(name="c", expression=var("x") <= param("p")).is_equality is False
+    assert Constraint(name="c", expression=var("x") >= param("p")).is_equality is False
+
+
+def test_is_equality_false_for_range_constraint() -> None:
+    c = Constraint(
+        name="c", expression=var("x"), lower_bound=literal(0), upper_bound=literal(10)
+    )
+    assert c.is_equality is False
+
+
+def test_is_equality_true_for_equal_explicit_bounds() -> None:
+    c = Constraint(
+        name="c", expression=var("x"), lower_bound=param("p"), upper_bound=param("p")
+    )
+    assert c.is_equality is True
+
+
+def test_is_equality_false_for_one_sided_constraint() -> None:
+    assert (
+        Constraint(name="c", expression=var("x"), lower_bound=literal(0)).is_equality
+        is False
+    )
+    assert (
+        Constraint(name="c", expression=var("x"), upper_bound=literal(0)).is_equality
+        is False
+    )
+
+
 # --- Issue #76: tolerate absence of expec() in objective contributions ---
 
 
