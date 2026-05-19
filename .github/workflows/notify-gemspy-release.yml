@@ -1,0 +1,118 @@
+name: Notify dependents — GemsPy new release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    name: Create issue in dependent repositories
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get release version
+        id: version
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Released version: $VERSION"
+
+      - name: Notify GEMS repository
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GEMS_REPO_PAT }}
+          script: |
+            const version = '${{ steps.version.outputs.version }}';
+            const title = `[GEMSPY UPDATE] New release: v${version}`;
+            const owner = context.repo.owner;
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: owner,
+              repo: 'GEMS',
+              state: 'open',
+            });
+
+            const duplicate = existing.data.find(i => i.title.includes(`v${version}`));
+            if (duplicate) {
+              console.log(`Issue already exists in GEMS: #${duplicate.number} — skipping.`);
+              return;
+            }
+
+            const body = [
+              '> This issue was automatically created by the `notify-gemspy-release` workflow in GemsPy.',
+              '',
+              '## New Version Detected',
+              '',
+              '| | |',
+              '|---|---|',
+              `| **New version** | \`${version}\` |`,
+              `| **PyPI page** | https://pypi.org/project/gemspy/${version}/ |`,
+              `| **Release notes** | https://github.com/${owner}/GemsPy/releases/tag/v${version} |`,
+              '',
+              '## Triage',
+              '',
+              '- [ ] GemsPy changelog reviewed',
+              '- [ ] No action needed (if release has no impact on GEMS)',
+            ].join('\n');
+
+            const result = await github.rest.issues.create({
+              owner: owner,
+              repo: 'GEMS',
+              title: title,
+              body: body,
+            });
+
+            console.log(`Issue created in GEMS: #${result.data.number} — ${result.data.html_url}`);
+
+      - name: Notify AntaresLegacyModels-to-GEMS-Converter repository
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GEMS_REPO_PAT }}
+          script: |
+            const version = '${{ steps.version.outputs.version }}';
+            const title = `[GEMSPY UPDATE] New release: v${version}`;
+            const owner = context.repo.owner;
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: owner,
+              repo: 'AntaresLegacyModels-to-GEMS-Converter',
+              state: 'open',
+            });
+
+            const duplicate = existing.data.find(i => i.title.includes(`v${version}`));
+            if (duplicate) {
+              console.log(`Issue already exists in AntaresLegacyModels-to-GEMS-Converter: #${duplicate.number} — skipping.`);
+              return;
+            }
+
+            const body = [
+              '> This issue was automatically created by the `notify-gemspy-release` workflow in GemsPy.',
+              '',
+              '## New Version Detected',
+              '',
+              '| | |',
+              '|---|---|',
+              `| **New version** | \`${version}\` |`,
+              `| **PyPI page** | https://pypi.org/project/gemspy/${version}/ |`,
+              `| **Release notes** | https://github.com/${owner}/GemsPy/releases/tag/v${version} |`,
+              '',
+              '## Triage',
+              '',
+              '- [ ] GemsPy changelog reviewed',
+              '- [ ] A2G-04 issue opened (if API changes affect GEMS study generation, model validation, or simulation output)',
+              '- [ ] No action needed (if release has no impact on the converter)',
+            ].join('\n');
+
+            const result = await github.rest.issues.create({
+              owner: owner,
+              repo: 'AntaresLegacyModels-to-GEMS-Converter',
+              title: title,
+              body: body,
+            });
+
+            console.log(`Issue created in AntaresLegacyModels-to-GEMS-Converter: #${result.data.number} — ${result.data.html_url}`);
