@@ -3,7 +3,6 @@ name: Notify dependents — GemsPy new release
 on:
   release:
     types: [published]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -116,3 +115,51 @@ jobs:
             });
 
             console.log(`Issue created in AntaresLegacyModels-to-GEMS-Converter: #${result.data.number} — ${result.data.html_url}`);
+
+      - name: Notify GEMS-ViewsBuilder repository
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GEMS_VIEWS_BUILDER_PAT }}
+          script: |
+            const version = '${{ steps.version.outputs.version }}';
+            const title = `[GEMSPY UPDATE] New release: v${version}`;
+            const owner = context.repo.owner;
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: owner,
+              repo: 'GEMS-ViewsBuilder',
+              state: 'open',
+            });
+
+            const duplicate = existing.data.find(i => i.title.includes(`v${version}`));
+            if (duplicate) {
+              console.log(`Issue already exists in GEMS-ViewsBuilder: #${duplicate.number} — skipping.`);
+              return;
+            }
+
+            const body = [
+              '> This issue was automatically created by the `notify-gemspy-release` workflow in GemsPy.',
+              '',
+              '## New Version Detected',
+              '',
+              '| | |',
+              '|---|---|',
+              `| **New version** | \`${version}\` |`,
+              `| **PyPI page** | https://pypi.org/project/gemspy/${version}/ |`,
+              `| **Release notes** | https://github.com/${owner}/GemsPy/releases/tag/v${version} |`,
+              '',
+              '## Triage',
+              '',
+              '- [ ] GemsPy changelog reviewed',
+              '- [ ] `gemspy` dependency version updated in `pyproject.toml` (if new features or fixes are required)',
+              '- [ ] No action needed (if release has no impact on GEMS-ViewsBuilder)',
+            ].join('\n');
+
+            const result = await github.rest.issues.create({
+              owner: owner,
+              repo: 'GEMS-ViewsBuilder',
+              title: title,
+              body: body,
+            });
+
+            console.log(`Issue created in GEMS-ViewsBuilder: #${result.data.number} — ${result.data.html_url}`);
