@@ -72,7 +72,7 @@ jobs:
       - name: Notify AntaresLegacyModels-to-GEMS-Converter repository
         uses: actions/github-script@v9
         with:
-          github-token: ${{ secrets.GEMS_REPO_PAT }}
+          github-token: ${{ secrets.ANTARES_LEGACY_CONVERTER_PAT }}
           script: |
             const version = '${{ steps.version.outputs.version }}';
             const title = `[GEMSPY UPDATE] New release: v${version}`;
