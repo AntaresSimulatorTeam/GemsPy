@@ -30,9 +30,7 @@ def _make_taxonomy(*categories: TaxonomyCategory) -> Taxonomy:
 
 
 def _make_category(cat_id: str, port_ids: list[str]) -> TaxonomyCategory:
-    return TaxonomyCategory(
-        id=cat_id, ports=[TaxonomyItem(id=p) for p in port_ids]
-    )
+    return TaxonomyCategory(id=cat_id, ports=[TaxonomyItem(id=p) for p in port_ids])
 
 
 def _parse_lib(yaml_content: str):

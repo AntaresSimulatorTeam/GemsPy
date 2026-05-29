@@ -55,7 +55,9 @@ def load_taxonomy(taxonomy_file: Path) -> Taxonomy:
     if "taxonomy" not in raw:
         raise ValueError(f"Missing 'taxonomy' key at root of {taxonomy_file}")
     data = TaxonomyData.model_validate(raw["taxonomy"])
-    return Taxonomy(id=data.id, description=data.description, categories=data.categories)
+    return Taxonomy(
+        id=data.id, description=data.description, categories=data.categories
+    )
 
 
 def check_library_against_taxonomy(library: LibrarySchema, taxonomy: Taxonomy) -> None:
