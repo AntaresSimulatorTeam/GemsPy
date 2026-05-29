@@ -2,7 +2,7 @@
 
 All notable changes to GemsPy are documented here.
 
-## [Unreleased]
+## [0.1.1] - 2026-05-29
 
 ### Scenario-scope playlist (replaces `nb-scenarios`)
 
