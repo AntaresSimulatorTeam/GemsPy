@@ -121,10 +121,12 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
         return float(math.ceil(visit(node.operand, self)))
 
     def abs(self, node: AbsNode) -> float:
-        return abs(visit(node.operand, self))
+        value: float = visit(node.operand, self)
+        return abs(value)
 
     def round(self, node: RoundNode) -> float:
-        return float(round(visit(node.operand, self)))
+        value: float = visit(node.operand, self)
+        return float(round(value))
 
     def maximum(self, node: MaxNode) -> float:
         return max(visit(op, self) for op in node.operands)
