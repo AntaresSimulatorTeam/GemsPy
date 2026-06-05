@@ -155,9 +155,7 @@ def test_extra_output_abs_round_on_variable() -> None:
 
     df = SimulationTableBuilder().build(problem)
     abs_shift = (
-        df.component("comp_1")
-        .output("abs_shift")
-        .value(time_index=0, scenario_index=0)
+        df.component("comp_1").output("abs_shift").value(time_index=0, scenario_index=0)
     )
     rounded = (
         df.component("comp_1").output("rounded").value(time_index=0, scenario_index=0)
