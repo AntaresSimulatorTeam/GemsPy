@@ -26,6 +26,7 @@ from gems.expression import (
     VariableNode,
 )
 from gems.expression.expression import (
+    AbsNode,
     AllTimeSumNode,
     BinaryOperatorNode,
     CeilNode,
@@ -34,6 +35,7 @@ from gems.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -149,6 +151,12 @@ class _PortFieldExpressionChecker(ExpressionVisitor[None]):
         visit(node.operand, self)
 
     def ceil(self, node: CeilNode) -> None:
+        visit(node.operand, self)
+
+    def abs(self, node: AbsNode) -> None:
+        visit(node.operand, self)
+
+    def round(self, node: RoundNode) -> None:
         visit(node.operand, self)
 
     def maximum(self, node: MaxNode) -> None:

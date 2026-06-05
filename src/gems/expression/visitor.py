@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from typing import Generic, Protocol, TypeVar
 
 from gems.expression.expression import (
+    AbsNode,
     AdditionNode,
     AllTimeSumNode,
     CeilNode,
@@ -34,6 +35,7 @@ from gems.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -105,6 +107,12 @@ class ExpressionVisitor(ABC, Generic[T]):
     def ceil(self, node: CeilNode) -> T: ...
 
     @abstractmethod
+    def abs(self, node: AbsNode) -> T: ...
+
+    @abstractmethod
+    def round(self, node: RoundNode) -> T: ...
+
+    @abstractmethod
     def maximum(self, node: MaxNode) -> T: ...
 
     @abstractmethod
@@ -149,6 +157,10 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
         return visitor.floor(root)
     elif isinstance(root, CeilNode):
         return visitor.ceil(root)
+    elif isinstance(root, AbsNode):
+        return visitor.abs(root)
+    elif isinstance(root, RoundNode):
+        return visitor.round(root)
     elif isinstance(root, MaxNode):
         return visitor.maximum(root)
     elif isinstance(root, MinNode):

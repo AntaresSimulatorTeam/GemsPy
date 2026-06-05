@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Dict
 
 from gems.expression.expression import (
+    AbsNode,
     AllTimeSumNode,
     CeilNode,
     FloorNode,
@@ -23,6 +24,7 @@ from gems.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    RoundNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -117,6 +119,12 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
 
     def ceil(self, node: CeilNode) -> float:
         return float(math.ceil(visit(node.operand, self)))
+
+    def abs(self, node: AbsNode) -> float:
+        return abs(visit(node.operand, self))
+
+    def round(self, node: RoundNode) -> float:
+        return float(round(visit(node.operand, self)))
 
     def maximum(self, node: MaxNode) -> float:
         return max(visit(op, self) for op in node.operands)

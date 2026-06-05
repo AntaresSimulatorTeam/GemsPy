@@ -14,6 +14,7 @@ import math
 
 import gems.expression.scenario_operator
 from gems.expression.expression import (
+    AbsNode,
     AllTimeSumNode,
     CeilNode,
     FloorNode,
@@ -21,6 +22,7 @@ from gems.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    RoundNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -103,6 +105,14 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         return 0 if d == 0 else math.inf
 
     def ceil(self, node: CeilNode) -> int | float:
+        d = visit(node.operand, self)
+        return 0 if d == 0 else math.inf
+
+    def abs(self, node: AbsNode) -> int | float:
+        d = visit(node.operand, self)
+        return 0 if d == 0 else math.inf
+
+    def round(self, node: RoundNode) -> int | float:
         d = visit(node.operand, self)
         return 0 if d == 0 else math.inf
 

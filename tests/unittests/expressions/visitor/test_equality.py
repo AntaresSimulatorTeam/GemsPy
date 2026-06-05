@@ -33,6 +33,8 @@ from gems.expression.expression import maximum, minimum
         var("x").expec(),
         var("x").floor(),
         var("x").ceil(),
+        var("x").abs(),
+        var("x").round(),
         maximum(var("x"), param("p")),
         minimum(var("x"), param("p")),
     ],
@@ -61,6 +63,12 @@ def test_equals(expr: ExpressionNode) -> None:
         (var("x").floor(), var("y").floor()),
         (var("x").ceil(), var("y").ceil()),
         (var("x").floor(), var("x").ceil()),  # different node type
+        # abs / round
+        (var("x").abs(), var("y").abs()),
+        (var("x").round(), var("y").round()),
+        (var("x").abs(), var("x").round()),  # different node type
+        (var("x").abs(), var("x").floor()),  # different node type
+        (var("x").round(), var("x").ceil()),  # different node type
         # max / min
         (maximum(var("x"), param("p")), maximum(var("y"), param("p"))),
         (minimum(var("x"), param("p")), minimum(var("x"), param("q"))),

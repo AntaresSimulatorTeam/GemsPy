@@ -23,7 +23,7 @@ from gems.expression import (
     var,
     visit,
 )
-from gems.expression.expression import CeilNode, FloorNode
+from gems.expression.expression import AbsNode, CeilNode, FloorNode, RoundNode
 
 
 def test_degree() -> None:
@@ -45,6 +45,18 @@ def test_floor_ceil_degree() -> None:
     assert visit(CeilNode(p), ExpressionDegreeVisitor()) == 0
     assert visit(FloorNode(x), ExpressionDegreeVisitor()) == math.inf
     assert visit(CeilNode(x), ExpressionDegreeVisitor()) == math.inf
+
+
+def test_abs_round_degree() -> None:
+    x = var("x")
+    p = param("p")
+
+    assert visit(AbsNode(p), ExpressionDegreeVisitor()) == 0
+    assert visit(RoundNode(p), ExpressionDegreeVisitor()) == 0
+    assert visit(AbsNode(x), ExpressionDegreeVisitor()) == math.inf
+    assert visit(RoundNode(x), ExpressionDegreeVisitor()) == math.inf
+    # On a degree-0 sub-expression (e.g. p - q), still degree 0.
+    assert visit(AbsNode(p - param("q")), ExpressionDegreeVisitor()) == 0
 
 
 def test_max_min_degree() -> None:

@@ -17,6 +17,7 @@ from typing import List
 from gems.expression.indexing_structure import IndexingStructure
 
 from .expression import (
+    AbsNode,
     AdditionNode,
     AllTimeSumNode,
     CeilNode,
@@ -32,6 +33,7 @@ from .expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -129,6 +131,12 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return visit(node.operand, self)
 
     def ceil(self, node: CeilNode) -> IndexingStructure:
+        return visit(node.operand, self)
+
+    def abs(self, node: AbsNode) -> IndexingStructure:
+        return visit(node.operand, self)
+
+    def round(self, node: RoundNode) -> IndexingStructure:
         return visit(node.operand, self)
 
     def maximum(self, node: MaxNode) -> IndexingStructure:

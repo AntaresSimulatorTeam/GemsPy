@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import List, cast
 
 from .expression import (
+    AbsNode,
     AdditionNode,
     AllTimeSumNode,
     CeilNode,
@@ -26,6 +27,7 @@ from .expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -88,6 +90,12 @@ class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
 
     def ceil(self, node: CeilNode) -> ExpressionNode:
         return CeilNode(visit(node.operand, self))
+
+    def abs(self, node: AbsNode) -> ExpressionNode:
+        return AbsNode(visit(node.operand, self))
+
+    def round(self, node: RoundNode) -> ExpressionNode:
+        return RoundNode(visit(node.operand, self))
 
     def maximum(self, node: MaxNode) -> ExpressionNode:
         return MaxNode([visit(op, self) for op in node.operands])
