@@ -362,7 +362,7 @@ def test_comparison_equal_also_raises(builder: VectorizedLinearExprBuilder) -> N
 
 
 # ---------------------------------------------------------------------------
-# 9. floor() / ceil() — linopy guard
+# 9. floor() / ceil() / abs() / round() — linopy guard
 # ---------------------------------------------------------------------------
 
 
