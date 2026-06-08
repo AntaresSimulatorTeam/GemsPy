@@ -360,6 +360,12 @@ class SimulationTableBuilder:
         problem: OptimizationProblem,
     ) -> Dict[Tuple[str, str], xr.DataArray]:
         """Return variable reduced costs keyed by (model_key, var_name)."""
+        # Linopy exposes no generic reduced-cost API (Variable.get_solver_attribute
+        # supports Gurobi only). For HiGHS, linopy stores the raw solver handle in
+        # solver_model after solving; getSolution().col_dual is the HiGHS-specific
+        # way to retrieve column duals. Other solvers (Gurobi, Xpress, …) either
+        # lack getSolution or return a plain list without col_dual, so they fall
+        # through to the except and return {}.
         solver_model = getattr(problem.linopy_model, "solver_model", None)
         if solver_model is None or not hasattr(solver_model, "getSolution"):
             return {}
