@@ -54,9 +54,7 @@ STUDIES_DIR = Path(__file__).parent / "studies"
         ),
     ],
 )
-def test_dual_reduced_cost_single_timestep(
-    study_id: str, expected: dict
-) -> None:
+def test_dual_reduced_cost_single_timestep(study_id: str, expected: dict) -> None:
     """Verify nodal price (dual) and reduced costs for single-timestep studies."""
     study = load_study(STUDIES_DIR / study_id)
     time_block = TimeBlock(1, [0])
@@ -68,18 +66,22 @@ def test_dual_reduced_cost_single_timestep(
 
     st = SimulationTableBuilder().build(problem)
 
-    price = st.component("base_zone").output("price").value(
-        time_index=0, scenario_index=0
+    price = (
+        st.component("base_zone").output("price").value(time_index=0, scenario_index=0)
     )
     assert price == pytest.approx(expected["base_zone.price"])
 
-    gas_rc = st.component("gas_base_zone").output("generation_reduced_cost").value(
-        time_index=0, scenario_index=0
+    gas_rc = (
+        st.component("gas_base_zone")
+        .output("generation_reduced_cost")
+        .value(time_index=0, scenario_index=0)
     )
     assert gas_rc == pytest.approx(expected["gas_base_zone.generation_reduced_cost"])
 
-    oil_rc = st.component("oil_base_zone").output("generation_reduced_cost").value(
-        time_index=0, scenario_index=0
+    oil_rc = (
+        st.component("oil_base_zone")
+        .output("generation_reduced_cost")
+        .value(time_index=0, scenario_index=0)
     )
     assert oil_rc == pytest.approx(expected["oil_base_zone.generation_reduced_cost"])
 
@@ -98,35 +100,44 @@ def test_dual_reduced_cost_multi_timestep() -> None:
 
     # Nodal prices at t=0,1,2
     for t, expected_price in enumerate([10.0, 15.0, 20000.0]):
-        price = st.component("base_zone").output("price").value(
-            time_index=t, scenario_index=0
+        price = (
+            st.component("base_zone")
+            .output("price")
+            .value(time_index=t, scenario_index=0)
         )
-        assert price == pytest.approx(expected_price), (
-            f"price at t={t}: expected {expected_price}, got {price}"
-        )
+        assert price == pytest.approx(
+            expected_price
+        ), f"price at t={t}: expected {expected_price}, got {price}"
 
     # Gas generator reduced costs at t=0,1,2
     for t, expected_rc in enumerate([0.0, 0.0, -19960.0]):
-        rc = st.component("gas_base_zone").output("generation_reduced_cost").value(
-            time_index=t, scenario_index=0
+        rc = (
+            st.component("gas_base_zone")
+            .output("generation_reduced_cost")
+            .value(time_index=t, scenario_index=0)
         )
-        assert rc == pytest.approx(expected_rc, abs=1e-3), (
-            f"gas RC at t={t}: expected {expected_rc}, got {rc}"
-        )
+        assert rc == pytest.approx(
+            expected_rc, abs=1e-3
+        ), f"gas RC at t={t}: expected {expected_rc}, got {rc}"
 
     # Oil generator reduced costs at t=0,1,2
     for t, expected_rc in enumerate([20.0, -5.0, -19990.0]):
-        rc = st.component("oil_base_zone").output("generation_reduced_cost").value(
-            time_index=t, scenario_index=0
+        rc = (
+            st.component("oil_base_zone")
+            .output("generation_reduced_cost")
+            .value(time_index=t, scenario_index=0)
         )
-        assert rc == pytest.approx(expected_rc, abs=1e-3), (
-            f"oil RC at t={t}: expected {expected_rc}, got {rc}"
-        )
+        assert rc == pytest.approx(
+            expected_rc, abs=1e-3
+        ), f"oil RC at t={t}: expected {expected_rc}, got {rc}"
 
 
 def test_dual_in_constraint_is_rejected() -> None:
     """dual() in a constraint expression must be caught by the library resolver."""
-    from gems.expression.parsing.parse_expression import ModelIdentifiers, parse_expression
+    from gems.expression.parsing.parse_expression import (
+        ModelIdentifiers,
+        parse_expression,
+    )
     from gems.model.resolve_library import _forbid_dual_or_rc
 
     ids = ModelIdentifiers(
@@ -141,7 +152,10 @@ def test_dual_in_constraint_is_rejected() -> None:
 
 def test_reduced_cost_in_objective_is_rejected() -> None:
     """reduced_cost() in an objective contribution must be caught by the library resolver."""
-    from gems.expression.parsing.parse_expression import ModelIdentifiers, parse_expression
+    from gems.expression.parsing.parse_expression import (
+        ModelIdentifiers,
+        parse_expression,
+    )
     from gems.model.resolve_library import _forbid_dual_or_rc
 
     ids = ModelIdentifiers(

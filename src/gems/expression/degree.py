@@ -17,7 +17,6 @@ from gems.expression.expression import (
     AbsNode,
     AdditionNode,
     AllTimeSumNode,
-    BinaryOperatorNode,
     CeilNode,
     DualNode,
     FloorNode,
@@ -30,7 +29,6 @@ from gems.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
-    UnaryOperatorNode,
 )
 
 from .expression import (
@@ -149,16 +147,3 @@ def is_linear(expr: ExpressionNode) -> bool:
     True if the expression is linear with respect to variables.
     """
     return compute_degree(expr) <= 1
-
-
-def contains_dual_or_reduced_cost(expr: ExpressionNode) -> bool:
-    """Return True if expr contains any DualNode or ReducedCostNode."""
-    if isinstance(expr, (DualNode, ReducedCostNode)):
-        return True
-    if isinstance(expr, (AdditionNode, MaxNode, MinNode)):
-        return any(contains_dual_or_reduced_cost(o) for o in expr.operands)
-    if isinstance(expr, BinaryOperatorNode):
-        return contains_dual_or_reduced_cost(expr.left) or contains_dual_or_reduced_cost(expr.right)
-    if isinstance(expr, UnaryOperatorNode):
-        return contains_dual_or_reduced_cost(expr.operand)
-    return False

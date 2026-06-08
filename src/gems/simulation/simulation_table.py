@@ -368,12 +368,12 @@ class SimulationTableBuilder:
             col_dual_vals = list(solution.col_dual)
             vlabels = problem.linopy_model.matrices.vlabels
             rc_series = pd.Series(col_dual_vals, index=vlabels, dtype=float)
-            rc_series.loc[-1] = float("nan")
+            rc_series.loc[rc_series.index == -1] = float("nan")
 
             result: Dict[Tuple[str, str], xr.DataArray] = {}
             for (mk, vname), lv in problem._linopy_vars.items():
                 idx = np.ravel(lv.labels.values)
-                rc_vals = rc_series.reindex(idx).values.reshape(lv.labels.shape)
+                rc_vals = rc_series.reindex(idx).to_numpy().reshape(lv.labels.shape)
                 result[(mk, vname)] = xr.DataArray(
                     rc_vals, coords=lv.labels.coords, dims=lv.labels.dims
                 )

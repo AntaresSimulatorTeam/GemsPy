@@ -42,6 +42,7 @@ def _make_structure_provider(
     # provider's get_constraint_structure is never invoked during this step.
     constraint_structures: Dict[str, IndexingStructure] = {}
     if constraints:
+
         class _BaseProvider(IndexingStructureProvider):
             def get_parameter_structure(self, name: str) -> IndexingStructure:
                 return parameters[name].structure

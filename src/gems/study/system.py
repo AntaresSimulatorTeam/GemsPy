@@ -18,8 +18,12 @@ including components and connections.
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, List, Optional
 
-from gems.expression.degree import contains_dual_or_reduced_cost
-from gems.expression.expression import ExpressionNode, PortFieldAggregatorNode, PortFieldNode
+from gems.expression.expression import (
+    ExpressionNode,
+    PortFieldAggregatorNode,
+    PortFieldNode,
+)
+from gems.expression.predicates import contains_dual_or_reduced_cost
 from gems.model import PortField, PortType
 from gems.model.model import Model
 from gems.model.port import PortFieldId
@@ -55,7 +59,9 @@ class PortRef:
     port_id: str
 
 
-def _uses_sum_connections_on(expr: ExpressionNode, port_name: str, field_name: str) -> bool:
+def _uses_sum_connections_on(
+    expr: ExpressionNode, port_name: str, field_name: str
+) -> bool:
     """Return True if expr contains sum_connections(port_name.field_name)."""
     if (
         isinstance(expr, PortFieldAggregatorNode)

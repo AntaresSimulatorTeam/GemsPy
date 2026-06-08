@@ -12,9 +12,9 @@
 from typing import Dict, List, Optional, Set
 
 from gems.expression import ExpressionNode, literal
-from gems.expression.degree import contains_dual_or_reduced_cost
 from gems.expression.indexing_structure import IndexingStructure
 from gems.expression.parsing.parse_expression import ModelIdentifiers, parse_expression
+from gems.expression.predicates import contains_dual_or_reduced_cost
 from gems.model import (
     Constraint,
     Model,
@@ -169,9 +169,7 @@ def _convert_port_type(port_type: PortTypeSchema) -> PortType:
 
 def _forbid_dual_or_rc(expr: ExpressionNode, context: str) -> None:
     if contains_dual_or_reduced_cost(expr):
-        raise ValueError(
-            f"Operators dual/reduced_cost are not allowed in {context}."
-        )
+        raise ValueError(f"Operators dual/reduced_cost are not allowed in {context}.")
 
 
 def _resolve_model(
