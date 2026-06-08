@@ -55,7 +55,6 @@ def test_abs_round_degree() -> None:
     assert visit(RoundNode(p), ExpressionDegreeVisitor()) == 0
     assert visit(AbsNode(x), ExpressionDegreeVisitor()) == math.inf
     assert visit(RoundNode(x), ExpressionDegreeVisitor()) == math.inf
-    # On a degree-0 sub-expression (e.g. p - q), still degree 0.
     assert visit(AbsNode(p - param("q")), ExpressionDegreeVisitor()) == 0
 
 
