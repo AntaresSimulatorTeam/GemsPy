@@ -17,6 +17,7 @@ from gems.expression.expression import (
     AbsNode,
     AllTimeSumNode,
     CeilNode,
+    DualNode,
     ExpressionNode,
     FloorNode,
     MaxNode,
@@ -24,6 +25,7 @@ from gems.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     RoundNode,
+    ReducedCostNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -135,6 +137,12 @@ class PrinterVisitor(ExpressionVisitor[str]):
 
     def minimum(self, node: MinNode) -> str:
         return "min(" + ", ".join(visit(op, self) for op in node.operands) + ")"
+
+    def dual(self, node: DualNode) -> str:
+        return f"dual({node.constraint_id})"
+
+    def reduced_cost(self, node: ReducedCostNode) -> str:
+        return f"reduced_cost({node.variable_id})"
 
 
 def print_expr(expression: ExpressionNode) -> str:

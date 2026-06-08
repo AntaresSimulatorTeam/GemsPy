@@ -18,6 +18,8 @@ including components and connections.
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, List, Optional
 
+from gems.expression.degree import contains_dual_or_reduced_cost
+from gems.expression.expression import ExpressionNode, PortFieldAggregatorNode, PortFieldNode
 from gems.model import PortField, PortType
 from gems.model.model import Model
 from gems.model.port import PortFieldId
@@ -51,6 +53,58 @@ def create_component(
 class PortRef:
     component: Component
     port_id: str
+
+
+def _uses_sum_connections_on(expr: ExpressionNode, port_name: str, field_name: str) -> bool:
+    """Return True if expr contains sum_connections(port_name.field_name)."""
+    if (
+        isinstance(expr, PortFieldAggregatorNode)
+        and isinstance(expr.operand, PortFieldNode)
+        and expr.operand.port_name == port_name
+        and expr.operand.field_name == field_name
+    ):
+        return True
+    for child in _children(expr):
+        if _uses_sum_connections_on(child, port_name, field_name):
+            return True
+    return False
+
+
+def _check_no_dual_rc_sum_connections(
+    master_ref: PortRef, slave_ref: PortRef, field_name: str
+) -> None:
+    master_model = master_ref.component.model
+    slave_model = slave_ref.component.model
+    master_port_id = PortFieldId(port_name=master_ref.port_id, field_name=field_name)
+    master_def = master_model.port_fields_definitions.get(master_port_id)
+    if master_def is None or not contains_dual_or_reduced_cost(master_def.definition):
+        return
+    for bc in slave_model.binding_constraints.values():
+        if _uses_sum_connections_on(bc.expression, slave_ref.port_id, field_name):
+            raise ValueError(
+                f"Port-field definition '{master_port_id}' contains "
+                f"dual/reduced_cost (non-linear) and cannot be aggregated "
+                f"via sum_connections in a binding-constraint of model "
+                f"'{slave_model.id}'."
+            )
+
+
+def _children(expr: ExpressionNode) -> list:
+    from gems.expression.expression import (
+        AdditionNode,
+        BinaryOperatorNode,
+        MaxNode,
+        MinNode,
+        UnaryOperatorNode,
+    )
+
+    if isinstance(expr, (AdditionNode, MaxNode, MinNode)):
+        return list(expr.operands)
+    if isinstance(expr, BinaryOperatorNode):
+        return [expr.left, expr.right]
+    if isinstance(expr, UnaryOperatorNode):
+        return [expr.operand]
+    return []
 
 
 @dataclass()
@@ -93,9 +147,10 @@ class PortsConnection:
                     f"Port field {field_name} on {port_1.port_name} has 2 definitions."
                 )
 
-            self.master_port[PortField(name=field_name)] = (
-                self.port1 if def1 else self.port2
-            )
+            master_ref = self.port1 if def1 else self.port2
+            slave_ref = self.port2 if def1 else self.port1
+            self.master_port[PortField(name=field_name)] = master_ref
+            _check_no_dual_rc_sum_connections(master_ref, slave_ref, field_name)
 
     def get_port_type(self) -> PortType:
         port_1 = self.port1.component.model.ports.get(self.port1.port_id)

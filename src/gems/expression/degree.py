@@ -15,21 +15,25 @@ import math
 import gems.expression.scenario_operator
 from gems.expression.expression import (
     AbsNode,
+    AdditionNode,
     AllTimeSumNode,
+    BinaryOperatorNode,
     CeilNode,
+    DualNode,
     FloorNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
     RoundNode,
+    ReducedCostNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UnaryOperatorNode,
 )
 
 from .expression import (
-    AdditionNode,
     ComparisonNode,
     DivisionNode,
     ExpressionNode,
@@ -122,6 +126,12 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
     def minimum(self, node: MinNode) -> int | float:
         return 0 if all(visit(op, self) == 0 for op in node.operands) else math.inf
 
+    def dual(self, node: DualNode) -> int | float:
+        return math.inf
+
+    def reduced_cost(self, node: ReducedCostNode) -> int | float:
+        return math.inf
+
 
 def compute_degree(expression: ExpressionNode) -> int | float:
     return visit(expression, ExpressionDegreeVisitor())
@@ -139,3 +149,16 @@ def is_linear(expr: ExpressionNode) -> bool:
     True if the expression is linear with respect to variables.
     """
     return compute_degree(expr) <= 1
+
+
+def contains_dual_or_reduced_cost(expr: ExpressionNode) -> bool:
+    """Return True if expr contains any DualNode or ReducedCostNode."""
+    if isinstance(expr, (DualNode, ReducedCostNode)):
+        return True
+    if isinstance(expr, (AdditionNode, MaxNode, MinNode)):
+        return any(contains_dual_or_reduced_cost(o) for o in expr.operands)
+    if isinstance(expr, BinaryOperatorNode):
+        return contains_dual_or_reduced_cost(expr.left) or contains_dual_or_reduced_cost(expr.right)
+    if isinstance(expr, UnaryOperatorNode):
+        return contains_dual_or_reduced_cost(expr.operand)
+    return False

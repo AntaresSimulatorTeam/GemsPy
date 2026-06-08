@@ -30,12 +30,14 @@ from gems.expression.expression import (
     AllTimeSumNode,
     BinaryOperatorNode,
     CeilNode,
+    DualNode,
     FloorNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
     RoundNode,
+    ReducedCostNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -169,6 +171,12 @@ class _PortFieldExpressionChecker(ExpressionVisitor[None]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> None:
         raise ValueError("Port definition cannot contain port field aggregation.")
+
+    def dual(self, node: DualNode) -> None:
+        pass  # dual() is permitted in port-field definitions
+
+    def reduced_cost(self, node: ReducedCostNode) -> None:
+        pass  # reduced_cost() is permitted in port-field definitions
 
 
 def _validate_port_field_expression(definition: PortFieldDefinition) -> None:

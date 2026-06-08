@@ -23,6 +23,7 @@ from .expression import (
     CeilNode,
     ComparisonNode,
     DivisionNode,
+    DualNode,
     ExpressionNode,
     FloorNode,
     LiteralNode,
@@ -34,6 +35,7 @@ from .expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     RoundNode,
+    ReducedCostNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -49,6 +51,9 @@ class IndexingStructureProvider(ABC):
 
     @abstractmethod
     def get_variable_structure(self, name: str) -> IndexingStructure: ...
+
+    @abstractmethod
+    def get_constraint_structure(self, name: str) -> IndexingStructure: ...
 
 
 @dataclass(frozen=True)
@@ -144,6 +149,12 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
 
     def minimum(self, node: MinNode) -> IndexingStructure:
         return self._combine(node.operands)
+
+    def dual(self, node: DualNode) -> IndexingStructure:
+        return self.context.get_constraint_structure(node.constraint_id)
+
+    def reduced_cost(self, node: ReducedCostNode) -> IndexingStructure:
+        return self.context.get_variable_structure(node.variable_id)
 
 
 def compute_indexation(

@@ -273,6 +273,9 @@ class SimulationTableBuilder:
                 if lv.name in solution:
                     var_solution_arrays[(mk, vname)] = solution[lv.name]
 
+        constraint_dual_arrays = self._collect_constraint_duals(problem)
+        var_reduced_cost_arrays = self._collect_reduced_costs(problem)
+
         for mk, components in problem.study.model_components.items():
             model = problem.study.models[mk]
             if not model.extra_outputs:
@@ -286,6 +289,8 @@ class SimulationTableBuilder:
                     model_id=mk_,
                     param_arrays=problem.param_arrays,
                     var_solution_arrays=var_solution_arrays,
+                    constraint_dual_arrays=constraint_dual_arrays,
+                    var_reduced_cost_arrays=var_reduced_cost_arrays,
                     port_arrays={},
                     block_length=problem.block_length,
                 ),
@@ -296,6 +301,8 @@ class SimulationTableBuilder:
                     model_id=mk,
                     param_arrays=problem.param_arrays,
                     var_solution_arrays=var_solution_arrays,
+                    constraint_dual_arrays=constraint_dual_arrays,
+                    var_reduced_cost_arrays=var_reduced_cost_arrays,
                     port_arrays=port_arrays,
                     block_length=problem.block_length,
                 )
@@ -320,6 +327,59 @@ class SimulationTableBuilder:
                 )
 
         return dfs
+
+    # -------------------------------------------------------------------------
+    # Dual / reduced-cost arrays (helpers for _collect_extra_outputs)
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _collect_constraint_duals(
+        problem: OptimizationProblem,
+    ) -> Dict[Tuple[str, str], xr.DataArray]:
+        """Return constraint shadow prices keyed by (model_key, constraint_name)."""
+        dual_dataset = problem.linopy_model.dual
+        result: Dict[Tuple[str, str], xr.DataArray] = {}
+        for mk in problem.study.model_components:
+            model = problem.study.models[mk]
+            prefix = mk.replace("-", "_")
+            all_constraints = {**model.constraints, **model.binding_constraints}
+            for cname in all_constraints:
+                safe = cname.replace(" ", "_").replace("-", "_")
+                dual_val: xr.DataArray = xr.DataArray(0.0)
+                lb_name = f"{prefix}__{safe}__lb"
+                ub_name = f"{prefix}__{safe}__ub"
+                if lb_name in dual_dataset:
+                    dual_val = dual_val + dual_dataset[lb_name]  # type: ignore[operator]
+                if ub_name in dual_dataset:
+                    dual_val = dual_val + dual_dataset[ub_name]  # type: ignore[operator]
+                result[(mk, cname)] = dual_val
+        return result
+
+    @staticmethod
+    def _collect_reduced_costs(
+        problem: OptimizationProblem,
+    ) -> Dict[Tuple[str, str], xr.DataArray]:
+        """Return variable reduced costs keyed by (model_key, var_name)."""
+        solver_model = getattr(problem.linopy_model, "solver_model", None)
+        if solver_model is None or not hasattr(solver_model, "getSolution"):
+            return {}
+        try:
+            solution = solver_model.getSolution()
+            col_dual_vals = list(solution.col_dual)
+            vlabels = problem.linopy_model.matrices.vlabels
+            rc_series = pd.Series(col_dual_vals, index=vlabels, dtype=float)
+            rc_series.loc[-1] = float("nan")
+
+            result: Dict[Tuple[str, str], xr.DataArray] = {}
+            for (mk, vname), lv in problem._linopy_vars.items():
+                idx = np.ravel(lv.labels.values)
+                rc_vals = rc_series.reindex(idx).values.reshape(lv.labels.shape)
+                result[(mk, vname)] = xr.DataArray(
+                    rc_vals, coords=lv.labels.coords, dims=lv.labels.dims
+                )
+            return result
+        except Exception:
+            return {}
 
     # -------------------------------------------------------------------------
     # Objective value
