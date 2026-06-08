@@ -33,6 +33,9 @@ class StructureProvider(IndexingStructureProvider):
     def get_variable_structure(self, name: str) -> IndexingStructure:
         return IndexingStructure(True, True)
 
+    def get_constraint_structure(self, name: str) -> IndexingStructure:
+        return IndexingStructure(True, True)
+
 
 def test_shift() -> None:
     x = var("x")
@@ -101,6 +104,9 @@ def test_multiplication_of_differently_indexed_terms() -> None:
 
         def get_variable_structure(self, name: str) -> IndexingStructure:
             return IndexingStructure(True, True)
+
+        def get_constraint_structure(self, name: str) -> IndexingStructure:
+            raise NotImplementedError()
 
     provider = CustomStructureProvider()
 

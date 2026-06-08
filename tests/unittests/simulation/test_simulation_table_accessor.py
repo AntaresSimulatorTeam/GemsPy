@@ -50,6 +50,12 @@ class FakeStudy:
 class FakeLinopyModel:
     solution: dict
 
+    @property
+    def dual(self) -> xr.Dataset:
+        return xr.Dataset()
+
+    solver_model = None
+
 
 @dataclass
 class FakeProblem:

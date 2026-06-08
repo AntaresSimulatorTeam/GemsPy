@@ -329,6 +329,16 @@ class ScenarioOperatorNode(UnaryOperatorNode):
             )
 
 
+@dataclass(frozen=True, eq=False)
+class DualNode(ExpressionNode):
+    constraint_id: str
+
+
+@dataclass(frozen=True, eq=False)
+class ReducedCostNode(ExpressionNode):
+    variable_id: str
+
+
 def sum_expressions(expressions: Sequence[ExpressionNode]) -> ExpressionNode:
     if len(expressions) == 0:
         return LiteralNode(0)

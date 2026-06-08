@@ -18,11 +18,13 @@ from typing import Dict
 from gems.expression.expression import (
     AllTimeSumNode,
     CeilNode,
+    DualNode,
     FloorNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    ReducedCostNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -123,6 +125,12 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
 
     def minimum(self, node: MinNode) -> float:
         return min(visit(op, self) for op in node.operands)
+
+    def dual(self, node: DualNode) -> float:
+        raise NotImplementedError("dual() is not statically evaluable.")
+
+    def reduced_cost(self, node: ReducedCostNode) -> float:
+        raise NotImplementedError("reduced_cost() is not statically evaluable.")
 
 
 def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:

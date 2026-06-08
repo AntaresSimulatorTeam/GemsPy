@@ -35,13 +35,46 @@ from gems.model.variable import Variable
 def _make_structure_provider(
     parameters: Dict[str, Parameter],
     variables: Dict[str, Variable],
+    constraints: Optional[Dict[str, Constraint]] = None,
 ) -> IndexingStructureProvider:
+    # Pre-compute constraint structures using a params/vars-only base provider.
+    # Constraint expressions cannot contain dual()/reduced_cost(), so the base
+    # provider's get_constraint_structure is never invoked during this step.
+    constraint_structures: Dict[str, IndexingStructure] = {}
+    if constraints:
+        class _BaseProvider(IndexingStructureProvider):
+            def get_parameter_structure(self, name: str) -> IndexingStructure:
+                return parameters[name].structure
+
+            def get_variable_structure(self, name: str) -> IndexingStructure:
+                return variables[name].structure
+
+            def get_constraint_structure(self, name: str) -> IndexingStructure:
+                raise NotImplementedError(
+                    f"Constraint structure for '{name}' not available at this stage."
+                )
+
+        base = _BaseProvider()
+        for cname, c in constraints.items():
+            try:
+                constraint_structures[cname] = compute_indexation(c.expression, base)
+            except ValueError:
+                # Constraints containing unresolved port fields (sum_connections)
+                # cannot be indexed before port resolution; fall back to the most
+                # general structure so callers can still proceed.
+                constraint_structures[cname] = IndexingStructure(
+                    time=True, scenario=True
+                )
+
     class Provider(IndexingStructureProvider):
         def get_parameter_structure(self, name: str) -> IndexingStructure:
             return parameters[name].structure
 
         def get_variable_structure(self, name: str) -> IndexingStructure:
             return variables[name].structure
+
+        def get_constraint_structure(self, name: str) -> IndexingStructure:
+            return constraint_structures[name]
 
     return Provider()
 
@@ -94,7 +127,9 @@ def _is_objective_contribution_valid(
         raise ValueError("Objective contribution must be a linear expression.")
 
     data_structure_provider = _make_structure_provider(
-        model.parameters, model.variables
+        model.parameters,
+        model.variables,
+        {**model.constraints, **model.binding_constraints},
     )
     objective_structure = compute_indexation(
         objective_contribution, data_structure_provider

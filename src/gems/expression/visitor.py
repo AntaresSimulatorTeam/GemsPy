@@ -24,6 +24,7 @@ from gems.expression.expression import (
     CeilNode,
     ComparisonNode,
     DivisionNode,
+    DualNode,
     ExpressionNode,
     FloorNode,
     LiteralNode,
@@ -34,6 +35,7 @@ from gems.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    ReducedCostNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -110,6 +112,12 @@ class ExpressionVisitor(ABC, Generic[T]):
     @abstractmethod
     def minimum(self, node: MinNode) -> T: ...
 
+    @abstractmethod
+    def dual(self, node: DualNode) -> T: ...
+
+    @abstractmethod
+    def reduced_cost(self, node: ReducedCostNode) -> T: ...
+
 
 def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
     """
@@ -153,6 +161,10 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
         return visitor.maximum(root)
     elif isinstance(root, MinNode):
         return visitor.minimum(root)
+    elif isinstance(root, DualNode):
+        return visitor.dual(root)
+    elif isinstance(root, ReducedCostNode):
+        return visitor.reduced_cost(root)
     raise ValueError(f"Unknown expression node type {root.__class__}")
 
 

@@ -9,7 +9,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Set
 
 from antlr4 import CommonTokenStream, InputStream
@@ -20,8 +20,10 @@ from gems.expression.equality import expressions_equal
 from gems.expression.expression import (
     Comparator,
     ComparisonNode,
+    DualNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    ReducedCostNode,
     maximum,
     minimum,
 )
@@ -33,11 +35,12 @@ from gems.expression.parsing.antlr.ExprVisitor import ExprVisitor
 @dataclass(frozen=True)
 class ModelIdentifiers:
     """
-    Allows to distinguish between parameters and variables.
+    Allows to distinguish between parameters, variables, and constraints.
     """
 
     variables: Set[str]
     parameters: Set[str]
+    constraints: Set[str] = field(default_factory=set)
 
     def is_variable(self, identifier: str) -> bool:
         return identifier in self.variables
@@ -175,12 +178,35 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         shifted_expr = ctx.expr().accept(self)  # type: ignore
         return shifted_expr.time_sum()
 
+    def _visit_dual(self, arg_exprs: list) -> ExpressionNode:
+        if len(arg_exprs) != 1:
+            raise ValueError("dual() requires exactly 1 argument.")
+        cid = arg_exprs[0].getText()  # type: ignore
+        if cid not in self.identifiers.constraints:
+            raise ValueError(f"'{cid}' is not a constraint of the model.")
+        return DualNode(cid)
+
+    def _visit_reduced_cost(self, arg_exprs: list) -> ExpressionNode:
+        if len(arg_exprs) != 1:
+            raise ValueError("reduced_cost() requires exactly 1 argument.")
+        vid = arg_exprs[0].getText()  # type: ignore
+        if vid not in self.identifiers.variables:
+            raise ValueError(f"'{vid}' is not a variable of the model.")
+        return ReducedCostNode(vid)
+
     # Visit a parse tree produced by ExprParser#function.
     def visitFunction(self, ctx: ExprParser.FunctionContext) -> ExpressionNode:
         function_name: str = ctx.IDENTIFIER().getText()  # type: ignore
         arg_list = ctx.argList()  # type: ignore
+        arg_exprs = arg_list.expr() if arg_list is not None else []  # type: ignore
+
+        if function_name == "dual":
+            return self._visit_dual(arg_exprs)
+        if function_name == "reduced_cost":
+            return self._visit_reduced_cost(arg_exprs)
+
         args: list[ExpressionNode] = (
-            [expr.accept(self) for expr in arg_list.expr()]  # type: ignore
+            [expr.accept(self) for expr in arg_exprs]  # type: ignore
             if arg_list is not None
             else []
         )

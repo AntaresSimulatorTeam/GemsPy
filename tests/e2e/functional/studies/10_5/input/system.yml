@@ -16,7 +16,6 @@
 system:
 
   id: case_10_5
-  description: One timestep problem
   components:
     - id: base_zone
       model: library-eo.area

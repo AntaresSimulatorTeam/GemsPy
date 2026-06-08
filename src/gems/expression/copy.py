@@ -18,6 +18,7 @@ from .expression import (
     AllTimeSumNode,
     CeilNode,
     ComparisonNode,
+    DualNode,
     ExpressionNode,
     FloorNode,
     LiteralNode,
@@ -26,6 +27,7 @@ from .expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    ReducedCostNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -94,6 +96,12 @@ class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
 
     def minimum(self, node: MinNode) -> ExpressionNode:
         return MinNode([visit(op, self) for op in node.operands])
+
+    def dual(self, node: DualNode) -> ExpressionNode:
+        return DualNode(node.constraint_id)
+
+    def reduced_cost(self, node: ReducedCostNode) -> ExpressionNode:
+        return ReducedCostNode(node.variable_id)
 
 
 def copy_expression(expression: ExpressionNode) -> ExpressionNode:
