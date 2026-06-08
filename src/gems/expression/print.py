@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Dict
 
 from gems.expression.expression import (
+    AbsNode,
     AllTimeSumNode,
     CeilNode,
     ExpressionNode,
@@ -22,6 +23,7 @@ from gems.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    RoundNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -121,6 +123,12 @@ class PrinterVisitor(ExpressionVisitor[str]):
 
     def ceil(self, node: CeilNode) -> str:
         return f"ceil({visit(node.operand, self)})"
+
+    def abs(self, node: AbsNode) -> str:
+        return f"abs({visit(node.operand, self)})"
+
+    def round(self, node: RoundNode) -> str:
+        return f"round({visit(node.operand, self)})"
 
     def maximum(self, node: MaxNode) -> str:
         return "max(" + ", ".join(visit(op, self) for op in node.operands) + ")"

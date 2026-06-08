@@ -133,6 +133,36 @@ from gems.expression.parsing.parse_expression import (
         ),
         (
             {},
+            {"p"},
+            "abs(p)",
+            param("p").abs(),
+        ),
+        (
+            {},
+            {"p"},
+            "round(p)",
+            param("p").round(),
+        ),
+        (
+            {},
+            {"p", "q"},
+            "abs(p - q)",
+            (param("p") - param("q")).abs(),
+        ),
+        (
+            {},
+            {"p", "q"},
+            "round(p / q)",
+            (param("p") / param("q")).round(),
+        ),
+        (
+            {},
+            {"p", "q"},
+            "max(0, abs(p - q))",
+            maximum(literal(0), (param("p") - param("q")).abs()),
+        ),
+        (
+            {},
             {"a", "b"},
             "max(a, b)",
             maximum(param("a"), param("b")),

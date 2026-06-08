@@ -265,6 +265,8 @@ _UNARY_FUNCTIONS = {
     "expec": ExpressionNode.expec,
     "floor": ExpressionNode.floor,
     "ceil": ExpressionNode.ceil,
+    "abs": ExpressionNode.abs,
+    "round": ExpressionNode.round,
 }
 
 _N_ARY_FUNCTIONS = {

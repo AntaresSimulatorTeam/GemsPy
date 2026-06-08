@@ -116,3 +116,49 @@ def test_extra_output_nonlinear() -> None:
         df.component("comp_1").output("squared").value(time_index=0, scenario_index=0)
     )
     assert squared == pytest.approx(9.0)
+
+
+def test_extra_output_abs_round_on_variable() -> None:
+    """
+    abs() and round() applied to a decision variable are allowed in extra
+    outputs (post-solve evaluation), even though they would be rejected as
+    nonlinear inside a constraint or bound.
+    """
+    from gems.expression import var
+    from gems.expression.expression import literal
+    from gems.model.model import model
+    from gems.model.variable import float_variable
+    from gems.simulation import TimeBlock, build_problem
+    from gems.study import DataBase, Study, System, create_component
+
+    SIMPLE_MODEL = model(
+        id="SIMPLE_ABS_ROUND",
+        variables=[
+            float_variable("a", lower_bound=literal(2.7), upper_bound=literal(2.7))
+        ],
+        extra_outputs={
+            "abs_shift": (var("a") - literal(5)).abs(),
+            "rounded": var("a").round(),
+        },
+    )
+
+    database = DataBase()
+    comp = create_component(model=SIMPLE_MODEL, id="comp_1")
+
+    system = System("test_abs_round_extra")
+    system.add_component(comp)
+
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), scenario_ids=list(range(1))
+    )
+    problem.solve(solver_name="highs")
+
+    df = SimulationTableBuilder().build(problem)
+    abs_shift = (
+        df.component("comp_1").output("abs_shift").value(time_index=0, scenario_index=0)
+    )
+    rounded = (
+        df.component("comp_1").output("rounded").value(time_index=0, scenario_index=0)
+    )
+    assert abs_shift == pytest.approx(2.3)
+    assert rounded == pytest.approx(3.0)

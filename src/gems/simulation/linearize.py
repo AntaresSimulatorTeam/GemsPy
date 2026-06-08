@@ -31,11 +31,13 @@ import numpy as np
 import xarray as xr
 
 from gems.expression.expression import (
+    AbsNode,
     AdditionNode,
     CeilNode,
     FloorNode,
     MaxNode,
     MinNode,
+    RoundNode,
     VariableNode,
 )
 from gems.expression.visitor import visit
@@ -125,6 +127,24 @@ class VectorizedLinearExprBuilder(VectorizedBuilderBase[VectorizedExpr]):
             return np.ceil(operand)  # type: ignore[return-value]
         raise NotImplementedError(
             "ceil() is only supported for parameter (DataArray) expressions; "
+            "it cannot be used with decision variables in a linear programme."
+        )
+
+    def abs(self, node: AbsNode) -> VectorizedExpr:
+        operand = visit(node.operand, self)
+        if isinstance(operand, xr.DataArray):
+            return np.abs(operand)  # type: ignore[return-value]
+        raise NotImplementedError(
+            "abs() is only supported for parameter (DataArray) expressions; "
+            "it cannot be used with decision variables in a linear programme."
+        )
+
+    def round(self, node: RoundNode) -> VectorizedExpr:
+        operand = visit(node.operand, self)
+        if isinstance(operand, xr.DataArray):
+            return np.round(operand)  # type: ignore[return-value]
+        raise NotImplementedError(
+            "round() is only supported for parameter (DataArray) expressions; "
             "it cannot be used with decision variables in a linear programme."
         )
 

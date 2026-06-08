@@ -370,3 +370,19 @@ def test_variable_eq_with_non_variable_returns_false() -> None:
     assert v != "x"
     assert v != 42
     assert v != None  # noqa: E711
+
+
+def test_variable_bounds_accept_abs_round_of_parameters() -> None:
+    """abs/round of a parameter expression is constant, so usable in bounds."""
+    v = float_variable("x", lower_bound=-param("p").abs(), upper_bound=param("p").abs())
+    assert v.lower_bound is not None and v.upper_bound is not None
+    v2 = float_variable("x", upper_bound=(param("p") / param("q")).round())
+    assert v2.upper_bound is not None
+
+
+def test_variable_bounds_reject_abs_of_variable() -> None:
+    """abs of a variable is not constant; the bound check must reject it."""
+    with pytest.raises(ValueError, match="bounds of variables must be constant"):
+        float_variable("x", upper_bound=var("y").abs())
+    with pytest.raises(ValueError, match="bounds of variables must be constant"):
+        float_variable("x", lower_bound=var("y").round())
