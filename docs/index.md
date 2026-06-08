@@ -1,7 +1,7 @@
 # GemsPy, a Python interpreter for the GEMS modelling language
 
 
-![Gems Logo](/images/gemsV2cropped.png)
+![Gems Logo](../images/gemsV2cropped.png)
 
 
 ## Motivation
