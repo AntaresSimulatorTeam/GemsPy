@@ -13,3 +13,5 @@ objective = 900
 base_zone.price = 10
 gas_base_zone.generation_reduced_cost = 0
 oil_base_zone.generation_reduced_cost = 40
+gas_base_zone.profit = 0
+oil_base_zone.profit = 0

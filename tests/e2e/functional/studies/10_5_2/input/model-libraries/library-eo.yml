@@ -13,12 +13,12 @@ library:
   id: library-eo
   description: Library for test cases on extra-outputs
 
-
   port-types:
     - id: flow
       description: A port which transfers power flow
       fields:
         - id: flow
+        - id: price
 
   models:
     - id: area
@@ -37,6 +37,10 @@ library:
       ports:
         - id: balance_port
           type: flow
+      port-field-definitions:
+        - port: balance_port
+          field: price
+          definition: dual(balance)
       binding-constraints:
         - id: balance
           expression: sum_connections(balance_port.flow) = spillage - unsupplied_energy
@@ -64,7 +68,6 @@ library:
           field: flow
           definition: -load_value
 
-
     - id: simple_gen
       parameters:
         - id: p_max_cluster # timeseries that takes outages into account
@@ -85,13 +88,11 @@ library:
         - port: balance_port
           field: flow
           definition: generation
-
       objective-contributions:
         - id: operational_objective
           expression: sum(marginal_generation_cost * generation)
       extra-outputs:
         - id: generation_reduced_cost
           expression: reduced_cost(generation)
-        
-
-    
+        - id: profit
+          expression: (sum_connections(balance_port.price) - marginal_generation_cost)* generation

@@ -71,6 +71,8 @@ _SOLVER_PARAMS = [
                 "base_zone.price": 10.0,
                 "gas_base_zone.generation_reduced_cost": 0.0,
                 "oil_base_zone.generation_reduced_cost": 40.0,
+                "gas_base_zone.profit": 0,
+                "oil_base_zone.profit": 0,
             },
         ),
         (
@@ -80,6 +82,8 @@ _SOLVER_PARAMS = [
                 "base_zone.price": 50.0,
                 "gas_base_zone.generation_reduced_cost": -40.0,
                 "oil_base_zone.generation_reduced_cost": 0.0,
+                "gas_base_zone.profit": 4000,
+                "oil_base_zone.profit": 0,
             },
         ),
     ],
@@ -118,6 +122,20 @@ def test_dual_reduced_cost_single_timestep(
     )
     assert oil_rc == pytest.approx(expected["oil_base_zone.generation_reduced_cost"])
 
+    gas_profit = (
+        st.component("gas_base_zone")
+        .output("profit")
+        .value(time_index=0, scenario_index=0)
+    )
+    assert gas_profit == pytest.approx(expected["gas_base_zone.profit"])
+
+    oil_profit = (
+        st.component("oil_base_zone")
+        .output("profit")
+        .value(time_index=0, scenario_index=0)
+    )
+    assert oil_profit == pytest.approx(expected["oil_base_zone.profit"])
+
 
 @pytest.mark.parametrize("solver_name", _SOLVER_PARAMS)
 def test_dual_reduced_cost_multi_timestep(solver_name: str) -> None:
@@ -132,35 +150,29 @@ def test_dual_reduced_cost_multi_timestep(solver_name: str) -> None:
 
     st = SimulationTableBuilder().build(problem)
 
-    # Nodal prices at t=0,1,2
-    for t, expected_price in enumerate([10.0, 15.0, 20000.0]):
-        price = (
-            st.component("base_zone")
-            .output("price")
-            .value(time_index=t, scenario_index=0)
-        )
-        assert price == pytest.approx(
-            expected_price
-        ), f"price at t={t}: expected {expected_price}, got {price}"
+    def assert_output_per_timestep(
+        component_id: str, output_id: str, expected_values: list, abs: float = 1e-9
+    ) -> None:
+        for t, expected in enumerate(expected_values):
+            actual = (
+                st.component(component_id)
+                .output(output_id)
+                .value(time_index=t, scenario_index=0)
+            )
+            assert actual == pytest.approx(
+                expected, abs=abs
+            ), f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
 
-    # Gas generator reduced costs at t=0,1,2
-    for t, expected_rc in enumerate([0.0, 0.0, -19960.0]):
-        rc = (
-            st.component("gas_base_zone")
-            .output("generation_reduced_cost")
-            .value(time_index=t, scenario_index=0)
-        )
-        assert rc == pytest.approx(
-            expected_rc, abs=1e-3
-        ), f"gas RC at t={t}: expected {expected_rc}, got {rc}"
-
-    # Oil generator reduced costs at t=0,1,2
-    for t, expected_rc in enumerate([20.0, -5.0, -19990.0]):
-        rc = (
-            st.component("oil_base_zone")
-            .output("generation_reduced_cost")
-            .value(time_index=t, scenario_index=0)
-        )
-        assert rc == pytest.approx(
-            expected_rc, abs=1e-3
-        ), f"oil RC at t={t}: expected {expected_rc}, got {rc}"
+    assert_output_per_timestep("base_zone", "price", [10.0, 15.0, 20000.0])
+    assert_output_per_timestep(
+        "gas_base_zone", "generation_reduced_cost", [0.0, 0.0, -19960.0], abs=1e-3
+    )
+    assert_output_per_timestep(
+        "oil_base_zone", "generation_reduced_cost", [20.0, -5.0, -19990.0], abs=1e-3
+    )
+    assert_output_per_timestep(
+        "gas_base_zone", "profit", [0.0, 0.0, 1996000.0], abs=1e-3
+    )
+    assert_output_per_timestep(
+        "oil_base_zone", "profit", [0.0, 500.0, 1999000.0], abs=1e-3
+    )
