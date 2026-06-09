@@ -76,7 +76,6 @@ def _check_no_dual_rc_sum_connections(
             )
 
 
-
 @dataclass()
 class PortsConnection:
     port1: PortRef
