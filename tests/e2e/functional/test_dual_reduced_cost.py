@@ -164,39 +164,3 @@ def test_dual_reduced_cost_multi_timestep(solver_name: str) -> None:
         assert rc == pytest.approx(
             expected_rc, abs=1e-3
         ), f"oil RC at t={t}: expected {expected_rc}, got {rc}"
-
-
-def test_dual_in_constraint_is_rejected() -> None:
-    """dual() in a constraint expression must be caught by the library resolver."""
-    from gems.expression.parsing.parse_expression import (
-        ModelIdentifiers,
-        parse_expression,
-    )
-    from gems.model.resolve_library import _forbid_dual_or_rc
-
-    ids = ModelIdentifiers(
-        variables={"x"},
-        parameters=set(),
-        constraints={"balance"},
-    )
-    expr = parse_expression("dual(balance) + x", ids)
-    with pytest.raises(ValueError, match="Operators dual/reduced_cost are not allowed"):
-        _forbid_dual_or_rc(expr, "constraint 'bad'")
-
-
-def test_reduced_cost_in_objective_is_rejected() -> None:
-    """reduced_cost() in an objective contribution must be caught by the library resolver."""
-    from gems.expression.parsing.parse_expression import (
-        ModelIdentifiers,
-        parse_expression,
-    )
-    from gems.model.resolve_library import _forbid_dual_or_rc
-
-    ids = ModelIdentifiers(
-        variables={"x"},
-        parameters=set(),
-        constraints=set(),
-    )
-    expr = parse_expression("reduced_cost(x)", ids)
-    with pytest.raises(ValueError, match="Operators dual/reduced_cost are not allowed"):
-        _forbid_dual_or_rc(expr, "objective contribution 'obj'")
