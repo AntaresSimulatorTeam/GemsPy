@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="docs/images/gemsV2.png" alt="GemsPy" width="320"/>
-
 # GemsPy
 
 **A Python interpreter for [GEMS](https://gems-energy.readthedocs.io/en/latest/) — modelling and simulating complex energy systems under uncertainty.**
