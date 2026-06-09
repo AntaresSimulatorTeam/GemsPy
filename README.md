@@ -1,4 +1,10 @@
-# GemsPy, a Python interpreter for GEMS
+<div align="center">
+
+<img src="docs/images/gemsV2.png" alt="GemsPy" width="320"/>
+
+# GemsPy
+
+**A Python interpreter for [GEMS](https://gems-energy.readthedocs.io/en/latest/) — modelling and simulating complex energy systems under uncertainty.**
 
 [![CI](https://github.com/AntaresSimulatorTeam/GemsPy/actions/workflows/ci.yml/badge.svg)](https://github.com/AntaresSimulatorTeam/GemsPy/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/gemspy)](https://pypi.org/project/gemspy/)
@@ -7,30 +13,94 @@
 [![Documentation](https://readthedocs.org/projects/gemspy/badge/?version=latest)](https://gemspy.readthedocs.io/en/latest/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-GemsPy is an open-source tool, developed in Python, for the modelling and the simulation of complex energy systems under uncertainty. This is a generic interpreter for the [**GEMS**](https://gems-energy.readthedocs.io/en/latest/) modelling framework.
+[📖 Documentation](https://gemspy.readthedocs.io/en/latest/) •
+[🚀 Getting Started](https://gemspy.readthedocs.io/en/latest/getting-started/) •
+[🧩 GEMS framework](https://gems-energy.readthedocs.io/en/latest/) •
+[💬 Issues](https://github.com/AntaresSimulatorTeam/GemsPy/issues)
 
-<img src="docs/images/gemsV2.png" alt="Description" width="400"/>
+</div>
 
-**Online GemsPy documentation**: [gemspy.readthedocs.io](https://gemspy.readthedocs.io/en/latest/).
+---
 
-## The [GEMS](https://gems-energy.readthedocs.io/en/latest/) framework
+## ✨ Why GemsPy
 
-### The rationale behind [GEMS](https://gems-energy.readthedocs.io/en/latest/)
+- 🧠 **No-code modelling** — describe energy-system components in a high-level language close to mathematical syntax, no Python required.
+- 🗂️ **YAML-first workflow** — read, edit and create case studies as plain YAML files, or build them programmatically from Python.
+- ⚙️ **Solver-agnostic** — generates optimisation problems and delegates to off-the-shelf solvers.
+- 🎲 **Built for uncertainty** — first-class support for time-dependent and scenario-dependent data.
+- 🧪 **Production-grade Python API** — self-supporting, fully tested package, independent from any simulator binary.
 
-[GEMS](https://gems-energy.readthedocs.io/en/latest/) introduces a novel approach to model and simulate energy systems, centered around a simple principle: getting models out of the code.
+---
 
-To develop and test new models of energy system components, writing software code should not be a prerequisite. This is where the **Gems** framework excels, offering users a "no-code" modelling experience with unparalleled versatility.
+## 📦 Installation
 
-### Gems = a high-level modelling language + a data structure
+```bash
+pip install gemspy
+```
 
-The Gems framework consists of a **high-level modelling language**, close to mathematical syntax, and a **data structure** for describing energy systems.
+## 🚀 Quick start
 
-## The  [GemsPy](https://gemspy.readthedocs.io/en/latest/) package
+Given a study directory containing your `library.yml`, `system.yml` and timeseries files (see the [Getting started guide](https://gemspy.readthedocs.io/en/latest/getting-started/)):
 
-This Python package features a generic interpreter of **Gems** capable of generating optimisation problems from any study case that adhere to the modelling language syntax. It then employs off-the-shelf optimisation solvers to solve these problems. The Python API facilitates reading case studies stored in YAML format, modifying them, or creating new ones from scratch by scripting.
+```python
+from pathlib import Path
+from gems.study.folder import load_study
+from gems.session import SimulationSession
+from gems.optim_config import load_optim_config
 
-The [Getting started](https://gemspy.readthedocs.io/en/latest/getting-started/) page of the online documentation introduce you to the **Gems** input file format and the basics of the GemsPy API.
+study = load_study(Path("my_study"))
+optim_config = load_optim_config(Path("my_study/input/optim-config.yml"))
 
+session = SimulationSession(study=study, optim_config=optim_config)
+results = session.run()
+```
 
-## Link with Antares Simulator software
-The GemsPy package forms part of the Antares project, but its implementation is completely independent of that of the AntaresSimulator software. Although it was initially designed to prototype the next features of the Antares software (for more information, see [Antares Simulator documentation](https://antares-simulator.readthedocs.io/en/latest/user-guide/modeler/01-overview-modeler/), its structuring and development practices have resulted in high-quality, self-supporting code. It is currently maintained to offer the flexibility of the designed modelling language and interpreter to Python users and to continue exploring its potential. 
+Or, in a single call:
+
+```python
+from pathlib import Path
+from gems.study.runner import run_study
+
+run_study(Path("my_study"))
+```
+
+---
+
+## 🧩 The GEMS framework
+
+[GEMS](https://gems-energy.readthedocs.io/en/latest/) introduces a novel approach to modelling and simulating energy systems, centred around a simple principle: **getting models out of the code**.
+
+To develop and test new models of energy-system components, writing software code should not be a prerequisite. This is where **GEMS** excels, offering users a *no-code* modelling experience with unparalleled versatility.
+
+The framework consists of two pieces:
+
+- 📝 a **high-level modelling language**, close to mathematical syntax;
+- 🗃️ a **data structure** for describing energy systems.
+
+## 🐍 The GemsPy package
+
+`GemsPy` ships a generic interpreter of **GEMS** capable of generating optimisation problems from any study case that adheres to the modelling language syntax, then solving them with off-the-shelf solvers.
+
+The Python API lets you:
+
+- read case studies stored in YAML format,
+- modify existing studies,
+- or create new ones from scratch by scripting.
+
+The [Getting started](https://gemspy.readthedocs.io/en/latest/getting-started/) page of the online documentation walks you through the **GEMS** input file format and the basics of the GemsPy API.
+
+---
+
+## 🔗 Link with Antares Simulator
+
+GemsPy is part of the **Antares** project, but its implementation is completely independent from the [Antares Simulator](https://antares-simulator.readthedocs.io/en/latest/user-guide/modeler/01-overview-modeler/) software. It was initially designed to prototype the next features of Antares, but its structuring and development practices have produced a high-quality, self-supporting codebase. It is now maintained to bring the flexibility of the GEMS modelling language and interpreter to Python users, and to keep exploring its potential.
+
+---
+
+## 📚 Documentation
+
+Full documentation is hosted on Read the Docs: **[gemspy.readthedocs.io](https://gemspy.readthedocs.io/en/latest/)**.
+
+## 📄 License
+
+Distributed under the **Mozilla Public License 2.0**. See [LICENSE](LICENSE) for details.
