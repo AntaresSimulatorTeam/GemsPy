@@ -21,6 +21,7 @@ contexts where they are not allowed (constraints, objectives).
 """
 
 from pathlib import Path
+from typing import List
 
 import pytest
 
@@ -31,6 +32,35 @@ from gems.study.folder import load_study
 STUDIES_DIR = Path(__file__).parent / "studies"
 
 
+def _available_solvers() -> List[str]:
+    solvers = ["highs"]
+    try:
+        import xpress  # noqa: F401
+
+        solvers.append("xpress")
+    except ImportError:
+        pass
+    try:
+        import gurobipy  # noqa: F401
+
+        solvers.append("gurobi")
+    except ImportError:
+        pass
+    return solvers
+
+
+_SOLVER_PARAMS = [
+    pytest.param(
+        s,
+        marks=pytest.mark.skipif(
+            s not in _available_solvers(), reason=f"{s} not installed"
+        ),
+    )
+    for s in ["highs", "xpress", "gurobi"]
+]
+
+
+# Reduced cost implementation is solver specific, tests are parametrized by solver to test each implementation
 @pytest.mark.parametrize(
     "study_id, expected",
     [
@@ -54,12 +84,15 @@ STUDIES_DIR = Path(__file__).parent / "studies"
         ),
     ],
 )
-def test_dual_reduced_cost_single_timestep(study_id: str, expected: dict) -> None:
+@pytest.mark.parametrize("solver_name", _SOLVER_PARAMS)
+def test_dual_reduced_cost_single_timestep(
+    study_id: str, expected: dict, solver_name: str
+) -> None:
     """Verify nodal price (dual) and reduced costs for single-timestep studies."""
     study = load_study(STUDIES_DIR / study_id)
     time_block = TimeBlock(1, [0])
     problem = build_problem(study, time_block, [0])
-    problem.solve(solver_name="highs")
+    problem.solve(solver_name=solver_name)
 
     assert problem.termination_condition == "optimal"
     assert problem.objective_value == pytest.approx(expected["objective"])
@@ -86,12 +119,13 @@ def test_dual_reduced_cost_single_timestep(study_id: str, expected: dict) -> Non
     assert oil_rc == pytest.approx(expected["oil_base_zone.generation_reduced_cost"])
 
 
-def test_dual_reduced_cost_multi_timestep() -> None:
+@pytest.mark.parametrize("solver_name", _SOLVER_PARAMS)
+def test_dual_reduced_cost_multi_timestep(solver_name: str) -> None:
     """Verify nodal prices and reduced costs for a 3-timestep study (10_5_2)."""
     study = load_study(STUDIES_DIR / "10_5_2")
     time_block = TimeBlock(1, [0, 1, 2])
     problem = build_problem(study, time_block, [0])
-    problem.solve(solver_name="highs")
+    problem.solve(solver_name=solver_name)
 
     assert problem.termination_condition == "optimal"
     assert problem.objective_value == pytest.approx(27550.0)

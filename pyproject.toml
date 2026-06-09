@@ -83,6 +83,11 @@ dev = [
     "antlr4-tools>=0.2.1",
     "pandas-stubs",
 ]
+# Only needed for runnning solver specific tests (dual / reduced cost)
+solvers = [
+    "xpress>=9.8",
+    "gurobipy>=10.0",
+]
 
 [tool.black]
 line-length = 88

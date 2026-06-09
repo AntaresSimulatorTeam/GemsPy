@@ -322,12 +322,17 @@ class OptimizationProblem:
     def block_length(self) -> int:
         return len(self.block.timesteps)
 
+    # Solvers whose linopy backend implements the direct (in-memory) API.
+    # All others fall back to file-based LP/MPS exchange.
+    _DIRECT_API_SOLVERS = {"highs", "gurobi"}
+
     def solve(self, solver_name: str = "highs", **kwargs: object) -> None:
         """Solve the problem using the specified solver."""
         # Use io_api="direct" to bypass LP file writing and avoid LP name parsing
         # issues in linopy's set_int_index (e.g. constraint names with spaces or
         # variables with non-standard characters).
-        kwargs.setdefault("io_api", "direct")  # type: ignore[call-overload]
+        if solver_name in self._DIRECT_API_SOLVERS:
+            kwargs.setdefault("io_api", "direct")  # type: ignore[call-overload]
         self.linopy_model.solve(solver_name=solver_name, **kwargs)  # type: ignore[arg-type]
 
     @property

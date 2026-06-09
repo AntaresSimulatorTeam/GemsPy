@@ -23,7 +23,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --group dev --group solvers
 
       - name: Check imports sort order
         run: uv run isort --profile black --check-only --diff src tests
