@@ -360,19 +360,31 @@ class SimulationTableBuilder:
         problem: OptimizationProblem,
     ) -> Dict[Tuple[str, str], xr.DataArray]:
         """Return variable reduced costs keyed by (model_key, var_name)."""
-        # Linopy exposes no generic reduced-cost API (Variable.get_solver_attribute
-        # supports Gurobi only). For HiGHS, linopy stores the raw solver handle in
-        # solver_model after solving; getSolution().col_dual is the HiGHS-specific
-        # way to retrieve column duals. Other solvers (Gurobi, Xpress, …) either
-        # lack getSolution or return a plain list without col_dual, so they fall
-        # through to the except and return {}.
         solver_model = getattr(problem.linopy_model, "solver_model", None)
-        if solver_model is None or not hasattr(solver_model, "getSolution"):
+        if solver_model is None:
             return {}
         try:
-            solution = solver_model.getSolution()
-            col_dual_vals = list(solution.col_dual)
             vlabels = problem.linopy_model.matrices.vlabels
+            col_dual_vals: Optional[List[float]] = None
+
+            if hasattr(solver_model, "getSolution"):
+                # HiGHS: col_dual holds reduced costs in column order
+                solution = solver_model.getSolution()
+                col_dual_vals = list(solution.col_dual)
+            elif hasattr(solver_model, "getAttr") and hasattr(solver_model, "getVars"):
+                # Gurobi: getAttr("RC", vars) returns reduced costs in column order
+                col_dual_vals = list(
+                    solver_model.getAttr("RC", solver_model.getVars())
+                )
+            elif hasattr(solver_model, "getlpsol"):
+                # Xpress: 4th positional arg (dj) is the reduced-cost array
+                dj: List[float] = [0.0] * len(vlabels)
+                solver_model.getlpsol(None, None, None, dj)
+                col_dual_vals = dj
+
+            if col_dual_vals is None:
+                return {}
+
             rc_series = pd.Series(col_dual_vals, index=vlabels, dtype=float)
             rc_series.loc[rc_series.index == -1] = float("nan")
 
