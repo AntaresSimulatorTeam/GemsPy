@@ -66,7 +66,7 @@ run_study(Path("my_study"))
 
 ---
 
-## 🧩 The GEMS framework
+## <img src="https://raw.githubusercontent.com/AntaresSimulatorTeam/GEMS/main/doc/assets/0_gems_favicon.png" alt="" height="28" align="top"/> The GEMS framework
 
 [GEMS](https://gems-energy.readthedocs.io/en/latest/) introduces a novel approach to modelling and simulating energy systems, centred around a simple principle: **getting models out of the code**.
 
