@@ -22,7 +22,7 @@
 
 ## ✨ Why GemsPy
 
-- 🧠 **No-code modelling** — describe energy-system components in a high-level language close to mathematical syntax, no Python required.
+- 🧠 **Low-code modelling** — describe energy-system components in a high-level language close to mathematical syntax, minimal Python required.
 - 🗂️ **YAML-first workflow** — read, edit and create case studies as plain YAML files, or build them programmatically from Python.
 - ⚙️ **Solver-agnostic** — generates optimisation problems and delegates to off-the-shelf solvers.
 - 🎲 **Built for uncertainty** — first-class support for time-dependent and scenario-dependent data.
@@ -68,7 +68,7 @@ run_study(Path("my_study"))
 
 [GEMS](https://gems-energy.readthedocs.io/en/latest/) introduces a novel approach to modelling and simulating energy systems, centred around a simple principle: **getting models out of the code**.
 
-To develop and test new models of energy-system components, writing software code should not be a prerequisite. This is where **GEMS** excels, offering users a *no-code* modelling experience with unparalleled versatility.
+To develop and test new models of energy-system components, writing software code should not be a prerequisite. This is where **GEMS** excels, offering users a *low-code* modelling experience with unparalleled versatility.
 
 The framework consists of two pieces:
 
