@@ -4,11 +4,18 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+---
+
+## [0.1.2] - 2026-06-11
+
 ### Added
 - Math operators `abs` and `round` in the GemsPy expression language.
   - Can be applied to parameters and literals in constraints, bounds, and objective contributions (degree-0 context).
   - Can be applied to any expression in extra-outputs (post-solve evaluation), including decision variables.
   - Use `.abs()` and `.round()` methods on expression objects, or `abs(expr)` and `round(expr)` in parsed expression strings.
+
+### Changed
+- Modernized README design: new layout, GEMS favicon, quick-link navigation, and `uv` install instructions.
 
 ---
 
