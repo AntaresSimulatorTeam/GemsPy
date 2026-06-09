@@ -11,6 +11,7 @@
 # This file is part of the Antares project.
 
 from gems.expression.expression import (
+    AbsNode,
     AdditionNode,
     AllTimeSumNode,
     CeilNode,
@@ -28,6 +29,7 @@ from gems.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -90,6 +92,12 @@ class ContainsDualOrReducedCostVisitor(ExpressionVisitor[bool]):
         return visit(node.operand, self)
 
     def ceil(self, node: CeilNode) -> bool:
+        return visit(node.operand, self)
+
+    def abs(self, node: AbsNode) -> bool:
+        return visit(node.operand, self)
+
+    def round(self, node: RoundNode) -> bool:
         return visit(node.operand, self)
 
     def maximum(self, node: MaxNode) -> bool:
@@ -172,6 +180,12 @@ class UsesSumConnectionsOnVisitor(ExpressionVisitor[bool]):
         return visit(node.operand, self)
 
     def ceil(self, node: CeilNode) -> bool:
+        return visit(node.operand, self)
+
+    def abs(self, node: AbsNode) -> bool:
+        return visit(node.operand, self)
+
+    def round(self, node: RoundNode) -> bool:
         return visit(node.operand, self)
 
     def maximum(self, node: MaxNode) -> bool:
