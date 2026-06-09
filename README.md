@@ -32,6 +32,14 @@
 
 ## 📦 Installation
 
+With [`uv`](https://docs.astral.sh/uv/) (recommended):
+
+```bash
+uv add gemspy
+```
+
+Or with `pip`:
+
 ```bash
 pip install gemspy
 ```
