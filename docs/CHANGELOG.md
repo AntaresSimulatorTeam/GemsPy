@@ -6,7 +6,7 @@ All notable changes to GemsPy are documented here.
 
 ---
 
-## [0.1.2] - 2026-06-09
+## [0.1.2] - 2026-06-11
 
 ### Added
 - Math operators `abs` and `round` in the GemsPy expression language.
