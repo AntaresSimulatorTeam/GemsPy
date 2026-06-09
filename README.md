@@ -13,7 +13,7 @@
 
 [📖 Documentation](https://gemspy.readthedocs.io/en/latest/) •
 [🚀 Getting Started](https://gemspy.readthedocs.io/en/latest/getting-started/) •
-[🧩 GEMS framework](https://gems-energy.readthedocs.io/en/latest/) •
+[<img src="https://raw.githubusercontent.com/AntaresSimulatorTeam/GEMS/main/doc/assets/0_gems_favicon.png" alt="" height="14"/> GEMS framework](https://gems-energy.readthedocs.io/en/latest/) •
 [💬 Issues](https://github.com/AntaresSimulatorTeam/GemsPy/issues)
 
 </div>
