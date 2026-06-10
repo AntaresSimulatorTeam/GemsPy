@@ -3,8 +3,14 @@ from pathlib import Path
 import pytest
 from yaml import dump, safe_load
 
+from gems.expression import literal, maximum, var
+from gems.expression.expression import port_field
+from gems.model import Constraint, ModelPort, PortType, model
 from gems.model.parsing import LibrarySchema, parse_yaml_library
+from gems.model.port import PortField, PortFieldDefinition, PortFieldId
 from gems.model.resolve_library import resolve_library
+from gems.model.variable import float_variable
+from gems.study import Component, PortRef, PortsConnection
 from gems.study.parsing import SystemSchema, load_input_system, parse_yaml_components
 from gems.study.resolve_components import consistency_check, resolve_system
 
@@ -92,3 +98,58 @@ def test_consistency_check_ko(
         match=r"Error: Component G has invalid model ID: basic.generator",
     ):
         consistency_check(result_comp, result_lib["basic"].models)
+
+
+# ---------------------------------------------------------------------------
+# sum_connections linearity checks
+# ---------------------------------------------------------------------------
+
+_MY_PORT_TYPE = PortType(id="my_port_type", fields=[PortField("flow")])
+
+_NONLINEAR_GENERATOR = model(
+    id="NONLINEAR_GEN",
+    variables=[float_variable("x"), float_variable("y")],
+    ports=[ModelPort(port_type=_MY_PORT_TYPE, port_name="my_port")],
+    port_fields_definitions=[
+        PortFieldDefinition(
+            port_field=PortFieldId("my_port", "flow"),
+            definition=maximum(var("x"), var("y")),
+        )
+    ],
+)
+
+_LINEAR_GENERATOR = model(
+    id="LINEAR_GEN",
+    variables=[float_variable("x")],
+    ports=[ModelPort(port_type=_MY_PORT_TYPE, port_name="my_port")],
+    port_fields_definitions=[
+        PortFieldDefinition(
+            port_field=PortFieldId("my_port", "flow"),
+            definition=var("x"),
+        )
+    ],
+)
+
+_NODE_WITH_SUM_CONNECTIONS = model(
+    id="NODE",
+    ports=[ModelPort(port_type=_MY_PORT_TYPE, port_name="my_port")],
+    binding_constraints=[
+        Constraint(
+            name="Balance",
+            expression=port_field("my_port", "flow").sum_connections() == literal(0),
+        )
+    ],
+)
+
+
+def test_sum_connections_with_nonlinear_port_field_raises() -> None:
+    gen = Component(id="G", model=_NONLINEAR_GENERATOR)
+    node = Component(id="N", model=_NODE_WITH_SUM_CONNECTIONS)
+    with pytest.raises(ValueError, match="non-linear"):
+        PortsConnection(PortRef(gen, "my_port"), PortRef(node, "my_port"))
+
+
+def test_sum_connections_with_linear_port_field_ok() -> None:
+    gen = Component(id="G", model=_LINEAR_GENERATOR)
+    node = Component(id="N", model=_NODE_WITH_SUM_CONNECTIONS)
+    PortsConnection(PortRef(gen, "my_port"), PortRef(node, "my_port"))

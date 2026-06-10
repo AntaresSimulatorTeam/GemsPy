@@ -12,9 +12,9 @@
 from typing import Dict, List, Optional, Set
 
 from gems.expression import ExpressionNode, literal
+from gems.expression.degree import is_linear
 from gems.expression.indexing_structure import IndexingStructure
 from gems.expression.parsing.parse_expression import ModelIdentifiers, parse_expression
-from gems.expression.predicates import contains_dual_or_reduced_cost
 from gems.model import (
     Constraint,
     Model,
@@ -167,9 +167,9 @@ def _convert_port_type(port_type: PortTypeSchema) -> PortType:
     )
 
 
-def _forbid_dual_or_rc(expr: ExpressionNode, context: str) -> None:
-    if contains_dual_or_reduced_cost(expr):
-        raise ValueError(f"Operators dual/reduced_cost are not allowed in {context}.")
+def _forbid_nonlinear(expr: ExpressionNode, context: str) -> None:
+    if not is_linear(expr):
+        raise ValueError(f"Non-linear expression is not allowed in {context}.")
 
 
 def _resolve_model(
@@ -188,7 +188,7 @@ def _resolve_model(
     constraints = [_to_constraint(c, identifiers) for c in input_model.constraints]
 
     for c in binding_constraints + constraints:
-        _forbid_dual_or_rc(c.expression, f"constraint '{c.name}'")
+        _forbid_nonlinear(c.expression, f"constraint '{c.name}'")
 
     objective_contributions = None
     if input_model.objective_contributions:
@@ -197,7 +197,7 @@ def _resolve_model(
             for contrib in input_model.objective_contributions
         }
         for oid, expr in objective_contributions.items():
-            _forbid_dual_or_rc(expr, f"objective contribution '{oid}'")
+            _forbid_nonlinear(expr, f"objective contribution '{oid}'")
 
     extra_outputs = (
         {

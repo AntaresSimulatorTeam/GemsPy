@@ -216,7 +216,7 @@ library:
           expression: dual(balance) + x = 0
 """)
     input_lib = parse_yaml_library(lib_yaml)
-    with pytest.raises(ValueError, match="Operators dual/reduced_cost are not allowed"):
+    with pytest.raises(ValueError, match="Non-linear expression is not allowed"):
         resolve_library([input_lib])
 
 
@@ -237,7 +237,7 @@ library:
           expression: reduced_cost(x)
 """)
     input_lib = parse_yaml_library(lib_yaml)
-    with pytest.raises(ValueError, match="Operators dual/reduced_cost are not allowed"):
+    with pytest.raises(ValueError, match="Non-linear expression is not allowed"):
         resolve_library([input_lib])
 
 
@@ -443,6 +443,22 @@ def test_linear_expr_in_binding_constraint(
     lib = resolve_library([input_lib])
     bc = lib["test"].models["test.test_model"].binding_constraints["bc1"]
     assert bc == Constraint(name="bc1", expression=expected_expr >= literal(0))  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# Rejection tests: binding-constraint expressions
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("yaml_expr,expected_expr", _UNRESTRICTED_EXPRS)
+def test_unrestricted_expr_rejected_in_binding_constraint(
+    yaml_expr: str, expected_expr: object
+) -> None:
+    input_lib = parse_yaml_library(
+        io.StringIO(_no_port_lib_yaml(constraint_expr=f"{yaml_expr} = 0"))
+    )
+    with pytest.raises(ValueError, match="Non-linear expression is not allowed"):
+        resolve_library([input_lib])
 
 
 # ---------------------------------------------------------------------------
