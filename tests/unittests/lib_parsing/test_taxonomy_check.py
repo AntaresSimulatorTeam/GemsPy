@@ -240,3 +240,181 @@ library:
           type: flow
 """)
     check_library_against_taxonomy(lib, taxonomy)  # must not raise
+
+
+# --- per-field-group checks (variables, parameters, constraints, ... ) ---
+
+
+def test_model_missing_required_taxonomy_variable_raises() -> None:
+    taxonomy = _make_taxonomy(
+        TaxonomyCategory(id="production", variables=[TaxonomyItem(id="generation")])
+    )
+    lib = _parse_lib("""
+library:
+  id: mylib
+  models:
+    - id: generator
+      taxonomy-category: production
+""")
+    with pytest.raises(ValueError, match="generation") as exc_info:
+        check_library_against_taxonomy(lib, taxonomy)
+    assert "variable" in str(exc_info.value)
+
+
+def test_model_missing_required_taxonomy_parameter_raises() -> None:
+    taxonomy = _make_taxonomy(
+        TaxonomyCategory(id="production", parameters=[TaxonomyItem(id="p_max")])
+    )
+    lib = _parse_lib("""
+library:
+  id: mylib
+  models:
+    - id: generator
+      taxonomy-category: production
+""")
+    with pytest.raises(ValueError, match="p_max") as exc_info:
+        check_library_against_taxonomy(lib, taxonomy)
+    assert "parameter" in str(exc_info.value)
+
+
+def test_model_missing_required_taxonomy_constraint_raises() -> None:
+    taxonomy = _make_taxonomy(
+        TaxonomyCategory(id="production", constraints=[TaxonomyItem(id="max_output")])
+    )
+    lib = _parse_lib("""
+library:
+  id: mylib
+  models:
+    - id: generator
+      taxonomy-category: production
+""")
+    with pytest.raises(ValueError, match="max_output") as exc_info:
+        check_library_against_taxonomy(lib, taxonomy)
+    assert "constraint" in str(exc_info.value)
+
+
+def test_model_missing_required_taxonomy_binding_constraint_raises() -> None:
+    taxonomy = _make_taxonomy(
+        TaxonomyCategory(
+            id="production",
+            binding_constraints=[TaxonomyItem(id="balance")],
+        )
+    )
+    lib = _parse_lib("""
+library:
+  id: mylib
+  models:
+    - id: generator
+      taxonomy-category: production
+""")
+    with pytest.raises(ValueError, match="balance") as exc_info:
+        check_library_against_taxonomy(lib, taxonomy)
+    assert "binding-constraint" in str(exc_info.value)
+
+
+def test_model_missing_required_taxonomy_extra_output_raises() -> None:
+    taxonomy = _make_taxonomy(
+        TaxonomyCategory(id="production", extra_outputs=[TaxonomyItem(id="co2")])
+    )
+    lib = _parse_lib("""
+library:
+  id: mylib
+  models:
+    - id: generator
+      taxonomy-category: production
+""")
+    with pytest.raises(ValueError, match="co2") as exc_info:
+        check_library_against_taxonomy(lib, taxonomy)
+    assert "extra-output" in str(exc_info.value)
+
+
+def test_model_missing_required_taxonomy_property_raises() -> None:
+    taxonomy = _make_taxonomy(
+        TaxonomyCategory(id="production", properties=[TaxonomyItem(id="technology")])
+    )
+    lib = _parse_lib("""
+library:
+  id: mylib
+  models:
+    - id: generator
+      taxonomy-category: production
+""")
+    with pytest.raises(ValueError, match="technology") as exc_info:
+        check_library_against_taxonomy(lib, taxonomy)
+    assert "property" in str(exc_info.value)
+
+
+def test_model_missing_required_taxonomy_port_field_definition_raises() -> None:
+    taxonomy = _make_taxonomy(
+        TaxonomyCategory(
+            id="production",
+            port_field_definitions=[TaxonomyItem(id="injection_port.flow")],
+        )
+    )
+    lib = _parse_lib("""
+library:
+  id: mylib
+  port-types:
+    - id: flow
+      fields:
+        - id: flow
+  models:
+    - id: generator
+      taxonomy-category: production
+      ports:
+        - id: injection_port
+          type: flow
+""")
+    with pytest.raises(ValueError, match="injection_port.flow") as exc_info:
+        check_library_against_taxonomy(lib, taxonomy)
+    assert "port-field-definition" in str(exc_info.value)
+
+
+def test_model_exposing_all_required_fields_is_valid() -> None:
+    taxonomy = _make_taxonomy(
+        TaxonomyCategory(
+            id="production",
+            variables=[TaxonomyItem(id="generation")],
+            parameters=[TaxonomyItem(id="p_max")],
+            ports=[TaxonomyItem(id="injection_port")],
+            port_field_definitions=[TaxonomyItem(id="injection_port.flow")],
+            constraints=[TaxonomyItem(id="max_output")],
+            binding_constraints=[TaxonomyItem(id="balance")],
+            extra_outputs=[TaxonomyItem(id="co2")],
+            properties=[TaxonomyItem(id="technology")],
+        )
+    )
+    lib = _parse_lib("""
+library:
+  id: mylib
+  port-types:
+    - id: flow
+      fields:
+        - id: flow
+  models:
+    - id: generator
+      taxonomy-category: production
+      parameters:
+        - id: p_max
+      variables:
+        - id: generation
+      ports:
+        - id: injection_port
+          type: flow
+      port-field-definitions:
+        - port: injection_port
+          field: flow
+          definition: generation
+      constraints:
+        - id: max_output
+          expression: generation <= p_max
+      binding-constraints:
+        - id: balance
+          expression: sum_connections(injection_port.flow) = 0
+      extra-outputs:
+        - id: co2
+          expression: generation
+      properties:
+        - id: technology
+""")
+    check_library_against_taxonomy(lib, taxonomy)  # must not raise

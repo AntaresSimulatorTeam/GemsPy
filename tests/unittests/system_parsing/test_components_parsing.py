@@ -191,3 +191,73 @@ system:
 def test_parse_yaml_components_system_level_properties_rejected() -> None:
     with pytest.raises(ValidationError):
         parse_yaml_components(io.StringIO(_SYSTEM_WITH_SYSTEM_LEVEL_PROPERTIES))
+
+
+# --- model-declared properties ---
+
+_LIB_WITH_MODEL_PROPERTIES = """\
+library:
+  id: basic
+  models:
+    - id: generator
+      properties:
+        - id: technology
+"""
+
+
+def test_parse_yaml_library_model_properties() -> None:
+    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
+    assert [p.id for p in lib.models[0].properties] == ["technology"]
+
+
+def test_resolve_library_exposes_model_properties() -> None:
+    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
+    lib_dict = resolve_library([lib])
+    assert lib_dict["basic"].models["basic.generator"].properties == ["technology"]
+
+
+def test_resolve_component_with_declared_property_ok() -> None:
+    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
+    system = parse_yaml_components(io.StringIO("""\
+system:
+  components:
+    - id: G
+      model: basic.generator
+      properties:
+        - id: technology
+          value: nuclear
+"""))
+    resolved = resolve_system(system, resolve_library([lib]))
+    assert resolved.get_component("G").properties == {"technology": "nuclear"}
+
+
+def test_resolve_component_missing_declared_property_raises() -> None:
+    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
+    system = parse_yaml_components(io.StringIO("""\
+system:
+  components:
+    - id: G
+      model: basic.generator
+"""))
+    with pytest.raises(ValueError, match="technology"):
+        resolve_system(system, resolve_library([lib]))
+
+
+def test_resolve_component_extra_undeclared_property_allowed() -> None:
+    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
+    system = parse_yaml_components(io.StringIO("""\
+system:
+  components:
+    - id: G
+      model: basic.generator
+      properties:
+        - id: technology
+          value: nuclear
+        - id: company
+          value: rhonepower
+"""))
+    resolved = resolve_system(system, resolve_library([lib]))
+    assert resolved.get_component("G").properties == {
+        "technology": "nuclear",
+        "company": "rhonepower",
+    }
