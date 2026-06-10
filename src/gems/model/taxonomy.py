@@ -35,6 +35,7 @@ class TaxonomyCategory(ModifiedBaseModel):
         default_factory=list
     )
     constraints: List[TaxonomyItem] = Field(default_factory=list)
+    binding_constraints: List[ConstraintSchema] = Field(default_factory=list)
     extra_outputs: List[TaxonomyItem] = Field(default_factory=list)
     properties: List[TaxonomyItem] = Field(default_factory=list)
 
