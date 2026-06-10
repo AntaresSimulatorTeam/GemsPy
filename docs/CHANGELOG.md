@@ -22,7 +22,7 @@ All notable changes to GemsPy are documented here.
   Reduced costs use each solver's native API (`getLpSol` / `getAttr("RC")` /
   `col_dual`) since linopy has no unified reduced-cost interface.
 - New `solvers` optional dependency group (`uv sync --group solvers`) for
-  running solver-specific tests with a free licence; CI now installs it.
+  running solver-specific tests with a licence; CI now installs it.
 
 ### Fixed
 
