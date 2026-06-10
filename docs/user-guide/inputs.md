@@ -58,8 +58,7 @@ system:
           value: rhonepower
 ~~~
 
-At resolution time (`resolve_system` / `load_study`), this list is normalized into
-a `dict[str, str]` stored on the resolved `Component`. Duplicate ids are rejected.
+Duplicate ids for properties are rejected.
 
 ### Loading the library and the system
 
