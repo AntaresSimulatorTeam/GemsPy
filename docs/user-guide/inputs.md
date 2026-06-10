@@ -41,7 +41,7 @@ parts of the study from in-memory data.
 
 ---
 
-## System YAML: optional component `properties`
+## System YAML: optional field `properties` for components
 
 In `system.yml`, each component may define an optional `properties` section as a
 list of id/value pairs:
