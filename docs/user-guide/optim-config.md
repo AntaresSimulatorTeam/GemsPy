@@ -353,7 +353,6 @@ config = OptimConfig(
 )
 
 # Build programmatically — playlist-file form
-from pathlib import Path
 config_pf = OptimConfig(
     time_scope=TimeScopeConfig(first_time_step=0, last_time_step=8759),
     scenario_scope=ScenarioScopeConfig(playlist_file=Path("mc_playlist.json")),
@@ -361,7 +360,7 @@ config_pf = OptimConfig(
 
 # Pass to SimulationSession
 from gems.session import SimulationSession
-from gems.study import load_study
+from gems.study.folder import load_study
 
 study = load_study(Path("my_study"))
 session = SimulationSession(study=study, optim_config=config)
