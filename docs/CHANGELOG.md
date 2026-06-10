@@ -2,22 +2,12 @@
 
 All notable changes to GemsPy are documented here.
 
-## [Unreleased]
-
-### Added
-- **Model schema: `properties`** - models in library YAML files may declare an optional `properties` list (entries with an `id`), exposed as `ModelSchema.properties` and `Model.properties`. When resolving a component, every property key declared by its model must be present in the component's `properties` (a `ValueError` is raised otherwise); extra, undeclared component properties remain allowed.
-
-### Changed
-- **Taxonomy check** - `check_library_against_taxonomy` now validates every field group declared in a taxonomy category (variables, parameters, ports, port-field-definitions, constraints, binding-constraints, extra-outputs and properties), instead of only ports.
-
----
-
 ## [0.1.2] - 2026-06-11
 
 ### Added
-- **System components: `properties`** - introduces optional `properties` on components in `system.yml` (a list of `id`/`value` pairs). These are normalized into a `dict[str, str]` on the resolved `Component` (duplicate ids raise a `ValueError`).
+- **Model properties** - models in library YAML files may declare an optional `properties` list (entries with an `id`), exposed as `ModelSchema.properties` and `Model.properties`. Components in `system.yml` carry optional `properties` (a list of `id`/`value` pairs), normalized into a `dict[str, str]` on the resolved `Component` (duplicate ids raise a `ValueError`). When resolving a component, every property key declared by its model must be present in the component's `properties` (a `ValueError` is raised otherwise); extra, undeclared component properties remain allowed.
 - **Model schema: `taxonomy-category`** - introduces optional `taxonomy-category` on models in library YAML files, exposed as `ModelSchema.taxonomy_category`.
-- **Taxonomy check** - new `gems.model.taxonomy` module with `load_taxonomy(path)` and `check_library_against_taxonomy(library, taxonomy)`. Validates that every model declaring a `taxonomy-category` references a category that exists in the taxonomy file, and exposes all variables, parameters, constraints, ports, extra-outputs and properties required by that category. Taxonomy classes are (`TaxonomyItem`, `TaxonomyCategory`, `Taxonomy`).
+- **Taxonomy check** - new `gems.model.taxonomy` module with `load_taxonomy(path)` and `check_library_against_taxonomy(library, taxonomy)`. Validates that every model declaring a `taxonomy-category` references a category that exists in the taxonomy file, and exposes every field group required by that category (variables, parameters, ports, port-field-definitions, constraints, binding-constraints, extra-outputs and properties). Taxonomy classes are (`TaxonomyItem`, `TaxonomyCategory`, `Taxonomy`).
 - Math operators `abs` and `round` in the GemsPy expression language.
   - Can be applied to parameters and literals in constraints, bounds, and objective contributions (degree-0 context).
   - Can be applied to any expression in extra-outputs (post-solve evaluation), including decision variables.
