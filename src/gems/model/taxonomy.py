@@ -64,7 +64,7 @@ def check_library_against_taxonomy(library: LibrarySchema, taxonomy: Taxonomy) -
     """
     Validates that every model declaring a taxonomy_category:
       1. References a category that exists in the taxonomy.
-      2. Exposes all port IDs listed in that taxonomy category.
+      2. Exposes all variables, parameters, constraints, ports, extra-outputs and properties listed in that taxonomy category.
 
     Raises ValueError describing the first violation found.
     """
