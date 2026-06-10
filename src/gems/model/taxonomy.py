@@ -17,7 +17,11 @@ from typing import Dict, List, Optional
 import yaml
 from pydantic import Field
 
-from gems.model.parsing import LibrarySchema
+from gems.model.parsing import (
+    ConstraintSchema,
+    LibrarySchema,
+    PortFieldDefinitionSchema,
+)
 from gems.utils import ModifiedBaseModel
 
 
