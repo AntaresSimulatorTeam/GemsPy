@@ -4,6 +4,12 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Model schema: `properties`** - models in library YAML files may declare an optional `properties` list (entries with an `id`), exposed as `ModelSchema.properties` and `Model.properties`. When resolving a component, every property key declared by its model must be present in the component's `properties` (a `ValueError` is raised otherwise); extra, undeclared component properties remain allowed.
+
+### Changed
+- **Taxonomy check** - `check_library_against_taxonomy` now validates every field group declared in a taxonomy category (variables, parameters, ports, port-field-definitions, constraints, binding-constraints, extra-outputs and properties), instead of only ports.
+
 ---
 
 ## [0.1.2] - 2026-06-11

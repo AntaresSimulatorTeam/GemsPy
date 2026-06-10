@@ -204,6 +204,7 @@ def _resolve_model(
         constraints=[_to_constraint(c, identifiers) for c in input_model.constraints],
         objective_contributions=objective_contributions,
         extra_outputs=extra_outputs,
+        properties=[p.id for p in input_model.properties],
     )
 
 

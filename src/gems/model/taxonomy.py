@@ -12,7 +12,7 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import yaml
 from pydantic import Field
@@ -20,6 +20,7 @@ from pydantic import Field
 from gems.model.parsing import (
     ConstraintSchema,
     LibrarySchema,
+    ModelSchema,
     PortFieldDefinitionSchema,
 )
 from gems.utils import ModifiedBaseModel
@@ -68,15 +69,60 @@ def load_taxonomy(taxonomy_file: Path) -> Taxonomy:
     )
 
 
+def _missing(required: List, exposed: List, key: Callable = lambda x: x.id) -> List:
+    """Return the sorted identifiers required by the taxonomy but not exposed by the model."""
+    return sorted(set(map(key, required)) - set(map(key, exposed)))
+
+
 def check_library_against_taxonomy(library: LibrarySchema, taxonomy: Taxonomy) -> None:
     """
     Validates that every model declaring a taxonomy_category:
       1. References a category that exists in the taxonomy.
-      2. Exposes all variables, parameters, constraints, ports, extra-outputs and properties listed in that taxonomy category.
+      2. Exposes all variables, parameters, ports, port-field-definitions,
+         constraints, binding-constraints, extra-outputs and properties listed
+         in that taxonomy category.
 
     Raises ValueError describing the first violation found.
     """
     categories: Dict[str, TaxonomyCategory] = {c.id: c for c in taxonomy.categories}
+
+    # Each entry maps a human-readable field-group name to the required items
+    # (from the taxonomy category) and the items exposed by the model, plus the
+    # function used to identify an item within that group.
+    def field_groups(
+        category: TaxonomyCategory, model_schema: "ModelSchema"
+    ) -> List[tuple]:
+        port_field_key: Callable = lambda d: (d.port, d.field)
+        return [
+            ("variable", category.variables, model_schema.variables, lambda x: x.id),
+            ("parameter", category.parameters, model_schema.parameters, lambda x: x.id),
+            ("port", category.ports, model_schema.ports, lambda x: x.id),
+            (
+                "port-field-definition",
+                category.port_field_definitions,
+                model_schema.port_field_definitions,
+                port_field_key,
+            ),
+            (
+                "constraint",
+                category.constraints,
+                model_schema.constraints,
+                lambda x: x.id,
+            ),
+            (
+                "binding-constraint",
+                category.binding_constraints,
+                model_schema.binding_constraints,
+                lambda x: x.id,
+            ),
+            (
+                "extra-output",
+                category.extra_outputs,
+                model_schema.extra_outputs or [],
+                lambda x: x.id,
+            ),
+            ("property", category.properties, model_schema.properties, lambda x: x.id),
+        ]
 
     for model_schema in library.models:
         cat_id = model_schema.taxonomy_category
@@ -90,10 +136,10 @@ def check_library_against_taxonomy(library: LibrarySchema, taxonomy: Taxonomy) -
             )
 
         category = categories[cat_id]
-        model_port_ids = {p.id for p in model_schema.ports}
-        missing = sorted({item.id for item in category.ports} - model_port_ids)
-        if missing:
-            raise ValueError(
-                f"Model '{model_schema.id}' (taxonomy-category: '{cat_id}') is missing "
-                f"port(s) required by the taxonomy: {missing}."
-            )
+        for group_name, required, exposed, key in field_groups(category, model_schema):
+            missing = _missing(required, exposed, key)
+            if missing:
+                raise ValueError(
+                    f"Model '{model_schema.id}' (taxonomy-category: '{cat_id}') is "
+                    f"missing {group_name}(s) required by the taxonomy: {missing}."
+                )
