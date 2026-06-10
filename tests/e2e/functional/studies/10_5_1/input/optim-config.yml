@@ -4,8 +4,9 @@ time-scope:
 
 solver-options:
   name: highs
-  logs: true
-  parameters: "THREADS 1"
+  logs: false
+  parameters: ""
 
 scenario-scope:
-  nb-scenarios: 1
+  include:
+    - 0
