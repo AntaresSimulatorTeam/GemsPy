@@ -15,11 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from gems.model.parsing import (
-    ConstraintSchema,
-    PortFieldDefinitionSchema,
-    parse_yaml_library,
-)
+from gems.model.parsing import parse_yaml_library
 from gems.model.taxonomy import (
     Taxonomy,
     TaxonomyCategory,
@@ -301,7 +297,7 @@ def test_model_missing_required_taxonomy_binding_constraint_raises() -> None:
     taxonomy = _make_taxonomy(
         TaxonomyCategory(
             id="production",
-            binding_constraints=[ConstraintSchema(id="balance", expression="x = 0")],
+            binding_constraints=[TaxonomyItem(id="balance")],
         )
     )
     lib = _parse_lib("""
@@ -352,11 +348,7 @@ def test_model_missing_required_taxonomy_port_field_definition_raises() -> None:
     taxonomy = _make_taxonomy(
         TaxonomyCategory(
             id="production",
-            port_field_definitions=[
-                PortFieldDefinitionSchema(
-                    port="injection_port", field="flow", definition="generation"
-                )
-            ],
+            port_field_definitions=[TaxonomyItem(id="injection_port.flow")],
         )
     )
     lib = _parse_lib("""
@@ -373,7 +365,7 @@ library:
         - id: injection_port
           type: flow
 """)
-    with pytest.raises(ValueError, match="injection_port") as exc_info:
+    with pytest.raises(ValueError, match="injection_port.flow") as exc_info:
         check_library_against_taxonomy(lib, taxonomy)
     assert "port-field-definition" in str(exc_info.value)
 
@@ -385,13 +377,9 @@ def test_model_exposing_all_required_fields_is_valid() -> None:
             variables=[TaxonomyItem(id="generation")],
             parameters=[TaxonomyItem(id="p_max")],
             ports=[TaxonomyItem(id="injection_port")],
-            port_field_definitions=[
-                PortFieldDefinitionSchema(
-                    port="injection_port", field="flow", definition="generation"
-                )
-            ],
+            port_field_definitions=[TaxonomyItem(id="injection_port.flow")],
             constraints=[TaxonomyItem(id="max_output")],
-            binding_constraints=[ConstraintSchema(id="balance", expression="x = 0")],
+            binding_constraints=[TaxonomyItem(id="balance")],
             extra_outputs=[TaxonomyItem(id="co2")],
             properties=[TaxonomyItem(id="technology")],
         )

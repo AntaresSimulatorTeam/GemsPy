@@ -17,12 +17,7 @@ from typing import Callable, Dict, List, Optional
 import yaml
 from pydantic import Field
 
-from gems.model.parsing import (
-    ConstraintSchema,
-    LibrarySchema,
-    ModelSchema,
-    PortFieldDefinitionSchema,
-)
+from gems.model.parsing import LibrarySchema, ModelSchema
 from gems.utils import ModifiedBaseModel
 
 
@@ -36,11 +31,9 @@ class TaxonomyCategory(ModifiedBaseModel):
     variables: List[TaxonomyItem] = Field(default_factory=list)
     parameters: List[TaxonomyItem] = Field(default_factory=list)
     ports: List[TaxonomyItem] = Field(default_factory=list)
-    port_field_definitions: List[PortFieldDefinitionSchema] = Field(
-        default_factory=list
-    )
+    port_field_definitions: List[TaxonomyItem] = Field(default_factory=list)
     constraints: List[TaxonomyItem] = Field(default_factory=list)
-    binding_constraints: List[ConstraintSchema] = Field(default_factory=list)
+    binding_constraints: List[TaxonomyItem] = Field(default_factory=list)
     extra_outputs: List[TaxonomyItem] = Field(default_factory=list)
     properties: List[TaxonomyItem] = Field(default_factory=list)
 
@@ -69,9 +62,18 @@ def load_taxonomy(taxonomy_file: Path) -> Taxonomy:
     )
 
 
-def _missing(required: List, exposed: List, key: Callable = lambda x: x.id) -> List:
-    """Return the sorted identifiers required by the taxonomy but not exposed by the model."""
-    return sorted(set(map(key, required)) - set(map(key, exposed)))
+def _missing(
+    required: List[TaxonomyItem], exposed: List, exposed_key: Callable
+) -> List[str]:
+    """Return the sorted taxonomy item ids not exposed by the model.
+
+    Taxonomy items are always identified by their ``id``; ``exposed_key`` maps each
+    model-side item to the identifier to compare against (e.g. the ``port.field``
+    string for port-field-definitions).
+    """
+    return sorted(
+        {item.id for item in required} - {exposed_key(item) for item in exposed}
+    )
 
 
 def check_library_against_taxonomy(library: LibrarySchema, taxonomy: Taxonomy) -> None:
@@ -86,42 +88,40 @@ def check_library_against_taxonomy(library: LibrarySchema, taxonomy: Taxonomy) -
     """
     categories: Dict[str, TaxonomyCategory] = {c.id: c for c in taxonomy.categories}
 
+    by_id: Callable = lambda x: x.id
+
     # Each entry maps a human-readable field-group name to the required items
     # (from the taxonomy category) and the items exposed by the model, plus the
-    # function used to identify an item within that group.
+    # function identifying a model-side item within that group. Taxonomy items are
+    # homogeneous (``TaxonomyItem``) and always identified by their ``id``.
     def field_groups(
         category: TaxonomyCategory, model_schema: "ModelSchema"
     ) -> List[tuple]:
-        port_field_key: Callable = lambda d: (d.port, d.field)
+        port_field_key: Callable = lambda d: f"{d.port}.{d.field}"
         return [
-            ("variable", category.variables, model_schema.variables, lambda x: x.id),
-            ("parameter", category.parameters, model_schema.parameters, lambda x: x.id),
-            ("port", category.ports, model_schema.ports, lambda x: x.id),
+            ("variable", category.variables, model_schema.variables, by_id),
+            ("parameter", category.parameters, model_schema.parameters, by_id),
+            ("port", category.ports, model_schema.ports, by_id),
             (
                 "port-field-definition",
                 category.port_field_definitions,
                 model_schema.port_field_definitions,
                 port_field_key,
             ),
-            (
-                "constraint",
-                category.constraints,
-                model_schema.constraints,
-                lambda x: x.id,
-            ),
+            ("constraint", category.constraints, model_schema.constraints, by_id),
             (
                 "binding-constraint",
                 category.binding_constraints,
                 model_schema.binding_constraints,
-                lambda x: x.id,
+                by_id,
             ),
             (
                 "extra-output",
                 category.extra_outputs,
                 model_schema.extra_outputs or [],
-                lambda x: x.id,
+                by_id,
             ),
-            ("property", category.properties, model_schema.properties, lambda x: x.id),
+            ("property", category.properties, model_schema.properties, by_id),
         ]
 
     for model_schema in library.models:
