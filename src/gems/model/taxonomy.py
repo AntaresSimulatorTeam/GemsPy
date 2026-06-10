@@ -31,6 +31,9 @@ class TaxonomyCategory(ModifiedBaseModel):
     variables: List[TaxonomyItem] = Field(default_factory=list)
     parameters: List[TaxonomyItem] = Field(default_factory=list)
     ports: List[TaxonomyItem] = Field(default_factory=list)
+    port_field_definitions: List[PortFieldDefinitionSchema] = Field(
+        default_factory=list
+    )
     constraints: List[TaxonomyItem] = Field(default_factory=list)
     extra_outputs: List[TaxonomyItem] = Field(default_factory=list)
     properties: List[TaxonomyItem] = Field(default_factory=list)
