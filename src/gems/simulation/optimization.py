@@ -38,8 +38,8 @@ import linopy
 import numpy as np
 import xarray as xr
 
+from gems.expression.degree import is_linear
 from gems.expression.expression import is_unbounded
-from gems.expression.predicates import contains_dual_or_reduced_cost
 from gems.expression.visitor import visit
 from gems.model.common import ValueType
 from gems.model.model import Model
@@ -207,10 +207,10 @@ def build_port_arrays(
                     # variable when building the master). Treat as zero.
                     port_arrays[pf_id] = xr.DataArray(0.0)
                 except NotImplementedError:
-                    # dual()/reduced_cost() are post-solve quantities; only the
-                    # extra-output builder can evaluate them. Treat as zero
-                    # during the optimization build phase.
-                    if not contains_dual_or_reduced_cost(defn):
+                    # Non-linear port-field definitions (dual, reduced_cost, max/min
+                    # of variables, …) cannot be evaluated during the LP build phase.
+                    # Treat as zero; the extra-output builder handles them post-solve.
+                    if is_linear(defn):
                         raise
                     port_arrays[pf_id] = xr.DataArray(0.0)
             else:
@@ -293,10 +293,9 @@ def _build_slave_port_array(
             # Its port contribution is treated as zero.
             continue
         except NotImplementedError:
-            # dual()/reduced_cost() are post-solve quantities; only the
-            # extra-output builder can evaluate them. Skip during the
-            # optimization build phase.
-            if not contains_dual_or_reduced_cost(defn):
+            # Non-linear port-field definitions cannot be evaluated during the
+            # LP build phase. Skip; the extra-output builder handles them post-solve.
+            if is_linear(defn):
                 raise
             continue
 
