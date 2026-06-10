@@ -99,6 +99,12 @@ class VectorizedExtraOutputBuilder(VectorizedBuilderBase[xr.DataArray]):
     var_solution_arrays:
         Mapping from (model_id, var_name) to a DataArray of solution values,
         with dims in {component, time, scenario} (or a subset).
+    constraint_dual_arrays:
+        Mapping from (model_id, constraint_id) to a DataArray of dual values,
+        with dims in {component, time, scenario} (or a subset).
+    var_reduced_cost_arrays:
+        Mapping from (model_id, var_name) to a DataArray of reduced cost values,
+        with dims in {component, time, scenario} (or a subset).
     port_arrays:
         Pre-computed xr.DataArray for each PortFieldId of this model.
         Keyed by PortFieldId(port_name, field_name).
