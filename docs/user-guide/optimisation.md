@@ -64,7 +64,9 @@ multiple solve calls.
 ### Building the optimisation problem
 
 ~~~ python
-from gems.study import Study, load_study
+from pathlib import Path
+from gems.study import Study
+from gems.study.folder import load_study
 from gems.simulation import build_problem, TimeBlock
 
 study = load_study(Path("my_study"))
