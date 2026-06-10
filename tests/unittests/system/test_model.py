@@ -219,6 +219,41 @@ def test_constraint_equals() -> None:
     )
 
 
+def test_is_equality_true_for_equality_comparison() -> None:
+    c = Constraint(name="c", expression=var("x") == param("p"))
+    assert c.is_equality is True
+
+
+def test_is_equality_false_for_inequality_comparison() -> None:
+    assert Constraint(name="c", expression=var("x") <= param("p")).is_equality is False
+    assert Constraint(name="c", expression=var("x") >= param("p")).is_equality is False
+
+
+def test_is_equality_false_for_range_constraint() -> None:
+    c = Constraint(
+        name="c", expression=var("x"), lower_bound=literal(0), upper_bound=literal(10)
+    )
+    assert c.is_equality is False
+
+
+def test_is_equality_true_for_equal_explicit_bounds() -> None:
+    c = Constraint(
+        name="c", expression=var("x"), lower_bound=param("p"), upper_bound=param("p")
+    )
+    assert c.is_equality is True
+
+
+def test_is_equality_false_for_one_sided_constraint() -> None:
+    assert (
+        Constraint(name="c", expression=var("x"), lower_bound=literal(0)).is_equality
+        is False
+    )
+    assert (
+        Constraint(name="c", expression=var("x"), upper_bound=literal(0)).is_equality
+        is False
+    )
+
+
 # --- Issue #76: tolerate absence of expec() in objective contributions ---
 
 
@@ -335,3 +370,19 @@ def test_variable_eq_with_non_variable_returns_false() -> None:
     assert v != "x"
     assert v != 42
     assert v != None  # noqa: E711
+
+
+def test_variable_bounds_accept_abs_round_of_parameters() -> None:
+    """abs/round of a parameter expression is constant, so usable in bounds."""
+    v = float_variable("x", lower_bound=-param("p").abs(), upper_bound=param("p").abs())
+    assert v.lower_bound is not None and v.upper_bound is not None
+    v2 = float_variable("x", upper_bound=(param("p") / param("q")).round())
+    assert v2.upper_bound is not None
+
+
+def test_variable_bounds_reject_abs_of_variable() -> None:
+    """abs of a variable is not constant; the bound check must reject it."""
+    with pytest.raises(ValueError, match="bounds of variables must be constant"):
+        float_variable("x", upper_bound=var("y").abs())
+    with pytest.raises(ValueError, match="bounds of variables must be constant"):
+        float_variable("x", lower_bound=var("y").round())

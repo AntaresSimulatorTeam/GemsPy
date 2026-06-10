@@ -140,7 +140,7 @@ _GEN_PREFIX = "simple_models.generator"
 # Constraints: 2 components (gen_1, gen_2) × 3 timesteps = 6 potential instances each.
 #
 # system_cyclic_with_param_in_shift — no drop mode, all instances present:
-#   is_on_dynamics (lb + ub): 6 each
+#   is_on_dynamics (eq): 6
 #   min_up_duration (ub only): 6
 #   min_down_duration (ub only): 6
 #
@@ -151,14 +151,12 @@ _GEN_PREFIX = "simple_models.generator"
 #   min_down_duration: both have d_min_down=1 → range [0,0] → never dropped → 6
 _EXPECTED_CONSTRAINT_COUNTS: Dict[str, Dict[str, int]] = {
     "system_cyclic_with_param_in_shift": {
-        f"{_GEN_PREFIX}__is_on_dynamics__lb": 6,
-        f"{_GEN_PREFIX}__is_on_dynamics__ub": 6,
+        f"{_GEN_PREFIX}__is_on_dynamics__eq": 6,
         f"{_GEN_PREFIX}__min_up_duration__ub": 6,
         f"{_GEN_PREFIX}__min_down_duration__ub": 6,
     },
     "system_drop_with_param_in_shift": {
-        f"{_GEN_PREFIX}__is_on_dynamics__lb": 4,
-        f"{_GEN_PREFIX}__is_on_dynamics__ub": 4,
+        f"{_GEN_PREFIX}__is_on_dynamics__eq": 4,
         f"{_GEN_PREFIX}__min_up_duration__ub": 5,
         f"{_GEN_PREFIX}__min_down_duration__ub": 6,
     },

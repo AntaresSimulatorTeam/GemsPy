@@ -691,23 +691,22 @@ class _OptimizationProblemBuilder:
                 # Sanitize constraint name for LP format (spaces → underscores)
                 safe_name = constraint.name.replace(" ", "_").replace("-", "_")
 
-                # Lower bound constraint: lhs >= lb  (if lb != -inf)
-                if not is_unbounded(constraint.lower_bound):
+                if constraint.is_equality:
                     lb = visit(constraint.lower_bound, builder)
                     if validity_mask is not None:
                         lb = _apply_validity_mask(lb, validity_mask)
-                    name = f"{prefix}__{safe_name}__lb"
-                    con_lb = lhs >= lb  # type: ignore[operator]
-                    self.linopy_model.add_constraints(con_lb, name=name)  # type: ignore[arg-type]
-
-                # Upper bound constraint: lhs <= ub  (if ub != +inf)
-                if not is_unbounded(constraint.upper_bound):
-                    ub = visit(constraint.upper_bound, builder)
-                    if validity_mask is not None:
-                        ub = _apply_validity_mask(ub, validity_mask)
-                    name = f"{prefix}__{safe_name}__ub"
-                    con_ub = lhs <= ub  # type: ignore[operator]
-                    self.linopy_model.add_constraints(con_ub, name=name)  # type: ignore[arg-type]
+                    self.linopy_model.add_constraints(lhs == lb, name=f"{prefix}__{safe_name}__eq")  # type: ignore[operator,arg-type]
+                else:
+                    if not is_unbounded(constraint.lower_bound):
+                        lb = visit(constraint.lower_bound, builder)
+                        if validity_mask is not None:
+                            lb = _apply_validity_mask(lb, validity_mask)
+                        self.linopy_model.add_constraints(lhs >= lb, name=f"{prefix}__{safe_name}__lb")  # type: ignore[operator,arg-type]
+                    if not is_unbounded(constraint.upper_bound):
+                        ub = visit(constraint.upper_bound, builder)
+                        if validity_mask is not None:
+                            ub = _apply_validity_mask(ub, validity_mask)
+                        self.linopy_model.add_constraints(lhs <= ub, name=f"{prefix}__{safe_name}__ub")  # type: ignore[operator,arg-type]
 
     def _add_objectives_for_model(
         self,

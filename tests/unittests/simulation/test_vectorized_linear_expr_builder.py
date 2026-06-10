@@ -362,7 +362,7 @@ def test_comparison_equal_also_raises(builder: VectorizedLinearExprBuilder) -> N
 
 
 # ---------------------------------------------------------------------------
-# 9. floor() / ceil() — linopy guard
+# 9. floor() / ceil() / abs() / round() — linopy guard
 # ---------------------------------------------------------------------------
 
 
@@ -396,6 +396,34 @@ def test_ceil_on_variable_raises(builder: VectorizedLinearExprBuilder) -> None:
 def test_ceil_on_exact_integer_da(builder: VectorizedLinearExprBuilder) -> None:
     result = visit(literal(3.0).ceil(), builder)
     assert float(result) == pytest.approx(3.0)
+
+
+def test_abs_on_da_works(builder: VectorizedLinearExprBuilder) -> None:
+    result = visit(literal(-2.5).abs(), builder)
+    assert isinstance(result, xr.DataArray)
+    assert float(result) == pytest.approx(2.5)
+
+
+def test_abs_on_variable_raises(builder: VectorizedLinearExprBuilder) -> None:
+    with pytest.raises(NotImplementedError, match="abs"):
+        visit(var("x").abs(), builder)
+
+
+def test_round_on_da_works(builder: VectorizedLinearExprBuilder) -> None:
+    result = visit(literal(2.7).round(), builder)
+    assert isinstance(result, xr.DataArray)
+    assert float(result) == pytest.approx(3.0)
+
+
+def test_round_on_variable_raises(builder: VectorizedLinearExprBuilder) -> None:
+    with pytest.raises(NotImplementedError, match="round"):
+        visit(var("x").round(), builder)
+
+
+def test_round_banker_on_da(builder: VectorizedLinearExprBuilder) -> None:
+    # Banker's rounding: 2.5 -> 2, 3.5 -> 4.
+    assert float(visit(literal(2.5).round(), builder)) == pytest.approx(2.0)
+    assert float(visit(literal(3.5).round(), builder)) == pytest.approx(4.0)
 
 
 # ---------------------------------------------------------------------------

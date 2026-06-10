@@ -197,6 +197,12 @@ Here is the GemsPy syntax to read a test case described by
 -  A set of timeseries located in the directory: `series_dir`.
 
 ~~~ python
+from pathlib import Path
+from gems.model.parsing import parse_yaml_library
+from gems.model.resolve_library import resolve_library
+from gems.study.parsing import parse_yaml_components
+from gems.study.resolve_components import resolve_system, build_data_base
+
 with open("library.yml") as lib_file:
     input_libraries = [parse_yaml_library(lib_file)]
 
@@ -212,6 +218,7 @@ database = build_data_base(input_system, Path(series_dir))
 
 ~~~ python
 from gems.study import Study
+from gems.simulation import build_problem, TimeBlock
 
 problem = build_problem(
     Study(system, database),

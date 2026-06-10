@@ -10,22 +10,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Install:**
 ```bash
-uv sync          # installs all dependencies including dev group
-# or: pip install -e ".[dev]"
+uv sync --group dev
 ```
 
 **Test:**
 ```bash
-pytest                                          # run all tests
-pytest tests/path/to/test_file.py::test_name   # run a single test
-pytest --cov gems --cov-report xml             # with coverage
+uv run pytest                                          # run all tests
+uv run pytest tests/path/to/test_file.py::test_name   # run a single test
+uv run pytest --cov gems --cov-report xml             # with coverage
 ```
 
 **Lint & Format:**
 ```bash
-black --config pyproject.toml src/ tests/
-isort --profile black --filter-files src/ tests/
-mypy
+uv run black src tests
+uv run isort --profile black src tests
+uv run mypy
 ```
 
 **Running:**

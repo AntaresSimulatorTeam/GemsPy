@@ -26,6 +26,7 @@ from gems.expression import (
     VariableNode,
 )
 from gems.expression.expression import (
+    AbsNode,
     AllTimeSumNode,
     BinaryOperatorNode,
     CeilNode,
@@ -34,6 +35,7 @@ from gems.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -99,6 +101,10 @@ class EqualityVisitor:
             return self.floor(left, right)
         if isinstance(left, CeilNode) and isinstance(right, CeilNode):
             return self.ceil(left, right)
+        if isinstance(left, AbsNode) and isinstance(right, AbsNode):
+            return self.abs(left, right)
+        if isinstance(left, RoundNode) and isinstance(right, RoundNode):
+            return self.round(left, right)
         if isinstance(left, MaxNode) and isinstance(right, MaxNode):
             return self.maximum(left, right)
         if isinstance(left, MinNode) and isinstance(right, MinNode):
@@ -181,6 +187,12 @@ class EqualityVisitor:
         return self.visit(left.operand, right.operand)
 
     def ceil(self, left: CeilNode, right: CeilNode) -> bool:
+        return self.visit(left.operand, right.operand)
+
+    def abs(self, left: AbsNode, right: AbsNode) -> bool:
+        return self.visit(left.operand, right.operand)
+
+    def round(self, left: RoundNode, right: RoundNode) -> bool:
         return self.visit(left.operand, right.operand)
 
     def maximum(self, left: MaxNode, right: MaxNode) -> bool:

@@ -42,6 +42,7 @@ import xarray as xr
 
 from gems.expression.evaluate import EvaluationContext, EvaluationVisitor
 from gems.expression.expression import (
+    AbsNode,
     AdditionNode,
     AllTimeSumNode,
     CeilNode,
@@ -57,6 +58,7 @@ from gems.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -368,6 +370,14 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         operand = visit(node.operand, self)
         return np.ceil(operand)  # type: ignore[return-value,arg-type,call-overload]
 
+    def abs(self, node: AbsNode) -> VectorizedExpr:
+        operand = visit(node.operand, self)
+        return np.abs(operand)  # type: ignore[return-value,arg-type,call-overload]
+
+    def round(self, node: RoundNode) -> VectorizedExpr:
+        operand = visit(node.operand, self)
+        return np.round(operand)  # type: ignore[return-value,arg-type,call-overload]
+
     def maximum(self, node: MaxNode) -> VectorizedExpr:
         operands = [visit(op, self) for op in node.operands]
         result = operands[0]
@@ -525,6 +535,12 @@ class _ShiftAmountEvaluator(ExpressionVisitorOperations[xr.DataArray]):
     def ceil(self, node: CeilNode) -> xr.DataArray:
         return np.ceil(visit(node.operand, self))  # type: ignore[return-value]
 
+    def abs(self, node: AbsNode) -> xr.DataArray:
+        return np.abs(visit(node.operand, self))  # type: ignore[return-value]
+
+    def round(self, node: RoundNode) -> xr.DataArray:
+        return np.round(visit(node.operand, self))  # type: ignore[return-value]
+
     def maximum(self, node: MaxNode) -> xr.DataArray:
         ops = [visit(op, self) for op in node.operands]
         return functools.reduce(
@@ -652,6 +668,12 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return visit(node.operand, self)
 
     def ceil(self, node: CeilNode) -> Optional[xr.DataArray]:
+        return visit(node.operand, self)
+
+    def abs(self, node: AbsNode) -> Optional[xr.DataArray]:
+        return visit(node.operand, self)
+
+    def round(self, node: RoundNode) -> Optional[xr.DataArray]:
         return visit(node.operand, self)
 
     def maximum(self, node: MaxNode) -> Optional[xr.DataArray]:

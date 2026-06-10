@@ -19,7 +19,8 @@ solver-options:
   parameters: "THREADS 1"
 
 scenario-scope:
-  nb-scenarios: 1
+  include:
+    - 0
 
 models:
   - id: lib_example_13_2.generator_with_discrete_invest

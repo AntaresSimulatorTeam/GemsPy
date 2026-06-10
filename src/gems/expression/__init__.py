@@ -14,6 +14,7 @@ from .copy import CopyVisitor, copy_expression
 from .degree import ExpressionDegreeVisitor, compute_degree
 from .evaluate import EvaluationContext, EvaluationVisitor, ValueProvider, evaluate
 from .expression import (
+    AbsNode,
     AdditionNode,
     CeilNode,
     Comparator,
@@ -27,6 +28,7 @@ from .expression import (
     MultiplicationNode,
     NegationNode,
     ParameterNode,
+    RoundNode,
     VariableNode,
     literal,
     maximum,
