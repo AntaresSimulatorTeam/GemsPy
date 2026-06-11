@@ -31,7 +31,7 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 import xarray as xr
 
-from gems.expression.expression import VariableNode
+from gems.expression.expression import DualNode, ReducedCostNode, VariableNode
 from gems.model.port import PortFieldId
 from gems.simulation.vectorized_builder import VectorizedBuilderBase
 from gems.study.system import Component
@@ -99,6 +99,12 @@ class VectorizedExtraOutputBuilder(VectorizedBuilderBase[xr.DataArray]):
     var_solution_arrays:
         Mapping from (model_id, var_name) to a DataArray of solution values,
         with dims in {component, time, scenario} (or a subset).
+    constraint_dual_arrays:
+        Mapping from (model_id, constraint_id) to a DataArray of dual values,
+        with dims in {component, time, scenario} (or a subset).
+    var_reduced_cost_arrays:
+        Mapping from (model_id, var_name) to a DataArray of reduced cost values,
+        with dims in {component, time, scenario} (or a subset).
     port_arrays:
         Pre-computed xr.DataArray for each PortFieldId of this model.
         Keyed by PortFieldId(port_name, field_name).
@@ -107,6 +113,12 @@ class VectorizedExtraOutputBuilder(VectorizedBuilderBase[xr.DataArray]):
     """
 
     var_solution_arrays: Dict[Tuple[str, str], xr.DataArray]
+    constraint_dual_arrays: Dict[Tuple[str, str], xr.DataArray] = field(
+        default_factory=dict
+    )
+    var_reduced_cost_arrays: Dict[Tuple[str, str], xr.DataArray] = field(
+        default_factory=dict
+    )
 
     def variable(self, node: VariableNode) -> xr.DataArray:
         key = (self.model_id, node.name)
@@ -116,3 +128,21 @@ class VectorizedExtraOutputBuilder(VectorizedBuilderBase[xr.DataArray]):
                 f"{self.model_id!r}."
             )
         return self.var_solution_arrays[key]
+
+    def dual(self, node: DualNode) -> xr.DataArray:
+        key = (self.model_id, node.constraint_id)
+        if key not in self.constraint_dual_arrays:
+            raise KeyError(
+                f"Dual of constraint '{node.constraint_id}' not found for model "
+                f"{self.model_id!r}."
+            )
+        return self.constraint_dual_arrays[key]
+
+    def reduced_cost(self, node: ReducedCostNode) -> xr.DataArray:
+        key = (self.model_id, node.variable_id)
+        if key not in self.var_reduced_cost_arrays:
+            raise KeyError(
+                f"Reduced cost of variable '{node.variable_id}' not found for model "
+                f"{self.model_id!r}."
+            )
+        return self.var_reduced_cost_arrays[key]

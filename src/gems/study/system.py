@@ -18,6 +18,10 @@ including components and connections.
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, List, Optional
 
+from gems.expression.predicates import (
+    contains_dual_or_reduced_cost,
+    uses_sum_connections_on,
+)
 from gems.model import PortField, PortType
 from gems.model.model import Model
 from gems.model.port import PortFieldId
@@ -51,6 +55,25 @@ def create_component(
 class PortRef:
     component: Component
     port_id: str
+
+
+def _check_no_dual_rc_sum_connections(
+    master_ref: PortRef, slave_ref: PortRef, field_name: str
+) -> None:
+    master_model = master_ref.component.model
+    slave_model = slave_ref.component.model
+    master_port_id = PortFieldId(port_name=master_ref.port_id, field_name=field_name)
+    master_def = master_model.port_fields_definitions.get(master_port_id)
+    if master_def is None or not contains_dual_or_reduced_cost(master_def.definition):
+        return
+    for bc in slave_model.binding_constraints.values():
+        if uses_sum_connections_on(bc.expression, slave_ref.port_id, field_name):
+            raise ValueError(
+                f"Port-field definition '{master_port_id}' contains "
+                f"dual/reduced_cost (non-linear) and cannot be aggregated "
+                f"via sum_connections in a binding-constraint of model "
+                f"'{slave_model.id}'."
+            )
 
 
 @dataclass()
@@ -93,9 +116,10 @@ class PortsConnection:
                     f"Port field {field_name} on {port_1.port_name} has 2 definitions."
                 )
 
-            self.master_port[PortField(name=field_name)] = (
-                self.port1 if def1 else self.port2
-            )
+            master_ref = self.port1 if def1 else self.port2
+            slave_ref = self.port2 if def1 else self.port1
+            self.master_port[PortField(name=field_name)] = master_ref
+            _check_no_dual_rc_sum_connections(master_ref, slave_ref, field_name)
 
     def get_port_type(self) -> PortType:
         port_1 = self.port1.component.model.ports.get(self.port1.port_id)

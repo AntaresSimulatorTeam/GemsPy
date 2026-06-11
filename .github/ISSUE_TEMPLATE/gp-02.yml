@@ -1,0 +1,113 @@
+name: "GP-02 — GemsPy internal development"
+description: Track internal bug fixes, new GemsPy features, or code improvements not driven by a GEMS Language release
+title: "[GP-02] "
+labels: ["GP-02"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Process GP-02** — Triggered by internal initiative to fix, improve, or extend GemsPy. Not driven by a new GEMS Language version.
+
+        > **Deviation from standard workflow — Step 3:** extended impact analysis on results is required. You must explicitly state whether solver results are expected to change, and if so, document the reasoning.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      options:
+        - Expression parsing / grammar (expression/, grammar/)
+        - Optimization problem construction (simulation/)
+        - Study loading / model resolution (study/)
+        - Decomposition / optim-config (optim_config/)
+        - Library resolution (libs/)
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: change_type
+    attributes:
+      label: Type of Change
+      description: Determines the semantic version impact.
+      options:
+        - "Major: backward-incompatible change or major new feature (e.g. rolling horizon)"
+        - "Minor: bug fix or backward-compatible new feature (e.g. new operator)"
+        - "Patch: dependency update, code optimisation, or internal refactor with no syntax impact"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What change is being proposed and why?
+    validations:
+      required: true
+
+  - type: textarea
+    id: results_impact
+    attributes:
+      label: Results Impact
+      description: |
+        Are solver output values expected to change?
+        - If yes: describe the before/after difference and why it is intended.
+        - If no: this must be confirmed via tests.
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation_strategy
+    attributes:
+      label: Validation Strategy
+      description: |
+        Describe the validation approach:
+        - Which unit tests cover the changed component?
+        - Which E2E studies confirm solver equivalence (if results must not change)?
+        - If results are expected to change, which reference studies document the new expected behavior?
+    validations:
+      required: true
+
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Process Checklist
+      value: |
+        ### Step 1 — Issue Creation
+        - [x] Issue created and linked to process GP-02
+
+        ### Step 2 — Triage
+        - [ ] Process confirmed applicable
+        - [ ] Assigned to responsible contributor
+        - [ ] Priority and milestone set (if applicable)
+
+        ### Step 3 — Impact Analysis ⚠️ extended results analysis required
+        - [ ] Affected modules identified
+        - [ ] Results impact explicitly stated: change intended / no change intended
+        - [ ] If results expected to change: before/after difference described and justified
+        - [ ] Breaking vs backward-compatible change determined
+
+        ### Step 4 — Implementation
+        - [ ] Code changes implemented
+        - [ ] Backward compatibility maintained unless explicitly intended as breaking
+
+        ### Step 5 — Testing & Validation
+        - [ ] If results expected to change: reference studies updated with new expected values
+        - [ ] If results must not change: solver equivalence confirmed via tests
+        - [ ] Unit tests cover changed components
+
+        ### Step 6 — CI Validation
+        - [ ] Type checking passes (`mypy`)
+        - [ ] Formatting passes (`black`, `isort`)
+        - [ ] All tests pass in CI (`pytest`)
+
+        ### Step 7 — Review & Merge
+        - [ ] PR reviewed; documentation changes included
+
+        ### Step 8 — Versioning
+        - [ ] `pyproject.toml` version bumped
+
+        ### Step 9 — Supporting Files
+        - [ ] `AGENTS.md` reviewed for impact and updated if needed
+
+        ### Step 10 — Release
+        - [ ] If a release is needed: follow the release process in the Developer Guidelines

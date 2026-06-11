@@ -30,11 +30,13 @@ from gems.expression.expression import (
     AllTimeSumNode,
     BinaryOperatorNode,
     CeilNode,
+    DualNode,
     FloorNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
@@ -109,6 +111,10 @@ class EqualityVisitor:
             return self.maximum(left, right)
         if isinstance(left, MinNode) and isinstance(right, MinNode):
             return self.minimum(left, right)
+        if isinstance(left, DualNode) and isinstance(right, DualNode):
+            return self.dual(left, right)
+        if isinstance(left, ReducedCostNode) and isinstance(right, ReducedCostNode):
+            return self.reduced_cost(left, right)
         raise NotImplementedError(f"Equality not implemented for {left.__class__}")
 
     def literal(self, left: LiteralNode, right: LiteralNode) -> bool:
@@ -204,6 +210,12 @@ class EqualityVisitor:
         return len(left.operands) == len(right.operands) and all(
             self.visit(l, r) for l, r in zip(left.operands, right.operands)
         )
+
+    def dual(self, left: DualNode, right: DualNode) -> bool:
+        return left.constraint_id == right.constraint_id
+
+    def reduced_cost(self, left: ReducedCostNode, right: ReducedCostNode) -> bool:
+        return left.variable_id == right.variable_id
 
 
 def expressions_equal(

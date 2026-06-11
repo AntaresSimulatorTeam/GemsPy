@@ -48,6 +48,7 @@ from gems.expression.expression import (
     CeilNode,
     ComparisonNode,
     DivisionNode,
+    DualNode,
     ExpressionNode,
     FloorNode,
     LiteralNode,
@@ -58,6 +59,7 @@ from gems.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
@@ -392,6 +394,18 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
             result = xr.where(result <= op, result, op)  # type: ignore[no-untyped-call,assignment,operator]
         return result  # type: ignore[return-value]
 
+    def dual(self, node: DualNode) -> VectorizedExpr:
+        raise NotImplementedError(
+            f"dual() is only available in the extra-output builder, "
+            f"not in {type(self).__name__}."
+        )
+
+    def reduced_cost(self, node: ReducedCostNode) -> VectorizedExpr:
+        raise NotImplementedError(
+            f"reduced_cost() is only available in the extra-output builder, "
+            f"not in {type(self).__name__}."
+        )
+
     # ------------------------------------------------------------------ #
     # Private helpers                                                       #
     # ------------------------------------------------------------------ #
@@ -552,6 +566,12 @@ class _ShiftAmountEvaluator(ExpressionVisitorOperations[xr.DataArray]):
         return functools.reduce(
             lambda a, b: xr.where(a <= b, a, b), ops  # type: ignore[return-value,no-untyped-call]
         )
+
+    def dual(self, node: DualNode) -> xr.DataArray:
+        raise NotImplementedError
+
+    def reduced_cost(self, node: ReducedCostNode) -> xr.DataArray:
+        raise NotImplementedError
 
 
 def _and_mask(
@@ -714,4 +734,10 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return None
 
     def port_field(self, node: PortFieldNode) -> Optional[xr.DataArray]:
+        return None
+
+    def dual(self, node: DualNode) -> Optional[xr.DataArray]:
+        return None
+
+    def reduced_cost(self, node: ReducedCostNode) -> Optional[xr.DataArray]:
         return None

@@ -15,13 +15,16 @@ import math
 import gems.expression.scenario_operator
 from gems.expression.expression import (
     AbsNode,
+    AdditionNode,
     AllTimeSumNode,
     CeilNode,
+    DualNode,
     FloorNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    ReducedCostNode,
     RoundNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -29,7 +32,6 @@ from gems.expression.expression import (
 )
 
 from .expression import (
-    AdditionNode,
     ComparisonNode,
     DivisionNode,
     ExpressionNode,
@@ -121,6 +123,12 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
 
     def minimum(self, node: MinNode) -> int | float:
         return 0 if all(visit(op, self) == 0 for op in node.operands) else math.inf
+
+    def dual(self, node: DualNode) -> int | float:
+        return math.inf
+
+    def reduced_cost(self, node: ReducedCostNode) -> int | float:
+        return math.inf
 
 
 def compute_degree(expression: ExpressionNode) -> int | float:

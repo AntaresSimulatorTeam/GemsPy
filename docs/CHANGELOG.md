@@ -9,10 +9,26 @@ All notable changes to GemsPy are documented here.
 ## [0.1.2] - 2026-06-11
 
 ### Added
+
 - Math operators `abs` and `round` in the GemsPy expression language.
   - Can be applied to parameters and literals in constraints, bounds, and objective contributions (degree-0 context).
   - Can be applied to any expression in extra-outputs (post-solve evaluation), including decision variables.
   - Use `.abs()` and `.round()` methods on expression objects, or `abs(expr)` and `round(expr)` in parsed expression strings.
+- **`dual(constraint_name)`** and **`reduced_cost(variable_name)`** operators in
+  the expression language, usable in `extra-outputs`.  Both are validated at
+  model-build time; using them inside constraints or objective contributions
+  raises a `ValueError`.
+- **Xpress** (≥ 9.8) and **Gurobi** (≥ 10.0) solver support alongside HiGHS.
+  Reduced costs use each solver's native API (`getLpSol` / `getAttr("RC")` /
+  `col_dual`) since linopy has no unified reduced-cost interface.
+- New `solvers` optional dependency group (`uv sync --group solvers`) for
+  running solver-specific tests with a licence; CI now installs it.
+
+### Fixed
+
+- Pre-commit `black` hook no longer passes redundant `--config pyproject.toml`.
+- Pre-commit `isort` hook simplified to `--profile black` (removed
+  `--filter-files` which conflicted with pre-commit's own file filtering).
 
 ### Changed
 - Modernized README design: new layout, GEMS favicon, quick-link navigation, and `uv` install instructions.

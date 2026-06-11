@@ -39,6 +39,7 @@ import numpy as np
 import xarray as xr
 
 from gems.expression.expression import is_unbounded
+from gems.expression.predicates import contains_dual_or_reduced_cost
 from gems.expression.visitor import visit
 from gems.model.common import ValueType
 from gems.model.model import Model
@@ -205,6 +206,13 @@ def build_port_arrays(
                     # available in the current problem (e.g. a subproblem-only
                     # variable when building the master). Treat as zero.
                     port_arrays[pf_id] = xr.DataArray(0.0)
+                except NotImplementedError:
+                    # dual()/reduced_cost() are post-solve quantities; only the
+                    # extra-output builder can evaluate them. Treat as zero
+                    # during the optimization build phase.
+                    if not contains_dual_or_reduced_cost(defn):
+                        raise
+                    port_arrays[pf_id] = xr.DataArray(0.0)
             else:
                 port_arrays[pf_id] = _build_slave_port_array(
                     comp_ids,
@@ -284,6 +292,13 @@ def _build_slave_port_array(
             # (e.g. a subproblem-only model when building the master).
             # Its port contribution is treated as zero.
             continue
+        except NotImplementedError:
+            # dual()/reduced_cost() are post-solve quantities; only the
+            # extra-output builder can evaluate them. Skip during the
+            # optimization build phase.
+            if not contains_dual_or_reduced_cost(defn):
+                raise
+            continue
 
         expr_master_r = expr_master.rename({"component": "component_master"})  # type: ignore[union-attr]
         contribution = (A * expr_master_r).sum("component_master")  # type: ignore[operator]
@@ -322,12 +337,17 @@ class OptimizationProblem:
     def block_length(self) -> int:
         return len(self.block.timesteps)
 
+    # Solvers whose linopy backend implements the direct (in-memory) API.
+    # All others fall back to file-based LP/MPS exchange.
+    _DIRECT_API_SOLVERS = {"highs", "gurobi"}
+
     def solve(self, solver_name: str = "highs", **kwargs: object) -> None:
         """Solve the problem using the specified solver."""
         # Use io_api="direct" to bypass LP file writing and avoid LP name parsing
         # issues in linopy's set_int_index (e.g. constraint names with spaces or
         # variables with non-standard characters).
-        kwargs.setdefault("io_api", "direct")  # type: ignore[call-overload]
+        if solver_name in self._DIRECT_API_SOLVERS:
+            kwargs.setdefault("io_api", "direct")  # type: ignore[call-overload]
         self.linopy_model.solve(solver_name=solver_name, **kwargs)  # type: ignore[arg-type]
 
     @property

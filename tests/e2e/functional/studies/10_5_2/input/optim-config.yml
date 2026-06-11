@@ -1,0 +1,12 @@
+time-scope:
+  first-time-step: 0
+  last-time-step: 2
+
+solver-options:
+  name: highs
+  logs: false
+  parameters: ""
+
+scenario-scope:
+  include:
+    - 0
