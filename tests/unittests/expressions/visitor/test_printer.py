@@ -11,6 +11,7 @@
 # This file is part of the Antares project.
 
 from gems.expression import ExpressionNode, PrinterVisitor, param, var, visit
+from gems.expression.expression import DualNode, ReducedCostNode
 
 
 def test_comparison() -> None:
@@ -49,3 +50,8 @@ def test_abs_round_printer() -> None:
     assert visit(p.round(), PrinterVisitor()) == "round(p)"
     assert visit((p - q).abs(), PrinterVisitor()) == "abs((p - q))"
     assert visit((p / q).round(), PrinterVisitor()) == "round((p / q))"
+
+
+def test_dual_reduced_cost_printer() -> None:
+    assert visit(DualNode("balance"), PrinterVisitor()) == "dual(balance)"
+    assert visit(ReducedCostNode("p"), PrinterVisitor()) == "reduced_cost(p)"

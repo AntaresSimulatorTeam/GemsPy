@@ -14,7 +14,7 @@ import pytest
 
 from gems.expression import ExpressionNode, copy_expression, literal, param, var
 from gems.expression.equality import expressions_equal
-from gems.expression.expression import maximum, minimum
+from gems.expression.expression import DualNode, ReducedCostNode, maximum, minimum
 
 
 @pytest.mark.parametrize(
@@ -84,3 +84,13 @@ def test_tolerance() -> None:
     assert not expressions_equal(literal(10), literal(10.11), abs_tol=0.1)
     assert expressions_equal(literal(10), literal(10.9), rel_tol=0.1)
     assert not expressions_equal(literal(10), literal(11.2), rel_tol=0.1)
+
+
+def test_dual_reduced_cost_equality() -> None:
+    assert expressions_equal(DualNode("balance"), copy_expression(DualNode("balance")))
+    assert not expressions_equal(DualNode("balance"), DualNode("other"))
+    assert expressions_equal(
+        ReducedCostNode("p"), copy_expression(ReducedCostNode("p"))
+    )
+    assert not expressions_equal(ReducedCostNode("p"), ReducedCostNode("q"))
+    assert not expressions_equal(DualNode("p"), ReducedCostNode("p"))

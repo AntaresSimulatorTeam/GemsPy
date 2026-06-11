@@ -73,7 +73,7 @@ library:
           definition: flow
       binding-constraints:
         - id: AC flow
-          expression: flow = 1 / reactance * (port1.angle - port2.angle)
+          expression: flow = 1 / reactance * (sum_connections(port1.angle) - sum_connections(port2.angle))
 
     # Flow on the line is proportional to angle difference between extremities,
     # and inverse of impedance.
@@ -105,7 +105,7 @@ library:
           definition: flow
       binding-constraints:
         - id: AC flow
-          expression: flow = 1 / reactance * (port1.angle - port2.angle)
+          expression: flow = 1 / reactance * (sum_connections(port1.angle) - sum_connections(port2.angle))
 
     # Flow on the line is proportional to angle difference between extremities,
     # and inverse of impedance.
@@ -145,7 +145,7 @@ library:
           expression: phase_shift = phase_shift_pos - phase_shift_neg
       binding-constraints:
         - id: AC flow
-          expression: flow = 1 / reactance * (port1.angle + phase_shift - port2.angle)
+          expression: flow = 1 / reactance * (sum_connections(port1.angle) + phase_shift - sum_connections(port2.angle))
       objective-contributions:
         - id: obj
           expression: expec(sum(phase_shift_cost * (phase_shift_pos + phase_shift_neg)))

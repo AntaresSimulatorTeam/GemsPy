@@ -23,8 +23,8 @@ from gems.expression.expression import (
     port_field,
 )
 from gems.expression.parsing.parse_expression import (
-    AntaresParseException,
     ModelIdentifiers,
+    ParsingException,
     parse_expression,
 )
 
@@ -267,13 +267,13 @@ def test_parsing_dual_and_reduced_cost(
 
 def test_parse_dual_unknown_constraint_raises() -> None:
     identifiers = ModelIdentifiers(set(), set(), {"other"})
-    with pytest.raises(AntaresParseException, match="not a constraint"):
+    with pytest.raises(ParsingException, match="not a constraint"):
         parse_expression("dual(balance)", identifiers)
 
 
 def test_parse_reduced_cost_unknown_variable_raises() -> None:
     identifiers = ModelIdentifiers({"x"}, set(), set())
-    with pytest.raises(AntaresParseException, match="not a variable"):
+    with pytest.raises(ParsingException, match="not a variable"):
         parse_expression("reduced_cost(p)", identifiers)
 
 
@@ -295,7 +295,7 @@ def test_parse_cancellation_should_throw(expression_str: str) -> None:
     )
 
     with pytest.raises(
-        AntaresParseException,
+        ParsingException,
         match=r"An error occurred during parsing: ParseCancellationException",
     ):
         parse_expression(expression_str, identifiers)

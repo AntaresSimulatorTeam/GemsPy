@@ -30,6 +30,7 @@ from gems.expression import (
     visit,
 )
 from gems.expression.equality import expressions_equal
+from gems.expression.expression import DualNode, ReducedCostNode
 
 
 def test_ast() -> None:
@@ -103,3 +104,11 @@ def test_abs_round() -> None:
     assert visit(param("s").round(), EvaluationVisitor(context)) == 4.0
     assert visit(literal(0.5).round(), EvaluationVisitor(context)) == 0.0
     assert visit(param("p").round(), EvaluationVisitor(context)) == -3.0
+
+
+def test_dual_reduced_cost_evaluation_raises() -> None:
+    ctx = EvaluationContext()
+    with pytest.raises(NotImplementedError, match="dual"):
+        visit(DualNode("balance"), EvaluationVisitor(ctx))
+    with pytest.raises(NotImplementedError, match="reduced_cost"):
+        visit(ReducedCostNode("p"), EvaluationVisitor(ctx))
