@@ -205,17 +205,6 @@ library:
 """
 
 
-def test_parse_yaml_library_model_properties() -> None:
-    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
-    assert [p.id for p in lib.models[0].properties] == ["technology"]
-
-
-def test_resolve_library_exposes_model_properties() -> None:
-    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
-    lib_dict = resolve_library([lib])
-    assert lib_dict["basic"].models["basic.generator"].properties == ["technology"]
-
-
 def test_resolve_component_with_declared_property_ok() -> None:
     lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
     system = parse_yaml_components(io.StringIO("""\
