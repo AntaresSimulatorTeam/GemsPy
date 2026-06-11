@@ -12,8 +12,36 @@
 from typing import Dict, List, Optional, Set
 
 from gems.expression import ExpressionNode, literal
+from gems.expression.degree import is_linear
+from gems.expression.expression import (
+    AbsNode,
+    AdditionNode,
+    AllTimeSumNode,
+    CeilNode,
+    ComparisonNode,
+    DivisionNode,
+    DualNode,
+    FloorNode,
+    LiteralNode,
+    MaxNode,
+    MinNode,
+    MultiplicationNode,
+    NegationNode,
+    ParameterNode,
+    PortFieldAggregatorNode,
+    PortFieldNode,
+    ReducedCostNode,
+    RoundNode,
+    ScenarioOperatorNode,
+    TimeEvalNode,
+    TimeShiftNode,
+    TimeSumNode,
+    VariableNode,
+)
 from gems.expression.indexing_structure import IndexingStructure
 from gems.expression.parsing.parse_expression import ModelIdentifiers, parse_expression
+from gems.expression.uses_sum_connections_on import uses_sum_connections_on
+from gems.expression.visitor import ExpressionVisitor, visit
 from gems.model import (
     Constraint,
     Model,
@@ -166,13 +194,138 @@ def _convert_port_type(port_type: PortTypeSchema) -> PortType:
     )
 
 
+def _forbid_nonlinear(expr: ExpressionNode, context: str) -> None:
+    if not is_linear(expr):
+        raise ValueError(f"Non-linear expression is not allowed in {context}.")
+
+
+class _ForbidBarePortFieldVisitor(ExpressionVisitor[None]):
+    """Raises if a bare PortFieldNode appears outside of sum_connections."""
+
+    def __init__(self, context: str) -> None:
+        self._context = context
+
+    def literal(self, node: LiteralNode) -> None:
+        pass
+
+    def negation(self, node: NegationNode) -> None:
+        visit(node.operand, self)
+
+    def addition(self, node: AdditionNode) -> None:
+        for o in node.operands:
+            visit(o, self)
+
+    def multiplication(self, node: MultiplicationNode) -> None:
+        visit(node.left, self)
+        visit(node.right, self)
+
+    def division(self, node: DivisionNode) -> None:
+        visit(node.left, self)
+        visit(node.right, self)
+
+    def comparison(self, node: ComparisonNode) -> None:
+        visit(node.left, self)
+        visit(node.right, self)
+
+    def variable(self, node: VariableNode) -> None:
+        pass
+
+    def parameter(self, node: ParameterNode) -> None:
+        pass
+
+    def time_shift(self, node: TimeShiftNode) -> None:
+        visit(node.operand, self)
+
+    def time_eval(self, node: TimeEvalNode) -> None:
+        visit(node.operand, self)
+
+    def time_sum(self, node: TimeSumNode) -> None:
+        visit(node.operand, self)
+
+    def all_time_sum(self, node: AllTimeSumNode) -> None:
+        visit(node.operand, self)
+
+    def scenario_operator(self, node: ScenarioOperatorNode) -> None:
+        visit(node.operand, self)
+
+    def port_field(self, node: PortFieldNode) -> None:
+        raise ValueError(
+            f"Bare port field '{node.port_name}.{node.field_name}' is not allowed "
+            f"outside sum_connections in {self._context}."
+        )
+
+    def port_field_aggregator(self, node: PortFieldAggregatorNode) -> None:
+        pass  # sum_connections wrapping a port field is valid; do not recurse
+
+    def floor(self, node: FloorNode) -> None:
+        visit(node.operand, self)
+
+    def ceil(self, node: CeilNode) -> None:
+        visit(node.operand, self)
+
+    def abs(self, node: AbsNode) -> None:
+        visit(node.operand, self)
+
+    def round(self, node: RoundNode) -> None:
+        visit(node.operand, self)
+
+    def maximum(self, node: MaxNode) -> None:
+        for o in node.operands:
+            visit(o, self)
+
+    def minimum(self, node: MinNode) -> None:
+        for o in node.operands:
+            visit(o, self)
+
+    def dual(self, node: DualNode) -> None:
+        pass
+
+    def reduced_cost(self, node: ReducedCostNode) -> None:
+        pass
+
+
+def _forbid_bare_port_field(expr: ExpressionNode, context: str) -> None:
+    visit(expr, _ForbidBarePortFieldVisitor(context))
+
+
+def _forbid_sum_connections_on_own_port(
+    expr: ExpressionNode,
+    own_port_fields: Set[tuple],
+    context: str,
+) -> None:
+    for port_name, field_name in own_port_fields:
+        if uses_sum_connections_on(expr, port_name, field_name):
+            raise ValueError(
+                f"sum_connections({port_name}.{field_name}) is not allowed in {context}: "
+                f"this port field is defined in the current model."
+            )
+
+
 def _resolve_model(
     input_model: ModelSchema, port_types: Dict[str, PortType], library_id: str
 ) -> Model:
     identifiers = ModelIdentifiers(
         variables={v.id for v in input_model.variables},
         parameters={p.id for p in input_model.parameters},
+        constraints={c.id for c in input_model.binding_constraints}
+        | {c.id for c in input_model.constraints},
     )
+
+    own_port_fields: Set[tuple] = {
+        (d.port, d.field) for d in input_model.port_field_definitions
+    }
+
+    binding_constraints = [
+        _to_constraint(c, identifiers) for c in input_model.binding_constraints
+    ]
+    constraints = [_to_constraint(c, identifiers) for c in input_model.constraints]
+
+    for c in binding_constraints + constraints:
+        _forbid_nonlinear(c.expression, f"constraint '{c.name}'")
+        _forbid_bare_port_field(c.expression, f"constraint '{c.name}'")
+        _forbid_sum_connections_on_own_port(
+            c.expression, own_port_fields, f"constraint '{c.name}'"
+        )
 
     objective_contributions = None
     if input_model.objective_contributions:
@@ -180,6 +333,12 @@ def _resolve_model(
             contrib.id: parse_expression(contrib.expression, identifiers)
             for contrib in input_model.objective_contributions
         }
+        for oid, expr in objective_contributions.items():
+            _forbid_nonlinear(expr, f"objective contribution '{oid}'")
+            _forbid_bare_port_field(expr, f"objective contribution '{oid}'")
+            _forbid_sum_connections_on_own_port(
+                expr, own_port_fields, f"objective contribution '{oid}'"
+            )
 
     extra_outputs = (
         {
@@ -189,6 +348,14 @@ def _resolve_model(
         if input_model.extra_outputs
         else None
     )
+
+    if extra_outputs:
+        for eo_id, eo_expr in extra_outputs.items():
+            _forbid_bare_port_field(eo_expr, f"extra-output '{eo_id}'")
+            _forbid_sum_connections_on_own_port(
+                eo_expr, own_port_fields, f"extra-output '{eo_id}'"
+            )
+
     return model(
         id=f"{library_id}.{input_model.id}",
         parameters=[_to_parameter(p) for p in input_model.parameters],
@@ -198,12 +365,11 @@ def _resolve_model(
             _resolve_field_definition(d, identifiers)
             for d in input_model.port_field_definitions
         ],
-        binding_constraints=[
-            _to_constraint(c, identifiers) for c in input_model.binding_constraints
-        ],
-        constraints=[_to_constraint(c, identifiers) for c in input_model.constraints],
+        binding_constraints=binding_constraints,
+        constraints=constraints,
         objective_contributions=objective_contributions,
         extra_outputs=extra_outputs,
+        properties=[p.id for p in input_model.properties],
     )
 
 

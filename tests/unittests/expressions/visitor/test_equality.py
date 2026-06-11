@@ -14,7 +14,7 @@ import pytest
 
 from gems.expression import ExpressionNode, copy_expression, literal, param, var
 from gems.expression.equality import expressions_equal
-from gems.expression.expression import maximum, minimum
+from gems.expression.expression import DualNode, ReducedCostNode, maximum, minimum
 
 
 @pytest.mark.parametrize(
@@ -33,6 +33,8 @@ from gems.expression.expression import maximum, minimum
         var("x").expec(),
         var("x").floor(),
         var("x").ceil(),
+        var("x").abs(),
+        var("x").round(),
         maximum(var("x"), param("p")),
         minimum(var("x"), param("p")),
     ],
@@ -61,6 +63,12 @@ def test_equals(expr: ExpressionNode) -> None:
         (var("x").floor(), var("y").floor()),
         (var("x").ceil(), var("y").ceil()),
         (var("x").floor(), var("x").ceil()),  # different node type
+        # abs / round
+        (var("x").abs(), var("y").abs()),
+        (var("x").round(), var("y").round()),
+        (var("x").abs(), var("x").round()),  # different node type
+        (var("x").abs(), var("x").floor()),  # different node type
+        (var("x").round(), var("x").ceil()),  # different node type
         # max / min
         (maximum(var("x"), param("p")), maximum(var("y"), param("p"))),
         (minimum(var("x"), param("p")), minimum(var("x"), param("q"))),
@@ -76,3 +84,13 @@ def test_tolerance() -> None:
     assert not expressions_equal(literal(10), literal(10.11), abs_tol=0.1)
     assert expressions_equal(literal(10), literal(10.9), rel_tol=0.1)
     assert not expressions_equal(literal(10), literal(11.2), rel_tol=0.1)
+
+
+def test_dual_reduced_cost_equality() -> None:
+    assert expressions_equal(DualNode("balance"), copy_expression(DualNode("balance")))
+    assert not expressions_equal(DualNode("balance"), DualNode("other"))
+    assert expressions_equal(
+        ReducedCostNode("p"), copy_expression(ReducedCostNode("p"))
+    )
+    assert not expressions_equal(ReducedCostNode("p"), ReducedCostNode("q"))
+    assert not expressions_equal(DualNode("p"), ReducedCostNode("p"))

@@ -26,14 +26,18 @@ from gems.expression import (
     VariableNode,
 )
 from gems.expression.expression import (
+    AbsNode,
     AllTimeSumNode,
     BinaryOperatorNode,
     CeilNode,
+    DualNode,
     FloorNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    ReducedCostNode,
+    RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -99,10 +103,18 @@ class EqualityVisitor:
             return self.floor(left, right)
         if isinstance(left, CeilNode) and isinstance(right, CeilNode):
             return self.ceil(left, right)
+        if isinstance(left, AbsNode) and isinstance(right, AbsNode):
+            return self.abs(left, right)
+        if isinstance(left, RoundNode) and isinstance(right, RoundNode):
+            return self.round(left, right)
         if isinstance(left, MaxNode) and isinstance(right, MaxNode):
             return self.maximum(left, right)
         if isinstance(left, MinNode) and isinstance(right, MinNode):
             return self.minimum(left, right)
+        if isinstance(left, DualNode) and isinstance(right, DualNode):
+            return self.dual(left, right)
+        if isinstance(left, ReducedCostNode) and isinstance(right, ReducedCostNode):
+            return self.reduced_cost(left, right)
         raise NotImplementedError(f"Equality not implemented for {left.__class__}")
 
     def literal(self, left: LiteralNode, right: LiteralNode) -> bool:
@@ -183,6 +195,12 @@ class EqualityVisitor:
     def ceil(self, left: CeilNode, right: CeilNode) -> bool:
         return self.visit(left.operand, right.operand)
 
+    def abs(self, left: AbsNode, right: AbsNode) -> bool:
+        return self.visit(left.operand, right.operand)
+
+    def round(self, left: RoundNode, right: RoundNode) -> bool:
+        return self.visit(left.operand, right.operand)
+
     def maximum(self, left: MaxNode, right: MaxNode) -> bool:
         return len(left.operands) == len(right.operands) and all(
             self.visit(l, r) for l, r in zip(left.operands, right.operands)
@@ -192,6 +210,12 @@ class EqualityVisitor:
         return len(left.operands) == len(right.operands) and all(
             self.visit(l, r) for l, r in zip(left.operands, right.operands)
         )
+
+    def dual(self, left: DualNode, right: DualNode) -> bool:
+        return left.constraint_id == right.constraint_id
+
+    def reduced_cost(self, left: ReducedCostNode, right: ReducedCostNode) -> bool:
+        return left.variable_id == right.variable_id
 
 
 def expressions_equal(

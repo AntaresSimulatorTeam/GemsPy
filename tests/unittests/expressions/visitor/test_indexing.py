@@ -12,6 +12,7 @@
 
 
 from gems.expression import param, var
+from gems.expression.expression import DualNode, ReducedCostNode
 from gems.expression.indexing import IndexingStructureProvider, compute_indexation
 from gems.expression.indexing_structure import IndexingStructure
 
@@ -31,6 +32,9 @@ class StructureProvider(IndexingStructureProvider):
         return IndexingStructure(True, True)
 
     def get_variable_structure(self, name: str) -> IndexingStructure:
+        return IndexingStructure(True, True)
+
+    def get_constraint_structure(self, name: str) -> IndexingStructure:
         return IndexingStructure(True, True)
 
 
@@ -102,6 +106,19 @@ def test_multiplication_of_differently_indexed_terms() -> None:
         def get_variable_structure(self, name: str) -> IndexingStructure:
             return IndexingStructure(True, True)
 
+        def get_constraint_structure(self, name: str) -> IndexingStructure:
+            raise NotImplementedError()
+
     provider = CustomStructureProvider()
 
     assert compute_indexation(expr, provider) == IndexingStructure(True, True)
+
+
+def test_dual_reduced_cost_indexing() -> None:
+    provider = StructureProvider()
+    assert compute_indexation(DualNode("balance"), provider) == IndexingStructure(
+        True, True
+    )
+    assert compute_indexation(ReducedCostNode("p"), provider) == IndexingStructure(
+        True, True
+    )

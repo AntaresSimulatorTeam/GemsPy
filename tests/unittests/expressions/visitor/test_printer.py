@@ -11,6 +11,7 @@
 # This file is part of the Antares project.
 
 from gems.expression import ExpressionNode, PrinterVisitor, param, var, visit
+from gems.expression.expression import DualNode, ReducedCostNode
 
 
 def test_comparison() -> None:
@@ -39,3 +40,18 @@ def test_floor_ceil_max_min_printer() -> None:
     # variadic (3+ operands)
     assert visit(maximum(p, q, param("r")), PrinterVisitor()) == "max(p, q, r)"
     assert visit(minimum(p, q, param("r")), PrinterVisitor()) == "min(p, q, r)"
+
+
+def test_abs_round_printer() -> None:
+    p = param("p")
+    q = param("q")
+
+    assert visit(p.abs(), PrinterVisitor()) == "abs(p)"
+    assert visit(p.round(), PrinterVisitor()) == "round(p)"
+    assert visit((p - q).abs(), PrinterVisitor()) == "abs((p - q))"
+    assert visit((p / q).round(), PrinterVisitor()) == "round((p / q))"
+
+
+def test_dual_reduced_cost_printer() -> None:
+    assert visit(DualNode("balance"), PrinterVisitor()) == "dual(balance)"
+    assert visit(ReducedCostNode("p"), PrinterVisitor()) == "reduced_cost(p)"

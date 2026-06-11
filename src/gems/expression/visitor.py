@@ -19,11 +19,13 @@ from abc import ABC, abstractmethod
 from typing import Generic, Protocol, TypeVar
 
 from gems.expression.expression import (
+    AbsNode,
     AdditionNode,
     AllTimeSumNode,
     CeilNode,
     ComparisonNode,
     DivisionNode,
+    DualNode,
     ExpressionNode,
     FloorNode,
     LiteralNode,
@@ -34,6 +36,8 @@ from gems.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    ReducedCostNode,
+    RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -105,10 +109,22 @@ class ExpressionVisitor(ABC, Generic[T]):
     def ceil(self, node: CeilNode) -> T: ...
 
     @abstractmethod
+    def abs(self, node: AbsNode) -> T: ...
+
+    @abstractmethod
+    def round(self, node: RoundNode) -> T: ...
+
+    @abstractmethod
     def maximum(self, node: MaxNode) -> T: ...
 
     @abstractmethod
     def minimum(self, node: MinNode) -> T: ...
+
+    @abstractmethod
+    def dual(self, node: DualNode) -> T: ...
+
+    @abstractmethod
+    def reduced_cost(self, node: ReducedCostNode) -> T: ...
 
 
 def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
@@ -149,10 +165,18 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
         return visitor.floor(root)
     elif isinstance(root, CeilNode):
         return visitor.ceil(root)
+    elif isinstance(root, AbsNode):
+        return visitor.abs(root)
+    elif isinstance(root, RoundNode):
+        return visitor.round(root)
     elif isinstance(root, MaxNode):
         return visitor.maximum(root)
     elif isinstance(root, MinNode):
         return visitor.minimum(root)
+    elif isinstance(root, DualNode):
+        return visitor.dual(root)
+    elif isinstance(root, ReducedCostNode):
+        return visitor.reduced_cost(root)
     raise ValueError(f"Unknown expression node type {root.__class__}")
 
 

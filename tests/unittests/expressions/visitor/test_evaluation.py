@@ -30,6 +30,7 @@ from gems.expression import (
     visit,
 )
 from gems.expression.equality import expressions_equal
+from gems.expression.expression import DualNode, ReducedCostNode
 
 
 def test_ast() -> None:
@@ -88,3 +89,26 @@ def test_floor_ceil_max_min() -> None:
     assert visit(
         minimum(param("p"), param("q"), literal(5.0)), EvaluationVisitor(context)
     ) == pytest.approx(1.3)
+
+
+def test_abs_round() -> None:
+    context = EvaluationContext(parameters={"p": -2.7, "q": 1.5, "r": 2.5, "s": 3.5})
+
+    assert visit(param("p").abs(), EvaluationVisitor(context)) == pytest.approx(2.7)
+    assert visit((-param("q")).abs(), EvaluationVisitor(context)) == pytest.approx(1.5)
+    assert visit(literal(0).abs(), EvaluationVisitor(context)) == 0.0
+
+    # Banker's rounding (round-half-to-even): 0.5 -> 0, 1.5 -> 2, 2.5 -> 2, 3.5 -> 4.
+    assert visit(param("q").round(), EvaluationVisitor(context)) == 2.0
+    assert visit(param("r").round(), EvaluationVisitor(context)) == 2.0
+    assert visit(param("s").round(), EvaluationVisitor(context)) == 4.0
+    assert visit(literal(0.5).round(), EvaluationVisitor(context)) == 0.0
+    assert visit(param("p").round(), EvaluationVisitor(context)) == -3.0
+
+
+def test_dual_reduced_cost_evaluation_raises() -> None:
+    ctx = EvaluationContext()
+    with pytest.raises(NotImplementedError, match="dual"):
+        visit(DualNode("balance"), EvaluationVisitor(ctx))
+    with pytest.raises(NotImplementedError, match="reduced_cost"):
+        visit(ReducedCostNode("p"), EvaluationVisitor(ctx))

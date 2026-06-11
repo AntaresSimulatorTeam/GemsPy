@@ -23,7 +23,14 @@ from gems.expression import (
     var,
     visit,
 )
-from gems.expression.expression import CeilNode, FloorNode
+from gems.expression.expression import (
+    AbsNode,
+    CeilNode,
+    DualNode,
+    FloorNode,
+    ReducedCostNode,
+    RoundNode,
+)
 
 
 def test_degree() -> None:
@@ -47,6 +54,17 @@ def test_floor_ceil_degree() -> None:
     assert visit(CeilNode(x), ExpressionDegreeVisitor()) == math.inf
 
 
+def test_abs_round_degree() -> None:
+    x = var("x")
+    p = param("p")
+
+    assert visit(AbsNode(p), ExpressionDegreeVisitor()) == 0
+    assert visit(RoundNode(p), ExpressionDegreeVisitor()) == 0
+    assert visit(AbsNode(x), ExpressionDegreeVisitor()) == math.inf
+    assert visit(RoundNode(x), ExpressionDegreeVisitor()) == math.inf
+    assert visit(AbsNode(p - param("q")), ExpressionDegreeVisitor()) == 0
+
+
 def test_max_min_degree() -> None:
     x = var("x")
     p = param("p")
@@ -62,6 +80,11 @@ def test_max_min_degree() -> None:
     assert visit(minimum(p, q, param("r")), ExpressionDegreeVisitor()) == 0
     assert visit(maximum(p, q, x), ExpressionDegreeVisitor()) == math.inf
     assert visit(minimum(p, x, q), ExpressionDegreeVisitor()) == math.inf
+
+
+def test_dual_reduced_cost_degree() -> None:
+    assert visit(DualNode("balance"), ExpressionDegreeVisitor()) == math.inf
+    assert visit(ReducedCostNode("p"), ExpressionDegreeVisitor()) == math.inf
 
 
 @pytest.mark.xfail(reason="Degree simplification not implemented")

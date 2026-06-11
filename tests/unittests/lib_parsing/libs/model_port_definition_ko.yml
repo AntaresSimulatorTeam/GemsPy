@@ -25,4 +25,4 @@ library:
           type: 1er_flow
       constraints:
         - id: Level equation
-          expression: injection_port1.1er_flow = withdrawal
+          expression: sum_connections(injection_port1.1er_flow) = withdrawal

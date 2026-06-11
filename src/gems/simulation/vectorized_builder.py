@@ -42,11 +42,13 @@ import xarray as xr
 
 from gems.expression.evaluate import EvaluationContext, EvaluationVisitor
 from gems.expression.expression import (
+    AbsNode,
     AdditionNode,
     AllTimeSumNode,
     CeilNode,
     ComparisonNode,
     DivisionNode,
+    DualNode,
     ExpressionNode,
     FloorNode,
     LiteralNode,
@@ -57,6 +59,8 @@ from gems.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    ReducedCostNode,
+    RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -368,6 +372,14 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         operand = visit(node.operand, self)
         return np.ceil(operand)  # type: ignore[return-value,arg-type,call-overload]
 
+    def abs(self, node: AbsNode) -> VectorizedExpr:
+        operand = visit(node.operand, self)
+        return np.abs(operand)  # type: ignore[return-value,arg-type,call-overload]
+
+    def round(self, node: RoundNode) -> VectorizedExpr:
+        operand = visit(node.operand, self)
+        return np.round(operand)  # type: ignore[return-value,arg-type,call-overload]
+
     def maximum(self, node: MaxNode) -> VectorizedExpr:
         operands = [visit(op, self) for op in node.operands]
         result = operands[0]
@@ -381,6 +393,18 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         for op in operands[1:]:
             result = xr.where(result <= op, result, op)  # type: ignore[no-untyped-call,assignment,operator]
         return result  # type: ignore[return-value]
+
+    def dual(self, node: DualNode) -> VectorizedExpr:
+        raise NotImplementedError(
+            f"dual() is only available in the extra-output builder, "
+            f"not in {type(self).__name__}."
+        )
+
+    def reduced_cost(self, node: ReducedCostNode) -> VectorizedExpr:
+        raise NotImplementedError(
+            f"reduced_cost() is only available in the extra-output builder, "
+            f"not in {type(self).__name__}."
+        )
 
     # ------------------------------------------------------------------ #
     # Private helpers                                                       #
@@ -525,6 +549,12 @@ class _ShiftAmountEvaluator(ExpressionVisitorOperations[xr.DataArray]):
     def ceil(self, node: CeilNode) -> xr.DataArray:
         return np.ceil(visit(node.operand, self))  # type: ignore[return-value]
 
+    def abs(self, node: AbsNode) -> xr.DataArray:
+        return np.abs(visit(node.operand, self))  # type: ignore[return-value]
+
+    def round(self, node: RoundNode) -> xr.DataArray:
+        return np.round(visit(node.operand, self))  # type: ignore[return-value]
+
     def maximum(self, node: MaxNode) -> xr.DataArray:
         ops = [visit(op, self) for op in node.operands]
         return functools.reduce(
@@ -536,6 +566,12 @@ class _ShiftAmountEvaluator(ExpressionVisitorOperations[xr.DataArray]):
         return functools.reduce(
             lambda a, b: xr.where(a <= b, a, b), ops  # type: ignore[return-value,no-untyped-call]
         )
+
+    def dual(self, node: DualNode) -> xr.DataArray:
+        raise NotImplementedError
+
+    def reduced_cost(self, node: ReducedCostNode) -> xr.DataArray:
+        raise NotImplementedError
 
 
 def _and_mask(
@@ -654,6 +690,12 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     def ceil(self, node: CeilNode) -> Optional[xr.DataArray]:
         return visit(node.operand, self)
 
+    def abs(self, node: AbsNode) -> Optional[xr.DataArray]:
+        return visit(node.operand, self)
+
+    def round(self, node: RoundNode) -> Optional[xr.DataArray]:
+        return visit(node.operand, self)
+
     def maximum(self, node: MaxNode) -> Optional[xr.DataArray]:
         return functools.reduce(
             _and_mask, (visit(op, self) for op in node.operands), None
@@ -692,4 +734,10 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return None
 
     def port_field(self, node: PortFieldNode) -> Optional[xr.DataArray]:
+        return None
+
+    def dual(self, node: DualNode) -> Optional[xr.DataArray]:
+        return None
+
+    def reduced_cost(self, node: ReducedCostNode) -> Optional[xr.DataArray]:
         return None

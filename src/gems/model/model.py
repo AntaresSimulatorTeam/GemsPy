@@ -19,7 +19,7 @@ defining parameters, variables, and equations.
 import itertools
 import warnings
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from gems.expression import ExpressionNode
 from gems.expression.degree import is_linear
@@ -35,13 +35,47 @@ from gems.model.variable import Variable
 def _make_structure_provider(
     parameters: Dict[str, Parameter],
     variables: Dict[str, Variable],
+    constraints: Optional[Dict[str, Constraint]] = None,
 ) -> IndexingStructureProvider:
+    # Pre-compute constraint structures using a params/vars-only base provider.
+    # Constraint expressions cannot contain dual()/reduced_cost(), so the base
+    # provider's get_constraint_structure is never invoked during this step.
+    constraint_structures: Dict[str, IndexingStructure] = {}
+    if constraints:
+
+        class _BaseProvider(IndexingStructureProvider):
+            def get_parameter_structure(self, name: str) -> IndexingStructure:
+                return parameters[name].structure
+
+            def get_variable_structure(self, name: str) -> IndexingStructure:
+                return variables[name].structure
+
+            def get_constraint_structure(self, name: str) -> IndexingStructure:
+                raise NotImplementedError(
+                    f"Constraint structure for '{name}' not available at this stage."
+                )
+
+        base = _BaseProvider()
+        for cname, c in constraints.items():
+            try:
+                constraint_structures[cname] = compute_indexation(c.expression, base)
+            except ValueError:
+                # Constraints containing unresolved port fields (sum_connections)
+                # cannot be indexed before port resolution; fall back to the most
+                # general structure so callers can still proceed.
+                constraint_structures[cname] = IndexingStructure(
+                    time=True, scenario=True
+                )
+
     class Provider(IndexingStructureProvider):
         def get_parameter_structure(self, name: str) -> IndexingStructure:
             return parameters[name].structure
 
         def get_variable_structure(self, name: str) -> IndexingStructure:
             return variables[name].structure
+
+        def get_constraint_structure(self, name: str) -> IndexingStructure:
+            return constraint_structures[name]
 
     return Provider()
 
@@ -94,7 +128,9 @@ def _is_objective_contribution_valid(
         raise ValueError("Objective contribution must be a linear expression.")
 
     data_structure_provider = _make_structure_provider(
-        model.parameters, model.variables
+        model.parameters,
+        model.variables,
+        {**model.constraints, **model.binding_constraints},
     )
     objective_structure = compute_indexation(
         objective_contribution, data_structure_provider
@@ -141,6 +177,7 @@ class Model:
         default_factory=dict
     )
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None
+    properties: List[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         # Validate each contribution if present
@@ -183,6 +220,7 @@ def model(
     ports: Optional[Iterable[ModelPort]] = None,
     port_fields_definitions: Optional[Iterable[PortFieldDefinition]] = None,
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None,
+    properties: Optional[Iterable[str]] = None,
 ) -> Model:
     """
     Utility method to create Models from relaxed arguments
@@ -225,4 +263,5 @@ def model(
             else {}
         ),
         extra_outputs=extra_outputs,
+        properties=list(properties) if properties else [],
     )

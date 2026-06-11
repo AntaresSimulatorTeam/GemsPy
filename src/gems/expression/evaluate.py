@@ -16,13 +16,17 @@ from dataclasses import dataclass, field
 from typing import Dict
 
 from gems.expression.expression import (
+    AbsNode,
     AllTimeSumNode,
     CeilNode,
+    DualNode,
     FloorNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    ReducedCostNode,
+    RoundNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -118,11 +122,25 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
     def ceil(self, node: CeilNode) -> float:
         return float(math.ceil(visit(node.operand, self)))
 
+    def abs(self, node: AbsNode) -> float:
+        value: float = visit(node.operand, self)
+        return abs(value)
+
+    def round(self, node: RoundNode) -> float:
+        value: float = visit(node.operand, self)
+        return float(round(value))
+
     def maximum(self, node: MaxNode) -> float:
         return max(visit(op, self) for op in node.operands)
 
     def minimum(self, node: MinNode) -> float:
         return min(visit(op, self) for op in node.operands)
+
+    def dual(self, node: DualNode) -> float:
+        raise NotImplementedError("dual() is not statically evaluable.")
+
+    def reduced_cost(self, node: ReducedCostNode) -> float:
+        raise NotImplementedError("reduced_cost() is not statically evaluable.")
 
 
 def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:

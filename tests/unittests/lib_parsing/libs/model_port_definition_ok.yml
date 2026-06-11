@@ -26,5 +26,5 @@ library:
           type: flow
       constraints:
         - id: Level equation
-          expression: injection_port.flow = withdrawal
+          expression: sum_connections(injection_port.flow) = withdrawal
 

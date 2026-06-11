@@ -64,7 +64,9 @@ multiple solve calls.
 ### Building the optimisation problem
 
 ~~~ python
-from gems.study import Study, load_study
+from pathlib import Path
+from gems.study import Study
+from gems.study.folder import load_study
 from gems.simulation import build_problem, TimeBlock
 
 study = load_study(Path("my_study"))
@@ -87,11 +89,18 @@ print(problem.objective_value)     # float
 print(problem.status)              # 'ok' or 'warning'
 ~~~
 
-A different solver or additional HiGHS options can be passed:
+A different solver or additional solver options can be passed via `solver_name`.
+HiGHS, Xpress (≥ 9.8), and Gurobi (≥ 10.0) are supported:
 
 ~~~ python
-problem.solve(solver_name="highs", threads=4)
+problem.solve(solver_name="highs", threads=4)   # HiGHS
+problem.solve(solver_name="xpress")             # Xpress
+problem.solve(solver_name="gurobi")             # Gurobi
 ~~~
+
+> **Note** — dual variables and reduced costs are available as model outputs
+> when using any of these solvers.  Xpress and Gurobi require their respective
+> Python packages (`xpress>=9.8`, `gurobipy>=10.0`) and a valid licence.
 
 ### Exporting the LP file
 

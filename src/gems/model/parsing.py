@@ -74,6 +74,10 @@ class PortFieldDefinitionSchema(ModifiedBaseModel):
     definition: str
 
 
+class PropertySchema(ModifiedBaseModel):
+    id: str
+
+
 class ObjectiveContributionSchema(ModifiedBaseModel):
     id: str
     expression: str
@@ -87,6 +91,7 @@ class ExtraOutputSchema(ModifiedBaseModel):
 
 class ModelSchema(ModifiedBaseModel):
     id: str
+    taxonomy_category: Optional[str] = None
     parameters: List[ParameterSchema] = Field(default_factory=list)
     variables: List[VariableSchema] = Field(default_factory=list)
     ports: List[ModelPortSchema] = Field(default_factory=list)
@@ -100,6 +105,7 @@ class ModelSchema(ModifiedBaseModel):
     )
     description: Optional[str] = None
     extra_outputs: Optional[List[ExtraOutputSchema]] = None
+    properties: List[PropertySchema] = Field(default_factory=list)
 
 
 class LibrarySchema(ModifiedBaseModel):

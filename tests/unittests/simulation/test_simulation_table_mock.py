@@ -48,6 +48,12 @@ class FakeLinopyModel:
 
     solution: dict  # lv.name -> xr.DataArray
 
+    @property
+    def dual(self) -> xr.Dataset:
+        return xr.Dataset()
+
+    solver_model = None
+
 
 @dataclass
 class FakeProblem:

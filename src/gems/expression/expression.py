@@ -124,6 +124,12 @@ class ExpressionNode:
     def ceil(self) -> "ExpressionNode":
         return CeilNode(self)
 
+    def abs(self) -> "ExpressionNode":
+        return AbsNode(self)
+
+    def round(self) -> "ExpressionNode":
+        return RoundNode(self)
+
     def expec(self) -> "ExpressionNode":
         return _apply_if_node(self, lambda x: ScenarioOperatorNode(x, "Expectation"))
 
@@ -236,6 +242,18 @@ class CeilNode(UnaryOperatorNode):
 
 
 @dataclass(frozen=True, eq=False)
+class AbsNode(UnaryOperatorNode):
+    pass
+
+
+@dataclass(frozen=True, eq=False)
+class RoundNode(UnaryOperatorNode):
+    """Round to nearest integer using banker's rounding (np.round / Python 3 round)."""
+
+    pass
+
+
+@dataclass(frozen=True, eq=False)
 class BinaryOperatorNode(ExpressionNode):
     left: ExpressionNode
     right: ExpressionNode
@@ -327,6 +345,16 @@ class ScenarioOperatorNode(UnaryOperatorNode):
             raise ValueError(
                 f"{self.name} is not a valid scenario operator, valid scenario operators are {valid_names}"
             )
+
+
+@dataclass(frozen=True, eq=False)
+class DualNode(ExpressionNode):
+    constraint_id: str
+
+
+@dataclass(frozen=True, eq=False)
+class ReducedCostNode(ExpressionNode):
+    variable_id: str
 
 
 def sum_expressions(expressions: Sequence[ExpressionNode]) -> ExpressionNode:

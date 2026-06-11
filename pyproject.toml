@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gemspy"
-version = "0.1.1"
+version = "0.1.2"
 description = "Python interpreter for GEMS: modelling and simulation of complex energy systems under uncertainty"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -82,6 +82,11 @@ dev = [
     "types-PyYAML>=6.0.12",
     "antlr4-tools>=0.2.1",
     "pandas-stubs",
+]
+# Only needed for runnning solver specific tests (dual / reduced cost)
+solvers = [
+    "xpress>=9.8",
+    "gurobipy>=10.0",
 ]
 
 [tool.black]

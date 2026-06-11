@@ -103,7 +103,7 @@ attaches the resulting `ScenarioBuilder` to the returned `Study` object:
 
 ~~~ python
 from pathlib import Path
-from gems.study import load_study
+from gems.study.folder import load_study
 
 study = load_study(Path("my_study"))
 # study.scenario_builder is populated from modeler-scenariobuilder.dat
