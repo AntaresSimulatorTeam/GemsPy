@@ -19,7 +19,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, List, Optional
 
 from gems.expression.degree import is_linear
-from gems.expression.predicates import uses_sum_connections_on
+from gems.expression.uses_sum_connections_on import uses_sum_connections_on
 from gems.model import PortField, PortType
 from gems.model.model import Model
 from gems.model.port import PortFieldId
