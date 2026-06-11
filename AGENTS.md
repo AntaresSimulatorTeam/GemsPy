@@ -64,6 +64,7 @@ An optional `optim-config.yml` activates decomposition: variables and constraint
 **`model/`** — Immutable model templates.
 - `Model`: defines component behavior (parameters, variables, constraints, ports)
 - `Library`: a collection of models, loaded from YAML
+- `Taxonomy` (`taxonomy.py`): a controlled vocabulary of `TaxonomyCategory`s (loaded from YAML via `load_taxonomy`), each listing the variables, parameters, ports, port-field-definitions, constraints, binding-constraints, extra-outputs and properties a conforming model must expose. A model opts in by declaring `taxonomy-category` in its schema. `check_library_against_taxonomy` validates that every model referencing a category points to an existing category and exposes all items it requires, raising `ValueError` on the first violation.
 
 **`expression/`** — Mathematical expression language and AST.
 - `ExpressionNode`: base frozen dataclass for all expression tree nodes
