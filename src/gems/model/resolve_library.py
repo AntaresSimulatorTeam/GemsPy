@@ -220,6 +220,7 @@ def _resolve_model(
         constraints=constraints,
         objective_contributions=objective_contributions,
         extra_outputs=extra_outputs,
+        properties=[p.id for p in input_model.properties],
     )
 
 

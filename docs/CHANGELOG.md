@@ -2,15 +2,12 @@
 
 All notable changes to GemsPy are documented here.
 
-## [Unreleased]
-
----
-
 ## [0.1.2] - 2026-06-11
 
 ### Added
-
-- Math operators `abs` and `round` in the GemsPy expression language.
+- **Properties in Models and Components** - models in library YAML files may declare an optional `properties` list (entries with an `id`). Components in system YAML files carry optional `properties`.
+- **Taxonomy** - new `gems.model.taxonomy` module to represent Taxonomy, i.e. a classification of GEMS models.  Optional `taxonomy-category` on models in library YAML files, exposed as `ModelSchema.taxonomy_category`.
+- Math operators `abs` and `round` in the GEMS expression language.
   - Can be applied to parameters and literals in constraints, bounds, and objective contributions (degree-0 context).
   - Can be applied to any expression in extra-outputs (post-solve evaluation), including decision variables.
   - Use `.abs()` and `.round()` methods on expression objects, or `abs(expr)` and `round(expr)` in parsed expression strings.
@@ -29,6 +26,7 @@ All notable changes to GemsPy are documented here.
 - Pre-commit `black` hook no longer passes redundant `--config pyproject.toml`.
 - Pre-commit `isort` hook simplified to `--profile black` (removed
   `--filter-files` which conflicted with pre-commit's own file filtering).
+
 
 ### Changed
 - Modernized README design: new layout, GEMS favicon, quick-link navigation, and `uv` install instructions.
