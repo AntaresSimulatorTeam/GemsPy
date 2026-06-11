@@ -247,7 +247,6 @@ library:
 # ---------------------------------------------------------------------------
 
 _PFIELD_ID = PortFieldId("port1", "flow")
-_SUM_CONNECTIONS_EXPR = port_field("port1", "flow").sum_connections()
 
 # Nonlinear/post-solve expressions accepted in port-field definitions and
 # extra-outputs only.  Rejected in: variable bounds (not constant), objectives
