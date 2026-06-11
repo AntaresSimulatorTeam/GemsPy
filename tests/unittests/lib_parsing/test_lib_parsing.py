@@ -203,3 +203,48 @@ def test_library_port_model_ok_parsing(libs_dir: Path) -> None:
             )
         ],
     )
+
+
+def test_dual_in_constraint_is_rejected() -> None:
+    lib_yaml = io.StringIO("""
+library:
+  id: basic
+  port-types: []
+  models:
+    - id: bad-model
+      variables:
+        - id: x
+          variable-type: continuous
+      parameters: []
+      ports: []
+      binding-constraints:
+        - id: balance
+          expression: x >= 0
+      constraints:
+        - id: bad
+          expression: dual(balance) + x = 0
+""")
+    input_lib = parse_yaml_library(lib_yaml)
+    with pytest.raises(ValueError, match="Operators dual/reduced_cost are not allowed"):
+        resolve_library([input_lib])
+
+
+def test_reduced_cost_in_objective_is_rejected() -> None:
+    lib_yaml = io.StringIO("""
+library:
+  id: basic
+  port-types: []
+  models:
+    - id: bad-model
+      variables:
+        - id: x
+          variable-type: continuous
+      parameters: []
+      ports: []
+      objective-contributions:
+        - id: bad-obj
+          expression: reduced_cost(x)
+""")
+    input_lib = parse_yaml_library(lib_yaml)
+    with pytest.raises(ValueError, match="Operators dual/reduced_cost are not allowed"):
+        resolve_library([input_lib])

@@ -33,9 +33,9 @@ scenario-scope:
 
 # Solver settings
 solver-options:
-  name: highs            # only HiGHS is currently supported
+  name: highs            # highs (default), xpress, or gurobi
   logs: false            # set to true to print solver output
-  parameters: "threads=4 time_limit=300"  # space-separated key=value pairs
+  parameters: "threads=4 time_limit=300"  # space-separated key=value pairs passed to the solver
 
 # Resolution strategy
 resolution:
@@ -183,9 +183,12 @@ listing the affected groups.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `name` | str | `"highs"` | Solver name (currently only `"highs"` is supported) |
+| `name` | str | `"highs"` | Solver name: `"highs"` (default), `"xpress"`, or `"gurobi"` |
 | `logs` | bool | `false` | Print solver output to stdout |
-| `parameters` | str | `""` | Space-separated `key=value` HiGHS parameters |
+| `parameters` | str | `""` | Space-separated `key=value` pairs forwarded as solver options |
+
+> **Note** — Xpress (≥ 9.8) and Gurobi (≥ 10.0) require their respective Python
+> packages and a valid licence.
 
 ---
 

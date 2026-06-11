@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - "**"
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -11,10 +10,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: 3.11
 
@@ -24,7 +23,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --group dev --group solvers
 
       - name: Check imports sort order
         run: uv run isort --profile black --check-only --diff src tests

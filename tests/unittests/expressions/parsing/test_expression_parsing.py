@@ -15,7 +15,13 @@ import pytest
 
 from gems.expression import ExpressionNode, literal, param, print_expr, var
 from gems.expression.equality import expressions_equal
-from gems.expression.expression import maximum, minimum, port_field
+from gems.expression.expression import (
+    DualNode,
+    ReducedCostNode,
+    maximum,
+    minimum,
+    port_field,
+)
 from gems.expression.parsing.parse_expression import (
     AntaresParseException,
     ModelIdentifiers,
@@ -238,6 +244,37 @@ def test_parsing_visitor(
     print()
     print(print_expr(expr))
     assert expressions_equal(expr, expected)
+
+
+@pytest.mark.parametrize(
+    "variables, parameters, constraints, expression_str, expected",
+    [
+        (set(), set(), {"balance"}, "dual(balance)", DualNode("balance")),
+        ({"p"}, set(), set(), "reduced_cost(p)", ReducedCostNode("p")),
+    ],
+)
+def test_parsing_dual_and_reduced_cost(
+    variables: set,
+    parameters: set,
+    constraints: set,
+    expression_str: str,
+    expected: ExpressionNode,
+) -> None:
+    identifiers = ModelIdentifiers(variables, parameters, constraints)
+    expr = parse_expression(expression_str, identifiers)
+    assert expressions_equal(expr, expected)
+
+
+def test_parse_dual_unknown_constraint_raises() -> None:
+    identifiers = ModelIdentifiers(set(), set(), {"other"})
+    with pytest.raises(AntaresParseException, match="not a constraint"):
+        parse_expression("dual(balance)", identifiers)
+
+
+def test_parse_reduced_cost_unknown_variable_raises() -> None:
+    identifiers = ModelIdentifiers({"x"}, set(), set())
+    with pytest.raises(AntaresParseException, match="not a variable"):
+        parse_expression("reduced_cost(p)", identifiers)
 
 
 @pytest.mark.parametrize(

@@ -13,7 +13,6 @@ repos:
     -   id: black
         name: Run black
         entry: uv run black
-        args: ["--config", "pyproject.toml"]
         language: system
         types: [python]
 
@@ -22,6 +21,6 @@ repos:
     -   id: isort
         name: Run isort
         entry: uv run isort
-        args: ["--profile", "black", "--filter-files", "src", "tests"]
+        args: ["--profile", "black"]
         language: system
         types: [python]
