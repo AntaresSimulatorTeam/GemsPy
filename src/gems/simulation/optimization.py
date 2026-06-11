@@ -40,6 +40,7 @@ import xarray as xr
 
 from gems.expression.degree import is_linear
 from gems.expression.expression import is_unbounded
+from gems.expression.predicates import contains_dual_or_reduced_cost
 from gems.expression.visitor import visit
 from gems.model.common import ValueType
 from gems.model.model import Model
