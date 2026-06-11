@@ -24,7 +24,7 @@ from gems.expression.expression import (
     port_field,
 )
 from gems.expression.indexing_structure import IndexingStructure
-from gems.expression.parsing.parse_expression import AntaresParseException
+from gems.expression.parsing.parse_expression import ParsingException
 from gems.model import (
     Constraint,
     ModelPort,
@@ -151,7 +151,7 @@ def test_library_error_parsing(libs_dir: Path) -> None:
         input_lib = parse_yaml_library(f)
     assert input_lib.id == "basic"
     with pytest.raises(
-        AntaresParseException,
+        ParsingException,
         match=r"An error occurred during parsing: ParseCancellationException",
     ):
         resolve_library([input_lib])
@@ -190,7 +190,8 @@ def test_library_port_model_ok_parsing(libs_dir: Path) -> None:
         constraints=[
             Constraint(
                 name="Level equation",
-                expression=port_field("injection_port", "flow") == var("withdrawal"),
+                expression=port_field("injection_port", "flow").sum_connections()
+                == var("withdrawal"),
             )
         ],
     )
@@ -489,3 +490,116 @@ def test_unrestricted_expr_rejected_in_objective(
     )
     with pytest.raises(ValueError):
         resolve_library([input_lib])
+
+
+# ---------------------------------------------------------------------------
+# Helper: model with a port-field-definition for balance_port.flow
+# ---------------------------------------------------------------------------
+
+
+def _port_model_yaml(*, constraint_expr: str = "", extra_output_expr: str = "") -> str:
+    """Minimal library with a model that defines balance_port.flow = generation.
+
+    The port type exposes two fields (flow, price) so tests can reference
+    balance_port.price as an undefined-in-this-model field.
+    """
+    bc_section = (
+        f"\n      binding-constraints:\n        - id: bc\n          expression: {constraint_expr}"
+        if constraint_expr
+        else ""
+    )
+    eo_section = (
+        f"\n      extra-outputs:\n        - id: eo\n          expression: {extra_output_expr}"
+        if extra_output_expr
+        else ""
+    )
+    return f"""
+library:
+  id: test
+  port-types:
+    - id: flow
+      fields:
+        - id: flow
+        - id: price
+  models:
+    - id: gen_model
+      variables:
+        - id: generation
+          variable-type: continuous
+      parameters:
+        - id: cost
+      ports:
+        - id: balance_port
+          type: flow
+      port-field-definitions:
+        - port: balance_port
+          field: flow
+          definition: generation{bc_section}{eo_section}
+"""
+
+
+# ---------------------------------------------------------------------------
+# Rule 1: sum_connections cannot refer to a port field defined in this model
+# ---------------------------------------------------------------------------
+
+
+def test_sum_connections_on_own_port_in_binding_constraint_raises() -> None:
+    """sum_connections(balance_port.flow) in a BC is invalid: flow is defined here."""
+    input_lib = parse_yaml_library(
+        io.StringIO(
+            _port_model_yaml(constraint_expr="sum_connections(balance_port.flow) >= 0")
+        )
+    )
+    with pytest.raises(ValueError, match="sum_connections"):
+        resolve_library([input_lib])
+
+
+def test_sum_connections_on_own_port_in_extra_output_raises() -> None:
+    """sum_connections(balance_port.flow) in an extra-output is invalid: flow is defined here."""
+    input_lib = parse_yaml_library(
+        io.StringIO(
+            _port_model_yaml(
+                extra_output_expr="sum_connections(balance_port.flow) * generation"
+            )
+        )
+    )
+    with pytest.raises(ValueError, match="sum_connections"):
+        resolve_library([input_lib])
+
+
+# ---------------------------------------------------------------------------
+# Rule 2: bare port.field cannot appear outside sum_connections
+# ---------------------------------------------------------------------------
+
+
+def test_bare_defined_port_field_in_binding_constraint_raises() -> None:
+    """balance_port.flow bare (no sum_connections) in a BC is invalid."""
+    input_lib = parse_yaml_library(
+        io.StringIO(_port_model_yaml(constraint_expr="balance_port.flow >= 0"))
+    )
+    with pytest.raises(ValueError, match="Bare port field"):
+        resolve_library([input_lib])
+
+
+def test_bare_undefined_port_field_in_binding_constraint_raises() -> None:
+    """balance_port.price bare (not defined in this model either) in a BC is invalid."""
+    input_lib = parse_yaml_library(
+        io.StringIO(_port_model_yaml(constraint_expr="balance_port.price >= 0"))
+    )
+    with pytest.raises(ValueError, match="Bare port field"):
+        resolve_library([input_lib])
+
+
+# ---------------------------------------------------------------------------
+# Acceptance: sum_connections on a port field NOT defined in this model is valid
+# ---------------------------------------------------------------------------
+
+
+def test_sum_connections_on_non_own_port_accepted() -> None:
+    """sum_connections(balance_port.price) is valid: price is not defined in this model."""
+    input_lib = parse_yaml_library(
+        io.StringIO(
+            _port_model_yaml(constraint_expr="sum_connections(balance_port.price) >= 0")
+        )
+    )
+    resolve_library([input_lib])  # must not raise
