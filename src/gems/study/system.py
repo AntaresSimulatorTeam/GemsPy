@@ -35,6 +35,7 @@ class Component:
     model: Model
     id: str
     scenario_group: Optional[str] = None
+    properties: Dict[str, str] = field(default_factory=dict)
 
     def is_variable_in_model(self, var_id: str) -> bool:
         return var_id in self.model.variables.keys()
@@ -44,9 +45,17 @@ class Component:
 
 
 def create_component(
-    model: Model, id: str, scenario_group: Optional[str] = None
+    model: Model,
+    id: str,
+    scenario_group: Optional[str] = None,
+    properties: Optional[Dict[str, str]] = None,
 ) -> Component:
-    return Component(model=model, id=id, scenario_group=scenario_group)
+    return Component(
+        model=model,
+        id=id,
+        scenario_group=scenario_group,
+        properties=properties or {},
+    )
 
 
 @dataclass(frozen=True)

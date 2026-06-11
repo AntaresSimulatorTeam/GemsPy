@@ -19,7 +19,7 @@ defining parameters, variables, and equations.
 import itertools
 import warnings
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from gems.expression import ExpressionNode
 from gems.expression.degree import is_linear
@@ -177,6 +177,7 @@ class Model:
         default_factory=dict
     )
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None
+    properties: List[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         # Validate each contribution if present
@@ -219,6 +220,7 @@ def model(
     ports: Optional[Iterable[ModelPort]] = None,
     port_fields_definitions: Optional[Iterable[PortFieldDefinition]] = None,
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None,
+    properties: Optional[Iterable[str]] = None,
 ) -> Model:
     """
     Utility method to create Models from relaxed arguments
@@ -261,4 +263,5 @@ def model(
             else {}
         ),
         extra_outputs=extra_outputs,
+        properties=list(properties) if properties else [],
     )

@@ -39,6 +39,27 @@ from `input/data-series/modeler-scenariobuilder.dat` (if present).
 Use the lower-level functions when you want to load files individually or build
 parts of the study from in-memory data.
 
+---
+
+## System YAML: optional field `properties` for components
+
+In `system.yml`, each component may define an optional `properties` section as a
+list of id/value pairs:
+
+~~~ yaml
+system:
+  components:
+    - id: nuclear_1
+      model: basic.generator
+      properties:
+        - id: technology
+          value: nuclear
+        - id: company
+          value: rhonepower
+~~~
+
+Duplicate ids for properties are rejected.
+
 ### Loading the library and the system
 
 ~~~ python

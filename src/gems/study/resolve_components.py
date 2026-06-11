@@ -12,8 +12,6 @@
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
-import pandas as pd
-
 from gems.model import Model
 from gems.model.library import Library
 from gems.study import (
@@ -21,7 +19,6 @@ from gems.study import (
     ConstantData,
     DataBase,
     PortRef,
-    PortsConnection,
     System,
 )
 from gems.study.data import (
@@ -33,8 +30,31 @@ from gems.study.data import (
     dataframe_to_time_series,
     load_ts_from_file,
 )
-from gems.study.parsing import ComponentSchema, PortConnectionsSchema, SystemSchema
+from gems.study.parsing import (
+    ComponentPropertySchema,
+    ComponentSchema,
+    PortConnectionsSchema,
+    SystemSchema,
+)
 from gems.study.scenario_builder import ScenarioBuilder
+
+
+def _resolve_properties_raw_to_dict(
+    raw: Optional[List[ComponentPropertySchema]],
+    component_id: str,
+) -> Dict[str, str]:
+    """Turn parsed ``properties`` (list of ``ComponentPropertySchema``) into ``Component``'s dict."""
+    if raw is None:
+        return {}
+    properties: Dict[str, str] = {}
+    for item in raw:
+        k = item.id
+        if k in properties:
+            raise ValueError(
+                f"Component {component_id!r}: duplicate properties id {k!r}"
+            )
+        properties[k] = item.value
+    return properties
 
 
 def resolve_system(input_system: SystemSchema, libraries: dict[str, Library]) -> System:
@@ -64,10 +84,20 @@ def _resolve_component(
     lib_id, model_id = component.model.split(".")
     model = libraries[lib_id].models[f"{lib_id}.{model_id}"]
 
+    properties = _resolve_properties_raw_to_dict(component.properties, component.id)
+    missing = sorted(k for k in model.properties if k not in properties)
+    if missing:
+        raise ValueError(
+            f"Component {component.id!r} (model {model.id!r}) is missing "
+            f"propert{'y' if len(missing) == 1 else 'ies'} declared by the model: "
+            f"{missing}."
+        )
+
     return Component(
         model=model,
         id=component.id,
         scenario_group=component.scenario_group,
+        properties=properties,
     )
 
 
