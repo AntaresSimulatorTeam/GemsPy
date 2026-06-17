@@ -84,6 +84,15 @@ def _resolve_component(
     lib_id, model_id = component.model.split(".")
     model = libraries[lib_id].models[f"{lib_id}.{model_id}"]
 
+    provided_param_ids = {p.id for p in component.parameters or []}
+    missing_params = sorted(k for k in model.parameters if k not in provided_param_ids)
+    if missing_params:
+        raise ValueError(
+            f"Component {component.id!r} (model {model.id!r}) is missing "
+            f"parameter{'s' if len(missing_params) > 1 else ''} declared by the model: "
+            f"{missing_params}."
+        )
+
     properties = _resolve_properties_raw_to_dict(component.properties, component.id)
     missing = sorted(k for k in model.properties if k not in properties)
     if missing:

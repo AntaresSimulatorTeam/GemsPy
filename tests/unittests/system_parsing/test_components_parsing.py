@@ -174,6 +174,11 @@ system:
           value: load_data
     - id: nuclear_1
       model: basic.generator
+      parameters:
+        - id: cost
+          value: 30
+        - id: p_max
+          value: 100
       properties:
         - id: technology
           value: nuclear
@@ -294,6 +299,55 @@ system:
       model: basic.generator
 """))
     with pytest.raises(ValueError, match="technology"):
+        resolve_system(system, resolve_library([lib]))
+
+
+# --- model-declared parameters ---
+
+_LIB_WITH_MODEL_PARAMETERS = """\
+library:
+  id: basic
+  models:
+    - id: generator
+      parameters:
+        - id: cost
+          time-dependent: false
+          scenario-dependent: false
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+"""
+
+
+def test_resolve_component_with_declared_parameters_ok() -> None:
+    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PARAMETERS))
+    system = parse_yaml_components(io.StringIO("""\
+system:
+  components:
+    - id: G
+      model: basic.generator
+      parameters:
+        - id: cost
+          value: 30
+        - id: p_max
+          value: 100
+"""))
+    resolved = resolve_system(system, resolve_library([lib]))
+    assert resolved.get_component("G") is not None
+
+
+def test_resolve_component_missing_declared_parameter_raises() -> None:
+    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PARAMETERS))
+    system = parse_yaml_components(io.StringIO("""\
+system:
+  components:
+    - id: G
+      model: basic.generator
+      parameters:
+        - id: cost
+          value: 30
+"""))
+    with pytest.raises(ValueError, match="p_max"):
         resolve_system(system, resolve_library([lib]))
 
 
