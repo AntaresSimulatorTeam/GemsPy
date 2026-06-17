@@ -1,0 +1,69 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+system:
+
+  components:
+    - id: N
+      model: antares_legacy_models.area
+      parameters:
+        - id: spillage_cost
+          value: 0
+        - id: unsupplied_energy_cost
+          value: 1000
+    - id: D
+      model: antares_legacy_models.load
+      parameters:
+        - id: load
+          time-dependent: true
+          value: demand-ts
+    - id: G
+      model: antares_legacy_models.thermal
+      parameters:
+        - id: max_power_per_unit
+          value: 1000
+        - id: min_power_per_unit
+          value: 700
+        - id: cluster_max_generation
+          value: 3000
+        - id: cluster_min_gen_modulation
+          value: 0
+        - id: market_bid_cost
+          value: 50
+        - id: startup_cost
+          value: 50
+        - id: fixed_cost
+          value: 1
+        - id: min_up_duration
+          value: 3
+        - id: min_down_duration
+          value: 10
+        - id: num_units
+          value: 3
+        - id: spinning
+          value: 0
+
+
+  connections:
+    - component1: N
+      port1: balance_port
+      component2: D
+      port2: balance_port
+
+    - component1: N
+      port1: balance_port
+      component2: G
+      port2: balance_port
+
+
+
+
+
