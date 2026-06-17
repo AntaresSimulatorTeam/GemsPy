@@ -13,28 +13,28 @@
 from pathlib import Path
 from typing import Callable, List, Optional
 
-from andromede.model import Model, PortType
-from andromede.model.library import library
-from andromede.simulation import (
+from gems.model import Model, PortType
+from gems.model.library import library
+from gems.simulation import (
     BlockBorderManagement,
     OptimizationProblem,
     OutputValues,
     TimeBlock,
     build_problem,
 )
-from andromede.study import ConstantData, DataBase, Network, create_component
-from andromede.study.data import ComponentParameterIndex
-from andromede.study.parsing import InputComponents, parse_yaml_components
-from andromede.study.resolve_components import (
+from gems.study import ConstantData, DataBase, Network, create_component
+from gems.study.data import ComponentParameterIndex
+from gems.study.parsing import InputComponents, parse_yaml_components
+from gems.study.resolve_components import (
     build_data_base,
     build_network,
     resolve_components_and_cnx,
 )
-from andromede.thermal_heuristic.cluster_parameter import (
+from gems.thermal_heuristic.cluster_parameter import (
     complete_database_for_fast_heuristic,
     complete_database_with_cluster_parameters,
 )
-from andromede.thermal_heuristic.time_scenario_parameter import (
+from gems.thermal_heuristic.time_scenario_parameter import (
     BlockScenarioIndex,
     TimeScenarioHourParameter,
     timesteps,

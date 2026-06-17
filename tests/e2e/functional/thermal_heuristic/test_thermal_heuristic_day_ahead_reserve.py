@@ -21,19 +21,19 @@ from andromede.libs.standard import BALANCE_PORT_TYPE
 from andromede.simulation import OutputValues
 from andromede.study.data import ComponentParameterIndex, ConstantData, DataBase
 from andromede.study.parsing import InputComponents
-from andromede.thermal_heuristic.model import (
+from gems.thermal_heuristic.model import (
     AccurateModelBuilder,
     HeuristicAccurateModelBuilder,
     Model,
 )
-from andromede.thermal_heuristic.problem import (
+from gems.thermal_heuristic.problem import (
     BlockScenarioIndex,
     ThermalProblemBuilder,
     TimeScenarioHourParameter,
     get_database,
     get_network,
 )
-from andromede.thermal_heuristic.time_scenario_parameter import timesteps
+from gems.thermal_heuristic.time_scenario_parameter import timesteps
 from tests.functional.libs.lib_thermal_heuristic import (
     DEMAND_WITH_RESERVE_MODEL,
     NODE_WITH_RESERVE_MODEL,

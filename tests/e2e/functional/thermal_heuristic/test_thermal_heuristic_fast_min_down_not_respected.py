@@ -22,12 +22,12 @@ from andromede.simulation import OutputValues
 from andromede.study import TimeScenarioSeriesData
 from andromede.study.data import ComponentParameterIndex
 from andromede.study.parsing import InputComponents
-from andromede.thermal_heuristic.cluster_parameter import compute_slot_length
-from andromede.thermal_heuristic.model import (
+from gems.thermal_heuristic.cluster_parameter import compute_slot_length
+from gems.thermal_heuristic.model import (
     FastModelBuilder,
     HeuristicFastModelBuilder,
 )
-from andromede.thermal_heuristic.problem import (
+from gems.thermal_heuristic.problem import (
     BlockScenarioIndex,
     ThermalProblemBuilder,
     TimeScenarioHourParameter,

@@ -13,7 +13,7 @@
 import numpy as np
 import pandas as pd
 
-from andromede.thermal_heuristic.data import (
+from gems.thermal_heuristic.data import (
     get_max_failures,
     get_max_unit,
     get_max_unit_for_min_down_time,

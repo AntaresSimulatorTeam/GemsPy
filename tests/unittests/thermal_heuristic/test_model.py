@@ -13,7 +13,7 @@
 from andromede.expression import literal, param, var
 from andromede.model import model
 from andromede.model.constraint import Constraint
-from andromede.thermal_heuristic.model import ModelEditor
+from gems.thermal_heuristic.model import ModelEditor
 
 
 def test_variable_in_expression() -> None:
