@@ -10,24 +10,16 @@
 #
 # This file is part of the Antares project.
 
-from typing import List
 
-import pandas as pd
 import pytest
 
-from andromede.study import (
-    TimeIndex,
-    TimeScenarioIndex,
-    TimeScenarioSeriesData,
-    TimeSeriesData,
-)
-from andromede.utils import get_or_add
+from gems.utils import get_or_add
 
 
 def test_get_or_add_should_evaluate_lazily() -> None:
     d = {"key1": "value1"}
 
-    def raise_factory() -> None:
+    def raise_factory() -> str:
         raise AssertionError("No value should be created")
 
     assert get_or_add(d, "key1", raise_factory) == "value1"
@@ -38,13 +30,3 @@ def test_get_or_add_should_evaluate_lazily() -> None:
         return "value2"
 
     assert get_or_add(d, "key2", value_factory) == "value2"
-
-
-def generate_scalar_matrix_data(
-    value: float, horizon: int, scenarios: int
-) -> TimeScenarioSeriesData:
-    data = pd.DataFrame(index=range(horizon), columns=range(scenarios))
-
-    data.fillna(value, inplace=True)
-
-    return TimeScenarioSeriesData(time_scenario_series=data)

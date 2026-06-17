@@ -3,17 +3,119 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "andromede_modeling_prototype"
-version = "0.0.1"
-license = {text="MPL-2.0"}
-dependencies = [
-    "ortools"
+name = "gemspy"
+version = "0.1.2"
+description = "Python interpreter for GEMS: modelling and simulation of complex energy systems under uncertainty"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "a-zakir" },
+    { name = "aalzoobi" },
+    { name = "aoustry" },
+    { name = "ChouaneLouis" },
+    { name = "dusanparipovic" },
+    { name = "flomnes" },
+    { name = "ianmnz" },
+    { name = "Juliette-Gerbaux" },
+    { name = "killian-scalian" },
+    { name = "klorel" },
+    { name = "MartinBelthle" },
+    { name = "pet-mit" },
+    { name = "sylvlecl" },
+    { name = "tbittar" },
+    { name = "thibaulttoujouse" },
+    { name = "vargastat" },
+    { name = "Yann-Temudjin" },
+    { name = "YassineAbdelouadoud" },
 ]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "antlr4-python3-runtime>=4.13.2",
+    "PyYAML>=6.0.2",
+    "pydantic>=2.0",
+    "anytree>=2.13",
+    "linopy>=0.6",
+    "xarray>=2025.3",
+    "highspy>=1.14",
+    "pandas>=2.2",
+    "attrs>=26.0",
+]
+classifiers = [
+   #    Classifiers here: https://pypi.org/classifiers/
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.optional-dependencies]
+doc = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocs-material-extensions",
+    "mkdocstrings-python",
+]
+
+[project.scripts]
+gemspy = "gems.main.main:main_cli"
+
+[project.urls]
+Repository = "https://github.com/AntaresSimulatorTeam/GemsPy"
+"Bug Tracker" = "https://github.com/AntaresSimulatorTeam/GemsPy/issues"
 
 [tool.setuptools.packages.find]
 # All the following settings are optional:
 where = ["src"]
 
+[dependency-groups]
+dev = [
+    "pyarrow",
+    "pytest>=9.0.3",
+    "mypy>=1.7",
+    "black>=24.0",
+    "isort>=5.12",
+    "pytest-cov",
+    "pre-commit>=3.5",
+    "types-PyYAML>=6.0.12",
+    "antlr4-tools>=0.2.1",
+    "pandas-stubs",
+]
+# Only needed for runnning solver specific tests (dual / reduced cost)
+solvers = [
+    "xpress>=9.8",
+    "gurobipy>=10.0",
+]
+
 [tool.black]
 line-length = 88
-include = '\.pyi?$'
+target-version = ["py311"]
+extend-exclude = '''
+/(
+  \.venv
+)/
+'''
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]
+testpaths = ["tests"]
+log_cli = true
+
+[tool.mypy]
+mypy_path = "src"
+packages = ["gems"]
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+
+[[tool.mypy.overrides]]
+module = ["anytree.*", "linopy.*", "xarray.*", "antlr4.*", "pytest.*", "pydantic.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["gems.expression.parsing.antlr.*"]
+ignore_errors = true

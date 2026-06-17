@@ -1,0 +1,124 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+library:
+  id: time_shift_test
+  description: Library for component-dependent time shift functional tests
+
+  port-types:
+    - id: flow
+      description: A port which transfers power flow
+      fields:
+        - id: flow
+
+  models:
+
+    - id: node
+      description: A basic balancing node
+      ports:
+        - id: injection_port
+          type: flow
+      binding-constraints:
+        - id: balance
+          expression: sum_connections(injection_port.flow) = 0
+
+    - id: demand
+      description: A demand model (supports time-varying and scenario-varying series)
+      parameters:
+        - id: demand
+          time-dependent: true
+          scenario-dependent: true
+      ports:
+        - id: injection_port
+          type: flow
+      port-field-definitions:
+        - port: injection_port
+          field: flow
+          definition: -demand
+
+    - id: spillage
+      description: A spillage model
+      parameters:
+        - id: cost
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: spillage
+          lower-bound: 0
+      ports:
+        - id: injection_port
+          type: flow
+      port-field-definitions:
+        - port: injection_port
+          field: flow
+          definition: -spillage
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * spillage))
+
+    - id: unsupplied
+      description: An unsupplied energy model
+      parameters:
+        - id: cost
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: unsupplied_energy
+          lower-bound: 0
+      ports:
+        - id: injection_port
+          type: flow
+      port-field-definitions:
+        - port: injection_port
+          field: flow
+          definition: unsupplied_energy
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * unsupplied_energy))
+
+    - id: lagged-storage
+      description: >
+        Storage whose level equation references the state `lag` steps ago.
+        The `lag` parameter is constant per component, so different instances
+        of this model can carry different shift values, exercising the
+        per-component time-shift code path.
+        Level equation: level[t] = level[t-lag] - withdrawal[t] + inflows
+        Port flow: withdrawal (positive → supplies the network).
+      parameters:
+        - id: lag
+          time-dependent: false
+          scenario-dependent: false
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+        - id: level_max
+          time-dependent: false
+          scenario-dependent: false
+        - id: inflows
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: level
+          lower-bound: 0
+          upper-bound: level_max
+        - id: withdrawal
+          lower-bound: 0
+          upper-bound: p_max
+      ports:
+        - id: injection_port
+          type: flow
+      port-field-definitions:
+        - port: injection_port
+          field: flow
+          definition: withdrawal
+      constraints:
+        - id: level-equation
+          expression: level[t] - level[t-lag] + withdrawal = inflows

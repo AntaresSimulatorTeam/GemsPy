@@ -1,0 +1,69 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+system:
+  model-libraries: basic
+  components:
+    - id: N
+      model: basic.node
+    - id: D
+      model: basic.demand
+      parameters:
+        - id: demand
+          time-dependent: true
+          scenario-dependent: true
+          value: demand-ts-unittest
+    - id: S
+      model: basic.spillage
+      parameters:
+        - id: cost
+          value: 1
+    - id: U
+      model: basic.unsupplied
+      parameters:
+        - id: cost
+          value: 10
+    - id: STS1
+      model: basic.short-term-storage
+      parameters:
+        - id: p_max_injection
+          value: 100
+        - id: p_max_withdrawal
+          value: 50
+        - id: level_min
+          value: 0
+        - id: level_max
+          value: 1000
+        - id: inflows
+          value: 0
+        - id: efficiency
+          value: 0.8
+
+  connections:
+    - component1: N
+      port1: injection_port
+      component2: D
+      port2: injection_port
+
+    - component1: N
+      port1: injection_port
+      component2: STS1
+      port2: injection_port
+
+    - component1: N
+      port1: injection_port
+      component2: U
+      port2: injection_port
+
+    - component1: N
+      port1: injection_port
+      component2: S
+      port2: injection_port

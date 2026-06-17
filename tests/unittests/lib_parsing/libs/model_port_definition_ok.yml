@@ -1,0 +1,30 @@
+library:
+  id: basic
+  description: Basic library
+
+  port-types:
+    - id: flow
+      description: second flow
+      fields:
+        - id: flow
+  models:
+
+    - id: short-term-storage-2
+      description: A short term storage
+      parameters:
+        - id: p_max_withdrawal
+        - id: p_max_injection
+      variables:
+        - id: injection
+          lower-bound: 0
+          upper-bound: p_max_injection
+        - id: withdrawal
+          lower-bound: 0
+          upper-bound: p_max_withdrawal
+      ports:
+        - id: injection_port
+          type: flow
+      constraints:
+        - id: Level equation
+          expression: sum_connections(injection_port.flow) = withdrawal
+

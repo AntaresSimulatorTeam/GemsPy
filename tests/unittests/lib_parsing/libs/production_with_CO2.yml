@@ -1,0 +1,51 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+library:
+  id: production_CO2
+  description: Library with only production
+  dependencies:
+    - basic
+    - CO2_port
+
+  models:
+    - id: generator
+      description: A basic generator model
+      parameters:
+        - id: cost
+          time-dependent: false
+          scenario-dependent: false
+        - id: emission
+          time-dependent: false
+          scenario-dependent: false
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: generation
+          lower-bound: 0
+          upper-bound: p_max
+      ports:
+        - id: injection_port
+          type: flow
+        - id: emission_port
+          type: emission
+      port-field-definitions:
+        - port: injection_port
+          field: flow
+          definition: generation
+        - port: emission_port
+          field: CO2
+          definition: generation * emission
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(cost * generation))

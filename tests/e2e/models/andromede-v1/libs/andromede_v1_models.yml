@@ -1,0 +1,128 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+library:
+  id: andromede-v1-models
+  description: Andromede V1 model library
+
+  port-types:
+    - id: flow
+      description: A port which transfers power flow
+      fields:
+        - id: flow
+  models:
+    - id: dsr
+      parameters:
+        - id: max_load
+          time-dependent: true
+          scenario-dependent: true
+        - id: curtailment_price
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: curtailment
+          lower-bound: 0
+          upper-bound: max_load
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(curtailment * curtailment_price))
+      ports:
+        - id: balance_port
+          type: flow
+      port-field-definitions:
+        - port: balance_port
+          field: flow
+          definition: -max_load + curtailment
+
+
+    - id: electrolyser
+      parameters:
+      - id: efficiency
+        scenario-dependent: false
+        time-dependent: false
+      - id: p_max
+        scenario-dependent: true
+        time-dependent: true
+      variables:
+      - id: power
+        lower-bound: 0
+        upper-bound: p_max
+      ports:
+        - id: power_port
+          type: flow
+        - id: hydrogen_port
+          type: flow
+      port-field-definitions:
+        - port: power_port
+          field: flow
+          definition: -power
+        - port: hydrogen_port
+          field: flow
+          definition: efficiency * power
+
+    - id: battery
+      parameters:
+        - id: reservoir_capacity
+          time-dependent: false
+          scenario-dependent: false
+        - id: injection_nominal_capacity
+          time-dependent: false
+          scenario-dependent: false
+        - id: withdrawal_nominal_capacity
+          time-dependent: false
+          scenario-dependent: false
+        - id: efficiency_injection
+          time-dependent: false
+          scenario-dependent: false
+        - id: efficiency_withdrawal
+          time-dependent: false
+          scenario-dependent: false
+        - id: lower_rule_curve
+          time-dependent: true
+          scenario-dependent: true
+        - id: upper_rule_curve
+          time-dependent: true
+          scenario-dependent: true
+        - id: p_max_injection_modulation  # Read in p_max_injection
+          time-dependent: true
+          scenario-dependent: true
+        - id: p_max_withdrawal_modulation # Read in p_max_withdrawal
+          time-dependent: true
+          scenario-dependent: true
+        - id: marginal_cost
+          time-dependent: true
+          scenario-dependent: false
+
+
+      variables:
+        - id: p_injection
+          lower-bound: 0
+          upper-bound: p_max_injection_modulation * injection_nominal_capacity # p_max_injection_modulation is a timeseries with adimensional values between 0 and 1
+        - id: p_withdrawal
+          lower-bound: 0
+          upper-bound: p_max_withdrawal_modulation * withdrawal_nominal_capacity # p_max_withdrawal_modulation is a timeseries with adimensional values between 0 and 1
+        - id: level
+          lower-bound: lower_rule_curve * reservoir_capacity
+          upper-bound: upper_rule_curve * reservoir_capacity
+      ports:
+        - id: injection_port
+          type: flow
+      port-field-definitions:
+        - port: injection_port
+          field: flow
+          definition: p_withdrawal - p_injection
+      constraints:
+        - id: level_equation
+          expression: level[t+1] = level + efficiency_injection * p_injection - efficiency_withdrawal * p_withdrawal 
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(marginal_cost * p_injection))

@@ -1,0 +1,2 @@
+                  master                  continuous_generator_candidate        0
+              subproblem                  continuous_generator_candidate        3

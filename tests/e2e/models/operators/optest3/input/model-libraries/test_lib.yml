@@ -1,0 +1,118 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+library:
+  id: test_lib
+  description: This library aims at testing the correct handling of complex expressions of bounds of variables, which requires an "expression expansion" step in the code. The test is successful if the optimization problem is solved without errors and the optimal solution is correct.
+
+
+  port-types:
+    - id: flow
+      description: A port that transfers power flow.
+      fields:
+        - id: flow
+      
+  models:
+    - id: area
+      parameters:
+        - id: spillage_cost
+        - id: ens_cost
+      variables:
+        - id: spillage
+          lower-bound: 0
+          variable-type: continuous
+        - id: unsupplied_energy
+          lower-bound: 0
+          variable-type: continuous
+      ports:
+        - id: balance_port
+          type: flow
+      binding-constraints:
+        - id: balance
+          expression: sum_connections(balance_port.flow) = spillage - unsupplied_energy
+      objective-contributions:
+        - id: objective
+          expression: expec(sum(spillage_cost * spillage + ens_cost * unsupplied_energy))
+
+    - id: load
+      parameters:
+        - id: load
+          time-dependent: true
+          scenario-dependent: true
+      ports:
+        - id: balance_port
+          type: flow
+      port-field-definitions:
+        - port: balance_port
+          field: flow
+          definition: -load
+
+
+
+   
+    - id: thermal
+      parameters:
+        - id: minimum_generation_modulation
+          scenario-dependent: true
+          time-dependent: true
+        - id: p_max_cluster # timeseries that takes outages into account
+          scenario-dependent: true
+          time-dependent: true
+        - id: p_min_unit
+        - id: p_max_unit
+        - id: generation_cost
+        - id: startup_cost
+        - id: fixed_cost
+        - id: d_min_up
+        - id: d_min_down
+        - id: unit_count
+      variables:
+        - id: generation
+          lower-bound: min(p_max_cluster, minimum_generation_modulation * unit_count * p_max_unit)
+          upper-bound: p_max_cluster
+          variable-type: continuous
+        - id: nb_units_on
+          lower-bound: ceil(min(p_max_cluster, minimum_generation_modulation * unit_count * p_max_unit)/p_max_unit)
+          upper-bound: ceil(p_max_cluster/p_max_unit)
+          variable-type: continuous #integer
+        - id: nb_starting
+          lower-bound: 0
+          variable-type: continuous #integer
+        - id: nb_stopping
+          lower-bound: 0
+          variable-type: continuous #integer
+        - id: nb_failing
+          lower-bound: 0
+          upper-bound: max(0, (ceil(p_max_cluster/p_max_unit))[t-1] - (ceil(p_max_cluster/p_max_unit)))
+          variable-type: continuous #integer
+      ports:
+        - id: balance_port
+          type: flow
+      port-field-definitions:
+        - port: balance_port
+          field: flow
+          definition: generation
+      constraints:
+        - id: max_generation
+          expression: generation <= nb_units_on * p_max_unit
+        - id: min_generation
+          expression: generation >= nb_units_on * p_min_unit
+        - id: on_units_dynamics
+          expression: nb_units_on = nb_units_on[t-1] + nb_starting - nb_stopping
+        - id: nb_failing_lower_than_stopping
+          expression: nb_failing <= nb_stopping
+        - id: min_up_duration
+          expression: sum(t-d_min_up + 1 .. t, nb_starting - nb_failing) <= nb_units_on
+        - id: min_down_duration
+          expression: sum(t-d_min_down + 1 .. t, nb_stopping) <= ((ceil(p_max_cluster/p_max_unit)))[t-d_min_down] - nb_units_on + sum(t-d_min_down + 1 .. t, max(0, ceil(p_max_cluster/p_max_unit) - (ceil(p_max_cluster/p_max_unit))[t-1]))
+      objective-contributions:
+        - id: objective
+          expression: expec(sum(generation_cost * generation + startup_cost * nb_starting + fixed_cost * nb_units_on))

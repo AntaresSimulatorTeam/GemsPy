@@ -1,0 +1,78 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# Minimal 4-component system for the rolling-horizon suboptimality test.
+#
+# Time series (6 steps, t=0..5):
+#   demand = [0, 4, 0, 4, 0, 4]  (oscillating; peaks at odd steps)
+#
+# Parameters:
+#   generator: p_max=2 (cannot cover peak demand=4 alone), gen_cost=1
+#   bus:       ens_cost=100 (penalty for unserved energy)
+#   storage:   capacity=2, max_rate=2, η=1
+
+system:
+  components:
+
+    - id: gen
+      model: rolling-horizon-lib.generator
+      parameters:
+        - id: gen_cost
+          time-dependent: false
+          scenario-dependent: false
+          value: 1
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+          value: 2
+
+    - id: load_node
+      model: rolling-horizon-lib.load
+      parameters:
+        - id: demand
+          time-dependent: true
+          scenario-dependent: false
+          value: demand
+
+    - id: storage
+      model: rolling-horizon-lib.storage
+      parameters:
+        - id: capacity
+          time-dependent: false
+          scenario-dependent: false
+          value: 2
+        - id: max_rate
+          time-dependent: false
+          scenario-dependent: false
+          value: 2
+
+    - id: bus
+      model: rolling-horizon-lib.bus
+      parameters:
+        - id: ens_cost
+          time-dependent: false
+          scenario-dependent: false
+          value: 100
+
+  connections:
+    - component1: bus
+      port1: balance
+      component2: gen
+      port2: balance
+    - component1: bus
+      port1: balance
+      component2: load_node
+      port2: balance
+    - component1: bus
+      port1: balance
+      component2: storage
+      port2: balance

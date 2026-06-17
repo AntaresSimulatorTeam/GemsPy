@@ -1,0 +1,63 @@
+site_name: GemsPy - a Python interpreter for GEMS
+repo_url: https://github.com/AntaresSimulatorTeam/GemsPy
+nav:
+  - 'Home': 'index.md'
+  - 'Getting started': 'getting-started.md'
+  - 'User guide: GEMS language and data structure': 'user-guide.md'
+  - 'User guide: GemsPy interpreter package':
+    - 'Reading input files': 'user-guide/inputs.md'
+    - 'Building systems with the Python API': 'user-guide/building.md'
+    - 'Optimization: building and solving problems': 'user-guide/optimisation.md'
+    - 'Retrieving outputs': 'user-guide/outputs.md'
+    - 'Optimisation configuration & resolution modes': 'user-guide/optim-config.md'
+    - 'Scenario builder': 'user-guide/scenario-builder.md'
+    - 'Data converters': 'user-guide/converters.md'
+  - Developer guide: developer-guide.md
+  - Changelog: CHANGELOG.md
+
+theme:
+  name: material
+  logo: images/logo.png 
+  favicon: images/logo.png
+  prev_next_buttons_location: none
+  features:
+    - navigation.instant
+    - navigation.top
+    - content.tabs.link
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: antares
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [ src ]
+          options:
+            show_bases: false
+            show_source: false
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences

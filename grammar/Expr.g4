@@ -13,24 +13,29 @@ This file is part of the Antares project.
 */
 
 grammar Expr;
-
+portFieldExpr : IDENTIFIER '.' IDENTIFIER;
 /* To match the whole input */
 fullexpr: expr EOF;
 
 expr
     : atom                                     # unsignedAtom
-    | IDENTIFIER '.' IDENTIFIER                # portField
+    | portFieldExpr                            # portField
     | '-' expr                                 # negation
     | '(' expr ')'                             # expression
     | expr op=('/' | '*') expr                 # muldiv
     | expr op=('+' | '-') expr                 # addsub
     | expr COMPARISON expr                     # comparison
-    | IDENTIFIER '(' expr ')'                  # function
-    | IDENTIFIER '[' shift (',' shift)* ']'    # timeShift
-    | IDENTIFIER '[' expr  (',' expr )* ']'    # timeIndex
-    | IDENTIFIER '[' shift1=shift '..' shift2=shift ']'     # timeShiftRange
-    | IDENTIFIER '[' expr '..' expr ']'        # timeRange
+    | 'sum' '(' expr ')'                       # allTimeSum
+    | 'sum_connections' '(' portFieldExpr ')'  # portFieldSum
+    | 'sum' '(' from=shift '..' to=shift ',' expr ')'  # timeSum
+    | IDENTIFIER '(' argList? ')'              # function
+    | IDENTIFIER '[' shift ']'                 # timeShift
+    | IDENTIFIER '[' expr  ']'                 # timeIndex
+    | '(' expr ')' '[' shift ']'               # timeShiftExpr
+    | '(' expr ')' '[' expr ']'               # timeIndexExpr
     ;
+
+argList : expr (',' expr)* ;
 
 atom
     : NUMBER                                   # number

@@ -1,0 +1,8 @@
+load, 0, 0
+load, 1, 1
+load, 2, 0
+load, 3, 1
+cost-group, 0, 0
+cost-group, 1, 0
+cost-group, 2, 1
+cost-group, 3, 1

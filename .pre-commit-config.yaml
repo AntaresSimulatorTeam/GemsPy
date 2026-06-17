@@ -3,7 +3,7 @@ repos:
     hooks:
     -   id: mypy
         name: Run mypy
-        entry: mypy
+        entry: uv run mypy
         language: system
         files: ^src/
         types: [python]
@@ -12,8 +12,7 @@ repos:
     hooks:
     -   id: black
         name: Run black
-        entry: black
-        args: ["--config", "pyproject.toml"]
+        entry: uv run black
         language: system
         types: [python]
 
@@ -21,7 +20,7 @@ repos:
     hooks:
     -   id: isort
         name: Run isort
-        entry: isort
-        args: ["--profile", "black", "--filter-files"]
+        entry: uv run isort
+        args: ["--profile", "black"]
         language: system
         types: [python]

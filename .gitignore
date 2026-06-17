@@ -6,7 +6,12 @@ prof
 .idea
 venv
 .env
+.venv
 .coverage
 coverage.xml
 bin
 outputs
+build
+src/gems.egg-info/
+src/gemspy.egg-info/
+build_time_scalability.csv

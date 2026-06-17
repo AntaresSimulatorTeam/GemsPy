@@ -1,0 +1,165 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# LP-only variant of the andromede_v1 DSR study (base028).
+#
+# Generators (gas, oil, coal) use the simple_generator LP model instead of
+# the antares-historic thermal MIP model.  MIP thermal clusters with zero
+# startup/fixed costs have multiple equivalent integer solutions across block
+# boundaries, making per-timestep comparison between resolution modes
+# unreliable.  The simple_generator model is a pure continuous LP, so the
+# unique optimal dispatch is determined entirely by merit order at each
+# timestep.  Frontal, parallel-subproblems, and sequential-subproblems modes
+# must therefore produce identical per-timestep results, which is exactly
+# what this test verifies.
+
+system:
+
+  components:
+    - id: base_zone
+      model: test-lib.area
+      parameters:
+        - id: spillage_cost
+          time-dependent: false
+          scenario-dependent: false
+          value: 0
+        - id: ens_cost
+          time-dependent: false
+          scenario-dependent: false
+          value: 20000
+
+    - id: load_base_zone
+      model: test-lib.load
+      parameters:
+        - id: load
+          time-dependent: true
+          scenario-dependent: true
+          value: load_ts_base028
+
+    - id: wind_base_zone
+      model: test-lib.renewable
+      parameters:
+        - id: nominal_capacity
+          time-dependent: false
+          scenario-dependent: false
+          value: 9000
+        - id: unit_count
+          time-dependent: false
+          scenario-dependent: false
+          value: 1
+        - id: generation
+          time-dependent: true
+          scenario-dependent: true
+          value: wind_ts_base028
+
+    - id: dsr_base_zone
+      model: test-lib.dsr
+      parameters:
+        - id: max_load
+          time-dependent: false
+          scenario-dependent: false
+          value: 300
+        - id: curtailment_price
+          time-dependent: false
+          scenario-dependent: false
+          value: 42.7
+
+    - id: gas_base_zone
+      model: test-lib.simple_generator
+      parameters:
+        - id: p_min
+          time-dependent: false
+          scenario-dependent: false
+          value: 0
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+          value: 2500
+        - id: generation_cost
+          time-dependent: false
+          scenario-dependent: false
+          value: 50
+        - id: co2_emission_factor
+          time-dependent: false
+          scenario-dependent: false
+          value: 0
+
+    - id: oil_base_zone
+      model: test-lib.simple_generator
+      parameters:
+        - id: p_min
+          time-dependent: false
+          scenario-dependent: false
+          value: 0
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+          value: 1000
+        - id: generation_cost
+          time-dependent: false
+          scenario-dependent: false
+          value: 80
+        - id: co2_emission_factor
+          time-dependent: false
+          scenario-dependent: false
+          value: 0
+
+    - id: coal_base_zone
+      model: test-lib.simple_generator
+      parameters:
+        - id: p_min
+          time-dependent: false
+          scenario-dependent: false
+          value: 0
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+          value: 6000
+        - id: generation_cost
+          time-dependent: false
+          scenario-dependent: false
+          value: 30
+        - id: co2_emission_factor
+          time-dependent: false
+          scenario-dependent: false
+          value: 0
+
+  connections:
+    - component1: base_zone
+      port1: balance_port
+      component2: load_base_zone
+      port2: balance_port
+
+    - component1: base_zone
+      port1: balance_port
+      component2: wind_base_zone
+      port2: balance_port
+
+    - component1: base_zone
+      port1: balance_port
+      component2: dsr_base_zone
+      port2: balance_port
+
+    - component1: base_zone
+      port1: balance_port
+      component2: gas_base_zone
+      port2: balance_port
+
+    - component1: base_zone
+      port1: balance_port
+      component2: oil_base_zone
+      port2: balance_port
+
+    - component1: base_zone
+      port1: balance_port
+      component2: coal_base_zone
+      port2: balance_port

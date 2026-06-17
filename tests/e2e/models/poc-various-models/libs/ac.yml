@@ -1,0 +1,151 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+library:
+  id: ac
+  description: |
+      AC network models
+    
+      Contains a few models useful for representing AC network,
+      through the DC approximation:
+      * An AC node model
+      * An AC link model
+      * An AC link model with a flow limit
+      * An AC link model with a PST
+
+  port-types:
+    - id: ac-port
+      description: A port which transfers power flow and voltage angle
+      fields:
+        - id: flow
+        - id: angle
+
+  models:
+
+    # Node has 2 ports: one for angle dependent connections,
+    # one for power-only connections.
+    # Should we relax constraints on ports compatibility to allow to have only one here?
+    - id: ac-node
+      variables:
+        - id: angle
+      ports:
+        - id: injections
+          type: balance
+        - id: links
+          type: ac-port
+      port-field-definitions:
+        - port: links
+          field: angle
+          definition: angle
+      binding-constraints:
+        - id: Balance
+          expression: sum_connections(injections.flow) + sum_connections(links.flow) = 0
+
+    # Flow on the line is proportional to angle difference between extremities,
+    # and inverse of impedance.
+    - id: ac-link
+      description: A basic AC link model
+      parameters:
+        - id: reactance
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: flow
+      ports:
+        - id: port1
+          type: ac-port
+        - id: port2
+          type: ac-port
+      port-field-definitions:
+        - port: port1
+          field: flow
+          definition: -flow
+        - port: port2
+          field: flow
+          definition: flow
+      binding-constraints:
+        - id: AC flow
+          expression: flow = 1 / reactance * (sum_connections(port1.angle) - sum_connections(port2.angle))
+
+    # Flow on the line is proportional to angle difference between extremities,
+    # and inverse of impedance.
+    # Flow value is restricted by the parameter flow_limit.
+    - id: ac-link-with-limit
+      description: A basic AC link model with a flow limit
+      parameters:
+        - id: reactance
+          time-dependent: false
+          scenario-dependent: false
+        - id: flow_limit
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: flow
+          lower-bound: -flow_limit
+          upper-bound: flow_limit
+      ports:
+        - id: port1
+          type: ac-port
+        - id: port2
+          type: ac-port
+      port-field-definitions:
+        - port: port1
+          field: flow
+          definition: -flow
+        - port: port2
+          field: flow
+          definition: flow
+      binding-constraints:
+        - id: AC flow
+          expression: flow = 1 / reactance * (sum_connections(port1.angle) - sum_connections(port2.angle))
+
+    # Flow on the line is proportional to angle difference between extremities,
+    # and inverse of impedance.
+    # A shift angle is applied on side 1, allowing to control the flow.
+    # We associate a cost to the absolute value of phase shift,
+    # which may be useful to remove equivalent solutions.
+    - id: ac-link-with-pst
+      description: An AC link with a phase shifter
+      parameters:
+        - id: reactance
+          time-dependent: false
+          scenario-dependent: false
+        - id: phase_shift_cost
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: flow
+        - id: phase_shift
+        - id: phase_shift_pos
+          lower-bound: 0
+        - id: phase_shift_neg
+          lower-bound: 0
+      ports:
+        - id: port1
+          type: ac-port
+        - id: port2
+          type: ac-port
+      port-field-definitions:
+        - port: port1
+          field: flow
+          definition: -flow
+        - port: port2
+          field: flow
+          definition: flow
+      constraints:
+        - id: Phase shift
+          expression: phase_shift = phase_shift_pos - phase_shift_neg
+      binding-constraints:
+        - id: AC flow
+          expression: flow = 1 / reactance * (sum_connections(port1.angle) + phase_shift - sum_connections(port2.angle))
+      objective-contributions:
+        - id: obj
+          expression: expec(sum(phase_shift_cost * (phase_shift_pos + phase_shift_neg)))
