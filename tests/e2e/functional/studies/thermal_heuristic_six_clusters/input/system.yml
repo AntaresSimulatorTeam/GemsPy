@@ -1,0 +1,178 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+system:
+
+  components:
+    - id: G1
+      model: antares_legacy_models.thermal
+      parameters:
+        - id: max_power_per_unit
+          value: 64
+        - id: min_power_per_unit
+          value: 32
+        - id: cluster_max_generation
+          time-dependent: true
+          scenario-dependent: true
+          value: series_G1
+        - id: cluster_min_gen_modulation
+          value: 0
+        - id: market_bid_cost
+          value: 165
+        - id: startup_cost
+          value: 10
+        - id: fixed_cost
+          value: 1
+        - id: min_up_duration
+          value: 3
+        - id: min_down_duration
+          value: 3
+        - id: num_units
+          value: 21
+        - id: spinning
+          value: 0
+    - id: G2
+      model: antares_legacy_models.thermal
+      parameters:
+        - id: max_power_per_unit
+          value: 221
+        - id: min_power_per_unit
+          value: 111
+        - id: cluster_max_generation
+          time-dependent: true
+          scenario-dependent: true
+          value: series_G2
+        - id: cluster_min_gen_modulation
+          value: 0
+        - id: market_bid_cost
+          value: 117
+        - id: startup_cost
+          value: 20
+        - id: fixed_cost
+          value: 2
+        - id: min_up_duration
+          value: 3
+        - id: min_down_duration
+          value: 3
+        - id: num_units
+          value: 13
+        - id: spinning
+          value: 0
+    - id: G3
+      model: antares_legacy_models.thermal
+      parameters:
+        - id: max_power_per_unit
+          value: 486
+        - id: min_power_per_unit
+          value: 194
+        - id: cluster_max_generation
+          time-dependent: true
+          scenario-dependent: true
+          value: series_G3
+        - id: cluster_min_gen_modulation
+          value: 0
+        - id: market_bid_cost
+          value: 106
+        - id: startup_cost
+          value: 30
+        - id: fixed_cost
+          value: 3
+        - id: min_up_duration
+          value: 2
+        - id: min_down_duration
+          value: 2
+        - id: num_units
+          value: 13
+        - id: spinning
+          value: 0
+    - id: G4
+      model: antares_legacy_models.thermal
+      parameters:
+        - id: max_power_per_unit
+          value: 218
+        - id: min_power_per_unit
+          value: 87
+        - id: cluster_max_generation
+          time-dependent: true
+          scenario-dependent: true
+          value: series_G4
+        - id: cluster_min_gen_modulation
+          value: 0
+        - id: market_bid_cost
+          value: 135
+        - id: startup_cost
+          value: 40
+        - id: fixed_cost
+          value: 4
+        - id: min_up_duration
+          value: 1
+        - id: min_down_duration
+          value: 1
+        - id: num_units
+          value: 2
+        - id: spinning
+          value: 0
+    - id: G5
+      model: antares_legacy_models.thermal
+      parameters:
+        - id: max_power_per_unit
+          value: 29
+        - id: min_power_per_unit
+          value: 14
+        - id: cluster_max_generation
+          time-dependent: true
+          scenario-dependent: true
+          value: series_G5
+        - id: cluster_min_gen_modulation
+          value: 0
+        - id: market_bid_cost
+          value: 191
+        - id: startup_cost
+          value: 50
+        - id: fixed_cost
+          value: 5
+        - id: min_up_duration
+          value: 1
+        - id: min_down_duration
+          value: 1
+        - id: num_units
+          value: 7
+        - id: spinning
+          value: 0
+    - id: G6
+      model: antares_legacy_models.thermal
+      parameters:
+        - id: max_power_per_unit
+          value: 159
+        - id: min_power_per_unit
+          value: 80
+        - id: cluster_max_generation
+          time-dependent: true
+          scenario-dependent: true
+          value: series_G6
+        - id: cluster_min_gen_modulation
+          value: 0
+        - id: market_bid_cost
+          value: 166
+        - id: startup_cost
+          value: 60
+        - id: fixed_cost
+          value: 6
+        - id: min_up_duration
+          value: 3
+        - id: min_down_duration
+          value: 3
+        - id: num_units
+          value: 16
+        - id: spinning
+          value: 0
+
+  connections: []
