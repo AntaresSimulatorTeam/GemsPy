@@ -162,3 +162,88 @@ def test_extra_output_abs_round_on_variable() -> None:
     )
     assert abs_shift == pytest.approx(2.3)
     assert rounded == pytest.approx(3.0)
+
+
+def test_extra_output_min_on_variable() -> None:
+    """
+    min(variable, parameter) is allowed in extra outputs and evaluated
+    element-wise post-solve (issue #237).
+    """
+    from gems.expression import param, var
+    from gems.expression.expression import literal, minimum
+    from gems.model.model import model
+    from gems.model.parameter import float_parameter
+    from gems.model.variable import float_variable
+    from gems.simulation import TimeBlock, build_problem
+    from gems.study import ConstantData, DataBase, Study, System, create_component
+
+    SIMPLE_MODEL = model(
+        id="SIMPLE_MIN",
+        parameters=[float_parameter("cap")],
+        variables=[float_variable("a", lower_bound=literal(5), upper_bound=literal(5))],
+        extra_outputs={"capped": minimum(var("a"), param("cap"))},
+    )
+
+    database = DataBase()
+    comp = create_component(model=SIMPLE_MODEL, id="comp_1")
+    database.add_data("comp_1", "cap", ConstantData(3.0))
+
+    system = System("test_min_extra")
+    system.add_component(comp)
+
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), scenario_ids=list(range(1))
+    )
+    problem.solve(solver_name="highs")
+
+    df = SimulationTableBuilder().build(problem)
+    capped = (
+        df.component("comp_1").output("capped").value(time_index=0, scenario_index=0)
+    )
+    # min(a=5, cap=3) == 3
+    assert capped == pytest.approx(3.0)
+
+
+def test_extra_output_comparison() -> None:
+    """
+    Comparison operators (>=, <=) are allowed in extra outputs and evaluated
+    post-solve as a float indicator: 1.0 where the condition holds, 0.0
+    otherwise (issue #237). Previously these raised NotImplementedError.
+    """
+    from gems.expression import param, var
+    from gems.expression.expression import Comparator, ComparisonNode, literal
+    from gems.model.model import model
+    from gems.model.parameter import float_parameter
+    from gems.model.variable import float_variable
+    from gems.simulation import TimeBlock, build_problem
+    from gems.study import ConstantData, DataBase, Study, System, create_component
+
+    SIMPLE_MODEL = model(
+        id="SIMPLE_CMP",
+        parameters=[float_parameter("threshold")],
+        variables=[float_variable("a", lower_bound=literal(5), upper_bound=literal(5))],
+        extra_outputs={
+            # a (=5) >= threshold (=3) -> 1.0
+            "ge": ComparisonNode(var("a"), param("threshold"), Comparator.GREATER_THAN),
+            # a (=5) <= threshold (=3) -> 0.0
+            "le": ComparisonNode(var("a"), param("threshold"), Comparator.LESS_THAN),
+        },
+    )
+
+    database = DataBase()
+    comp = create_component(model=SIMPLE_MODEL, id="comp_1")
+    database.add_data("comp_1", "threshold", ConstantData(3.0))
+
+    system = System("test_comparison_extra")
+    system.add_component(comp)
+
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), scenario_ids=list(range(1))
+    )
+    problem.solve(solver_name="highs")
+
+    df = SimulationTableBuilder().build(problem)
+    ge = df.component("comp_1").output("ge").value(time_index=0, scenario_index=0)
+    le = df.component("comp_1").output("le").value(time_index=0, scenario_index=0)
+    assert ge == pytest.approx(1.0)
+    assert le == pytest.approx(0.0)
