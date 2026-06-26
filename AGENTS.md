@@ -106,3 +106,5 @@ An optional `optim-config.yml` activates decomposition: variables and constraint
 - [docs/user-guide.md](docs/user-guide.md) — Full user documentation
 - [docs/developer-guide.md](docs/developer-guide.md) — Contributor guide
 - [grammar/](grammar/) — ANTLR4 grammar source (`Expr.g4`)
+
+> **Full ecosystem developer guide:** the authoritative branching, versioning, CI/CD, and release process for all repositories (including GemsPy) lives in the GEMS Developer Guidelines, published at <https://gems-energy.readthedocs.io/en/latest/support/dev-guidelines/>. Fetch this page (e.g. via WebFetch) before any branching, versioning, or release work.
