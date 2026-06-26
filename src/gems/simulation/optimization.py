@@ -32,7 +32,7 @@ optimization problem in four phases:
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, cast
 
 import linopy
 import numpy as np
@@ -44,6 +44,7 @@ from gems.expression.visitor import visit
 from gems.model.common import ValueType
 from gems.model.model import Model
 from gems.model.port import PortField, PortFieldId
+from gems.model.variable import Variable
 from gems.simulation.linearize import (
     VectorizedExpr,
     VectorizedLinearExprBuilder,
@@ -51,6 +52,7 @@ from gems.simulation.linearize import (
 )
 from gems.simulation.time_block import TimeBlock
 from gems.simulation.vectorized_builder import ShiftValidityVisitor
+from gems.study.parsing import IntegerStrategy
 from gems.study.study import Study
 from gems.study.system import Component
 
@@ -556,90 +558,128 @@ class _OptimizationProblemBuilder:
     def _create_variables_for_model(
         self, model: Model, components: List[Component]
     ) -> None:
+        RELAXED_STRATEGIES = {IntegerStrategy.RELAXED, IntegerStrategy.HEURISTIC}
         comp_ids = [c.id for c in components]
 
         for var in model.variables.values():
             if not self._location_filter or self._location_filter.include_variable(
                 model.id, var.name
             ):
-                # Build coords for this variable
-                coords: Dict[str, object] = {"component": comp_ids}
-                dims = ["component"]
-                if var.structure.time:
-                    coords["time"] = self.time_coord
-                    dims.append("time")
-                if var.structure.scenario:
-                    coords["scenario"] = self.local_scenario_coord
-                    dims.append("scenario")
+                needs_split = var.data_type in (
+                    ValueType.INTEGER,
+                    ValueType.BINARY,
+                ) and any(c.integer_strategy in RELAXED_STRATEGIES for c in components)
 
-                # Shape of this variable (used to broadcast scalar bounds)
-                var_shape = tuple(
-                    (
-                        len(comp_ids)
-                        if d == "component"
-                        else (
-                            len(self.time_coord)
-                            if d == "time"
-                            else len(self.local_scenario_coord)
+                if needs_split:
+                    groups: Dict[bool, List[Component]] = {}
+                    for c in components:
+                        groups.setdefault(
+                            c.integer_strategy in RELAXED_STRATEGIES, []
+                        ).append(c)
+                    partial = [
+                        self._add_variable_for_group(
+                            model,
+                            var,
+                            group,
+                            relax=relax,
+                            name_suffix=f"__relaxed" if relax else "",
+                        )
+                        for i, (relax, group) in enumerate(groups.items())
+                    ]
+                    merged = cast(
+                        xr.Dataset,
+                        xr.concat([lv.data for lv in partial], dim="component"),
+                    ).sel(component=comp_ids)
+                    self.linopy_vars[(model.id, var.name)] = linopy.Variable(
+                        merged, partial[0].model, partial[0].name
+                    )
+                else:
+                    self.linopy_vars[(model.id, var.name)] = (
+                        self._add_variable_for_group(
+                            model, var, components, relax=False
                         )
                     )
-                    for d in dims
+
+    def _add_variable_for_group(
+        self,
+        model: Model,
+        var: Variable,
+        components: List[Component],
+        relax: bool,
+        name_suffix: str = "",
+    ) -> linopy.Variable:
+        comp_ids = [c.id for c in components]
+        coords: Dict[str, object] = {"component": comp_ids}
+        dims = ["component"]
+        if var.structure.time:
+            coords["time"] = self.time_coord
+            dims.append("time")
+        if var.structure.scenario:
+            coords["scenario"] = self.local_scenario_coord
+            dims.append("scenario")
+
+        var_shape = tuple(
+            (
+                len(comp_ids)
+                if d == "component"
+                else (
+                    len(self.time_coord)
+                    if d == "time"
+                    else len(self.local_scenario_coord)
+                )
+            )
+            for d in dims
+        )
+
+        bound_builder = VectorizedLinearExprBuilder(
+            model_id=model.id,
+            linopy_vars={},
+            param_arrays=self.param_arrays,
+            port_arrays={},
+            block_length=self.block_length,
+        )
+
+        is_binary = var.data_type == ValueType.BINARY
+        lower: object = (
+            np.full(var_shape, 0.0 if is_binary else -np.inf)
+            if var.lower_bound is None
+            else self._to_bound_array(
+                visit(var.lower_bound, bound_builder), var_shape, dims
+            )
+        )
+        upper: object = (
+            np.full(var_shape, 1.0 if is_binary else np.inf)
+            if var.upper_bound is None
+            else self._to_bound_array(
+                visit(var.upper_bound, bound_builder), var_shape, dims
+            )
+        )
+
+        lower_arr = lower if isinstance(lower, np.ndarray) else np.array(lower)
+        upper_arr = upper if isinstance(upper, np.ndarray) else np.array(upper)
+        for ci, comp_id in enumerate(comp_ids):
+            lo = np.asarray(lower_arr[ci] if lower_arr.ndim > 0 else lower_arr)
+            up = np.asarray(upper_arr[ci] if upper_arr.ndim > 0 else upper_arr)
+            finite = np.isfinite(lo) & np.isfinite(up)
+            violation = finite & (up < lo)
+            if np.any(violation):
+                idx = int(np.argmax(violation))
+                raise ValueError(
+                    f"Upper bound ({float(up.flat[idx]):g}) must be strictly "
+                    f"greater than lower bound ({float(lo.flat[idx]):g}) "
+                    f"for variable {comp_id}.{var.name}"
                 )
 
-                # Build a minimal builder for bound expressions (no variables needed)
-                bound_builder = VectorizedLinearExprBuilder(
-                    model_id=model.id,
-                    linopy_vars={},
-                    param_arrays=self.param_arrays,
-                    port_arrays={},
-                    block_length=self.block_length,
-                )
-
-                lower: object = (
-                    np.full(var_shape, -np.inf)
-                    if var.lower_bound is None
-                    else self._to_bound_array(
-                        visit(var.lower_bound, bound_builder), var_shape, dims
-                    )
-                )
-                upper: object = (
-                    np.full(var_shape, np.inf)
-                    if var.upper_bound is None
-                    else self._to_bound_array(
-                        visit(var.upper_bound, bound_builder), var_shape, dims
-                    )
-                )
-
-                # Validate bounds: upper must be >= lower across all timesteps/scenarios
-                lower_arr = lower if isinstance(lower, np.ndarray) else np.array(lower)
-                upper_arr = upper if isinstance(upper, np.ndarray) else np.array(upper)
-                for ci, comp_id in enumerate(comp_ids):
-                    lo = np.asarray(lower_arr[ci] if lower_arr.ndim > 0 else lower_arr)
-                    up = np.asarray(upper_arr[ci] if upper_arr.ndim > 0 else upper_arr)
-                    finite = np.isfinite(lo) & np.isfinite(up)
-                    violation = finite & (up < lo)
-                    if np.any(violation):
-                        idx = int(np.argmax(violation))
-                        raise ValueError(
-                            f"Upper bound ({float(up.flat[idx]):g}) must be strictly "
-                            f"greater than lower bound ({float(lo.flat[idx]):g}) "
-                            f"for variable {comp_id}.{var.name}"
-                        )
-
-                prefix = model.id.replace("-", "_")
-                name = f"{prefix}__{var.name}"
-                binary = var.data_type == ValueType.BINARY
-                integer = var.data_type == ValueType.INTEGER
-
-                lv = self.linopy_model.add_variables(
-                    lower=lower,
-                    upper=upper,
-                    coords=coords,
-                    name=name,
-                    binary=binary,
-                    integer=integer,
-                )
-                self.linopy_vars[(model.id, var.name)] = lv
+        prefix = model.id.replace("-", "_")
+        name = f"{prefix}__{var.name}{name_suffix}"
+        return self.linopy_model.add_variables(
+            lower=lower,
+            upper=upper,
+            coords=coords,
+            name=name,
+            binary=var.data_type == ValueType.BINARY and not relax,
+            integer=var.data_type == ValueType.INTEGER and not relax,
+        )
 
     # ------------------------------------------------------------------
     # Phase 3 — Port arrays

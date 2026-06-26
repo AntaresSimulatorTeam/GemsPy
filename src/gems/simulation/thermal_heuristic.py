@@ -133,7 +133,10 @@ def find_min_generation_fast(
         nb_units_on=nb_units_on,
     )
 
-    return [min(n * min_power_per_unit, cluster_max_generation[t]) for t, n in enumerate(nb_units_on)]
+    return [
+        min(n * min_power_per_unit, cluster_max_generation[t])
+        for t, n in enumerate(nb_units_on)
+    ]
 
 
 def find_nb_units_accurate(
