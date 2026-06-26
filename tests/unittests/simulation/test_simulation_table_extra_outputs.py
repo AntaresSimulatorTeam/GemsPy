@@ -208,7 +208,7 @@ def test_extra_output_comparison() -> None:
     """
     Comparison operators (>=, <=) are allowed in extra outputs and evaluated
     post-solve as a float indicator: 1.0 where the condition holds, 0.0
-    otherwise (issue #237). Previously these raised NotImplementedError.
+    otherwise. Previously these raised NotImplementedError.
     """
     from gems.expression import param, var
     from gems.expression.expression import Comparator, ComparisonNode, literal
