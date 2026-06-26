@@ -167,7 +167,7 @@ def test_extra_output_abs_round_on_variable() -> None:
 def test_extra_output_min_on_variable() -> None:
     """
     min(variable, parameter) is allowed in extra outputs and evaluated
-    element-wise post-solve (issue #237).
+    element-wise post-solve.
     """
     from gems.expression import param, var
     from gems.expression.expression import literal, minimum
