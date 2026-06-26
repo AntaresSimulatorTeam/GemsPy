@@ -14,6 +14,7 @@ system:
   components:
     - id: G1
       model: antares_legacy_models.thermal
+      integer-strategy: heuristic
       parameters:
         - id: max_power_per_unit
           value: 1318.5

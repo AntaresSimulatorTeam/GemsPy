@@ -38,7 +38,7 @@ from gems.study.folder import load_study
 STUDIES_DIR = Path(__file__).parent / "studies"
 
 MILP_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_milp"
-LP_STUDY_DIR   = STUDIES_DIR / "thermal_heuristic_one_cluster_lp"
+LP_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_lp"
 ACCURATE_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_accurate"
 FAST_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_fast"
 
@@ -75,9 +75,7 @@ def test_milp_version() -> None:
     problem.solve(solver_name="highs")
 
     assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(
-        16805387 
-    )
+    assert problem.objective_value == pytest.approx(16805387)
 
     st = SimulationTableBuilder().build(problem)
 
@@ -93,14 +91,20 @@ def test_milp_version() -> None:
                 .output(output_id)
                 .value(time_index=t, scenario_index=0)
             )
-            assert actual == pytest.approx(expected, abs=abs), (
-                f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
-            )
+            assert actual == pytest.approx(
+                expected, abs=abs
+            ), f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
 
-    assert_output_per_timestep("G", "generation_power", [2000 if t!=12 else 2100 for t in range(168)])
-    assert_output_per_timestep("G", "num_units_on", [2 if t!=12 else 3 for t in range(168)])
+    assert_output_per_timestep(
+        "G", "generation_power", [2000 if t != 12 else 2100 for t in range(168)]
+    )
+    assert_output_per_timestep(
+        "G", "num_units_on", [2 if t != 12 else 3 for t in range(168)]
+    )
     assert_output_per_timestep("N", "unsupplied_energy", [0.0] * 168)
-    assert_output_per_timestep("N", "spilled_energy", [0 if t!=12 else 50 for t in range(168)])
+    assert_output_per_timestep(
+        "N", "spilled_energy", [0 if t != 12 else 50 for t in range(168)]
+    )
 
 
 def test_lp_version() -> None:
@@ -133,11 +137,9 @@ def test_lp_version() -> None:
     time_block = TimeBlock(1, list(range(168)))
     problem = build_problem(study, time_block, scenario_ids=[0])
     problem.solve(solver_name="highs")
-    
+
     assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(
-        16802840.55 
-    )
+    assert problem.objective_value == pytest.approx(16802840.55)
 
     st = SimulationTableBuilder().build(problem)
 
@@ -153,18 +155,21 @@ def test_lp_version() -> None:
                 .output(output_id)
                 .value(time_index=t, scenario_index=0)
             )
-            assert actual == pytest.approx(expected, abs=abs), (
-                f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
-            )
+            assert actual == pytest.approx(
+                expected, abs=abs
+            ), f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
 
-    assert_output_per_timestep("G", "generation_power", [2000 if t!=12 else 2050 for t in range(168)])
-    assert_output_per_timestep("G", "num_units_on", [2 if t!=12 else 2.05 for t in range(168)])
+    assert_output_per_timestep(
+        "G", "generation_power", [2000 if t != 12 else 2050 for t in range(168)]
+    )
+    assert_output_per_timestep(
+        "G", "num_units_on", [2 if t != 12 else 2.05 for t in range(168)]
+    )
     assert_output_per_timestep("N", "unsupplied_energy", [0.0] * 168)
     assert_output_per_timestep("N", "spilled_energy", [0.0] * 168)
 
 
-def test_accurate_heuristic(
-) -> None:
+def test_accurate_heuristic() -> None:
     """
     Solve the same problem as before with the heuristic accurate of Antares. The accurate heuristic is able to retrieve the milp optimal solution because when the number of on units found in the linear relaxation is ceiled, we found the optimal number of on units which is already feasible.
     """
@@ -175,9 +180,7 @@ def test_accurate_heuristic(
     problem.solve(solver_name="highs")
 
     assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(
-        16805387 
-    )
+    assert problem.objective_value == pytest.approx(16805387)
 
     st = SimulationTableBuilder().build(problem)
 
@@ -193,17 +196,23 @@ def test_accurate_heuristic(
                 .output(output_id)
                 .value(time_index=t, scenario_index=0)
             )
-            assert actual == pytest.approx(expected, abs=abs), (
-                f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
-            )
+            assert actual == pytest.approx(
+                expected, abs=abs
+            ), f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
 
-    assert_output_per_timestep("G", "generation_power", [2000 if t!=12 else 2100 for t in range(168)])
-    assert_output_per_timestep("G", "num_units_on", [2 if t!=12 else 3 for t in range(168)])
+    assert_output_per_timestep(
+        "G", "generation_power", [2000 if t != 12 else 2100 for t in range(168)]
+    )
+    assert_output_per_timestep(
+        "G", "num_units_on", [2 if t != 12 else 3 for t in range(168)]
+    )
     assert_output_per_timestep("N", "unsupplied_energy", [0.0] * 168)
-    assert_output_per_timestep("N", "spilled_energy", [0 if t!=12 else 50 for t in range(168)])
+    assert_output_per_timestep(
+        "N", "spilled_energy", [0 if t != 12 else 50 for t in range(168)]
+    )
 
-def test_fast_heuristic(
-) -> None:
+
+def test_fast_heuristic() -> None:
     """
     Solve the same problem as before with the heuristic fast of Antares
     Model on 168 time steps with one thermal generation and one demand on a single node.
@@ -234,9 +243,7 @@ def test_fast_heuristic(
     problem.solve(solver_name="highs")
 
     assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(
-        16850000 
-    )
+    assert problem.objective_value == pytest.approx(16850000)
 
     st = SimulationTableBuilder().build(problem)
 
@@ -252,11 +259,23 @@ def test_fast_heuristic(
                 .output(output_id)
                 .value(time_index=t, scenario_index=0)
             )
-            assert actual == pytest.approx(expected, abs=abs), (
-                f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
-            )
+            assert actual == pytest.approx(
+                expected, abs=abs
+            ), f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
 
-    assert_output_per_timestep("G", "generation_power", [2000 if t not in [i for i in range(10,20)] else 2100 for t in range(168)])
-    assert_output_per_timestep("G", "num_units_on", [2 if t not in [i for i in range(10,20)] else 3 for t in range(168)])
+    assert_output_per_timestep(
+        "G",
+        "generation_power",
+        [2000 if t not in [i for i in range(10, 20)] else 2100 for t in range(168)],
+    )
+    assert_output_per_timestep(
+        "G",
+        "num_units_on",
+        [2 if t not in [i for i in range(10, 20)] else 3 for t in range(168)],
+    )
     assert_output_per_timestep("N", "unsupplied_energy", [0.0] * 168)
-    assert_output_per_timestep("N", "spilled_energy", [0 if t not in [i for i in range(10,20)] else 50 for t in range(168)])
+    assert_output_per_timestep(
+        "N",
+        "spilled_energy",
+        [0 if t not in [i for i in range(10, 20)] else 50 for t in range(168)],
+    )

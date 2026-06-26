@@ -96,18 +96,8 @@ def test_milp_version(
     output = OutputValues(main_resolution_step)
     expected_output.check_output_values(output)
 
-    assert (
-        sum(
-            output.component("G").var("nb_start").value[0]  # type:ignore
-        )
-        == 4
-    )
-    assert (
-        sum(
-            output.component("G").var("nb_stop").value[0]  # type:ignore
-        )
-        == 4
-    )
+    assert sum(output.component("G").var("nb_start").value[0]) == 4  # type: ignore
+    assert sum(output.component("G").var("nb_stop").value[0]) == 4  # type: ignore
 
     assert main_resolution_step.solver.Objective().Value() == pytest.approx(29040)
 
@@ -213,7 +203,7 @@ def test_classic_accurate_heuristic(
         OutputValues(resolution_step_2)
         .component(heuristic_components[0])
         .var("nb_on")
-        .value[0][time_step]  # type:ignore
+        .value[0][time_step]  # type: ignore
         for time_step in range(13)
     ] == [
         0.0,
@@ -235,7 +225,7 @@ def test_classic_accurate_heuristic(
         OutputValues(resolution_step_2)
         .component(heuristic_components[0])
         .var("nb_start")
-        .value[0][time_step]  # type:ignore
+        .value[0][time_step]  # type: ignore
         for time_step in range(13)
     ] == [
         0.0,
@@ -257,7 +247,7 @@ def test_classic_accurate_heuristic(
         OutputValues(resolution_step_2)
         .component(heuristic_components[0])
         .var("nb_stop")
-        .value[0][time_step]  # type:ignore
+        .value[0][time_step]  # type: ignore
         for time_step in range(13)
     ] == [
         0.0,
@@ -440,7 +430,7 @@ def test_classic_fast_heuristic(
         OutputValues(resolution_step_1)
         .component(heuristic_components[0])
         .var("generation")
-        .value[0][time_step]  # type:ignore
+        .value[0][time_step]  # type: ignore
         for time_step in range(13)
     ] == [0, 50, 100, 150, 200, 250, 300, 250, 200, 150, 100, 50, 0]
 
@@ -498,7 +488,7 @@ def test_classic_fast_heuristic(
         OutputValues(resolution_step_2)
         .component(heuristic_components[0])
         .var("generation")
-        .value[0][time_step]  # type:ignore
+        .value[0][time_step]  # type: ignore
         for time_step in range(13)
     ] == [0, 100, 100, 150, 200, 250, 300, 250, 200, 150, 100, 100, 0]
     # with NODU=1, ramp constraints not respected

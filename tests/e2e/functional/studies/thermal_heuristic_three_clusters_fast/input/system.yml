@@ -28,6 +28,7 @@ system:
           value: demand-ts
     - id: G1
       model: antares_legacy_models.thermal
+      integer-strategy: heuristic
       parameters:
         - id: max_power_per_unit
           value: 410
@@ -55,6 +56,7 @@ system:
           value: 0
     - id: G2
       model: antares_legacy_models.thermal
+      integer-strategy: heuristic
       parameters:
         - id: max_power_per_unit
           value: 90
@@ -82,6 +84,7 @@ system:
           value: 0
     - id: G3
       model: antares_legacy_models.thermal
+      integer-strategy: heuristic
       parameters:
         - id: max_power_per_unit
           value: 275

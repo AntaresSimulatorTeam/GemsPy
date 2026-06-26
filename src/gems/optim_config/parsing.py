@@ -74,10 +74,39 @@ class OutOfBoundsProcessingConfig(ModifiedBaseModel):
     constraints: List[OutOfBoundsConstraintConfig] = Field(default_factory=list)
 
 
+class HeuristicType(str, Enum):
+    FAST = "fast"
+    ACCURATE = "accurate"
+
+
+class HeuristicBoundField(str, Enum):
+    LOWER_BOUND = "lower-bound"
+    UPPER_BOUND = "upper-bound"
+    BOTH_BOUNDS = "both-bounds"
+
+
+class HeuristicInputConfig(ModifiedBaseModel):
+    id: str
+    value: str
+
+
+class HeuristicOutputConfig(ModifiedBaseModel):
+    id: str
+    variable: str
+    field: HeuristicBoundField
+
+
+class HeuristicConfig(ModifiedBaseModel):
+    id: HeuristicType
+    inputs: List[HeuristicInputConfig] = Field(default_factory=list)
+    outputs: List[HeuristicOutputConfig] = Field(default_factory=list)
+
+
 class ModelOptimConfig(ModifiedBaseModel):
     id: str
     model_decomposition: Optional[ModelDecompositionConfig] = None
     out_of_bounds_processing: Optional[OutOfBoundsProcessingConfig] = None
+    heuristic: List[HeuristicConfig] = Field(default_factory=list)
 
 
 class ResolutionMode(str, Enum):

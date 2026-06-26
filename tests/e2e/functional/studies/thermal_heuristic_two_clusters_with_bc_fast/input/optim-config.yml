@@ -1,0 +1,21 @@
+models:
+  - id: antares_legacy_models.thermal
+    heuristic:
+      - id: fast
+        inputs:
+          - id: generation_power
+            value: generation_power
+          - id: cluster_max_generation
+            value: cluster_max_generation
+          - id: min_power_per_unit
+            value: min_power_per_unit
+          - id: max_power_per_unit
+            value: max_power_per_unit
+          - id: min_up_duration
+            value: min_up_duration
+          - id: min_down_duration
+            value: min_down_duration
+        outputs:
+          - id: minimum_generation_power
+            variable: generation_power
+            field: lower-bound

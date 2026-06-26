@@ -49,7 +49,11 @@ def _assert_per_timestep(
     abs: float = 1e-6,
 ) -> None:
     for t, expected in enumerate(expected_values):
-        actual = st.component(component_id).output(output_id).value(time_index=t, scenario_index=0)
+        actual = (
+            st.component(component_id)
+            .output(output_id)
+            .value(time_index=t, scenario_index=0)
+        )
         assert actual == pytest.approx(expected, abs=abs), (  # type: ignore[operator]
             f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
         )
@@ -71,10 +75,25 @@ def test_milp_version() -> None:
 
     st = SimulationTableBuilder().build(problem)
     # At t=13-15: G2 still on (min_up=4), G1 reduces to 1950 so total = 1950+50 = 2000 = demand (no spillage)
-    _assert_per_timestep(st, "G1", "generation_power", [1950.0 if t in range(13, 16) else 2000.0 for t in range(168)])
-    _assert_per_timestep(st, "G2", "generation_power", [50.0 if t in range(12, 16) else 0.0 for t in range(168)])
+    _assert_per_timestep(
+        st,
+        "G1",
+        "generation_power",
+        [1950.0 if t in range(13, 16) else 2000.0 for t in range(168)],
+    )
+    _assert_per_timestep(
+        st,
+        "G2",
+        "generation_power",
+        [50.0 if t in range(12, 16) else 0.0 for t in range(168)],
+    )
     _assert_per_timestep(st, "G1", "num_units_on", [2.0] * 168)
-    _assert_per_timestep(st, "G2", "num_units_on", [1.0 if t in range(12, 16) else 0.0 for t in range(168)])
+    _assert_per_timestep(
+        st,
+        "G2",
+        "num_units_on",
+        [1.0 if t in range(12, 16) else 0.0 for t in range(168)],
+    )
     _assert_per_timestep(st, "N", "unsupplied_energy", [0.0] * 168)
     _assert_per_timestep(st, "N", "spilled_energy", [0.0] * 168)
 
@@ -93,9 +112,16 @@ def test_lp_version() -> None:
     assert problem.objective_value == pytest.approx(16802840.55)
 
     st = SimulationTableBuilder().build(problem)
-    _assert_per_timestep(st, "G1", "generation_power", [2000.0 if t != 12 else 2050.0 for t in range(168)])
+    _assert_per_timestep(
+        st,
+        "G1",
+        "generation_power",
+        [2000.0 if t != 12 else 2050.0 for t in range(168)],
+    )
     _assert_per_timestep(st, "G2", "generation_power", [0.0] * 168)
-    _assert_per_timestep(st, "G1", "num_units_on", [2.0 if t != 12 else 2.05 for t in range(168)])
+    _assert_per_timestep(
+        st, "G1", "num_units_on", [2.0 if t != 12 else 2.05 for t in range(168)]
+    )
     _assert_per_timestep(st, "G2", "num_units_on", [0.0] * 168)
     _assert_per_timestep(st, "N", "unsupplied_energy", [0.0] * 168)
     _assert_per_timestep(st, "N", "spilled_energy", [0.0] * 168)

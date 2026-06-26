@@ -1,0 +1,17 @@
+models:
+  - id: antares_legacy_models.thermal
+    heuristic:
+      - id: accurate
+        inputs:
+          - id: nb_units_on_opt
+            value: nb_units_on
+          - id: nb_units_max
+            value: nb_units_max
+          - id: min_up_duration
+            value: min_up_duration
+          - id: min_down_duration
+            value: min_down_duration
+        outputs:
+          - id: minimum_nb_units_on
+            variable: nb_units_on
+            field: lower-bound

@@ -14,6 +14,7 @@ system:
   components:
     - id: G1
       model: antares_legacy_models.thermal
+      integer-strategy: heuristic
       parameters:
         - id: max_power_per_unit
           value: 64
@@ -41,6 +42,7 @@ system:
           value: 0
     - id: G2
       model: antares_legacy_models.thermal
+      integer-strategy: heuristic
       parameters:
         - id: max_power_per_unit
           value: 221
@@ -68,6 +70,7 @@ system:
           value: 0
     - id: G3
       model: antares_legacy_models.thermal
+      integer-strategy: heuristic
       parameters:
         - id: max_power_per_unit
           value: 486
@@ -95,6 +98,7 @@ system:
           value: 0
     - id: G4
       model: antares_legacy_models.thermal
+      integer-strategy: heuristic
       parameters:
         - id: max_power_per_unit
           value: 218
@@ -122,6 +126,7 @@ system:
           value: 0
     - id: G5
       model: antares_legacy_models.thermal
+      integer-strategy: heuristic
       parameters:
         - id: max_power_per_unit
           value: 29
@@ -149,6 +154,7 @@ system:
           value: 0
     - id: G6
       model: antares_legacy_models.thermal
+      integer-strategy: heuristic
       parameters:
         - id: max_power_per_unit
           value: 159

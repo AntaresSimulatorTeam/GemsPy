@@ -98,6 +98,7 @@ def _resolve_component(
         id=component.id,
         scenario_group=component.scenario_group,
         properties=properties,
+        integer_strategy=component.integer_strategy,
     )
 
 

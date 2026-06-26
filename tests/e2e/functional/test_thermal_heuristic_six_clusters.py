@@ -15,7 +15,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gems.simulation.thermal_heuristic import find_nb_units_fast, find_nb_units_accurate
+from gems.simulation.thermal_heuristic import (
+    find_min_generation_fast,
+    find_nb_units_accurate,
+)
 from gems.study.data import ComponentParameterIndex
 from gems.study.folder import load_study
 
@@ -43,19 +46,39 @@ def test_accurate_heuristic() -> None:
     study = load_study(STUDY_DIR)
 
     for j, cluster in enumerate(CLUSTERS):
-        max_power_per_unit = float(study.database.get_value(ComponentParameterIndex(cluster, "max_power_per_unit"), 0, scenario))
-        min_up_duration = int(study.database.get_value(ComponentParameterIndex(cluster, "min_up_duration"), 0, scenario))
-        min_down_duration = int(study.database.get_value(ComponentParameterIndex(cluster, "min_down_duration"), 0, scenario))
+        max_power_per_unit = float(
+            study.database.get_value(
+                ComponentParameterIndex(cluster, "max_power_per_unit"), 0, scenario
+            )
+        )
+        min_up_duration = int(
+            study.database.get_value(
+                ComponentParameterIndex(cluster, "min_up_duration"), 0, scenario
+            )
+        )
+        min_down_duration = int(
+            study.database.get_value(
+                ComponentParameterIndex(cluster, "min_down_duration"), 0, scenario
+            )
+        )
 
         # itr1: LP fractional nb_on values
-        nb_units_on_opt = np.loadtxt(DATA_DIR / f"accurate/itr1_accurate_cluster{j+1}.txt").tolist()
+        nb_units_on_opt = np.loadtxt(
+            DATA_DIR / f"accurate/itr1_accurate_cluster{j+1}.txt"
+        ).tolist()
 
         # nb_units_max[t] = ceil(cluster_max_generation[t] / max_power_per_unit)
         nb_units_max = [
-            int(np.ceil(
-                study.database.get_value(ComponentParameterIndex(cluster, "cluster_max_generation"), t, scenario)
-                / max_power_per_unit
-            ))
+            int(
+                np.ceil(
+                    study.database.get_value(
+                        ComponentParameterIndex(cluster, "cluster_max_generation"),
+                        t,
+                        scenario,
+                    )
+                    / max_power_per_unit
+                )
+            )
             for t in range(number_hours)
         ]
 
@@ -67,14 +90,16 @@ def test_accurate_heuristic() -> None:
         )
 
         # itr2: expected integer nb_on after heuristic
-        expected_output = np.loadtxt(DATA_DIR / f"accurate/itr2_accurate_cluster{j+1}.txt")
+        expected_output = np.loadtxt(
+            DATA_DIR / f"accurate/itr2_accurate_cluster{j+1}.txt"
+        )
         for t in range(number_hours):
             assert nb_units_on[t] == pytest.approx(expected_output[t])
 
 
 def test_fast_heuristic() -> None:
     """
-    Check that find_nb_units_fast produces the same min_generating as Antares with
+    Check that find_min_generation_fast produces the same min_generating as Antares with
     the same LP production input.
     """
     number_hours = 168
@@ -83,15 +108,44 @@ def test_fast_heuristic() -> None:
     study = load_study(STUDY_DIR)
 
     for j, cluster in enumerate(CLUSTERS):
-        max_power_per_unit = float(study.database.get_value(ComponentParameterIndex(cluster, "max_power_per_unit"), 0, scenario))
-        p_min = float(study.database.get_value(ComponentParameterIndex(cluster, "min_power_per_unit"), 0, scenario))
-        min_up_duration = int(study.database.get_value(ComponentParameterIndex(cluster, "min_up_duration"), 0, scenario))
-        min_down_duration = int(study.database.get_value(ComponentParameterIndex(cluster, "min_down_duration"), 0, scenario))
+        max_power_per_unit = float(
+            study.database.get_value(
+                ComponentParameterIndex(cluster, "max_power_per_unit"), 0, scenario
+            )
+        )
+        p_min = float(
+            study.database.get_value(
+                ComponentParameterIndex(cluster, "min_power_per_unit"), 0, scenario
+            )
+        )
+        min_up_duration = int(
+            study.database.get_value(
+                ComponentParameterIndex(cluster, "min_up_duration"), 0, scenario
+            )
+        )
+        min_down_duration = int(
+            study.database.get_value(
+                ComponentParameterIndex(cluster, "min_down_duration"), 0, scenario
+            )
+        )
+        cluster_max_generation = [
+            float(
+                study.database.get_value(
+                    ComponentParameterIndex(cluster, "cluster_max_generation"),
+                    t,
+                    scenario,
+                )
+            )
+            for t in range(number_hours)
+        ]
 
-        generation_power = np.loadtxt(DATA_DIR / f"fast/itr1_fast_cluster{j+1}.txt").tolist()
+        generation_power = np.loadtxt(
+            DATA_DIR / f"fast/itr1_fast_cluster{j+1}.txt"
+        ).tolist()
 
-        nb_units_on = find_nb_units_fast(
+        min_generation = find_min_generation_fast(
             generation_power=generation_power,
+            cluster_max_generation=cluster_max_generation,
             min_power_per_unit=p_min,
             max_power_per_unit=max_power_per_unit,
             min_up_duration=min_up_duration,
@@ -99,9 +153,4 @@ def test_fast_heuristic() -> None:
         )
 
         expected_output = np.loadtxt(DATA_DIR / f"fast/itr2_fast_cluster{j+1}.txt")
-        for t in range(number_hours):
-            max_generating = float(study.database.get_value(
-                ComponentParameterIndex(cluster, "cluster_max_generation"), t, scenario
-            ))
-            min_generating = min(nb_units_on[t] * p_min, max_generating)
-            assert min_generating == pytest.approx(expected_output[t])
+        assert min_generation == pytest.approx(expected_output)

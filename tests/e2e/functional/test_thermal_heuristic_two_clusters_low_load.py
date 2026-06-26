@@ -70,7 +70,9 @@ def _assert_per_timestep(
 ) -> None:
     for t, expected in enumerate(expected_values):
         actual = (
-            st.component(component_id).output(output_id).value(time_index=t, scenario_index=0)
+            st.component(component_id)
+            .output(output_id)
+            .value(time_index=t, scenario_index=0)
         )
         assert actual == pytest.approx(expected, abs=abs), (  # type: ignore[operator]
             f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"

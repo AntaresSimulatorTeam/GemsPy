@@ -12,6 +12,7 @@
 
 import argparse
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import List, Optional, TextIO, Union
 
@@ -60,12 +61,19 @@ class ComponentPropertySchema(ModifiedBaseModel):
     value: str
 
 
+class IntegerStrategy(str, Enum):
+    EXACT = "exact"
+    RELAXED = "relaxed"
+    HEURISTIC = "heuristic"
+
+
 class ComponentSchema(ModifiedBaseModel):
     id: str
     model: str
     scenario_group: Optional[str] = None
     parameters: Optional[List[ComponentParameterSchema]] = None
     properties: Optional[List[ComponentPropertySchema]] = None
+    integer_strategy: IntegerStrategy = IntegerStrategy.EXACT
 
 
 class SystemSchema(ModifiedBaseModel):

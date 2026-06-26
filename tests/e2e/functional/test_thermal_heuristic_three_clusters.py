@@ -34,14 +34,27 @@ from gems.simulation import TimeBlock, build_problem
 from gems.simulation.simulation_table import SimulationTable, SimulationTableBuilder
 from gems.study.folder import load_study
 from tests.e2e.functional.expected_outputs_three_clusters import (
-    GEN_G1_ACCURATE, GEN_G1_FAST, GEN_G1_MILP,
-    GEN_G2_ACCURATE, GEN_G2_FAST, GEN_G2_MILP,
-    GEN_G3_ACCURATE, GEN_G3_FAST, GEN_G3_MILP,
-    NODU_G1_ACCURATE, NODU_G1_MILP,
-    NODU_G2_ACCURATE, NODU_G2_MILP,
-    NODU_G3_ACCURATE, NODU_G3_MILP,
-    SPIL_ACCURATE, SPIL_FAST, SPIL_MILP,
-    UNSP_ACCURATE, UNSP_FAST, UNSP_MILP,
+    GEN_G1_ACCURATE,
+    GEN_G1_FAST,
+    GEN_G1_MILP,
+    GEN_G2_ACCURATE,
+    GEN_G2_FAST,
+    GEN_G2_MILP,
+    GEN_G3_ACCURATE,
+    GEN_G3_FAST,
+    GEN_G3_MILP,
+    NODU_G1_ACCURATE,
+    NODU_G1_MILP,
+    NODU_G2_ACCURATE,
+    NODU_G2_MILP,
+    NODU_G3_ACCURATE,
+    NODU_G3_MILP,
+    SPIL_ACCURATE,
+    SPIL_FAST,
+    SPIL_MILP,
+    UNSP_ACCURATE,
+    UNSP_FAST,
+    UNSP_MILP,
 )
 
 STUDIES_DIR = Path(__file__).parent / "studies"
@@ -56,7 +69,10 @@ SCENARIOS = [0, 1]
 # Expected objective costs [scenario][week]
 _COST_MILP = [[78933742, 102103587], [17472101, 17424769]]
 _COST_ACCURATE = [[78996726, 102215087 - 69500], [17589534, 17641808]]
-_COST_FAST = [[79277215 - 630089, 102461792 - 699765], [17803738 - 661246, 17720390 - 661246]]
+_COST_FAST = [
+    [79277215 - 630089, 102461792 - 699765],
+    [17803738 - 661246, 17720390 - 661246],
+]
 
 
 def _assert_per_timestep(
@@ -68,7 +84,11 @@ def _assert_per_timestep(
     abs: float = 1e-6,
 ) -> None:
     for t, expected in enumerate(expected_values):
-        actual = st.component(component_id).output(output_id).value(time_index=time_offset + t, scenario_index=0)
+        actual = (
+            st.component(component_id)
+            .output(output_id)
+            .value(time_index=time_offset + t, scenario_index=0)
+        )
         assert actual == pytest.approx(expected, abs=abs), (  # type: ignore[operator]
             f"{component_id}.{output_id} at t={time_offset + t}: expected {expected}, got {actual}"
         )
@@ -83,18 +103,36 @@ def test_milp_version() -> None:
             problem = build_problem(study, time_block, scenario_ids=[scenario])
             problem.solve(solver_name="highs")
             assert problem.termination_condition == "optimal"
-            assert problem.objective_value == pytest.approx(_COST_MILP[scenario][week_idx])
+            assert problem.objective_value == pytest.approx(
+                _COST_MILP[scenario][week_idx]
+            )
 
             st = SimulationTableBuilder().build(problem)
             offset = week_idx * 168
-            _assert_per_timestep(st, "G1", "generation_power", GEN_G1_MILP[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G2", "generation_power", GEN_G2_MILP[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G3", "generation_power", GEN_G3_MILP[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G1", "num_units_on", NODU_G1_MILP[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G2", "num_units_on", NODU_G2_MILP[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G3", "num_units_on", NODU_G3_MILP[scenario][week_idx], offset)
-            _assert_per_timestep(st, "N", "spilled_energy", SPIL_MILP[scenario][week_idx], offset)
-            _assert_per_timestep(st, "N", "unsupplied_energy", UNSP_MILP[scenario][week_idx], offset)
+            _assert_per_timestep(
+                st, "G1", "generation_power", GEN_G1_MILP[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "G2", "generation_power", GEN_G2_MILP[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "G3", "generation_power", GEN_G3_MILP[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "G1", "num_units_on", NODU_G1_MILP[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "G2", "num_units_on", NODU_G2_MILP[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "G3", "num_units_on", NODU_G3_MILP[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "N", "spilled_energy", SPIL_MILP[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "N", "unsupplied_energy", UNSP_MILP[scenario][week_idx], offset
+            )
 
 
 def test_accurate_heuristic() -> None:
@@ -109,18 +147,48 @@ def test_accurate_heuristic() -> None:
             problem = build_problem(study, time_block, scenario_ids=[scenario])
             problem.solve(solver_name="highs")
             assert problem.termination_condition == "optimal"
-            assert problem.objective_value == pytest.approx(_COST_ACCURATE[scenario][week_idx])
+            assert problem.objective_value == pytest.approx(
+                _COST_ACCURATE[scenario][week_idx]
+            )
 
             st = SimulationTableBuilder().build(problem)
             offset = week_idx * 168
-            _assert_per_timestep(st, "G1", "generation_power", GEN_G1_ACCURATE[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G2", "generation_power", GEN_G2_ACCURATE[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G3", "generation_power", GEN_G3_ACCURATE[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G1", "num_units_on", NODU_G1_ACCURATE[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G2", "num_units_on", NODU_G2_ACCURATE[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G3", "num_units_on", NODU_G3_ACCURATE[scenario][week_idx], offset)
-            _assert_per_timestep(st, "N", "spilled_energy", SPIL_ACCURATE[scenario][week_idx], offset)
-            _assert_per_timestep(st, "N", "unsupplied_energy", UNSP_ACCURATE[scenario][week_idx], offset)
+            _assert_per_timestep(
+                st,
+                "G1",
+                "generation_power",
+                GEN_G1_ACCURATE[scenario][week_idx],
+                offset,
+            )
+            _assert_per_timestep(
+                st,
+                "G2",
+                "generation_power",
+                GEN_G2_ACCURATE[scenario][week_idx],
+                offset,
+            )
+            _assert_per_timestep(
+                st,
+                "G3",
+                "generation_power",
+                GEN_G3_ACCURATE[scenario][week_idx],
+                offset,
+            )
+            _assert_per_timestep(
+                st, "G1", "num_units_on", NODU_G1_ACCURATE[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "G2", "num_units_on", NODU_G2_ACCURATE[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "G3", "num_units_on", NODU_G3_ACCURATE[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "N", "spilled_energy", SPIL_ACCURATE[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "N", "unsupplied_energy", UNSP_ACCURATE[scenario][week_idx], offset
+            )
 
 
 def test_fast_heuristic() -> None:
@@ -135,13 +203,25 @@ def test_fast_heuristic() -> None:
             problem = build_problem(study, time_block, scenario_ids=[scenario])
             problem.solve(solver_name="highs")
             assert problem.termination_condition == "optimal"
-            assert problem.objective_value == pytest.approx(_COST_FAST[scenario][week_idx])
+            assert problem.objective_value == pytest.approx(
+                _COST_FAST[scenario][week_idx]
+            )
 
             st = SimulationTableBuilder().build(problem)
             offset = week_idx * 168
-            _assert_per_timestep(st, "G1", "generation_power", GEN_G1_FAST[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G2", "generation_power", GEN_G2_FAST[scenario][week_idx], offset)
-            _assert_per_timestep(st, "G3", "generation_power", GEN_G3_FAST[scenario][week_idx], offset)
+            _assert_per_timestep(
+                st, "G1", "generation_power", GEN_G1_FAST[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "G2", "generation_power", GEN_G2_FAST[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "G3", "generation_power", GEN_G3_FAST[scenario][week_idx], offset
+            )
             # fast heuristic does not check num_units_on (slot-based, not per-unit)
-            _assert_per_timestep(st, "N", "spilled_energy", SPIL_FAST[scenario][week_idx], offset)
-            _assert_per_timestep(st, "N", "unsupplied_energy", UNSP_FAST[scenario][week_idx], offset)
+            _assert_per_timestep(
+                st, "N", "spilled_energy", SPIL_FAST[scenario][week_idx], offset
+            )
+            _assert_per_timestep(
+                st, "N", "unsupplied_energy", UNSP_FAST[scenario][week_idx], offset
+            )

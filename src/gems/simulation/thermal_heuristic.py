@@ -59,24 +59,28 @@ def _compute_nb_units_from_window_max(
     return total_excess_units
 
 
-def find_nb_units_fast(
+def find_min_generation_fast(
     generation_power: List[float],
+    cluster_max_generation: List[float],
     min_power_per_unit: float,
     max_power_per_unit: float,
     min_up_duration: int,
     min_down_duration: int,
-) -> List[int]:
+) -> List[float]:
     """
-    Fast heuristic: derives the number of running units from the optimised production
+    Fast heuristic: derives the minimum generation power from the optimised production
     timeseries. Timesteps are grouped into windows of size max(min_up_duration, min_down_duration)
     and each window is assigned the maximum unit count required within it. The window grid is
     shifted over all possible offsets and the offset that minimises the total number of
-    units assigned above nb_units_required is retained.
+    units assigned above nb_units_required is retained. The result is clamped by
+    cluster_max_generation.
 
     Parameters
     ----------
     generation_power:
         Optimal production per timestep (MW).
+    cluster_max_generation:
+        Maximum available generation per timestep (MW).
     min_power_per_unit:
         Minimum power output per unit (MW). If ~0, all units are considered off.
     max_power_per_unit:
@@ -88,14 +92,14 @@ def find_nb_units_fast(
 
     Returns
     -------
-    List[int]
-        Number of running units per timestep.
+    List[float]
+        Minimum generation power per timestep (MW), clamped by cluster_max_generation.
     """
     nb_timesteps = len(generation_power)
     nb_units_on = [0] * nb_timesteps
 
     if abs(min_power_per_unit) < ZERO:
-        return nb_units_on
+        return [0.0] * nb_timesteps
 
     assert max_power_per_unit > ZERO
 
@@ -129,7 +133,7 @@ def find_nb_units_fast(
         nb_units_on=nb_units_on,
     )
 
-    return nb_units_on
+    return [min(n * min_power_per_unit, cluster_max_generation[t]) for t, n in enumerate(nb_units_on)]
 
 
 def find_nb_units_accurate(
@@ -246,6 +250,8 @@ def find_nb_units_accurate(
 
     problem.solve(solver_name="highs")
 
-    assert problem.status == "ok", "Accurate thermal heuristic LP has no feasible solution."
+    assert (
+        problem.status == "ok"
+    ), "Accurate thermal heuristic LP has no feasible solution."
     solution = nb_on_var.solution.values
     return [math.ceil(float(solution[t])) for t in timesteps]

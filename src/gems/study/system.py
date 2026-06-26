@@ -23,6 +23,7 @@ from gems.expression.uses_sum_connections_on import uses_sum_connections_on
 from gems.model import PortField, PortType
 from gems.model.model import Model
 from gems.model.port import PortFieldId
+from gems.study.parsing import IntegerStrategy
 from gems.utils import require_not_none
 
 
@@ -36,6 +37,7 @@ class Component:
     id: str
     scenario_group: Optional[str] = None
     properties: Dict[str, str] = field(default_factory=dict)
+    integer_strategy: IntegerStrategy = IntegerStrategy.EXACT
 
     def is_variable_in_model(self, var_id: str) -> bool:
         return var_id in self.model.variables.keys()
