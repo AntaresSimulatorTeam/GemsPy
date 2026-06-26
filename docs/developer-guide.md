@@ -2,6 +2,9 @@
 
 This page aims at providing useful information for contributors.
 
+!!! info "Ecosystem developer guidelines"
+    This page covers GemsPy-specific local development tasks only. The authoritative branching, versioning, CI/CD, and release process shared across all GEMS repositories (including GemsPy) lives in the **GEMS Developer Guidelines**: <https://gems-energy.readthedocs.io/en/latest/support/dev-guidelines/>. Read it before any branching, versioning, or release work.
+
 ## Install dev requirements
 
 Install dev requirements with `uv sync` (or `pip install -e ".[dev]"` for pip users)
