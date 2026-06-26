@@ -2,6 +2,15 @@
 
 All notable changes to GemsPy are documented here.
 
+## [Unreleased]
+
+### Fixed
+- Comparison operators (`>=`, `<=`, `=`) in extra-output expressions no longer raise
+  `NotImplementedError` at post-solve evaluation; they now evaluate to a 0/1 indicator
+  (e.g. `dual(balance) >= unsupplied_cost - 5`).
+
+---
+
 ## [0.1.2] - 2026-06-11
 
 ### Added
