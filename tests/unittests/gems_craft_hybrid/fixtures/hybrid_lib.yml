@@ -11,6 +11,8 @@ library:
         injection-to-balance: flow
         spillage-bound: flow
         unsupplied-energy-bound:
+      thermal-capacity-connection:
+        capacity-field: flow
     - id: signal
       description: A signal port without area connection
       fields:

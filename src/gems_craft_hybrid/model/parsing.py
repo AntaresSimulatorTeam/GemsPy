@@ -24,8 +24,13 @@ class AreaConnectionSchema(ModifiedBaseModel):
     unsupplied_energy_bound: Optional[str] = None
 
 
+class PortThermalCapacitySchema(ModifiedBaseModel):
+    capacity_field: str
+
+
 class HybridPortTypeSchema(PortTypeSchema):
     area_connection: Optional[AreaConnectionSchema] = None
+    thermal_capacity_connection: Optional[PortThermalCapacitySchema] = None
 
 
 class HybridLibrarySchema(LibrarySchema):

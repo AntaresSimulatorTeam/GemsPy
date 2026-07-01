@@ -23,5 +23,17 @@ class AreaConnectionsSchema(ModifiedBaseModel):
     area: str
 
 
+class ThermalComponentSchema(ModifiedBaseModel):
+    area: str
+    cluster_id: str
+
+
+class ThermalCapacityConnectionSchema(ModifiedBaseModel):
+    component: str
+    port: str
+    thermal_component: ThermalComponentSchema
+
+
 class HybridSystemSchema(SystemSchema):
     area_connections: Optional[List[AreaConnectionsSchema]] = None
+    thermal_capacity_connections: Optional[List[ThermalCapacityConnectionSchema]] = None

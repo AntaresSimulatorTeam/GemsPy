@@ -19,3 +19,9 @@ system:
     - component: G
       port: injection_port
       area: fr
+  thermal-capacity-connections:
+    - component: G
+      port: injection_port
+      thermal-component:
+        area: fr
+        cluster-id: nuclear1

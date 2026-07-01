@@ -111,8 +111,10 @@ Hybrid GEMS studies extend the standard format with additional fields.
 
 ### Hybrid system
 
-A hybrid `system.yml` may include an `area-connections` section that maps
-component ports to areas:
+A hybrid `system.yml` extends the standard format with two optional sections:
+
+- `area-connections`: maps component ports to areas.
+- `thermal-capacity-connections`: maps component ports to Antares thermal clusters, each identified by `area` and `cluster-id`.
 
 ~~~ yaml
 system:
@@ -133,6 +135,12 @@ system:
     - component: G
       port: injection_port
       area: fr
+  thermal-capacity-connections:
+    - component: G
+      port: injection_port
+      thermal-component:
+        area: fr
+        cluster-id: nuclear1
 ~~~
 
 Load and write hybrid systems with `load_yaml_system` / `write_yaml_system`
@@ -148,9 +156,10 @@ write_yaml_system(system, Path("output/system.yml"))
 
 ### Hybrid library
 
-A hybrid library YAML may include top-level `version` and `taxonomy` fields,
-and each port-type may carry an `area-connection` sub-field mapping port roles
-to port fields:
+Each port-type of an hybrid library YAML may carry two additional sub-fields:
+
+- `area-connection`: maps port roles to port fields for area coupling (`injection-to-balance`, `spillage-bound`, `unsupplied-energy-bound`).
+- `thermal-capacity-connection`: identifies the port field that carries thermal capacity (`capacity-field`).
 
 ~~~ yaml
 library:
@@ -165,6 +174,8 @@ library:
         injection-to-balance: flow
         spillage-bound: flow
         unsupplied-energy-bound:
+      thermal-capacity-connection:
+        capacity-field: flow
 ~~~
 
 Load and write hybrid libraries with `load_yaml_library` / `write_yaml_library`

@@ -26,6 +26,8 @@ from gems_craft_hybrid.model.parsing import (
 from gems_craft_hybrid.study.parsing import (
     AreaConnectionsSchema,
     HybridSystemSchema,
+    ThermalCapacityConnectionSchema,
+    ThermalComponentSchema,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -111,3 +113,41 @@ def test_write_yaml_library_roundtrip_hybrid(tmp_path: Path) -> None:
     write_yaml_library(original, out)
     reloaded = load_yaml_library(out, HybridLibrarySchema)
     assert reloaded == original
+
+
+# ---------------------------------------------------------------------------
+# HybridLibrarySchema — thermal-capacity-connections
+# ---------------------------------------------------------------------------
+
+
+def test_load_yaml_hybrid_library_parses_thermal_capacity_connection() -> None:
+    from gems_craft_hybrid.model.parsing import PortThermalCapacitySchema
+
+    lib = load_yaml_library(FIXTURES / "hybrid_lib.yml", HybridLibrarySchema)
+    flow_port = next(pt for pt in lib.port_types if pt.id == "flow")
+    assert isinstance(flow_port, HybridPortTypeSchema)
+    assert flow_port.thermal_capacity_connection == PortThermalCapacitySchema(
+        capacity_field="flow"
+    )
+
+
+def test_load_yaml_hybrid_library_port_type_without_thermal_capacity_connection() -> None:
+    lib = load_yaml_library(FIXTURES / "hybrid_lib.yml", HybridLibrarySchema)
+    signal_port = next(pt for pt in lib.port_types if pt.id == "signal")
+    assert signal_port.thermal_capacity_connection is None
+
+
+# ---------------------------------------------------------------------------
+# HybridSystemSchema — thermal-capacity-connections
+# ---------------------------------------------------------------------------
+
+
+def test_load_yaml_hybrid_system_parses_thermal_capacity_connections() -> None:
+    system = load_yaml_system(FIXTURES / "hybrid_system.yml", HybridSystemSchema)
+    assert system.thermal_capacity_connections is not None
+    assert len(system.thermal_capacity_connections) == 1
+    conn = system.thermal_capacity_connections[0]
+    assert isinstance(conn, ThermalCapacityConnectionSchema)
+    assert conn.component == "G"
+    assert conn.port == "injection_port"
+    assert conn.thermal_component == ThermalComponentSchema(area="fr", cluster_id="nuclear1")
