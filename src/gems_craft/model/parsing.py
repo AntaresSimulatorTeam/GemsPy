@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from pydantic import ConfigDict, Field, ValidationError
-from yaml import safe_load
-
+from yaml import safe_dump, safe_load
+from pathlib import Path
 from gems_craft.utils import ModifiedBaseModel
 
 
@@ -106,6 +106,13 @@ class ModelSchema(ModifiedBaseModel):
     description: Optional[str] = None
     extra_outputs: Optional[List[ExtraOutputSchema]] = None
     properties: List[PropertySchema] = Field(default_factory=list)
+
+
+def write_yaml_library(library: "LibrarySchema", path: Path) -> None:
+    data = {"library": library.model_dump(by_alias=True, exclude_none=True, mode="json")}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        safe_dump(data, f, allow_unicode=True, sort_keys=False)
 
 
 class LibrarySchema(ModifiedBaseModel):

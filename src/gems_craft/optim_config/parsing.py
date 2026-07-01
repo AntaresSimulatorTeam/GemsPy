@@ -24,7 +24,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from yaml import safe_load
+from yaml import safe_dump, safe_load
 
 from gems_craft.utils import ModifiedBaseModel
 
@@ -268,6 +268,13 @@ class OptimConfig(ModifiedBaseModel):
     scenario_scope: ScenarioScopeConfig = Field(default_factory=ScenarioScopeConfig)
     resolution: ResolutionConfig = Field(default_factory=ResolutionConfig)
     models: List[ModelOptimConfig] = Field(default_factory=list)
+
+
+def write_optim_config(config: OptimConfig, path: Path) -> None:
+    data = config.model_dump(by_alias=True, exclude_none=True, mode="json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        safe_dump(data, f, allow_unicode=True, sort_keys=False)
 
 
 def load_optim_config(config_path: Path) -> Optional[OptimConfig]:

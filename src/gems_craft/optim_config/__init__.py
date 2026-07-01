@@ -19,6 +19,7 @@ from .parsing import (
     SolverOptionsConfig,
     TimeScopeConfig,
     load_optim_config,
+    write_optim_config,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "SolverOptionsConfig",
     "TimeScopeConfig",
     "load_optim_config",
+    "write_optim_config",
 ]

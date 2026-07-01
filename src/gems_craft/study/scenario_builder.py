@@ -86,6 +86,21 @@ class ScenarioBuilder:
                 )
         return errors
 
+    def dump(self, path: Path) -> None:
+        """Write the scenario builder to a ``modeler-scenariobuilder.dat`` file.
+
+        Each line follows the format::
+
+            group_name, mc_scenario = time_serie_number
+
+        where ``time_serie_number`` is 1-based.
+        """
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w") as f:
+            for group, arr in self._group_arrays.items():
+                for mc_scenario, col_idx in enumerate(arr):
+                    f.write(f"{group}, {mc_scenario} = {col_idx + 1}\n")
+
     @classmethod
     def load(cls, path: Path) -> "ScenarioBuilder":
         """Parse a ``modeler-scenariobuilder.dat`` file.
