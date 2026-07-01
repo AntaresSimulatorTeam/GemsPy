@@ -11,25 +11,12 @@
 # This file is part of the Antares project.
 import typing
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Type, TypeVar
 
 from pydantic import ConfigDict, Field, ValidationError
 from yaml import safe_dump, safe_load
 from pathlib import Path
 from gems_craft.utils import ModifiedBaseModel
-
-
-def _parse_yaml_library(input: typing.TextIO) -> "LibrarySchema":
-    tree = safe_load(input)
-    try:
-        return LibrarySchema.model_validate(tree["library"])
-    except ValidationError as e:
-        raise ValueError(f"An error occurred during parsing: {e}")
-
-
-def load_yaml_library(path: Path) -> "LibrarySchema":
-    with path.open() as f:
-        return _parse_yaml_library(f)
 
 
 class ParameterSchema(ModifiedBaseModel):
@@ -113,18 +100,34 @@ class ModelSchema(ModifiedBaseModel):
     properties: List[PropertySchema] = Field(default_factory=list)
 
 
-def write_yaml_library(library: "LibrarySchema", path: Path) -> None:
-    data = {
-        "library": library.model_dump(by_alias=True, exclude_none=True, mode="json")
-    }
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as f:
-        safe_dump(data, f, allow_unicode=True, sort_keys=False)
-
-
 class LibrarySchema(ModifiedBaseModel):
     id: str
     dependencies: List[str] = Field(default_factory=list)
     port_types: List[PortTypeSchema] = Field(default_factory=list)
     models: List[ModelSchema] = Field(default_factory=list)
     description: Optional[str] = None
+
+
+_L = TypeVar("_L", bound=LibrarySchema)
+
+
+def _parse_yaml_library(input: typing.TextIO, schema: Type[_L] = LibrarySchema) -> _L:
+    tree = safe_load(input)
+    try:
+        return schema.model_validate(tree["library"])
+    except ValidationError as e:
+        raise ValueError(f"An error occurred during parsing: {e}")
+
+
+def load_yaml_library(path: Path, schema: Type[_L] = LibrarySchema) -> _L:
+    with path.open() as f:
+        return _parse_yaml_library(f, schema)
+
+
+def write_yaml_library(library: LibrarySchema, path: Path) -> None:
+    data = {
+        "library": library.model_dump(by_alias=True, exclude_none=True, mode="json")
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        safe_dump(data, f, allow_unicode=True, sort_keys=False)

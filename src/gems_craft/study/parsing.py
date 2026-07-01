@@ -13,31 +13,12 @@
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, TextIO, Union
+from typing import List, Optional, TextIO, Type, TypeVar, Union
 
 from pydantic import Field, ValidationError
 from yaml import safe_dump, safe_load
 
 from gems_craft.utils import ModifiedBaseModel
-
-
-def _parse_yaml_components(input_study: TextIO) -> "SystemSchema":
-    tree = safe_load(input_study)
-    return SystemSchema.model_validate(tree["system"])
-
-
-def load_yaml_system(path: Path) -> "SystemSchema":
-    try:
-        with path.open() as f:
-            return _parse_yaml_components(f)
-    except (ValidationError, ValueError) as e:
-        raise ValueError(f"An error occurred during parsing: {e}") from e
-
-
-class AreaConnectionsSchema(ModifiedBaseModel):
-    component: str
-    port: str
-    area: str
 
 
 class PortConnectionsSchema(ModifiedBaseModel):
@@ -73,10 +54,25 @@ class SystemSchema(ModifiedBaseModel):
     model_libraries: Optional[str] = None  # Parsed but unused for now
     components: List[ComponentSchema] = Field(default_factory=list)
     connections: Optional[List[PortConnectionsSchema]] = None
-    area_connections: Optional[List[AreaConnectionsSchema]] = None
 
 
-def write_yaml_system(system: "SystemSchema", path: Path) -> None:
+_S = TypeVar("_S", bound=SystemSchema)
+
+
+def _parse_yaml_components(input_study: TextIO, schema: Type[_S] = SystemSchema) -> _S:
+    tree = safe_load(input_study)
+    return schema.model_validate(tree["system"])
+
+
+def load_yaml_system(path: Path, schema: Type[_S] = SystemSchema) -> _S:
+    try:
+        with path.open() as f:
+            return _parse_yaml_components(f, schema)
+    except (ValidationError, ValueError) as e:
+        raise ValueError(f"An error occurred during parsing: {e}") from e
+
+
+def write_yaml_system(system: SystemSchema, path: Path) -> None:
     data = {"system": system.model_dump(by_alias=True, exclude_none=True, mode="json")}
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as f:

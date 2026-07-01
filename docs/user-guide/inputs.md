@@ -97,3 +97,83 @@ study = Study(system=system, database=database)
 
 This `study` object can then be passed directly to
 [`build_problem()`](optimisation.md) or `SimulationSession`.
+
+---
+
+## Hybrid studies (`gems_craft_hybrid`)
+
+Hybrid GEMS studies extend the standard format with additional fields.
+
+> **Limitation:** hybrid studies cannot be simulated with GemsPy. The
+> `gems_craft_hybrid` package only provides reading and writing of hybrid
+> files. To simulate hybrid studies, use
+> [Antares Simulator](https://antares-simulator.org/).
+
+### Hybrid system
+
+A hybrid `system.yml` may include an `area-connections` section that maps
+component ports to areas:
+
+~~~ yaml
+system:
+  components:
+    - id: G
+      model: basic.generator
+      parameters:
+        - id: cost
+          value: 30
+        - id: p_max
+          value: 100
+  connections:
+    - component1: N
+      port1: injection_port
+      component2: G
+      port2: injection_port
+  area-connections:
+    - component: G
+      port: injection_port
+      area: fr
+~~~
+
+Load and write hybrid systems with `load_yaml_system` / `write_yaml_system`
+passing `HybridSystemSchema` as the schema:
+
+~~~ python
+from gems_craft.study.parsing import load_yaml_system, write_yaml_system
+from gems_craft_hybrid.study.parsing import HybridSystemSchema
+
+system = load_yaml_system(Path("system.yml"), HybridSystemSchema)
+write_yaml_system(system, Path("output/system.yml"))
+~~~
+
+### Hybrid library
+
+A hybrid library YAML may include top-level `version` and `taxonomy` fields,
+and each port-type may carry an `area-connection` sub-field mapping port roles
+to port fields:
+
+~~~ yaml
+library:
+  id: my_lib
+  version: "1.0"
+  taxonomy: power-system
+  port-types:
+    - id: flow
+      fields:
+        - id: flow
+      area-connection:
+        injection-to-balance: flow
+        spillage-bound: flow
+        unsupplied-energy-bound:
+~~~
+
+Load and write hybrid libraries with `load_yaml_library` / `write_yaml_library`
+passing `HybridLibrarySchema` as the schema:
+
+~~~ python
+from gems_craft.model.parsing import load_yaml_library, write_yaml_library
+from gems_craft_hybrid.model.parsing import HybridLibrarySchema
+
+library = load_yaml_library(Path("lib.yml"), HybridLibrarySchema)
+write_yaml_library(library, Path("output/lib.yml"))
+~~~

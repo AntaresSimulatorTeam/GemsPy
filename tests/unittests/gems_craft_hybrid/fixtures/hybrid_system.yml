@@ -1,0 +1,21 @@
+system:
+  model-libraries: hybrid_basic
+  components:
+    - id: N
+      model: hybrid_basic.node
+    - id: G
+      model: hybrid_basic.generator
+      parameters:
+        - id: cost
+          value: 30
+        - id: p_max
+          value: 100
+  connections:
+    - component1: N
+      port1: injection_port
+      component2: G
+      port2: injection_port
+  area-connections:
+    - component: G
+      port: injection_port
+      area: fr

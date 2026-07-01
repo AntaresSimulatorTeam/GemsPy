@@ -86,11 +86,9 @@ The second category of input files mentioned above corresponds to system files. 
 ~~~yaml
 system:
   model-libraries: basic
-  nodes:
+  components:
     - id: N
       model: basic.node
-
-  components:
     - id: G1
       model: basic.generator
       properties:
