@@ -63,17 +63,14 @@ Duplicate ids for properties are rejected.
 ### Loading the library and the system
 
 ~~~ python
-from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.parsing import load_yaml_library
 from gems_runner.model.resolve_library import resolve_library
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import load_yaml_system
 from gems_runner.study.resolve_components import resolve_system, build_data_base
 from pathlib import Path
 
-with open("simple_library.yml") as lib_file:
-    input_libraries = [parse_yaml_library(lib_file)]
-
-with open("system_example.yml") as compo_file:
-    input_system = parse_yaml_components(compo_file)
+input_libraries = [load_yaml_library(Path("simple_library.yml"))]
+input_system = load_yaml_system(Path("system_example.yml"))
 
 result_lib = resolve_library(input_libraries)
 system = resolve_system(input_system, result_lib)

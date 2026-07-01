@@ -14,13 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.parsing import load_yaml_library
 from gems_runner.model.resolve_library import resolve_library
 from gems_runner.simulation import build_problem
 from gems_runner.simulation.time_block import TimeBlock
 from gems_runner.study import Study
 from gems_runner.study.data import DataBase
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import load_yaml_system
 from gems_runner.study.resolve_components import (
     build_data_base,
     consistency_check,
@@ -31,7 +31,7 @@ from gems_craft.study.scenario_builder import ScenarioBuilder
 
 @pytest.fixture
 def scenario_builder(series_dir: Path) -> ScenarioBuilder:
-    return ScenarioBuilder.load(series_dir / "modeler-scenariobuilder.dat")
+    return ScenarioBuilder.load_dat(series_dir / "modeler-scenariobuilder.dat")
 
 
 @pytest.fixture
@@ -39,9 +39,8 @@ def database(
     series_dir: Path, systems_dir: Path, scenario_builder: ScenarioBuilder
 ) -> DataBase:
     system_path = systems_dir / "with_scenarization.yml"
-    with system_path.open() as components:
-        return build_data_base(
-            parse_yaml_components(components), series_dir, scenario_builder
+    return build_data_base(
+            load_yaml_system(system_path), series_dir, scenario_builder
         )
 
 
@@ -49,14 +48,12 @@ def test_system_with_scenarization(
     libs_dir: Path, systems_dir: Path, database: DataBase
 ) -> None:
     library_path = libs_dir / "lib_unittest.yml"
-    with library_path.open("r") as file:
-        yaml_lib = parse_yaml_library(file)
-        lib_dict = resolve_library([yaml_lib])
+    yaml_lib = load_yaml_library(library_path)
+    lib_dict = resolve_library([yaml_lib])
 
     components_path = systems_dir / "with_scenarization.yml"
-    with components_path.open("r") as file:
-        yaml_comp = parse_yaml_components(file)
-        components = resolve_system(yaml_comp, lib_dict)
+    yaml_comp = load_yaml_system(components_path)
+    components = resolve_system(yaml_comp, lib_dict)
 
     consistency_check(components, lib_dict["basic"].models)
 

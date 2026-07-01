@@ -28,7 +28,7 @@ from gems_runner.study.data import (
     dataframe_to_scenario_series,
     dataframe_to_time_series,
 )
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import _parse_yaml_components
 from gems_craft.study.scenario_builder import ScenarioBuilder
 from gems_craft.study.timeseries import load_ts_from_file
 from gems_runner.study.resolve_components import _build_data, build_data_base
@@ -206,7 +206,7 @@ def test_build_data_base_param_group_overrides_component_group(
     (tmp_path / "series.txt").write_text("100 200\n")
     sb = ScenarioBuilder()
     db = build_data_base(
-        parse_yaml_components(io.StringIO(_SYSTEM_WITH_PARAM_GROUP)),
+        _parse_yaml_components(io.StringIO(_SYSTEM_WITH_PARAM_GROUP)),
         tmp_path,
         scenario_builder=sb,
     )

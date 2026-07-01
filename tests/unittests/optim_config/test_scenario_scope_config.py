@@ -289,7 +289,7 @@ def test_yaml_inline_include_exclude() -> None:
 def test_yaml_playlist_file_relative_resolved_by_load_optim_config(
     tmp_path: Path,
 ) -> None:
-    from gems_craft.optim_config.parsing import load_optim_config
+    from gems_craft.optim_config.parsing import load_yaml_optim_config as load_optim_config
 
     playlist = tmp_path / "playlist.json"
     playlist.write_text(json.dumps([0, 1, 2]))
@@ -364,7 +364,7 @@ def test_scenario_ids_cached_inline() -> None:
 def test_scenario_ids_cached_playlist_file_via_load_optim_config(
     tmp_path: Path,
 ) -> None:
-    from gems_craft.optim_config.parsing import load_optim_config
+    from gems_craft.optim_config.parsing import load_yaml_optim_config as load_optim_config
 
     playlist = tmp_path / "playlist.json"
     playlist.write_text(json.dumps([0, 1, 2]))

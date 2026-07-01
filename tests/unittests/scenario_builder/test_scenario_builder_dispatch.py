@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import _parse_yaml_components
 from gems_runner.study.resolve_components import build_data_base
 from gems_craft.study.scenario_builder import ScenarioBuilder
 
@@ -52,8 +52,8 @@ system:
 
 
 def test_scenario_builder_load(dispatch_series_dir: Path) -> None:
-    """ScenarioBuilder.load() parses the .dat file into correct 0-based col_idx arrays."""
-    sb = ScenarioBuilder.load(dispatch_series_dir / "modeler-scenariobuilder.dat")
+    """ScenarioBuilder.load_dat() parses the .dat file into correct 0-based col_idx arrays."""
+    sb = ScenarioBuilder.load_dat(dispatch_series_dir / "modeler-scenariobuilder.dat")
     mc = np.array([0, 1, 2], dtype=int)
     cols = sb.resolve_vectorized("load", mc)
     assert list(cols) == [2, 0, 1]
@@ -63,12 +63,12 @@ def test_dispatch_mc_scenarios_to_columns(
     dispatch_series_dir: Path, dispatch_system_yml: str
 ) -> None:
     """DataBase.get_values() dispatches each MC scenario to the correct data column."""
-    sb = ScenarioBuilder.load(dispatch_series_dir / "modeler-scenariobuilder.dat")
+    sb = ScenarioBuilder.load_dat(dispatch_series_dir / "modeler-scenariobuilder.dat")
 
     import io
 
     db = build_data_base(
-        parse_yaml_components(io.StringIO(dispatch_system_yml)),
+        _parse_yaml_components(io.StringIO(dispatch_system_yml)),
         dispatch_series_dir,
         scenario_builder=sb,
     )

@@ -122,7 +122,7 @@ from pathlib import Path
 from gems_craft.study.scenario_builder import ScenarioBuilder
 
 # Load from file
-sb = ScenarioBuilder.load(Path("my_study/input/data-series/modeler-scenariobuilder.dat"))
+sb = ScenarioBuilder.load_dat(Path("my_study/input/data-series/modeler-scenariobuilder.dat"))
 
 # Resolve a batch of MC scenarios for the "wind" group
 mc_scenarios = np.array([0, 1, 2, 3])          # 0-based internally
@@ -137,12 +137,12 @@ col_indices = sb.resolve_vectorized(None, mc_scenarios)
 !!! note
     `resolve_vectorized` works with **0-based** indices internally, even though
     the `.dat` file uses 1-based numbering.  The conversion is handled
-    automatically by `ScenarioBuilder.load()`.
+    automatically by `ScenarioBuilder.load_dat()`.
 
 ## Writing a scenario builder
 
-Use `dump()` to write a `ScenarioBuilder` back to disk in the standard `.dat` format:
+Use `write_dat()` to write a `ScenarioBuilder` back to disk in the standard `.dat` format:
 
 ~~~ python
-sb.dump(Path("my_study/input/data-series/modeler-scenariobuilder.dat"))
+sb.write_dat(Path("my_study/input/data-series/modeler-scenariobuilder.dat"))
 ~~~

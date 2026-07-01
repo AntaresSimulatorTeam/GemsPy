@@ -8,10 +8,10 @@
 from pathlib import Path
 from gems_runner.study.folder import load_study
 from gems_runner.session import SimulationSession
-from gems_craft.optim_config import load_optim_config
+from gems_craft.optim_config import load_yaml_optim_config
 
 study = load_study(Path("my_study"))
-optim_config = load_optim_config(Path("my_study/input/optim-config.yml"))
+optim_config = load_yaml_optim_config(Path("my_study/input/optim-config.yml"))
 
 session = SimulationSession(study=study, optim_config=optim_config)
 results = session.run()  # SimulationTable

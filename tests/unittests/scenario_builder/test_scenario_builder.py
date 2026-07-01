@@ -17,7 +17,7 @@ import pytest
 
 from gems_runner.study import DataBase
 from gems_runner.study.data import ComponentParameterIndex
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import load_yaml_system
 from gems_runner.study.resolve_components import build_data_base
 from gems_craft.study.scenario_builder import ScenarioBuilder
 
@@ -29,15 +29,14 @@ def series_dir() -> Path:
 
 @pytest.fixture(scope="session")
 def scenario_builder(series_dir: Path) -> ScenarioBuilder:
-    return ScenarioBuilder.load(series_dir / "modeler-scenariobuilder.dat")
+    return ScenarioBuilder.load_dat(series_dir / "modeler-scenariobuilder.dat")
 
 
 @pytest.fixture
 def database(series_dir: Path, scenario_builder: ScenarioBuilder) -> DataBase:
     system_path = Path(__file__).parent / "systems/with_scenarization.yml"
-    with system_path.open() as components:
-        return build_data_base(
-            parse_yaml_components(components), series_dir, scenario_builder
+    return build_data_base(
+            load_yaml_system(system_path), series_dir, scenario_builder
         )
 
 

@@ -70,7 +70,7 @@ from typing import Dict
 import linopy
 import pytest
 
-from gems_craft.optim_config.parsing import load_optim_config
+from gems_craft.optim_config.parsing import load_yaml_optim_config
 from gems_runner.simulation import TimeBlock, build_decomposed_problems
 from gems_runner.simulation.simulation_table import SimulationTableBuilder
 from gems_runner.study.folder import load_study
@@ -96,7 +96,7 @@ def _count_active(model: linopy.Model, name: str) -> int:
 def test_out_of_bounds_processing(study_id: str, expected_objective: float) -> None:
     study = load_study(STUDIES_DIR / study_id)
     config_path = STUDIES_DIR / study_id / "input" / "optim-config.yml"
-    optim_config = load_optim_config(config_path)
+    optim_config = load_yaml_optim_config(config_path)
 
     # 3-step block matching the study parameters (first-time-step: 0, last-time-step: 2)
     time_block = TimeBlock(1, [0, 1, 2])
@@ -169,7 +169,7 @@ def test_constraint_instantiation(study_id: str) -> None:
     instantiated at exactly the expected (component, time) pairs."""
     study = load_study(STUDIES_DIR / study_id)
     config_path = STUDIES_DIR / study_id / "input" / "optim-config.yml"
-    optim_config = load_optim_config(config_path)
+    optim_config = load_yaml_optim_config(config_path)
     time_block = TimeBlock(1, [0, 1, 2])
     decomposed = build_decomposed_problems(study, time_block, [0], optim_config)
     linopy_model = decomposed.subproblem.linopy_model

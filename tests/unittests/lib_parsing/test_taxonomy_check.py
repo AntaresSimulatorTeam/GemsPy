@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from gems_craft.model.parsing import parse_yaml_library
-from gems_craft.model.resolve_library import (
+from gems_craft.model.parsing import _parse_yaml_library
+from gems_craft.model.taxonomy import (
     Taxonomy,
     TaxonomyCategory,
     TaxonomyItem,
@@ -34,7 +34,7 @@ def _make_category(cat_id: str, port_ids: list[str]) -> TaxonomyCategory:
 
 
 def _parse_lib(yaml_content: str):
-    return parse_yaml_library(io.StringIO(yaml_content))
+    return _parse_yaml_library(io.StringIO(yaml_content))
 
 
 # --- valid cases ---

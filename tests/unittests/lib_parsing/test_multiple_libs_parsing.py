@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.parsing import load_yaml_library
 from gems_runner.model.resolve_library import resolve_library
 
 # in following tests "lib_A -> lib_B" means lib_A must be resolved before lib_B
@@ -34,8 +34,7 @@ def test_simple_dependency_tree(libs_dir: Path) -> None:
 
     input_libs = []
     for lib_file in lib_files:
-        with lib_file.open() as f:
-            input_libs.append(parse_yaml_library(f))
+        input_libs.append(load_yaml_library(lib_file))
 
     lib_dict = resolve_library(input_libs)
     assert len(lib_dict) == 3
@@ -57,8 +56,7 @@ def test_simple_dependency_tree(libs_dir: Path) -> None:
 
     input_libs = []
     for lib_file in lib_files:
-        with lib_file.open() as f:
-            input_libs.append(parse_yaml_library(f))
+        input_libs.append(load_yaml_library(lib_file))
 
     lib_dict = resolve_library(input_libs)
     assert len(lib_dict["basic"].models) == 1
@@ -85,8 +83,7 @@ def test_multiple_dependencies_tree(libs_dir: Path) -> None:
 
     input_libs = []
     for lib_file in lib_files:
-        with lib_file.open() as f:
-            input_libs.append(parse_yaml_library(f))
+        input_libs.append(load_yaml_library(lib_file))
 
     lib_dict = resolve_library(input_libs)
     assert len(lib_dict["basic"].models) == 1
@@ -111,8 +108,7 @@ def test_looping_dependency(libs_dir: Path) -> None:
 
     input_libs = []
     for lib_file in lib_files:
-        with lib_file.open() as f:
-            input_libs.append(parse_yaml_library(f))
+        input_libs.append(load_yaml_library(lib_file))
 
     with pytest.raises(Exception, match=r"Circular import in yaml libraries"):
         resolve_library(input_libs)
@@ -133,8 +129,7 @@ def test_model_with_same_name_in_different_lib_ok(libs_dir: Path) -> None:
 
     input_libs = []
     for lib_file in lib_files:
-        with lib_file.open() as f:
-            input_libs.append(parse_yaml_library(f))
+        input_libs.append(load_yaml_library(lib_file))
 
     lib_dict = resolve_library(input_libs)
     assert len(lib_dict["basic"].models) == 1
@@ -156,8 +151,7 @@ def test_model_redefinition_in_same_lib(libs_dir: Path) -> None:
 
     input_libs = []
     for lib_file in lib_files:
-        with lib_file.open() as f:
-            input_libs.append(parse_yaml_library(f))
+        input_libs.append(load_yaml_library(lib_file))
 
     with pytest.raises(Exception, match=re.escape("Model generator is defined twice")):
         resolve_library(input_libs)
@@ -172,8 +166,7 @@ def test_port_redefinition(libs_dir: Path) -> None:
 
     input_libs = []
     for lib_file in lib_files:
-        with lib_file.open() as f:
-            input_libs.append(parse_yaml_library(f))
+        input_libs.append(load_yaml_library(lib_file))
 
     with pytest.raises(
         Exception, match=re.escape("Port(s) : {'flow'} is(are) defined twice")

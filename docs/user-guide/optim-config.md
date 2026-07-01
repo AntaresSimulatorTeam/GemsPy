@@ -10,7 +10,7 @@ By convention the file lives at:
 ```
 my_study/
 └── input/
-    └── optim-config.yml   ← read automatically by run_study() / load_optim_config()
+    └── optim-config.yml   ← read automatically by run_study() / load_yaml_optim_config()
 ```
 
 When the file is absent, `run_study()` and `SimulationSession` use the defaults
@@ -158,7 +158,7 @@ scenario-scope:
     - "8-10"
 ~~~
 
-GemsPy reads and validates the playlist eagerly when `load_optim_config()` is
+GemsPy reads and validates the playlist eagerly when `load_yaml_optim_config()` is
 called, so any I/O or format errors surface immediately at load time.
 
 **Rules:**
@@ -332,7 +332,7 @@ You can load, inspect, and build the config programmatically:
 ~~~ python
 from pathlib import Path
 from gems_craft.optim_config import (
-    load_optim_config,
+    load_yaml_optim_config,
     OptimConfig,
     ResolutionConfig,
     ResolutionMode,
@@ -342,7 +342,7 @@ from gems_craft.optim_config import (
 )
 
 # Load from file (returns None if the file does not exist)
-config = load_optim_config(Path("my_study/input/optim-config.yml"))
+config = load_yaml_optim_config(Path("my_study/input/optim-config.yml"))
 
 # Build programmatically — inline form (scenarios 0–9)
 config = OptimConfig(

@@ -36,7 +36,8 @@ from gems_runner.main.main import (
     input_libs,
     input_system,
 )
-from gems_craft.optim_config.parsing import load_optim_config, validate_optim_config
+from gems_craft.optim_config.parsing import load_yaml_optim_config
+from gems_runner.optim_config import validate_optim_config
 from gems_runner.simulation import TimeBlock, build_decomposed_problems
 from gems_runner.study import Study
 
@@ -61,7 +62,7 @@ def test_study_mps_matches_expected(study_id: str, tmp_path: Path) -> None:
 
     # --- Load and validate optim-config ---
     config_path = input_dir / "optim-config.yml"
-    optim_config = load_optim_config(config_path)
+    optim_config = load_yaml_optim_config(config_path)
     assert optim_config is not None, f"optim-config.yml not found in {input_dir}"
     validate_optim_config(optim_config, system)
 

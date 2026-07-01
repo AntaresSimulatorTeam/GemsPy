@@ -4,9 +4,9 @@ from typing import Optional
 
 from gems_craft.optim_config.parsing import (
     OptimConfig,
-    load_optim_config,
-    validate_optim_config,
+    load_yaml_optim_config,
 )
+from gems_runner.optim_config import validate_optim_config
 from gems_runner.session.session import SimulationSession
 from gems_runner.study.folder import load_study
 
@@ -32,7 +32,7 @@ def run_study(
     resolved_config_path = optim_config_path or (
         study_dir / "input" / "optim-config.yml"
     )
-    optim_config = load_optim_config(resolved_config_path) or OptimConfig()
+    optim_config = load_yaml_optim_config(resolved_config_path) or OptimConfig()
     validate_optim_config(optim_config, study.system, study.scenario_builder)
 
     run_id = datetime.now().strftime("%Y%m%dT%H%M")

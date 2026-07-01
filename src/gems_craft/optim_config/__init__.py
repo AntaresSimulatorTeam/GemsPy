@@ -18,8 +18,8 @@ from .parsing import (
     ScenarioScopeConfig,
     SolverOptionsConfig,
     TimeScopeConfig,
-    load_optim_config,
-    write_optim_config,
+    load_yaml_optim_config,
+    write_yaml_optim_config,
 )
 
 __all__ = [
@@ -30,6 +30,6 @@ __all__ = [
     "ScenarioScopeConfig",
     "SolverOptionsConfig",
     "TimeScopeConfig",
-    "load_optim_config",
-    "write_optim_config",
+    "load_yaml_optim_config",
+    "write_yaml_optim_config",
 ]

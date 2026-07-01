@@ -19,12 +19,17 @@ from pathlib import Path
 from gems_craft.utils import ModifiedBaseModel
 
 
-def parse_yaml_library(input: typing.TextIO) -> "LibrarySchema":
+def _parse_yaml_library(input: typing.TextIO) -> "LibrarySchema":
     tree = safe_load(input)
     try:
         return LibrarySchema.model_validate(tree["library"])
     except ValidationError as e:
         raise ValueError(f"An error occurred during parsing: {e}")
+
+
+def load_yaml_library(path: Path) -> "LibrarySchema":
+    with path.open() as f:
+        return _parse_yaml_library(f)
 
 
 class ParameterSchema(ModifiedBaseModel):

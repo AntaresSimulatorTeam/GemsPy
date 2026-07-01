@@ -21,17 +21,17 @@ from yaml import safe_dump, safe_load
 from gems_craft.utils import ModifiedBaseModel
 
 
-def load_input_system(input_study: Path) -> "SystemSchema":
-    try:
-        with input_study.open() as f:
-            return SystemSchema.model_validate(safe_load(f))
-    except ValidationError as e:
-        raise ValueError(f"An error occurred during parsing: {e}")
-
-
-def parse_yaml_components(input_study: TextIO) -> "SystemSchema":
+def _parse_yaml_components(input_study: TextIO) -> "SystemSchema":
     tree = safe_load(input_study)
     return SystemSchema.model_validate(tree["system"])
+
+
+def load_yaml_system(path: Path) -> "SystemSchema":
+    try:
+        with path.open() as f:
+            return _parse_yaml_components(f)
+    except (ValidationError, ValueError) as e:
+        raise ValueError(f"An error occurred during parsing: {e}") from e
 
 
 class AreaConnectionsSchema(ModifiedBaseModel):

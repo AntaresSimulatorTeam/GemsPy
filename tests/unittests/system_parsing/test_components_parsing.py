@@ -8,12 +8,12 @@ from yaml import dump, safe_load
 from gems_runner.expression import literal, maximum, var
 from gems_runner.expression.expression import port_field
 from gems_runner.model import model
-from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
+from gems_craft.model.parsing import LibrarySchema, load_yaml_library, _parse_yaml_library
 from gems_runner.model.port import PortField, PortFieldDefinition, PortFieldId
 from gems_runner.model.resolve_library import resolve_library
 from gems_runner.model.variable import float_variable
 from gems_runner.study import Component, PortRef, PortsConnection
-from gems_craft.study.parsing import SystemSchema, load_input_system, parse_yaml_components
+from gems_craft.study.parsing import SystemSchema, load_yaml_system, _parse_yaml_components
 from gems_runner.study.resolve_components import consistency_check, resolve_system
 from gems_runner.model import Constraint, ModelPort, PortType
 
@@ -22,16 +22,13 @@ COMPO_FILE = Path(__file__).parent / "systems/system.yml"
 
 @pytest.fixture
 def input_system() -> SystemSchema:
-    with COMPO_FILE.open() as c:
-        return parse_yaml_components(c)
+    return load_yaml_system(COMPO_FILE)
 
 
 @pytest.fixture
 def input_library() -> LibrarySchema:
     library = Path(__file__).parent / "libs/lib_unittest.yml"
-
-    with library.open() as lib:
-        return parse_yaml_library(lib)
+    return load_yaml_library(library)
 
 
 def test_parsing_components_ok(
@@ -55,39 +52,22 @@ def test_consistency_check_ok(
     consistency_check(result_system, result_lib["basic"].models)
 
 
-def test_load_input_system_ok(tmp_path: Path) -> None:
-    data = safe_load(COMPO_FILE.read_text())
-    system_only = data["system"]
-    file_for_load = tmp_path / "system.yml"
-    file_for_load.write_text(dump(system_only))
-
-    result = load_input_system(file_for_load)
-
-    assert isinstance(result, SystemSchema)
-    assert len(result.components) == 3
-    assert result.components[0].id == "N"
-    assert result.components[1].id == "G"
-    assert result.components[2].id == "D"
-    assert result.connections is not None
-    assert len(result.connections) == 2
-
-
-def test_load_input_system_invalid_yaml_raises_value_error(tmp_path: Path) -> None:
+def test_load_yaml_system_invalid_yaml_raises_value_error(tmp_path: Path) -> None:
     data = safe_load(COMPO_FILE.read_text())
     system_only = data["system"].copy()
     system_only["unknown_field"] = "not_allowed"
     bad_file = tmp_path / "system.yml"
-    bad_file.write_text(dump(system_only))
+    bad_file.write_text(dump({"system": system_only}))
 
     with pytest.raises(ValueError, match="An error occurred during parsing"):
-        load_input_system(bad_file)
+        load_yaml_system(bad_file)
 
 
-def test_load_input_system_missing_file_raises_error() -> None:
+def test_load_yaml_system_missing_file_raises_error() -> None:
     missing = Path(__file__).parent / "systems/does_not_exist.yml"
 
     with pytest.raises(FileNotFoundError):
-        load_input_system(missing)
+        load_yaml_system(missing)
 
 
 def test_consistency_check_ko(
@@ -189,7 +169,7 @@ system:
 
 
 def test_parse_yaml_components_properties_optional_and_normalized() -> None:
-    system = parse_yaml_components(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
+    system = _parse_yaml_components(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
     props_by_id = {c.id: c.properties for c in system.components}
     assert props_by_id["load"] is None
     raw = props_by_id["nuclear_1"]
@@ -203,7 +183,7 @@ def test_parse_yaml_components_properties_optional_and_normalized() -> None:
 def test_resolve_system_normalizes_list_properties_to_dict(
     input_library: LibrarySchema,
 ) -> None:
-    system = parse_yaml_components(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
+    system = _parse_yaml_components(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
     lib_dict = resolve_library([input_library])
     resolved = resolve_system(system, lib_dict)
     assert resolved.get_component("nuclear_1").properties == {
@@ -224,7 +204,7 @@ system:
 
 def test_parse_yaml_components_properties_missing_key_raises() -> None:
     with pytest.raises(ValidationError):
-        parse_yaml_components(io.StringIO(_SYSTEM_WITH_PROPERTIES_MISSING_KEY))
+        _parse_yaml_components(io.StringIO(_SYSTEM_WITH_PROPERTIES_MISSING_KEY))
 
 
 _SYSTEM_WITH_PROPERTIES_DUPLICATE_KEYS = """\
@@ -243,7 +223,7 @@ system:
 def test_resolve_component_properties_duplicate_keys_raises(
     input_library: LibrarySchema,
 ) -> None:
-    system = parse_yaml_components(io.StringIO(_SYSTEM_WITH_PROPERTIES_DUPLICATE_KEYS))
+    system = _parse_yaml_components(io.StringIO(_SYSTEM_WITH_PROPERTIES_DUPLICATE_KEYS))
     lib_dict = resolve_library([input_library])
     with pytest.raises(ValueError, match="duplicate properties id"):
         resolve_system(system, lib_dict)
@@ -261,7 +241,7 @@ system:
 
 def test_parse_yaml_components_system_level_properties_rejected() -> None:
     with pytest.raises(ValidationError):
-        parse_yaml_components(io.StringIO(_SYSTEM_WITH_SYSTEM_LEVEL_PROPERTIES))
+        _parse_yaml_components(io.StringIO(_SYSTEM_WITH_SYSTEM_LEVEL_PROPERTIES))
 
 
 # --- model-declared properties ---
@@ -277,8 +257,8 @@ library:
 
 
 def test_resolve_component_with_declared_property_ok() -> None:
-    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
-    system = parse_yaml_components(io.StringIO("""\
+    lib = _parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
+    system = _parse_yaml_components(io.StringIO("""\
 system:
   components:
     - id: G
@@ -292,8 +272,8 @@ system:
 
 
 def test_resolve_component_missing_declared_property_raises() -> None:
-    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
-    system = parse_yaml_components(io.StringIO("""\
+    lib = _parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
+    system = _parse_yaml_components(io.StringIO("""\
 system:
   components:
     - id: G
@@ -321,8 +301,8 @@ library:
 
 
 def test_resolve_component_with_declared_parameters_ok() -> None:
-    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PARAMETERS))
-    system = parse_yaml_components(io.StringIO("""\
+    lib = _parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PARAMETERS))
+    system = _parse_yaml_components(io.StringIO("""\
 system:
   components:
     - id: G
@@ -338,8 +318,8 @@ system:
 
 
 def test_resolve_component_missing_declared_parameter_raises() -> None:
-    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PARAMETERS))
-    system = parse_yaml_components(io.StringIO("""\
+    lib = _parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PARAMETERS))
+    system = _parse_yaml_components(io.StringIO("""\
 system:
   components:
     - id: G
@@ -353,8 +333,8 @@ system:
 
 
 def test_resolve_component_extra_undeclared_property_allowed() -> None:
-    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
-    system = parse_yaml_components(io.StringIO("""\
+    lib = _parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
+    system = _parse_yaml_components(io.StringIO("""\
 system:
   components:
     - id: G

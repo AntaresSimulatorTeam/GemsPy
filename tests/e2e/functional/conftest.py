@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
+from gems_craft.model.parsing import LibrarySchema, load_yaml_library
 from gems_runner.model.resolve_library import Library, resolve_library
-from gems_craft.study.parsing import SystemSchema, parse_yaml_components
+from gems_craft.study.parsing import SystemSchema, load_yaml_system
 
 
 @pytest.fixture(scope="session")
@@ -35,36 +35,21 @@ def series_dir() -> Path:
 
 @pytest.fixture
 def input_system(systems_dir: Path) -> SystemSchema:
-    compo_file = systems_dir / "system.yml"
-
-    with compo_file.open() as c:
-        return parse_yaml_components(c)
+    return load_yaml_system(systems_dir / "system.yml")
 
 
 @pytest.fixture
 def input_library(libs_dir: Path) -> LibrarySchema:
-    library = libs_dir / "lib_unittest.yml"
-
-    with library.open() as lib:
-        return parse_yaml_library(lib)
+    return load_yaml_library(libs_dir / "lib_unittest.yml")
 
 
 @pytest.fixture(scope="session")
 def lib_dict(libs_dir: Path) -> dict[str, Library]:
-    lib_file = libs_dir / "lib.yml"
-
-    with lib_file.open() as f:
-        input_lib = parse_yaml_library(f)
-
-    lib_dict = resolve_library([input_lib])
-    return lib_dict
+    input_lib = load_yaml_library(libs_dir / "lib.yml")
+    return resolve_library([input_lib])
 
 
 @pytest.fixture(scope="session")
 def lib_dict_unittest(libs_dir: Path) -> dict[str, Library]:
-    lib_file = libs_dir / "lib_unittest.yml"
-
-    with lib_file.open() as f:
-        input_lib = parse_yaml_library(f)
-
+    input_lib = load_yaml_library(libs_dir / "lib_unittest.yml")
     return resolve_library([input_lib])

@@ -17,7 +17,7 @@ from uuid import uuid4
 
 import xarray as xr
 
-from gems_craft.optim_config.parsing import OptimConfig, ResolutionMode, load_optim_config
+from gems_craft.optim_config.parsing import OptimConfig, ResolutionMode
 from gems_runner.simulation.optimization import OptimizationProblem, build_problem
 from gems_runner.simulation.simulation_table import (
     SimulationTable,

@@ -110,7 +110,7 @@ input_system = SystemSchema(
 )
 ~~~
 
-The `input_system` variable can then be used in the same way as when it was created using the [parse_yaml_components](inputs.md) method.
+The `input_system` variable can then be used in the same way as when it was created using the [load_yaml_system](inputs.md) function.
 
 ## Writing a SystemSchema to file
 

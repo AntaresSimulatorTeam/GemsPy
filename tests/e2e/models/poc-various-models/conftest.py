@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.parsing import load_yaml_library
 from gems_runner.model.resolve_library import Library, resolve_library
 
 
@@ -29,21 +29,11 @@ def data_dir() -> Path:
 
 @pytest.fixture(scope="session")
 def lib_dict(libs_dir: Path) -> dict[str, Library]:
-    lib_file = libs_dir / "lib_unittest.yml"
-
-    with lib_file.open() as f:
-        input_lib = parse_yaml_library(f)
-
-    lib_dict = resolve_library([input_lib])
-    return lib_dict
+    input_lib = load_yaml_library(libs_dir / "lib_unittest.yml")
+    return resolve_library([input_lib])
 
 
 @pytest.fixture(scope="session")
 def lib_dict_sc(libs_dir: Path) -> dict[str, Library]:
-    lib_sc_file = libs_dir / "standard_sc.yml"
-
-    with lib_sc_file.open() as f:
-        input_lib_sc = parse_yaml_library(f)
-
-    lib_dict_sc = resolve_library([input_lib_sc])
-    return lib_dict_sc
+    input_lib_sc = load_yaml_library(libs_dir / "standard_sc.yml")
+    return resolve_library([input_lib_sc])

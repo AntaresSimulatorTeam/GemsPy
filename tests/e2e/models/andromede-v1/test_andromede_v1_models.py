@@ -17,12 +17,12 @@ from typing import List
 import pandas as pd
 import pytest
 
-from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
+from gems_craft.model.parsing import LibrarySchema, load_yaml_library
 from gems_runner.model.resolve_library import resolve_library
 from gems_runner.simulation import build_problem
 from gems_runner.simulation.time_block import TimeBlock
 from gems_runner.study import Study
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import load_yaml_system
 from gems_runner.study.resolve_components import build_data_base, resolve_system
 
 
@@ -49,10 +49,8 @@ def series_dir(data_dir: Path) -> Path:
 @pytest.fixture
 def input_libraries(data_dir: Path) -> List[LibrarySchema]:
     libs_dir = data_dir / "libs"
-    with open(libs_dir / "antares_historic.yml") as lib_file:
-        lib_historic = parse_yaml_library(lib_file)
-    with open(libs_dir / "andromede_v1_models.yml") as lib_file:
-        lib_v1 = parse_yaml_library(lib_file)
+    lib_historic = load_yaml_library(libs_dir / "antares_historic.yml")
+    lib_v1 = load_yaml_library(libs_dir / "andromede_v1_models.yml")
     return [lib_historic, lib_v1]
 
 
@@ -122,8 +120,7 @@ def test_model_behaviour(
     series_dir: Path,
 ) -> None:
     scenarios = 1
-    with open(systems_dir / system_file) as compo_file:
-        input_component = parse_yaml_components(compo_file)
+    input_component = load_yaml_system(systems_dir / system_file)
     result_lib = resolve_library(input_libraries)
     system_input = resolve_system(input_component, result_lib)
     database = build_data_base(input_component, Path(series_dir))

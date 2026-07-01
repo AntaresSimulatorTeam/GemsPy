@@ -15,7 +15,7 @@ import pytest
 from libs.standard import BALANCE_PORT_TYPE, DEMAND_MODEL, GENERATOR_MODEL
 
 from gems_runner.model.library import Library, library
-from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.parsing import load_yaml_library
 from gems_runner.model.resolve_library import resolve_library
 from gems_runner.simulation import TimeBlock, build_problem
 from gems_runner.simulation.simulation_table import SimulationTableBuilder
@@ -39,10 +39,8 @@ def std_lib() -> Library:
 
 @pytest.fixture
 def ac_lib(libs_dir: Path, std_lib: Library) -> dict[str, Library]:
-    lib_file = libs_dir / "ac.yml"
-    with lib_file.open() as f:
-        input_lib = parse_yaml_library(f)
-        return resolve_library([input_lib], preloaded_libs=[std_lib])
+    input_lib = load_yaml_library(libs_dir / "ac.yml")
+    return resolve_library([input_lib], preloaded_libs=[std_lib])
 
 
 def test_ac_network_no_links(ac_lib: dict[str, Library]) -> None:

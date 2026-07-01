@@ -170,10 +170,10 @@ If your inputs are organised in a study directory (see [Reading input files](use
 from pathlib import Path
 from gems_runner.study.folder import load_study
 from gems_runner.session import SimulationSession
-from gems_craft.optim_config import load_optim_config
+from gems_craft.optim_config import load_yaml_optim_config
 
 study = load_study(Path("my_study"))
-optim_config = load_optim_config(Path("my_study/input/optim-config.yml"))
+optim_config = load_yaml_optim_config(Path("my_study/input/optim-config.yml"))
 
 session = SimulationSession(study=study, optim_config=optim_config)
 results = session.run()
@@ -198,16 +198,13 @@ Here is the GemsPy syntax to read a test case described by
 
 ~~~ python
 from pathlib import Path
-from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.parsing import load_yaml_library
 from gems_runner.model.resolve_library import resolve_library
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import load_yaml_system
 from gems_runner.study.resolve_components import resolve_system, build_data_base
 
-with open("library.yml") as lib_file:
-    input_libraries = [parse_yaml_library(lib_file)]
-
-with open("system.yml") as compo_file:
-    input_system = parse_yaml_components(compo_file)
+input_libraries = [load_yaml_library(Path("library.yml"))]
+input_system = load_yaml_system(Path("system.yml"))
 
 result_lib = resolve_library(input_libraries)
 system = resolve_system(input_system, result_lib)

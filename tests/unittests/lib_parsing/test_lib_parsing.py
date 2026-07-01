@@ -29,7 +29,7 @@ from gems_runner.model import (
     model,
 )
 from gems_runner.model.model import PortFieldDefinition, PortFieldId
-from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.parsing import _parse_yaml_library, load_yaml_library
 from gems_runner.model.resolve_library import resolve_library
 from gems_runner.model import Constraint, ModelPort, PortField, PortType, ValueType, float_parameter, float_variable
 
@@ -39,8 +39,7 @@ CONSTANT = IndexingStructure(False, False)
 def test_library_parsing(libs_dir: Path) -> None:
     lib_file = libs_dir / "lib_unittest.yml"
 
-    with lib_file.open() as f:
-        input_lib = parse_yaml_library(f)
+    input_lib = load_yaml_library(lib_file)
     assert input_lib.id == "basic"
     assert len(input_lib.models) == 7
     assert len(input_lib.port_types) == 1
@@ -132,7 +131,7 @@ library:
         - id: on_off
           variable-type: binary
 """
-    input_lib = parse_yaml_library(io.StringIO(yaml_content))
+    input_lib = _parse_yaml_library(io.StringIO(yaml_content))
     lib = resolve_library([input_lib])
     on_off = lib["test"].models["test.binary_model"].variables["on_off"]
     assert on_off.data_type == ValueType.BINARY
@@ -150,7 +149,7 @@ library:
           time-dependent: false
           scenario-dependent: false
 """
-    input_lib = parse_yaml_library(io.StringIO(yaml_content))
+    input_lib = _parse_yaml_library(io.StringIO(yaml_content))
     assert input_lib.models[0].taxonomy_category == "balance"
 
 
@@ -165,12 +164,12 @@ library:
 
 
 def test_parse_yaml_library_model_properties() -> None:
-    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
+    lib = _parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
     assert [p.id for p in lib.models[0].properties] == ["technology"]
 
 
 def test_resolve_library_exposes_model_properties() -> None:
-    lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
+    lib = _parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
     lib_dict = resolve_library([lib])
     assert lib_dict["basic"].models["basic.generator"].properties == ["technology"]
 
@@ -178,8 +177,7 @@ def test_resolve_library_exposes_model_properties() -> None:
 def test_library_error_parsing(libs_dir: Path) -> None:
     lib_file = libs_dir / "model_port_definition_ko.yml"
 
-    with lib_file.open() as f:
-        input_lib = parse_yaml_library(f)
+    input_lib = load_yaml_library(lib_file)
     assert input_lib.id == "basic"
     with pytest.raises(
         ParsingException,
@@ -191,8 +189,7 @@ def test_library_error_parsing(libs_dir: Path) -> None:
 def test_library_port_model_ok_parsing(libs_dir: Path) -> None:
     lib_file = libs_dir / "model_port_definition_ok.yml"
 
-    with lib_file.open() as f:
-        input_lib = parse_yaml_library(f)
+    input_lib = load_yaml_library(lib_file)
     assert input_lib.id == "basic"
 
     lib = resolve_library([input_lib])
@@ -247,7 +244,7 @@ library:
         - id: bad
           expression: dual(balance) + x = 0
 """)
-    input_lib = parse_yaml_library(lib_yaml)
+    input_lib = _parse_yaml_library(lib_yaml)
     with pytest.raises(ValueError, match="Non-linear expression is not allowed"):
         resolve_library([input_lib])
 
@@ -268,7 +265,7 @@ library:
         - id: bad-obj
           expression: reduced_cost(x)
 """)
-    input_lib = parse_yaml_library(lib_yaml)
+    input_lib = _parse_yaml_library(lib_yaml)
     with pytest.raises(ValueError, match="Non-linear expression is not allowed"):
         resolve_library([input_lib])
 
@@ -399,7 +396,7 @@ library:
     _UNRESTRICTED_EXPRS + _CONSTANT_EXPRS + _LINEAR_EXPRS,
 )
 def test_expr_in_port_field_definition(yaml_expr: str, expected_expr: object) -> None:
-    input_lib = parse_yaml_library(io.StringIO(_base_lib_yaml(yaml_expr)))
+    input_lib = _parse_yaml_library(io.StringIO(_base_lib_yaml(yaml_expr)))
     lib = resolve_library([input_lib])
     pfd = lib["test"].models["test.test_model"].port_fields_definitions[_PFIELD_ID]
     assert expressions_equal(pfd.definition, expected_expr)  # type: ignore[arg-type]
@@ -414,7 +411,7 @@ def test_expr_in_port_field_definition(yaml_expr: str, expected_expr: object) ->
 def test_constant_expr_in_variable_upper_bound(
     yaml_expr: str, expected_expr: object
 ) -> None:
-    input_lib = parse_yaml_library(io.StringIO(_no_port_lib_yaml(var_bound=yaml_expr)))
+    input_lib = _parse_yaml_library(io.StringIO(_no_port_lib_yaml(var_bound=yaml_expr)))
     lib = resolve_library([input_lib])
     variable = lib["test"].models["test.test_model"].variables["x"]
     assert expressions_equal_if_present(variable.upper_bound, expected_expr)  # type: ignore[arg-type]
@@ -427,7 +424,7 @@ def test_constant_expr_in_variable_upper_bound(
 
 @pytest.mark.parametrize("yaml_expr,expected_expr", _CONSTANT_EXPRS)
 def test_constant_expr_in_objective(yaml_expr: str, expected_expr: object) -> None:
-    input_lib = parse_yaml_library(
+    input_lib = _parse_yaml_library(
         io.StringIO(_no_port_lib_yaml(objective_expr=yaml_expr))
     )
     lib = resolve_library([input_lib])
@@ -438,7 +435,7 @@ def test_constant_expr_in_objective(yaml_expr: str, expected_expr: object) -> No
 
 @pytest.mark.parametrize("yaml_expr,expected_expr", _LINEAR_EXPRS)
 def test_linear_expr_in_objective(yaml_expr: str, expected_expr: object) -> None:
-    input_lib = parse_yaml_library(
+    input_lib = _parse_yaml_library(
         io.StringIO(_no_port_lib_yaml(objective_expr=f"expec(sum({yaml_expr}))"))
     )
     lib = resolve_library([input_lib])
@@ -456,7 +453,7 @@ def test_linear_expr_in_objective(yaml_expr: str, expected_expr: object) -> None
 def test_constant_expr_in_binding_constraint(
     yaml_expr: str, expected_expr: object
 ) -> None:
-    input_lib = parse_yaml_library(
+    input_lib = _parse_yaml_library(
         io.StringIO(_no_port_lib_yaml(constraint_expr=f"{yaml_expr} = 0"))
     )
     lib = resolve_library([input_lib])
@@ -468,7 +465,7 @@ def test_constant_expr_in_binding_constraint(
 def test_linear_expr_in_binding_constraint(
     yaml_expr: str, expected_expr: object
 ) -> None:
-    input_lib = parse_yaml_library(
+    input_lib = _parse_yaml_library(
         io.StringIO(_no_port_lib_yaml(constraint_expr=f"{yaml_expr} >= 0"))
     )
     lib = resolve_library([input_lib])
@@ -485,7 +482,7 @@ def test_linear_expr_in_binding_constraint(
 def test_unrestricted_expr_rejected_in_binding_constraint(
     yaml_expr: str, expected_expr: object
 ) -> None:
-    input_lib = parse_yaml_library(
+    input_lib = _parse_yaml_library(
         io.StringIO(_no_port_lib_yaml(constraint_expr=f"{yaml_expr} = 0"))
     )
     with pytest.raises(ValueError, match="Non-linear expression is not allowed"):
@@ -501,7 +498,7 @@ def test_unrestricted_expr_rejected_in_binding_constraint(
 def test_expr_rejected_in_variable_upper_bound(
     yaml_expr: str, expected_expr: object
 ) -> None:
-    input_lib = parse_yaml_library(io.StringIO(_no_port_lib_yaml(var_bound=yaml_expr)))
+    input_lib = _parse_yaml_library(io.StringIO(_no_port_lib_yaml(var_bound=yaml_expr)))
     with pytest.raises(ValueError, match="bounds of variables must be constant"):
         resolve_library([input_lib])
 
@@ -515,7 +512,7 @@ def test_expr_rejected_in_variable_upper_bound(
 def test_unrestricted_expr_rejected_in_objective(
     yaml_expr: str, expected_expr: object
 ) -> None:
-    input_lib = parse_yaml_library(
+    input_lib = _parse_yaml_library(
         io.StringIO(_no_port_lib_yaml(objective_expr=yaml_expr))
     )
     with pytest.raises(ValueError):
@@ -575,7 +572,7 @@ library:
 
 def test_sum_connections_on_own_port_in_binding_constraint_raises() -> None:
     """sum_connections(balance_port.flow) in a BC is invalid: flow is defined here."""
-    input_lib = parse_yaml_library(
+    input_lib = _parse_yaml_library(
         io.StringIO(
             _port_model_yaml(constraint_expr="sum_connections(balance_port.flow) >= 0")
         )
@@ -586,7 +583,7 @@ def test_sum_connections_on_own_port_in_binding_constraint_raises() -> None:
 
 def test_sum_connections_on_own_port_in_extra_output_raises() -> None:
     """sum_connections(balance_port.flow) in an extra-output is invalid: flow is defined here."""
-    input_lib = parse_yaml_library(
+    input_lib = _parse_yaml_library(
         io.StringIO(
             _port_model_yaml(
                 extra_output_expr="sum_connections(balance_port.flow) * generation"
@@ -604,7 +601,7 @@ def test_sum_connections_on_own_port_in_extra_output_raises() -> None:
 
 def test_bare_defined_port_field_in_binding_constraint_raises() -> None:
     """balance_port.flow bare (no sum_connections) in a BC is invalid."""
-    input_lib = parse_yaml_library(
+    input_lib = _parse_yaml_library(
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.flow >= 0"))
     )
     with pytest.raises(ValueError, match="Bare port field"):
@@ -613,7 +610,7 @@ def test_bare_defined_port_field_in_binding_constraint_raises() -> None:
 
 def test_bare_undefined_port_field_in_binding_constraint_raises() -> None:
     """balance_port.price bare (not defined in this model either) in a BC is invalid."""
-    input_lib = parse_yaml_library(
+    input_lib = _parse_yaml_library(
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.price >= 0"))
     )
     with pytest.raises(ValueError, match="Bare port field"):
@@ -627,7 +624,7 @@ def test_bare_undefined_port_field_in_binding_constraint_raises() -> None:
 
 def test_sum_connections_on_non_own_port_accepted() -> None:
     """sum_connections(balance_port.price) is valid: price is not defined in this model."""
-    input_lib = parse_yaml_library(
+    input_lib = _parse_yaml_library(
         io.StringIO(
             _port_model_yaml(constraint_expr="sum_connections(balance_port.price) >= 0")
         )

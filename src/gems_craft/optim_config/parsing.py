@@ -165,7 +165,7 @@ class ScenarioScopeConfig(ModifiedBaseModel):
       and/or ``"a-b"`` range strings.
     - **File** (``playlist_file``): path to a flat JSON array of 0-based
       integers, resolved relative to ``optim-config.yml`` by
-      ``load_optim_config()``.
+      ``load_yaml_optim_config()``.
 
     ``exclude`` is optional and compatible with *both* forms.  It subtracts a
     set of scenarios from the base set using the same entry format.  Entries
@@ -180,7 +180,7 @@ class ScenarioScopeConfig(ModifiedBaseModel):
 
     The resolved list is computed lazily on first access to
     ``scenario_ids`` and cached for the lifetime of the object.
-    ``load_optim_config()`` triggers eager resolution so that file I/O
+    ``load_yaml_optim_config()`` triggers eager resolution so that file I/O
     errors surface at load time.
     """
 
@@ -270,14 +270,14 @@ class OptimConfig(ModifiedBaseModel):
     models: List[ModelOptimConfig] = Field(default_factory=list)
 
 
-def write_optim_config(config: OptimConfig, path: Path) -> None:
+def write_yaml_optim_config(config: OptimConfig, path: Path) -> None:
     data = config.model_dump(by_alias=True, exclude_none=True, mode="json")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as f:
         safe_dump(data, f, allow_unicode=True, sort_keys=False)
 
 
-def load_optim_config(config_path: Path) -> Optional[OptimConfig]:
+def load_yaml_optim_config(config_path: Path) -> Optional[OptimConfig]:
     """Load and fully resolve an ``optim-config.yml`` file.
 
     Returns ``None`` if the file does not exist.

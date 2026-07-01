@@ -10,9 +10,9 @@ A study is defined by a directory containing:
 from pathlib import Path
 
 from gems_runner.model.model import Model
-from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.parsing import load_yaml_library
 from gems_runner.model.resolve_library import resolve_library
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import load_yaml_system
 from gems_runner.study.resolve_components import (
     build_data_base,
     consistency_check,
@@ -42,11 +42,9 @@ def load_study(study_dir: Path) -> Study:
 
     input_libraries = []
     for lib_file in lib_folder.glob("*.yml"):
-        with lib_file.open() as lib:
-            input_libraries.append(parse_yaml_library(lib))
+        input_libraries.append(load_yaml_library(lib_file))
 
-    with system_file.open() as c:
-        input_study = parse_yaml_components(c)
+    input_study = load_yaml_system(system_file)
     lib_dict = resolve_library(input_libraries)
     system = resolve_system(input_study, lib_dict)
     model_dict: dict[str, Model] = {}
@@ -58,7 +56,7 @@ def load_study(study_dir: Path) -> Study:
         study_dir / "input" / "data-series" / "modeler-scenariobuilder.dat"
     )
     scenario_builder = (
-        ScenarioBuilder.load(scenario_builder_path)
+        ScenarioBuilder.load_dat(scenario_builder_path)
         if scenario_builder_path.exists()
         else ScenarioBuilder()
     )

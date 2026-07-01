@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from gems_runner.model.library import Library
-from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.parsing import load_yaml_library
 from gems_runner.model.resolve_library import resolve_library
 from gems_runner.study.system import Component, System
 
@@ -29,8 +29,7 @@ def libs_dir() -> Path:
 def lib_dict(libs_dir: Path) -> dict[str, Library]:
     lib_file = libs_dir / "lib.yml"
 
-    with lib_file.open() as f:
-        input_lib = parse_yaml_library(f)
+    input_lib = load_yaml_library(lib_file)
 
     lib_dict = resolve_library([input_lib])
     return lib_dict

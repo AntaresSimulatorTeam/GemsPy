@@ -41,11 +41,11 @@ from typing import Callable, Tuple
 
 import pytest
 
-from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
+from gems_craft.model.parsing import LibrarySchema, load_yaml_library
 from gems_runner.model.resolve_library import resolve_library
 from gems_runner.simulation import TimeBlock, build_problem
 from gems_runner.study.data import DataBase
-from gems_craft.study.parsing import SystemSchema, parse_yaml_components
+from gems_craft.study.parsing import SystemSchema, load_yaml_system
 from gems_runner.study.resolve_components import (
     build_data_base,
     consistency_check,
@@ -80,11 +80,8 @@ def setup_test(
     def _setup_test(study_file_name: str) -> Study:
         study_file = systems_dir / study_file_name
         lib_file = libs_dir / "lib_unittest.yml"
-        with lib_file.open() as lib:
-            input_library = parse_yaml_library(lib)
-
-        with study_file.open() as c:
-            input_system = parse_yaml_components(c)
+        input_library = load_yaml_library(lib_file)
+        input_system = load_yaml_system(study_file)
         lib_dict = resolve_library([input_library])
         system = resolve_system(input_system, lib_dict)
         consistency_check(system, lib_dict["basic"].models)

@@ -86,7 +86,7 @@ class ScenarioBuilder:
                 )
         return errors
 
-    def dump(self, path: Path) -> None:
+    def write_dat(self, path: Path) -> None:
         """Write the scenario builder to a ``modeler-scenariobuilder.dat`` file.
 
         Each line follows the format::
@@ -102,7 +102,7 @@ class ScenarioBuilder:
                     f.write(f"{group}, {mc_scenario} = {col_idx + 1}\n")
 
     @classmethod
-    def load(cls, path: Path) -> "ScenarioBuilder":
+    def load_dat(cls, path: Path) -> "ScenarioBuilder":
         """Parse a ``modeler-scenariobuilder.dat`` file.
 
         Each non-blank, non-comment line must follow::
