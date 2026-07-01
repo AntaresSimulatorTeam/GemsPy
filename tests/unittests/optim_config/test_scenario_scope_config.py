@@ -289,7 +289,9 @@ def test_yaml_inline_include_exclude() -> None:
 def test_yaml_playlist_file_relative_resolved_by_load_optim_config(
     tmp_path: Path,
 ) -> None:
-    from gems_craft.optim_config.parsing import load_yaml_optim_config as load_optim_config
+    from gems_craft.optim_config.parsing import (
+        load_yaml_optim_config as load_optim_config,
+    )
 
     playlist = tmp_path / "playlist.json"
     playlist.write_text(json.dumps([0, 1, 2]))
@@ -364,7 +366,9 @@ def test_scenario_ids_cached_inline() -> None:
 def test_scenario_ids_cached_playlist_file_via_load_optim_config(
     tmp_path: Path,
 ) -> None:
-    from gems_craft.optim_config.parsing import load_yaml_optim_config as load_optim_config
+    from gems_craft.optim_config.parsing import (
+        load_yaml_optim_config as load_optim_config,
+    )
 
     playlist = tmp_path / "playlist.json"
     playlist.write_text(json.dumps([0, 1, 2]))
@@ -386,7 +390,8 @@ def test_scenario_ids_cached_playlist_file_via_load_optim_config(
 def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
     import numpy as np
 
-    from gems_craft.optim_config.parsing import OptimConfig, validate_optim_config
+    from gems_craft.optim_config.parsing import OptimConfig
+    from gems_runner.optim_config import validate_optim_config
     from gems_craft.study.scenario_builder import ScenarioBuilder
     from gems_runner.study.system import System
 
@@ -404,7 +409,8 @@ def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
 def test_validate_optim_config_scenario_builder_accepts_valid_playlist() -> None:
     import numpy as np
 
-    from gems_craft.optim_config.parsing import OptimConfig, validate_optim_config
+    from gems_craft.optim_config.parsing import OptimConfig
+    from gems_runner.optim_config import validate_optim_config
     from gems_craft.study.scenario_builder import ScenarioBuilder
     from gems_runner.study.system import System
 

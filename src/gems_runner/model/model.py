@@ -23,7 +23,10 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from gems_runner.expression import ExpressionNode
 from gems_runner.expression.degree import is_linear
-from gems_runner.expression.indexing import IndexingStructureProvider, compute_indexation
+from gems_runner.expression.indexing import (
+    IndexingStructureProvider,
+    compute_indexation,
+)
 from gems_runner.expression.indexing_structure import IndexingStructure
 from gems_runner.model.constraint import Constraint
 from gems_runner.model.parameter import Parameter

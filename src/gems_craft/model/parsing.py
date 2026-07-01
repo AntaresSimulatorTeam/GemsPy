@@ -114,7 +114,9 @@ class ModelSchema(ModifiedBaseModel):
 
 
 def write_yaml_library(library: "LibrarySchema", path: Path) -> None:
-    data = {"library": library.model_dump(by_alias=True, exclude_none=True, mode="json")}
+    data = {
+        "library": library.model_dump(by_alias=True, exclude_none=True, mode="json")
+    }
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as f:
         safe_dump(data, f, allow_unicode=True, sort_keys=False)

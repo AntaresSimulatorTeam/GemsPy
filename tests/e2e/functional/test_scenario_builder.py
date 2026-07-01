@@ -39,9 +39,7 @@ def database(
     series_dir: Path, systems_dir: Path, scenario_builder: ScenarioBuilder
 ) -> DataBase:
     system_path = systems_dir / "with_scenarization.yml"
-    return build_data_base(
-            load_yaml_system(system_path), series_dir, scenario_builder
-        )
+    return build_data_base(load_yaml_system(system_path), series_dir, scenario_builder)
 
 
 def test_system_with_scenarization(

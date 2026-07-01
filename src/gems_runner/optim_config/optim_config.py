@@ -22,7 +22,12 @@ from gems_runner.expression.expression import (
     UnaryOperatorNode,
     VariableNode,
 )
-from gems_craft.optim_config.parsing import ElementLocation, OutOfBoundsProcessingConfig, ModelDecompositionConfig, OptimConfig
+from gems_craft.optim_config.parsing import (
+    ElementLocation,
+    OutOfBoundsProcessingConfig,
+    ModelDecompositionConfig,
+    OptimConfig,
+)
 
 if TYPE_CHECKING:
     from gems_runner.model.model import Model

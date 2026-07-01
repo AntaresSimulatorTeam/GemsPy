@@ -161,7 +161,8 @@ class SimulationTable:
             ds[row[col_out]] = xr.DataArray(float(row[col_val]))
 
         return ds
-    
+
+
 class SimulationColumns(str, Enum):
     BLOCK = "block"
     COMPONENT = "component"

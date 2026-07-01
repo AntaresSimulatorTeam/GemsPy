@@ -55,7 +55,11 @@ from gems_runner.study.study import Study
 from gems_runner.study.system import Component
 
 if TYPE_CHECKING:
-    from gems_craft.optim_config.parsing import ElementLocation, OptimConfig, OutOfBoundsMode
+    from gems_craft.optim_config.parsing import (
+        ElementLocation,
+        OptimConfig,
+        OutOfBoundsMode,
+    )
 
 # ---------------------------------------------------------------------------
 # Public types

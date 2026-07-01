@@ -10,7 +10,14 @@
 #
 # This file is part of the Antares project.
 
-from gems_runner.model import Constraint, ModelPort, PortField, PortType, float_parameter, float_variable
+from gems_runner.model import (
+    Constraint,
+    ModelPort,
+    PortField,
+    PortType,
+    float_parameter,
+    float_variable,
+)
 from libs.standard import BALANCE_PORT_TYPE, CONSTANT
 
 from gems_runner.expression import literal, param, var

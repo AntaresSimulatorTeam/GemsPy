@@ -15,7 +15,10 @@ from pathlib import Path
 import pytest
 
 from gems_runner.expression import literal, param, var
-from gems_runner.expression.equality import expressions_equal, expressions_equal_if_present
+from gems_runner.expression.equality import (
+    expressions_equal,
+    expressions_equal_if_present,
+)
 from gems_runner.expression.expression import (
     DualNode,
     ReducedCostNode,
@@ -31,7 +34,15 @@ from gems_runner.model import (
 from gems_runner.model.model import PortFieldDefinition, PortFieldId
 from gems_craft.model.parsing import _parse_yaml_library, load_yaml_library
 from gems_runner.model.resolve_library import resolve_library
-from gems_runner.model import Constraint, ModelPort, PortField, PortType, ValueType, float_parameter, float_variable
+from gems_runner.model import (
+    Constraint,
+    ModelPort,
+    PortField,
+    PortType,
+    ValueType,
+    float_parameter,
+    float_variable,
+)
 
 CONSTANT = IndexingStructure(False, False)
 

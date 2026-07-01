@@ -27,7 +27,10 @@ import pytest
 
 from gems_runner.model.library import Library
 from gems_runner.simulation import TimeBlock, build_problem
-from gems_runner.simulation.simulation_table import SimulationColumns, SimulationTableBuilder
+from gems_runner.simulation.simulation_table import (
+    SimulationColumns,
+    SimulationTableBuilder,
+)
 from gems_runner.study import (
     Component,
     ConstantData,

@@ -92,7 +92,9 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         return visit(node.operand, self)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> int | float:
-        scenario_operator_cls = getattr(gems_runner.expression.scenario_operator, node.name)
+        scenario_operator_cls = getattr(
+            gems_runner.expression.scenario_operator, node.name
+        )
         # TODO: Carefully check if this formula is correct
         return scenario_operator_cls.degree() * visit(node.operand, self)
 

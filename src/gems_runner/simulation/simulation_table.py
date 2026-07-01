@@ -7,7 +7,10 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from gems_craft.simulation_table.simulation_table import SimulationTable, SimulationColumns
+from gems_craft.simulation_table.simulation_table import (
+    SimulationTable,
+    SimulationColumns,
+)
 
 
 from gems_runner.expression.visitor import visit

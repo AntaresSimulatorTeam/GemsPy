@@ -13,7 +13,10 @@
 
 from gems_runner.expression import param, var
 from gems_runner.expression.expression import DualNode, ReducedCostNode
-from gems_runner.expression.indexing import IndexingStructureProvider, compute_indexation
+from gems_runner.expression.indexing import (
+    IndexingStructureProvider,
+    compute_indexation,
+)
 from gems_runner.expression.indexing_structure import IndexingStructure
 
 

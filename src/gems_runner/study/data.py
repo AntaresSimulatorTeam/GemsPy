@@ -147,6 +147,7 @@ class TimeScenarioSeriesData(AbstractDataStructure):
             raise ValueError("Invalid data type for TimeScenarioSeriesData")
         return time and scenario
 
+
 def dataframe_to_time_series(ts_dataframe: pd.DataFrame) -> pd.Series:
     if ts_dataframe.shape[1] != 1:
         raise ValueError(

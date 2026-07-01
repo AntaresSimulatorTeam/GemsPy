@@ -28,6 +28,7 @@ from yaml import safe_dump, safe_load
 
 from gems_craft.utils import ModifiedBaseModel
 
+
 class ElementLocation(str, Enum):
     MASTER = "master"
     SUBPROBLEMS = "subproblems"

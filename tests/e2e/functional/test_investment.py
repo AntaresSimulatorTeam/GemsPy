@@ -31,7 +31,14 @@ from gems_craft.optim_config.parsing import (
     OptimConfig,
 )
 from gems_runner.optim_config import validate_optim_config
-from gems_runner.model import Constraint, Model, ModelPort, float_parameter, float_variable, int_variable
+from gems_runner.model import (
+    Constraint,
+    Model,
+    ModelPort,
+    float_parameter,
+    float_variable,
+    int_variable,
+)
 from gems_runner.simulation import TimeBlock, build_problem
 from gems_runner.simulation.simulation_table import SimulationTableBuilder
 from gems_runner.study import (

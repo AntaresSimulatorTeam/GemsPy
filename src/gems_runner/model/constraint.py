@@ -14,7 +14,10 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from gems_runner.expression.degree import is_constant
-from gems_runner.expression.equality import expressions_equal, expressions_equal_if_present
+from gems_runner.expression.equality import (
+    expressions_equal,
+    expressions_equal_if_present,
+)
 from gems_runner.expression.expression import (
     Comparator,
     ComparisonNode,

@@ -39,7 +39,10 @@ from gems_runner.expression.expression import (
     VariableNode,
 )
 from gems_runner.expression.indexing_structure import IndexingStructure
-from gems_runner.expression.parsing.parse_expression import ModelIdentifiers, parse_expression
+from gems_runner.expression.parsing.parse_expression import (
+    ModelIdentifiers,
+    parse_expression,
+)
 from gems_runner.expression.uses_sum_connections_on import uses_sum_connections_on
 from gems_runner.expression.visitor import ExpressionVisitor, visit
 from gems_runner.model import (
@@ -67,7 +70,16 @@ from gems_craft.model.parsing import (
     VariableSchema,
 )
 from gems_runner.model.port import PortFieldDefinition, port_field_def
-from gems_runner.model import Constraint, Model, ModelPort, Parameter, PortField, PortType, ValueType, Variable
+from gems_runner.model import (
+    Constraint,
+    Model,
+    ModelPort,
+    Parameter,
+    PortField,
+    PortType,
+    ValueType,
+    Variable,
+)
 
 
 def resolve_library(

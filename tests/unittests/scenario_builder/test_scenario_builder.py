@@ -35,9 +35,7 @@ def scenario_builder(series_dir: Path) -> ScenarioBuilder:
 @pytest.fixture
 def database(series_dir: Path, scenario_builder: ScenarioBuilder) -> DataBase:
     system_path = Path(__file__).parent / "systems/with_scenarization.yml"
-    return build_data_base(
-            load_yaml_system(system_path), series_dir, scenario_builder
-        )
+    return build_data_base(load_yaml_system(system_path), series_dir, scenario_builder)
 
 
 def test_scenario_builder_load(scenario_builder: ScenarioBuilder) -> None:

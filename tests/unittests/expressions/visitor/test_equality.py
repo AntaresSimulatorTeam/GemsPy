@@ -14,7 +14,12 @@ import pytest
 
 from gems_runner.expression import ExpressionNode, copy_expression, literal, param, var
 from gems_runner.expression.equality import expressions_equal
-from gems_runner.expression.expression import DualNode, ReducedCostNode, maximum, minimum
+from gems_runner.expression.expression import (
+    DualNode,
+    ReducedCostNode,
+    maximum,
+    minimum,
+)
 
 
 @pytest.mark.parametrize(

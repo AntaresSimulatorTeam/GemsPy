@@ -339,7 +339,9 @@ class ScenarioOperatorNode(UnaryOperatorNode):
             for _, cls in inspect.getmembers(
                 gems_runner.expression.scenario_operator, inspect.isclass
             )
-            if issubclass(cls, gems_runner.expression.scenario_operator.ScenarioOperator)
+            if issubclass(
+                cls, gems_runner.expression.scenario_operator.ScenarioOperator
+            )
         ]
         if self.name not in valid_names:
             raise ValueError(

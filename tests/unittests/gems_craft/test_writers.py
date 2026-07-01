@@ -17,7 +17,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gems_craft.model.parsing import LibrarySchema, load_yaml_library, write_yaml_library
+from gems_craft.model.parsing import (
+    LibrarySchema,
+    load_yaml_library,
+    write_yaml_library,
+)
 from gems_craft.optim_config import load_yaml_optim_config, write_yaml_optim_config
 from gems_craft.optim_config.parsing import (
     OptimConfig,
@@ -29,7 +33,6 @@ from gems_craft.optim_config.parsing import (
 )
 from gems_craft.study.parsing import SystemSchema, load_yaml_system, write_yaml_system
 from gems_craft.study.scenario_builder import ScenarioBuilder
-
 
 # ---------------------------------------------------------------------------
 # write_yaml_system
@@ -69,7 +72,10 @@ def test_write_yaml_system_uses_kebab_keys(tmp_path: Path) -> None:
                 model="lib.generator",
                 parameters=[
                     ComponentParameterSchema(
-                        id="cost", time_dependent=True, scenario_dependent=False, value=30.0
+                        id="cost",
+                        time_dependent=True,
+                        scenario_dependent=False,
+                        value=30.0,
                     )
                 ],
             )
@@ -207,8 +213,8 @@ def test_scenario_builder_write_dat_format(tmp_path: Path) -> None:
     sb.write_dat(out)
 
     lines = [l for l in out.read_text().splitlines() if l.strip()]
-    assert lines[0] == "wind, 0 = 1"   # col_idx 0 → 1-based = 1
-    assert lines[1] == "wind, 1 = 3"   # col_idx 2 → 1-based = 3
+    assert lines[0] == "wind, 0 = 1"  # col_idx 0 → 1-based = 1
+    assert lines[1] == "wind, 1 = 3"  # col_idx 2 → 1-based = 3
 
 
 def test_scenario_builder_write_dat_creates_parent_dirs(tmp_path: Path) -> None:

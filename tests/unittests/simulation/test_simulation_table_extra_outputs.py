@@ -19,10 +19,22 @@ def test_extra_output_with_sum_connections() -> None:
     from gems_runner.expression import var
     from gems_runner.expression.expression import literal, port_field
     from gems_runner.model.model import ModelPort, model
-    from gems_runner.model.port import PortField, PortFieldDefinition, PortFieldId, PortType
+    from gems_runner.model.port import (
+        PortField,
+        PortFieldDefinition,
+        PortFieldId,
+        PortType,
+    )
     from gems_runner.model.variable import float_variable
     from gems_runner.simulation import TimeBlock, build_problem
-    from gems_runner.study import Component, DataBase, PortRef, Study, System, create_component
+    from gems_runner.study import (
+        Component,
+        DataBase,
+        PortRef,
+        Study,
+        System,
+        create_component,
+    )
 
     BALANCE_PORT_TYPE = PortType(id="balance", fields=[PortField("flow")])
 

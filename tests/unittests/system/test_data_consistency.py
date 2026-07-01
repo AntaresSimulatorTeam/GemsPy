@@ -36,7 +36,13 @@ from gems_runner.study import (
     create_component,
 )
 from gems_craft.study.timeseries import load_ts_from_file
-from gems_runner.model import Constraint, Model, ModelPort, float_parameter, float_variable
+from gems_runner.model import (
+    Constraint,
+    Model,
+    ModelPort,
+    float_parameter,
+    float_variable,
+)
 from tests.unittests.system.libs.standard import (
     BALANCE_PORT_TYPE,
     CONSTANT,
