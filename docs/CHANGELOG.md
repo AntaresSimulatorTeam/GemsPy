@@ -2,6 +2,31 @@
 
 All notable changes to GemsPy are documented here.
 
+## [2.0.0] - Unreleased
+
+### Changed
+
+- **Package split**: the `gems` package is replaced by three dedicated packages:
+  - `gems_craft`: I/O and data structures (YAML parsing/writing for libraries, systems, optim-config, scenario builder) — no solver dependency
+  - `gems_runner`: solver and execution logic (expression language, model resolution, simulation, session)
+  - `gems_craft_hybrid`: read/write support for hybrid GEMS studies (not simulable with GemsPy — use Antares Simulator)
+- **Renamed functions**: all public YAML functions now follow `load_yaml_*` / `write_yaml_*` with `Path` inputs. Stream-based helpers are private (`_parse_yaml_*`).
+  - `parse_yaml_library` → `load_yaml_library`
+  - `parse_yaml_components` / `load_input_system` → `load_yaml_system`
+  - `load_optim_config` → `load_yaml_optim_config`, `write_optim_config` → `write_yaml_optim_config`
+  - `ScenarioBuilder.load` → `ScenarioBuilder.load_dat`, `ScenarioBuilder.dump` → `ScenarioBuilder.write_dat`
+- **Generic schema support**: `load_yaml_system` and `load_yaml_library` accept an optional `schema` argument (TypeVar with default) to load subclass schemas without code duplication.
+
+### Added
+
+- **`gems_craft_hybrid`** package with:
+  - `HybridSystemSchema`: extends `SystemSchema` with `area-connections` and `thermal-capacity-connections`
+  - `HybridPortTypeSchema`: extends `PortTypeSchema` with `area-connection` and `thermal-capacity-connection`
+  - `HybridLibrarySchema`: extends `LibrarySchema` with `HybridPortTypeSchema` port-types
+- **`version`** field on `LibrarySchema`
+
+---
+
 ## [0.1.2] - 2026-06-11
 
 ### Added
