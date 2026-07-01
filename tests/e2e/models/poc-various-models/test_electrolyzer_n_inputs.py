@@ -21,9 +21,9 @@ from libs.standard_sc import (
     TWO_INPUTS_CONVERTOR_MODEL,
 )
 
-from gems.simulation import TimeBlock, build_problem
-from gems.simulation.simulation_table import SimulationTableBuilder
-from gems.study import (
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.simulation.simulation_table import SimulationTableBuilder
+from gems_runner.study import (
     Component,
     ConstantData,
     DataBase,

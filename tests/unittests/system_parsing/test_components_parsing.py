@@ -5,16 +5,17 @@ import pytest
 from pydantic import ValidationError
 from yaml import dump, safe_load
 
-from gems.expression import literal, maximum, var
-from gems.expression.expression import port_field
-from gems.model import Constraint, ModelPort, PortType, model
-from gems.model.parsing import LibrarySchema, parse_yaml_library
-from gems.model.port import PortField, PortFieldDefinition, PortFieldId
-from gems.model.resolve_library import resolve_library
-from gems.model.variable import float_variable
-from gems.study import Component, PortRef, PortsConnection
-from gems.study.parsing import SystemSchema, load_input_system, parse_yaml_components
-from gems.study.resolve_components import consistency_check, resolve_system
+from gems_runner.expression import literal, maximum, var
+from gems_runner.expression.expression import port_field
+from gems_runner.model import model
+from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
+from gems_runner.model.port import PortField, PortFieldDefinition, PortFieldId
+from gems_runner.model.resolve_library import resolve_library
+from gems_runner.model.variable import float_variable
+from gems_runner.study import Component, PortRef, PortsConnection
+from gems_craft.study.parsing import SystemSchema, load_input_system, parse_yaml_components
+from gems_runner.study.resolve_components import consistency_check, resolve_system
+from gems_runner.model import Constraint, ModelPort, PortType
 
 COMPO_FILE = Path(__file__).parent / "systems/system.yml"
 

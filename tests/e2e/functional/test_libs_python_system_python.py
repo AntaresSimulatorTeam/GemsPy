@@ -37,12 +37,13 @@ Several cases are tested:
 import pandas as pd
 import pytest
 
-from gems.expression import literal, param, var
-from gems.expression.indexing_structure import IndexingStructure
-from gems.model import Model, ModelPort, float_parameter, float_variable, model
-from gems.model.port import PortFieldDefinition, PortFieldId
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_runner.expression import literal, param, var
+from gems_runner.expression.indexing_structure import IndexingStructure
+from gems_runner.model import model
+from gems_runner.model.port import PortFieldDefinition, PortFieldId
+from gems_runner.model import Model, ModelPort, float_parameter, float_variable
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.study import (
     Component,
     ConstantData,
     DataBase,

@@ -103,7 +103,7 @@ attaches the resulting `ScenarioBuilder` to the returned `Study` object:
 
 ~~~ python
 from pathlib import Path
-from gems.study.folder import load_study
+from gems_runner.study.folder import load_study
 
 study = load_study(Path("my_study"))
 # study.scenario_builder is populated from modeler-scenariobuilder.dat
@@ -119,7 +119,7 @@ that passes MC scenario indices through unchanged.
 ~~~ python
 import numpy as np
 from pathlib import Path
-from gems.study.scenario_builder import ScenarioBuilder
+from gems_craft.study.scenario_builder import ScenarioBuilder
 
 # Load from file
 sb = ScenarioBuilder.load(Path("my_study/input/data-series/modeler-scenariobuilder.dat"))

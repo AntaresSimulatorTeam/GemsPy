@@ -13,16 +13,16 @@ from typing import Set
 
 import pytest
 
-from gems.expression import ExpressionNode, literal, param, print_expr, var
-from gems.expression.equality import expressions_equal
-from gems.expression.expression import (
+from gems_runner.expression import ExpressionNode, literal, param, print_expr, var
+from gems_runner.expression.equality import expressions_equal
+from gems_runner.expression.expression import (
     DualNode,
     ReducedCostNode,
     maximum,
     minimum,
     port_field,
 )
-from gems.expression.parsing.parse_expression import (
+from gems_runner.expression.parsing.parse_expression import (
     ModelIdentifiers,
     ParsingException,
     parse_expression,

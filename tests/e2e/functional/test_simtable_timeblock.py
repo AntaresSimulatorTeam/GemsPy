@@ -25,10 +25,10 @@ Test: `test_simtable_on_partial_timeblock`
 import pandas as pd
 import pytest
 
-from gems.model.library import Library
-from gems.simulation import TimeBlock, build_problem
-from gems.simulation.simulation_table import SimulationColumns, SimulationTableBuilder
-from gems.study import (
+from gems_runner.model.library import Library
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.simulation.simulation_table import SimulationColumns, SimulationTableBuilder
+from gems_runner.study import (
     Component,
     ConstantData,
     DataBase,

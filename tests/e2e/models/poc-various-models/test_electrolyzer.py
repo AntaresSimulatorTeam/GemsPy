@@ -10,22 +10,17 @@
 #
 # This file is part of the Antares project.
 
+from gems_runner.model import Constraint, ModelPort, PortField, PortType, float_parameter, float_variable
 from libs.standard import CONSTANT, TIME_AND_SCENARIO_FREE
 
-from gems.expression import literal, param, var
-from gems.expression.expression import port_field
-from gems.model import (
-    Constraint,
-    ModelPort,
-    PortField,
-    PortType,
-    float_parameter,
-    float_variable,
+from gems_runner.expression import literal, param, var
+from gems_runner.expression.expression import port_field
+from gems_runner.model import (
     model,
 )
-from gems.model.port import PortFieldDefinition, PortFieldId
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_runner.model.port import PortFieldDefinition, PortFieldId
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.study import (
     Component,
     ConstantData,
     DataBase,

@@ -33,9 +33,9 @@ parameters, and solves the problem. Assertions are made to ensure the solver's r
 import pandas as pd
 import pytest
 
-from gems.model.library import Library
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_runner.model.library import Library
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.study import (
     Component,
     ConstantData,
     DataBase,

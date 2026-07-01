@@ -3,8 +3,8 @@ import time
 import numpy as np
 import pandas as pd
 
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.study import (
     Component,
     ConstantData,
     DataBase,

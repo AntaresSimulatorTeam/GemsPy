@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from gems.model.parsing import parse_yaml_library
-from gems.model.taxonomy import (
+from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.resolve_library import (
     Taxonomy,
     TaxonomyCategory,
     TaxonomyItem,

@@ -80,15 +80,16 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from gems.expression import literal, param, var
-from gems.expression.indexing_structure import IndexingStructure
-from gems.model import ModelPort, float_parameter, float_variable, model
-from gems.model.constraint import Constraint
-from gems.model.parsing import parse_yaml_library
-from gems.model.port import PortFieldDefinition, PortFieldId
-from gems.model.resolve_library import resolve_library
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_runner.expression import literal, param, var
+from gems_runner.expression.indexing_structure import IndexingStructure
+from gems_runner.model import model
+from gems_runner.model.constraint import Constraint
+from gems_craft.model.parsing import parse_yaml_library
+from gems_runner.model.port import PortFieldDefinition, PortFieldId
+from gems_runner.model.resolve_library import resolve_library
+from gems_runner.model import ModelPort, float_parameter, float_variable
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.study import (
     Component,
     ConstantData,
     DataBase,
@@ -98,8 +99,8 @@ from gems.study import (
     TimeScenarioSeriesData,
     create_component,
 )
-from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import (
+from gems_craft.study.parsing import parse_yaml_components
+from gems_runner.study.resolve_components import (
     build_data_base,
     consistency_check,
     resolve_system,

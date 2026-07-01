@@ -12,7 +12,7 @@
 
 import pytest
 
-from gems.expression import (
+from gems_runner.expression import (
     AdditionNode,
     DivisionNode,
     EvaluationContext,
@@ -29,8 +29,8 @@ from gems.expression import (
     var,
     visit,
 )
-from gems.expression.equality import expressions_equal
-from gems.expression.expression import DualNode, ReducedCostNode
+from gems_runner.expression.equality import expressions_equal
+from gems_runner.expression.expression import DualNode, ReducedCostNode
 
 
 def test_ast() -> None:
@@ -66,7 +66,7 @@ def test_sum_expressions() -> None:
 
 
 def test_floor_ceil_max_min() -> None:
-    from gems.expression.expression import maximum, minimum
+    from gems_runner.expression.expression import maximum, minimum
 
     context = EvaluationContext(parameters={"p": 2.7, "q": 1.3})
 

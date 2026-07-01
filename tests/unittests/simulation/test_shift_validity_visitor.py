@@ -16,9 +16,9 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from gems.expression.expression import literal, param, var
-from gems.expression.visitor import visit
-from gems.simulation.vectorized_builder import ShiftValidityVisitor
+from gems_runner.expression.expression import literal, param, var
+from gems_runner.expression.visitor import visit
+from gems_runner.simulation.vectorized_builder import ShiftValidityVisitor
 
 
 def _visitor(param_arrays=None, block_length=4):

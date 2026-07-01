@@ -331,7 +331,7 @@ You can load, inspect, and build the config programmatically:
 
 ~~~ python
 from pathlib import Path
-from gems.optim_config import (
+from gems_craft.optim_config import (
     load_optim_config,
     OptimConfig,
     ResolutionConfig,
@@ -362,8 +362,8 @@ config_pf = OptimConfig(
 )
 
 # Pass to SimulationSession
-from gems.session import SimulationSession
-from gems.study.folder import load_study
+from gems_runner.session import SimulationSession
+from gems_runner.study.folder import load_study
 
 study = load_study(Path("my_study"))
 session = SimulationSession(study=study, optim_config=config)

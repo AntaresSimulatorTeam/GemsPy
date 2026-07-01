@@ -6,9 +6,9 @@
 
 ~~~ python
 from pathlib import Path
-from gems.study.folder import load_study
-from gems.session import SimulationSession
-from gems.optim_config import load_optim_config
+from gems_runner.study.folder import load_study
+from gems_runner.session import SimulationSession
+from gems_craft.optim_config import load_optim_config
 
 study = load_study(Path("my_study"))
 optim_config = load_optim_config(Path("my_study/input/optim-config.yml"))
@@ -22,7 +22,7 @@ results = session.run()  # SimulationTable
 When using `build_problem()` directly, build the table from the solved problem:
 
 ~~~ python
-from gems.simulation.simulation_table import SimulationTableBuilder
+from gems_runner.simulation.simulation_table import SimulationTableBuilder
 
 results = SimulationTableBuilder().build(problem)
 ~~~

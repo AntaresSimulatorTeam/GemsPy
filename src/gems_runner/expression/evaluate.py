@@ -1,0 +1,153 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+import math
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import Dict
+
+from gems_runner.expression.expression import (
+    AbsNode,
+    AllTimeSumNode,
+    CeilNode,
+    DualNode,
+    FloorNode,
+    MaxNode,
+    MinNode,
+    PortFieldAggregatorNode,
+    PortFieldNode,
+    ReducedCostNode,
+    RoundNode,
+    TimeEvalNode,
+    TimeShiftNode,
+    TimeSumNode,
+)
+
+from .expression import (
+    ComparisonNode,
+    ExpressionNode,
+    LiteralNode,
+    ParameterNode,
+    ScenarioOperatorNode,
+    VariableNode,
+)
+from .indexing import IndexingStructureProvider
+from .visitor import ExpressionVisitorOperations, visit
+
+
+class ValueProvider(ABC):
+    """
+    Implementations are in charge of mapping parameters and variables to their values.
+    Depending on the implementation, evaluation may require a component id or not.
+    """
+
+    @abstractmethod
+    def get_variable_value(self, name: str) -> float: ...
+
+    @abstractmethod
+    def get_parameter_value(self, name: str) -> float: ...
+
+
+@dataclass(frozen=True)
+class EvaluationContext(ValueProvider):
+    """
+    Simple value provider relying on dictionaries.
+    Does not support component variables/parameters.
+    """
+
+    variables: Dict[str, float] = field(default_factory=dict)
+    parameters: Dict[str, float] = field(default_factory=dict)
+
+    def get_variable_value(self, name: str) -> float:
+        return self.variables[name]
+
+    def get_parameter_value(self, name: str) -> float:
+        return self.parameters[name]
+
+
+@dataclass(frozen=True)
+class EvaluationVisitor(ExpressionVisitorOperations[float]):
+    """
+    Evaluates the expression with respect to the provided context
+    (variables and parameters values).
+    """
+
+    context: ValueProvider
+
+    def literal(self, node: LiteralNode) -> float:
+        return node.value
+
+    def comparison(self, node: ComparisonNode) -> float:
+        raise ValueError("Cannot evaluate comparison operator.")
+
+    def variable(self, node: VariableNode) -> float:
+        return self.context.get_variable_value(node.name)
+
+    def parameter(self, node: ParameterNode) -> float:
+        return self.context.get_parameter_value(node.name)
+
+    def time_shift(self, node: TimeShiftNode) -> float:
+        raise NotImplementedError()
+
+    def time_eval(self, node: TimeEvalNode) -> float:
+        raise NotImplementedError()
+
+    def time_sum(self, node: TimeSumNode) -> float:
+        raise NotImplementedError()
+
+    def all_time_sum(self, node: AllTimeSumNode) -> float:
+        raise NotImplementedError()
+
+    def scenario_operator(self, node: ScenarioOperatorNode) -> float:
+        raise NotImplementedError()
+
+    def port_field(self, node: PortFieldNode) -> float:
+        raise NotImplementedError()
+
+    def port_field_aggregator(self, node: PortFieldAggregatorNode) -> float:
+        raise NotImplementedError()
+
+    def floor(self, node: FloorNode) -> float:
+        return float(math.floor(visit(node.operand, self)))
+
+    def ceil(self, node: CeilNode) -> float:
+        return float(math.ceil(visit(node.operand, self)))
+
+    def abs(self, node: AbsNode) -> float:
+        value: float = visit(node.operand, self)
+        return abs(value)
+
+    def round(self, node: RoundNode) -> float:
+        value: float = visit(node.operand, self)
+        return float(round(value))
+
+    def maximum(self, node: MaxNode) -> float:
+        return max(visit(op, self) for op in node.operands)
+
+    def minimum(self, node: MinNode) -> float:
+        return min(visit(op, self) for op in node.operands)
+
+    def dual(self, node: DualNode) -> float:
+        raise NotImplementedError("dual() is not statically evaluable.")
+
+    def reduced_cost(self, node: ReducedCostNode) -> float:
+        raise NotImplementedError("reduced_cost() is not statically evaluable.")
+
+
+def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:
+    return visit(expression, EvaluationVisitor(value_provider))
+
+
+class EvaluationError(Exception):
+    """Raised when an expression cannot be evaluated due to missing context or math errors."""
+
+    pass

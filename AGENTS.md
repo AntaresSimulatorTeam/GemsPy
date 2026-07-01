@@ -38,15 +38,15 @@ gemspy \
   --scenarios    1
 
 # Python API — directory-based study
-from gems.study.folder import load_study
-from gems.study.runner import run_study
+from gems_runner.study.folder import load_study
+from gems_runner.study.runner import run_study
 
 study = load_study(Path("path/to/study_dir"))   # reads input/, model-libraries/, data-series/
 run_study(Path("path/to/study_dir"))            # loads study, solves, writes CSV to output/
 
 # Python API — programmatic study
-from gems.study import Study
-from gems.simulation import build_problem, TimeBlock
+from gems_runner.study import Study
+from gems_runner.simulation import build_problem, TimeBlock
 
 study = Study(system=system, database=database)
 problem = build_problem(study, TimeBlock(1, list(range(8760))), scenarios=1)

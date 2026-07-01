@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from gems.study.data import (
+from gems_runner.study.data import (
     ConstantData,
     DataBase,
     ScenarioSeriesData,
@@ -27,11 +27,11 @@ from gems.study.data import (
     TimeSeriesData,
     dataframe_to_scenario_series,
     dataframe_to_time_series,
-    load_ts_from_file,
 )
-from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import _build_data, build_data_base
-from gems.study.scenario_builder import ScenarioBuilder
+from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.scenario_builder import ScenarioBuilder
+from gems_craft.study.timeseries import load_ts_from_file
+from gems_runner.study.resolve_components import _build_data, build_data_base
 
 # ---------------------------------------------------------------------------
 # load_ts_from_file
@@ -210,7 +210,7 @@ def test_build_data_base_param_group_overrides_component_group(
         tmp_path,
         scenario_builder=sb,
     )
-    from gems.study.data import ComponentParameterIndex
+    from gems_runner.study.data import ComponentParameterIndex
 
     # p_max has param-group; cost has component-group (constant so group is irrelevant)
     idx_pmax = ComponentParameterIndex("G", "p_max")
@@ -250,7 +250,7 @@ def test_database_get_value_constant_returns_scalar() -> None:
     """get_value on ConstantData returns a plain float, not a numpy array."""
     db = DataBase()
     db.add_data("C", "val", ConstantData(7.5))
-    from gems.study.data import ComponentParameterIndex
+    from gems_runner.study.data import ComponentParameterIndex
 
     result = db.get_value(ComponentParameterIndex("C", "val"), 0, 0)
     assert result == 7.5

@@ -17,29 +17,24 @@ This file tests that the modeller is able to generate investment problems proble
 import pandas as pd
 import pytest
 
-from gems.expression.expression import literal, param, var
-from gems.expression.indexing_structure import IndexingStructure
-from gems.model import (
-    Constraint,
-    Model,
-    ModelPort,
-    float_parameter,
-    float_variable,
-    int_variable,
+from gems_runner.expression.expression import literal, param, var
+from gems_runner.expression.indexing_structure import IndexingStructure
+from gems_runner.model import (
     model,
 )
-from gems.model.port import PortFieldDefinition, PortFieldId
-from gems.optim_config.parsing import (
+from gems_runner.model.port import PortFieldDefinition, PortFieldId
+from gems_craft.optim_config.parsing import (
     ElementLocation,
     ElementLocationConfig,
     ModelDecompositionConfig,
     ModelOptimConfig,
     OptimConfig,
-    validate_optim_config,
 )
-from gems.simulation import TimeBlock, build_problem
-from gems.simulation.simulation_table import SimulationTableBuilder
-from gems.study import (
+from gems_runner.optim_config import validate_optim_config
+from gems_runner.model import Constraint, Model, ModelPort, float_parameter, float_variable, int_variable
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.simulation.simulation_table import SimulationTableBuilder
+from gems_runner.study import (
     Component,
     ConstantData,
     DataBase,

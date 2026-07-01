@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from gems.model.parsing import parse_yaml_library
-from gems.model.resolve_library import resolve_library
+from gems_craft.model.parsing import parse_yaml_library
+from gems_runner.model.resolve_library import resolve_library
 
 # in following tests "lib_A -> lib_B" means lib_A must be resolved before lib_B
 
