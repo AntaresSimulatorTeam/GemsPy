@@ -165,7 +165,6 @@ Each port-type of an hybrid library YAML may carry two additional sub-fields:
 library:
   id: my_lib
   version: "1.0"
-  taxonomy: power-system
   port-types:
     - id: flow
       fields:

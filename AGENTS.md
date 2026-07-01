@@ -17,7 +17,7 @@ uv sync --group dev
 ```bash
 uv run pytest                                          # run all tests
 uv run pytest tests/path/to/test_file.py::test_name   # run a single test
-uv run pytest --cov gems --cov-report xml             # with coverage
+uv run pytest --cov gems_craft --cov gems_runner --cov gems_craft_hybrid --cov-report xml  # with coverage
 ```
 
 **Lint & Format:**
@@ -44,7 +44,7 @@ from gems_runner.study import Study
 from gems_runner.simulation import build_problem, TimeBlock
 
 study = Study(system=system, database=database)
-problem = build_problem(study, TimeBlock(1, list(range(8760))), scenarios=1)
+problem = build_problem(study, TimeBlock(1, list(range(8760))), scenario_ids=[0])
 problem.solve(solver_name="highs")
 ```
 
@@ -81,11 +81,11 @@ The source tree is split into three packages under `src/`:
 
 Extends `gems_craft` schemas for hybrid GEMS studies. **Hybrid studies cannot be simulated with GemsPy** — simulation support is not yet implemented.
 
-**`study/`** — `HybridSystemSchema(SystemSchema)`: adds `area-connections`.
-- Key functions: `load_yaml_system(path, HybridSystemSchema)`, `write_yaml_system(system, path)`
+**`study/`** — `HybridSystemSchema(SystemSchema)`: adds `area-connections` and `thermal-capacity-connections`.
+- Use `load_yaml_system(path, HybridSystemSchema)` and `write_yaml_system(system, path)` from `gems_craft`
 
-**`model/`** — `HybridLibrarySchema(LibrarySchema)`: adds `version`, `taxonomy`, and `area-connection` in port-types.
-- Key functions: `load_yaml_library(path, HybridLibrarySchema)`, `write_yaml_library(library, path)`
+**`model/`** — `HybridPortTypeSchema(PortTypeSchema)`: adds `area-connection` and `thermal-capacity-connection`. `HybridLibrarySchema(LibrarySchema)`: overrides `port-types` with `HybridPortTypeSchema`.
+- Use `load_yaml_library(path, HybridLibrarySchema)` and `write_yaml_library(library, path)` from `gems_craft`
 
 #### `gems_runner/` — Solver and execution (depends on `gems_craft`)
 

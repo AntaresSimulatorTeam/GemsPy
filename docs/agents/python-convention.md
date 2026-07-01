@@ -9,8 +9,9 @@
   is run with `disallow_untyped_defs = true` and `disallow_untyped_calls = true` (see `mypy.ini`).
 - **Dataclasses**: Prefer `@dataclass(frozen=True)` for value objects (expression nodes, model
   definitions). Mutability must be justified explicitly.
-- **Pydantic**: Use `ConfigDict(alias_generator=to_camel)` or kebab-case alias generation for YAML
-  round-tripping; use Pydantic v2 APIs only.
+- **Pydantic**: Use `ModifiedBaseModel` (from `gems_craft.utils`) which applies kebab-case alias
+  generation via `alias_generator=_to_kebab` and `extra="forbid"`. Use Pydantic v2 APIs only.
+  Serialize with `model_dump(by_alias=True, exclude_none=True, mode="json")` for YAML output.
 - **Naming**:
   - Classes: `PascalCase`
   - Functions / variables: `snake_case` — use descriptive names; avoid single-letter or two-letter
@@ -28,7 +29,7 @@
 Rules for automated agents (CI bots, AI coding assistants, Dependabot, etc.):
 
 1. **Never auto-merge** to `main`; all changes require at least one human review.
-2. **Do not edit generated files** under `src/gems/expression/parsing/antlr/`; regenerate them
+2. **Do not edit generated files** under `src/gems_runner/expression/parsing/antlr/`; regenerate them
    from `grammar/Expr.g4` instead.
 3. **Do not modify `pyproject.toml` version** manually; version bumps are handled via the
    `feat(release):` commit workflow.

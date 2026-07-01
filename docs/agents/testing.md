@@ -14,6 +14,8 @@ in `tests/` sub-directories. No mocking of the solver—tests use real HiGHS cal
 | Unit — libraries | `tests/unittests/lib_parsing/` | Model library YAML parsing |
 | Unit — system | `tests/unittests/system/` | Model, network, and port object behaviour |
 | Unit — system parsing | `tests/unittests/system_parsing/` | System YAML parsing |
+| Unit — gems_craft | `tests/unittests/gems_craft/` | Read/write roundtrips for system, library, optim-config, scenario builder |
+| Unit — gems_craft_hybrid | `tests/unittests/gems_craft_hybrid/` | Hybrid system and library parsing (HybridSystemSchema, HybridLibrarySchema) |
 | Unit — scenario builder | `tests/unittests/scenario_builder/` | Scenario and time-series builder |
 | Integration | `tests/unittests/simulation/` | Full problem build + solve on small networks |
 | End-to-end — functional | `tests/e2e/functional/` | Cross-cutting tests: library/system combinations, stochastic, investment, scenario builder |
