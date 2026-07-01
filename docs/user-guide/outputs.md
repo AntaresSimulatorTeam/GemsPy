@@ -83,3 +83,20 @@ results.to_parquet(Path("output/"))   # writes Parquet files
 results.to_netcdf(Path("output/"))    # writes a NetCDF file
 ds = results.to_dataset()             # returns an xarray Dataset
 ~~~
+
+---
+
+## Reloading previously saved results
+
+`SimulationTable` wraps a plain pandas DataFrame, so reloading a CSV is straightforward:
+
+~~~ python
+import pandas as pd
+from gems_craft.simulation_table.simulation_table import SimulationTable
+
+df = pd.read_csv(Path("output/20240101T1200/simulation_table_20240101T1200.csv"))
+results = SimulationTable(df)
+
+# then use the normal accessor API
+results.component("gen_de").output("generation").value(scenario_index=0)
+~~~

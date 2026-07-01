@@ -138,3 +138,11 @@ col_indices = sb.resolve_vectorized(None, mc_scenarios)
     `resolve_vectorized` works with **0-based** indices internally, even though
     the `.dat` file uses 1-based numbering.  The conversion is handled
     automatically by `ScenarioBuilder.load()`.
+
+## Writing a scenario builder
+
+Use `dump()` to write a `ScenarioBuilder` back to disk in the standard `.dat` format:
+
+~~~ python
+sb.dump(Path("my_study/input/data-series/modeler-scenariobuilder.dat"))
+~~~

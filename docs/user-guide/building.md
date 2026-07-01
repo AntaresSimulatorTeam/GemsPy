@@ -111,3 +111,14 @@ input_system = SystemSchema(
 ~~~
 
 The `input_system` variable can then be used in the same way as when it was created using the [parse_yaml_components](inputs.md) method.
+
+## Writing a SystemSchema to file
+
+Once you have built or modified a `SystemSchema`, you can save it as a `system.yml` file:
+
+~~~ python
+from pathlib import Path
+from gems_craft.study.parsing import write_yaml_system
+
+write_yaml_system(input_system, Path("my_study/input/system.yml"))
+~~~
