@@ -12,7 +12,6 @@
 
 from typing import List, Optional
 
-
 from gems_craft.study.parsing import SystemSchema
 from gems_craft.utils import ModifiedBaseModel
 

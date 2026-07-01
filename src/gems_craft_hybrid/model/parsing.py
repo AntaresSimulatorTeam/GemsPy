@@ -34,4 +34,4 @@ class HybridPortTypeSchema(PortTypeSchema):
 
 
 class HybridLibrarySchema(LibrarySchema):
-    port_types: List[HybridPortTypeSchema] = Field(default_factory=list)
+    port_types: List[HybridPortTypeSchema] = Field(default_factory=list)  # type: ignore[assignment]

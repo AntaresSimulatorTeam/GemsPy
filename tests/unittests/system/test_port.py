@@ -14,9 +14,8 @@ import pytest
 
 from gems_runner.expression import literal
 from gems_runner.expression.expression import port_field
-from gems_runner.model import model
+from gems_runner.model import Constraint, ModelPort, PortType, model
 from gems_runner.study import Component, PortRef, PortsConnection, create_component
-from gems_runner.model import Constraint, ModelPort, PortType
 from tests.unittests.system.libs.standard import DEMAND_MODEL
 
 

@@ -13,7 +13,7 @@
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, TextIO, Type, TypeVar, Union
+from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
 
 from pydantic import Field, ValidationError
 from yaml import safe_dump, safe_load
@@ -59,12 +59,24 @@ class SystemSchema(ModifiedBaseModel):
 _S = TypeVar("_S", bound=SystemSchema)
 
 
-def _parse_yaml_components(input_study: TextIO, schema: Type[_S] = SystemSchema) -> _S:
+@overload
+def _parse_yaml_components(input_study: TextIO) -> SystemSchema: ...
+@overload
+def _parse_yaml_components(input_study: TextIO, schema: Type[_S]) -> _S: ...
+def _parse_yaml_components(
+    input_study: TextIO, schema: Type[SystemSchema] = SystemSchema
+) -> SystemSchema:
     tree = safe_load(input_study)
     return schema.model_validate(tree["system"])
 
 
-def load_yaml_system(path: Path, schema: Type[_S] = SystemSchema) -> _S:
+@overload
+def load_yaml_system(path: Path) -> SystemSchema: ...
+@overload
+def load_yaml_system(path: Path, schema: Type[_S]) -> _S: ...
+def load_yaml_system(
+    path: Path, schema: Type[SystemSchema] = SystemSchema
+) -> SystemSchema:
     try:
         with path.open() as f:
             return _parse_yaml_components(f, schema)

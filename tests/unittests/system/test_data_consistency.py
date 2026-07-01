@@ -16,9 +16,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from gems_craft.study.timeseries import load_ts_from_file
 from gems_runner.expression import param, var
 from gems_runner.expression.indexing_structure import IndexingStructure
 from gems_runner.model import (
+    Constraint,
+    Model,
+    ModelPort,
+    float_parameter,
+    float_variable,
     model,
 )
 from gems_runner.model.port import PortFieldDefinition, PortFieldId
@@ -34,14 +40,6 @@ from gems_runner.study import (
     TimeScenarioSeriesData,
     TimeSeriesData,
     create_component,
-)
-from gems_craft.study.timeseries import load_ts_from_file
-from gems_runner.model import (
-    Constraint,
-    Model,
-    ModelPort,
-    float_parameter,
-    float_variable,
 )
 from tests.unittests.system.libs.standard import (
     BALANCE_PORT_TYPE,

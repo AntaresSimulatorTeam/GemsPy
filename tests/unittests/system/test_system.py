@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from gems_runner.model.library import Library
 from gems_craft.model.parsing import load_yaml_library
+from gems_runner.model.library import Library
 from gems_runner.model.resolve_library import resolve_library
 from gems_runner.study.system import Component, System
 

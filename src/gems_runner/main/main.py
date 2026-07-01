@@ -13,14 +13,14 @@
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from gems_runner.model.library import Library
-from gems_craft.model.parsing import load_yaml_library
-from gems_runner.model.resolve_library import resolve_library
+from gems_craft.model.parsing import LibrarySchema, load_yaml_library
 from gems_craft.optim_config.parsing import OptimConfig
+from gems_craft.study.parsing import load_yaml_system, parse_cli
+from gems_runner.model.library import Library
+from gems_runner.model.resolve_library import resolve_library
 from gems_runner.simulation import DecomposedProblems, build_couplings, dump_couplings
 from gems_runner.study import Study
 from gems_runner.study.data import DataBase
-from gems_craft.study.parsing import parse_cli, load_yaml_system
 from gems_runner.study.resolve_components import build_data_base, resolve_system
 from gems_runner.study.runner import run_study
 from gems_runner.study.system import System
@@ -30,7 +30,7 @@ def input_libs(yaml_lib_paths: List[Path]) -> Dict[str, Library]:
     yaml_libraries = []
     yaml_library_ids = set()
     for path in yaml_lib_paths:
-        yaml_lib = load_yaml_library(path)
+        yaml_lib: LibrarySchema = load_yaml_library(path)
         if yaml_lib.id in yaml_library_ids:
             raise ValueError(f"The identifier '{yaml_lib.id}' is defined twice")
         yaml_libraries.append(yaml_lib)

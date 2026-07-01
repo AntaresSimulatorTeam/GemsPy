@@ -12,6 +12,14 @@
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
+from gems_craft.study.parsing import (
+    ComponentPropertySchema,
+    ComponentSchema,
+    PortConnectionsSchema,
+    SystemSchema,
+)
+from gems_craft.study.scenario_builder import ScenarioBuilder
+from gems_craft.study.timeseries import load_ts_from_file
 from gems_runner.model import Model
 from gems_runner.model.library import Library
 from gems_runner.study import (
@@ -29,14 +37,6 @@ from gems_runner.study.data import (
     dataframe_to_scenario_series,
     dataframe_to_time_series,
 )
-from gems_craft.study.parsing import (
-    ComponentPropertySchema,
-    ComponentSchema,
-    PortConnectionsSchema,
-    SystemSchema,
-)
-from gems_craft.study.scenario_builder import ScenarioBuilder
-from gems_craft.study.timeseries import load_ts_from_file
 
 
 def _resolve_properties_raw_to_dict(

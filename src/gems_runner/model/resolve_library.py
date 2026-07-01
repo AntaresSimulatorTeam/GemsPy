@@ -11,6 +11,17 @@
 # This file is part of the Antares project.
 from typing import Dict, List, Optional, Set
 
+from gems_craft.model.parsing import (
+    ConstraintSchema,
+    FieldSchema,
+    LibrarySchema,
+    ModelPortSchema,
+    ModelSchema,
+    ParameterSchema,
+    PortFieldDefinitionSchema,
+    PortTypeSchema,
+    VariableSchema,
+)
 from gems_runner.expression import ExpressionNode, literal
 from gems_runner.expression.degree import is_linear
 from gems_runner.expression.expression import (
@@ -58,28 +69,7 @@ from gems_runner.model import (
 )
 from gems_runner.model.library import Library
 from gems_runner.model.model import model
-from gems_craft.model.parsing import (
-    ConstraintSchema,
-    FieldSchema,
-    LibrarySchema,
-    ModelPortSchema,
-    ModelSchema,
-    ParameterSchema,
-    PortFieldDefinitionSchema,
-    PortTypeSchema,
-    VariableSchema,
-)
 from gems_runner.model.port import PortFieldDefinition, port_field_def
-from gems_runner.model import (
-    Constraint,
-    Model,
-    ModelPort,
-    Parameter,
-    PortField,
-    PortType,
-    ValueType,
-    Variable,
-)
 
 
 def resolve_library(

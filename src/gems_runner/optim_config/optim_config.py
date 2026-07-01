@@ -12,7 +12,12 @@
 
 from typing import TYPE_CHECKING, List, Optional, Set
 
-
+from gems_craft.optim_config.parsing import (
+    ElementLocation,
+    ModelDecompositionConfig,
+    OptimConfig,
+    OutOfBoundsProcessingConfig,
+)
 from gems_runner.expression.expression import (
     AdditionNode,
     BinaryOperatorNode,
@@ -22,16 +27,10 @@ from gems_runner.expression.expression import (
     UnaryOperatorNode,
     VariableNode,
 )
-from gems_craft.optim_config.parsing import (
-    ElementLocation,
-    OutOfBoundsProcessingConfig,
-    ModelDecompositionConfig,
-    OptimConfig,
-)
 
 if TYPE_CHECKING:
-    from gems_runner.model.model import Model
     from gems_craft.study.scenario_builder import ScenarioBuilder
+    from gems_runner.model.model import Model
     from gems_runner.study.system import System
 
 _MASTER_LOCS: Set[ElementLocation] = {

@@ -6,11 +6,11 @@ import numpy as np
 import pandas as pd
 
 from gems_craft.model.parsing import load_yaml_library
+from gems_craft.study.parsing import load_yaml_system
 from gems_runner.model.resolve_library import resolve_library
 from gems_runner.simulation import TimeBlock, build_problem
 from gems_runner.study import Study
 from gems_runner.study.data import DataBase
-from gems_craft.study.parsing import load_yaml_system
 from gems_runner.study.resolve_components import (
     build_data_base,
     consistency_check,

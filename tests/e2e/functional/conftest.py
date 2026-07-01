@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 
 from gems_craft.model.parsing import LibrarySchema, load_yaml_library
-from gems_runner.model.resolve_library import Library, resolve_library
 from gems_craft.study.parsing import SystemSchema, load_yaml_system
+from gems_runner.model.resolve_library import Library, resolve_library
 
 
 @pytest.fixture(scope="session")

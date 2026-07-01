@@ -18,12 +18,12 @@ import pandas as pd
 import pytest
 
 from gems_craft.model.parsing import LibrarySchema, load_yaml_library
+from gems_craft.study.parsing import load_yaml_system
 from gems_runner.model.resolve_library import resolve_library
 from gems_runner.simulation import build_problem
 from gems_runner.simulation.simulation_table import SimulationTableBuilder
 from gems_runner.simulation.time_block import TimeBlock
 from gems_runner.study import Study
-from gems_craft.study.parsing import load_yaml_system
 from gems_runner.study.resolve_components import build_data_base, resolve_system
 
 

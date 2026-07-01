@@ -15,9 +15,9 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Dict, List
 
+from gems_craft.study.scenario_builder import ScenarioBuilder
 from gems_runner.model.model import Model
 from gems_runner.study.data import DataBase
-from gems_craft.study.scenario_builder import ScenarioBuilder
 from gems_runner.study.system import Component, System
 
 

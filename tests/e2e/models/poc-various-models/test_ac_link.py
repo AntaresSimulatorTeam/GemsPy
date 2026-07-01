@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 from libs.standard import BALANCE_PORT_TYPE, DEMAND_MODEL, GENERATOR_MODEL
 
-from gems_runner.model.library import Library, library
 from gems_craft.model.parsing import load_yaml_library
+from gems_runner.model.library import Library, library
 from gems_runner.model.resolve_library import resolve_library
 from gems_runner.simulation import TimeBlock, build_problem
 from gems_runner.simulation.simulation_table import SimulationTableBuilder

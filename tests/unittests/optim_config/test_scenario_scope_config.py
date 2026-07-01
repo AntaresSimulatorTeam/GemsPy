@@ -391,8 +391,8 @@ def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
     import numpy as np
 
     from gems_craft.optim_config.parsing import OptimConfig
-    from gems_runner.optim_config import validate_optim_config
     from gems_craft.study.scenario_builder import ScenarioBuilder
+    from gems_runner.optim_config import validate_optim_config
     from gems_runner.study.system import System
 
     config = OptimConfig.model_validate(
@@ -410,8 +410,8 @@ def test_validate_optim_config_scenario_builder_accepts_valid_playlist() -> None
     import numpy as np
 
     from gems_craft.optim_config.parsing import OptimConfig
-    from gems_runner.optim_config import validate_optim_config
     from gems_craft.study.scenario_builder import ScenarioBuilder
+    from gems_runner.optim_config import validate_optim_config
     from gems_runner.study.system import System
 
     config = OptimConfig.model_validate(

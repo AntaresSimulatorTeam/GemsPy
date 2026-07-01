@@ -131,7 +131,9 @@ def test_load_yaml_hybrid_library_parses_thermal_capacity_connection() -> None:
     )
 
 
-def test_load_yaml_hybrid_library_port_type_without_thermal_capacity_connection() -> None:
+def test_load_yaml_hybrid_library_port_type_without_thermal_capacity_connection() -> (
+    None
+):
     lib = load_yaml_library(FIXTURES / "hybrid_lib.yml", HybridLibrarySchema)
     signal_port = next(pt for pt in lib.port_types if pt.id == "signal")
     assert signal_port.thermal_capacity_connection is None
@@ -150,4 +152,6 @@ def test_load_yaml_hybrid_system_parses_thermal_capacity_connections() -> None:
     assert isinstance(conn, ThermalCapacityConnectionSchema)
     assert conn.component == "G"
     assert conn.port == "injection_port"
-    assert conn.thermal_component == ThermalComponentSchema(area="fr", cluster_id="nuclear1")
+    assert conn.thermal_component == ThermalComponentSchema(
+        area="fr", cluster_id="nuclear1"
+    )

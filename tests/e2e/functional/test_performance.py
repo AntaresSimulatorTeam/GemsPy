@@ -18,8 +18,7 @@ import pandas as pd
 
 from gems_runner.expression.expression import ExpressionNode, literal, param, var
 from gems_runner.expression.indexing_structure import IndexingStructure
-from gems_runner.model import model
-from gems_runner.model import float_parameter, float_variable
+from gems_runner.model import float_parameter, float_variable, model
 from gems_runner.simulation import TimeBlock, build_problem
 from gems_runner.study import (
     Component,

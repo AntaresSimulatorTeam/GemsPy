@@ -1,7 +1,6 @@
 library:
   id: hybrid_basic
   version: "1.0"
-  taxonomy: power-system
   port-types:
     - id: flow
       description: A port which transfers power flow

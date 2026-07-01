@@ -8,11 +8,9 @@ import pandas as pd
 import xarray as xr
 
 from gems_craft.simulation_table.simulation_table import (
-    SimulationTable,
     SimulationColumns,
+    SimulationTable,
 )
-
-
 from gems_runner.expression.visitor import visit
 from gems_runner.simulation.extra_output import VectorizedExtraOutputBuilder
 from gems_runner.simulation.optimization import OptimizationProblem, build_port_arrays

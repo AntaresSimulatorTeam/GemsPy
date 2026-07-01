@@ -15,11 +15,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from gems_craft.study.parsing import load_yaml_system
+from gems_craft.study.scenario_builder import ScenarioBuilder
 from gems_runner.study import DataBase
 from gems_runner.study.data import ComponentParameterIndex
-from gems_craft.study.parsing import load_yaml_system
 from gems_runner.study.resolve_components import build_data_base
-from gems_craft.study.scenario_builder import ScenarioBuilder
 
 
 @pytest.fixture(scope="session")

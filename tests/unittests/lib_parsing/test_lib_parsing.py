@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from gems_craft.model.parsing import _parse_yaml_library, load_yaml_library
 from gems_runner.expression import literal, param, var
 from gems_runner.expression.equality import (
     expressions_equal,
@@ -29,12 +30,6 @@ from gems_runner.expression.expression import (
 from gems_runner.expression.indexing_structure import IndexingStructure
 from gems_runner.expression.parsing.parse_expression import ParsingException
 from gems_runner.model import (
-    model,
-)
-from gems_runner.model.model import PortFieldDefinition, PortFieldId
-from gems_craft.model.parsing import _parse_yaml_library, load_yaml_library
-from gems_runner.model.resolve_library import resolve_library
-from gems_runner.model import (
     Constraint,
     ModelPort,
     PortField,
@@ -42,7 +37,10 @@ from gems_runner.model import (
     ValueType,
     float_parameter,
     float_variable,
+    model,
 )
+from gems_runner.model.model import PortFieldDefinition, PortFieldId
+from gems_runner.model.resolve_library import resolve_library
 
 CONSTANT = IndexingStructure(False, False)
 

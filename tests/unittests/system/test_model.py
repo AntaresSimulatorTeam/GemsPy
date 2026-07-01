@@ -23,11 +23,10 @@ from gems_runner.expression.expression import (
     var,
 )
 from gems_runner.expression.indexing_structure import IndexingStructure
-from gems_runner.model import model
+from gems_runner.model import Constraint, float_variable, model
 from gems_runner.model.common import ValueType
 from gems_runner.model.port import port_field_def
 from gems_runner.model.variable import bool_var, int_variable
-from gems_runner.model import Constraint, float_variable
 
 
 @pytest.mark.parametrize(

@@ -11,11 +11,12 @@
 # This file is part of the Antares project.
 import typing
 from dataclasses import dataclass
-from typing import List, Optional, Type, TypeVar
+from pathlib import Path
+from typing import List, Optional, Type, TypeVar, overload
 
 from pydantic import ConfigDict, Field, ValidationError
 from yaml import safe_dump, safe_load
-from pathlib import Path
+
 from gems_craft.utils import ModifiedBaseModel
 
 
@@ -112,7 +113,13 @@ class LibrarySchema(ModifiedBaseModel):
 _L = TypeVar("_L", bound=LibrarySchema)
 
 
-def _parse_yaml_library(input: typing.TextIO, schema: Type[_L] = LibrarySchema) -> _L:
+@overload
+def _parse_yaml_library(input: typing.TextIO) -> LibrarySchema: ...
+@overload
+def _parse_yaml_library(input: typing.TextIO, schema: Type[_L]) -> _L: ...
+def _parse_yaml_library(
+    input: typing.TextIO, schema: Type[LibrarySchema] = LibrarySchema
+) -> LibrarySchema:
     tree = safe_load(input)
     try:
         return schema.model_validate(tree["library"])
@@ -120,7 +127,13 @@ def _parse_yaml_library(input: typing.TextIO, schema: Type[_L] = LibrarySchema) 
         raise ValueError(f"An error occurred during parsing: {e}")
 
 
-def load_yaml_library(path: Path, schema: Type[_L] = LibrarySchema) -> _L:
+@overload
+def load_yaml_library(path: Path) -> LibrarySchema: ...
+@overload
+def load_yaml_library(path: Path, schema: Type[_L]) -> _L: ...
+def load_yaml_library(
+    path: Path, schema: Type[LibrarySchema] = LibrarySchema
+) -> LibrarySchema:
     with path.open() as f:
         return _parse_yaml_library(f, schema)
 

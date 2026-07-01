@@ -16,8 +16,8 @@ import numpy as np
 import pytest
 
 from gems_craft.study.parsing import _parse_yaml_components
-from gems_runner.study.resolve_components import build_data_base
 from gems_craft.study.scenario_builder import ScenarioBuilder
+from gems_runner.study.resolve_components import build_data_base
 
 
 @pytest.fixture(scope="session")
