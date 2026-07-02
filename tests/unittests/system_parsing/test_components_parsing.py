@@ -70,7 +70,7 @@ def test_load_input_system_invalid_yaml_raises_value_error(tmp_path: Path) -> No
         load_yaml_system(bad_file)
 
 
-def test_load_yaml_system_missing_file_raises_error() -> None:
+def test_load_input_system_missing_file_raises_error() -> None:
     missing = Path(__file__).parent / "systems/does_not_exist.yml"
 
     with pytest.raises(FileNotFoundError):
