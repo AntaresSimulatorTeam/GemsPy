@@ -59,7 +59,7 @@ def test_consistency_check_ok(
     consistency_check(result_system, result_lib["basic"].models)
 
 
-def test_load_yaml_system_invalid_yaml_raises_value_error(tmp_path: Path) -> None:
+def test_load_input_system_invalid_yaml_raises_value_error(tmp_path: Path) -> None:
     data = safe_load(COMPO_FILE.read_text())
     system_only = data["system"].copy()
     system_only["unknown_field"] = "not_allowed"

@@ -64,18 +64,15 @@ The source tree is split into three packages under `src/`:
 - `Model`: defines component behavior (parameters, variables, constraints, ports)
 - `Library`: a collection of models, loaded from YAML
 - `Taxonomy` (`taxonomy.py`): categories naming the items a model must expose. Models opt in via `taxonomy-category`; `check_library_against_taxonomy` enforces conformance.
-- Key functions: `load_yaml_library(path, schema=LibrarySchema)`, `write_yaml_library(library, path)`
 
 **`study/`** — Study schema and parsing.
 - `SystemSchema` (`parsing.py`): Pydantic model for `system.yml`
-- Key functions: `load_yaml_system(path, schema=SystemSchema)`, `write_yaml_system(system, path)`
-- `ScenarioBuilder` (`scenario_builder.py`): maps MC scenarios to data-series column indices; `load_dat` / `write_dat`
+- `ScenarioBuilder` (`scenario_builder.py`): maps MC scenarios to data-series column indices;
 
 **`optim_config/`** — Optional decomposition configuration.
 - `OptimConfig` (`parsing.py`): top-level config loaded from `optim-config.yml`
 - `ResolutionMode` (`parsing.py`): `FRONTAL` (default), `SEQUENTIAL_SUBPROBLEMS`, `PARALLEL_SUBPROBLEMS`, or `BENDERS_DECOMPOSITION`
 - `ModelDecompositionConfig` (`parsing.py`): per-model assignment of variables/constraints/objective contributions to master or subproblems
-- Key functions: `load_yaml_optim_config(path)`, `write_yaml_optim_config(config, path)`
 
 #### `gems_craft_hybrid/` — Hybrid study I/O (read/write only, no simulation)
 
