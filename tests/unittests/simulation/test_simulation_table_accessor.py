@@ -11,9 +11,8 @@ import pandas as pd
 import pytest
 import xarray as xr
 
+from gems_craft.simulation_table.simulation_table import ComponentView, OutputView
 from gems_runner.simulation.simulation_table import (
-    ComponentView,
-    OutputView,
     SimulationTable,
     SimulationTableBuilder,
 )

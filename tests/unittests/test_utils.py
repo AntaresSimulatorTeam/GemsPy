@@ -13,7 +13,7 @@
 
 import pytest
 
-from gems_craft.utils import get_or_add
+from gems_runner.utils import get_or_add
 
 
 def test_get_or_add_should_evaluate_lazily() -> None:
