@@ -23,7 +23,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --group dev --group solvers
+        run: uv sync --group dev --group solvers --extra runner
 
       - name: Check imports sort order
         run: uv run isort --profile black --check-only --diff src tests
@@ -35,7 +35,7 @@ jobs:
         run: uv run mypy
 
       - name: Test
-        run: uv run pytest --cov gems --cov-report xml
+        run: uv run pytest --cov gems_craft --cov gems_runner --cov-report xml
 
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
