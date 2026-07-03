@@ -17,13 +17,13 @@ from typing import List
 import pandas as pd
 import pytest
 
-from gems.model.parsing import LibrarySchema, parse_yaml_library
-from gems.model.resolve_library import resolve_library
-from gems.simulation import build_problem
-from gems.simulation.time_block import TimeBlock
-from gems.study import Study
-from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import build_data_base, resolve_system
+from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
+from gems_craft.model.resolve_library import resolve_library
+from gems_craft.study import Study
+from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.resolve_components import build_data_base, resolve_system
+from gems_runner.simulation import build_problem
+from gems_runner.simulation.time_block import TimeBlock
 
 
 @pytest.fixture

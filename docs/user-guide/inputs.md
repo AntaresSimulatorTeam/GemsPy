@@ -23,7 +23,7 @@ my_study/
 
 ~~~ python
 from pathlib import Path
-from gems.study.folder import load_study
+from gems_craft.study.folder import load_study
 
 study = load_study(Path("my_study"))
 ~~~
@@ -63,10 +63,10 @@ Duplicate ids for properties are rejected.
 ### Loading the library and the system
 
 ~~~ python
-from gems.model.parsing import parse_yaml_library
-from gems.model.resolve_library import resolve_library
-from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import resolve_system, build_data_base
+from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.resolve_library import resolve_library
+from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.resolve_components import resolve_system, build_data_base
 from pathlib import Path
 
 with open("simple_library.yml") as lib_file:
@@ -93,7 +93,7 @@ database = build_data_base(input_system, Path(series_dir))
 Once you have `system` and `database`, wrap them in a `Study`:
 
 ~~~ python
-from gems.study import Study
+from gems_craft.study import Study
 
 study = Study(system=system, database=database)
 ~~~

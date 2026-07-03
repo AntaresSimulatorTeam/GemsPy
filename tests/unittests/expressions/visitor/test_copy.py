@@ -13,16 +13,16 @@
 
 import time
 
-from gems.expression import (
+from gems_craft.expression import (
     AdditionNode,
     DivisionNode,
     LiteralNode,
     ParameterNode,
     VariableNode,
 )
-from gems.expression.copy import copy_expression
-from gems.expression.equality import expressions_equal
-from gems.expression.expression import (
+from gems_craft.expression.copy import copy_expression
+from gems_craft.expression.equality import expressions_equal
+from gems_craft.expression.expression import (
     AllTimeSumNode,
     MultiplicationNode,
     TimeEvalNode,

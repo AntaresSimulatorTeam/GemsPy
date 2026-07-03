@@ -12,9 +12,9 @@
 
 from libs.standard import BALANCE_PORT_TYPE, CONSTANT
 
-from gems.expression import literal, param, var
-from gems.expression.expression import port_field
-from gems.model import (
+from gems_craft.expression import literal, param, var
+from gems_craft.expression.expression import port_field
+from gems_craft.model import (
     Constraint,
     ModelPort,
     PortField,
@@ -23,7 +23,7 @@ from gems.model import (
     float_variable,
     model,
 )
-from gems.model.port import PortFieldDefinition, PortFieldId
+from gems_craft.model.port import PortFieldDefinition, PortFieldId
 
 """
 Simple Convertor model.

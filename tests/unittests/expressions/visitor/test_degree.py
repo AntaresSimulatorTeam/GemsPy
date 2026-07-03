@@ -14,7 +14,7 @@ import math
 
 import pytest
 
-from gems.expression import (
+from gems_craft.expression import (
     ExpressionDegreeVisitor,
     LiteralNode,
     maximum,
@@ -23,7 +23,7 @@ from gems.expression import (
     var,
     visit,
 )
-from gems.expression.expression import (
+from gems_craft.expression.expression import (
     AbsNode,
     CeilNode,
     DualNode,

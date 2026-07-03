@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from gems.model.parsing import LibrarySchema, parse_yaml_library
-from gems.model.resolve_library import Library, resolve_library
-from gems.study.parsing import SystemSchema, parse_yaml_components
+from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
+from gems_craft.model.resolve_library import Library, resolve_library
+from gems_craft.study.parsing import SystemSchema, parse_yaml_components
 
 
 @pytest.fixture(scope="session")

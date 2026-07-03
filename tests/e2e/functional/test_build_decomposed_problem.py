@@ -30,15 +30,15 @@ from pathlib import Path
 
 import pytest
 
-from gems.main.main import (
+from gems_craft.optim_config.parsing import load_optim_config, validate_optim_config
+from gems_craft.study import Study
+from gems_runner.main.main import (
     _write_structure_txt,
     input_database,
     input_libs,
     input_system,
 )
-from gems.optim_config.parsing import load_optim_config, validate_optim_config
-from gems.simulation import TimeBlock, build_decomposed_problems
-from gems.study import Study
+from gems_runner.simulation import TimeBlock, build_decomposed_problems
 
 STUDIES_DIR = Path(__file__).parent / "studies"
 STUDY_IDS = ["13_1", "13_2"]

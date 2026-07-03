@@ -12,10 +12,10 @@
 
 import pytest
 
-from gems.expression import literal
-from gems.expression.expression import port_field
-from gems.model import Constraint, ModelPort, PortType, model
-from gems.study import Component, PortRef, PortsConnection, create_component
+from gems_craft.expression import literal
+from gems_craft.expression.expression import port_field
+from gems_craft.model import Constraint, ModelPort, PortType, model
+from gems_craft.study import Component, PortRef, PortsConnection, create_component
 from tests.unittests.system.libs.standard import DEMAND_MODEL
 
 

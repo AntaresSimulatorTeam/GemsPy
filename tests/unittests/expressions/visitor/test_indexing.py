@@ -11,10 +11,10 @@
 # This file is part of the Antares project.
 
 
-from gems.expression import param, var
-from gems.expression.expression import DualNode, ReducedCostNode
-from gems.expression.indexing import IndexingStructureProvider, compute_indexation
-from gems.expression.indexing_structure import IndexingStructure
+from gems_craft.expression import param, var
+from gems_craft.expression.expression import DualNode, ReducedCostNode
+from gems_craft.expression.indexing import IndexingStructureProvider, compute_indexation
+from gems_craft.expression.indexing_structure import IndexingStructure
 
 
 class StructureProvider(IndexingStructureProvider):

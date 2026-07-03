@@ -3,7 +3,7 @@
 
 import pytest
 
-from gems.simulation.simulation_table import SimulationTableBuilder
+from gems_runner.simulation.simulation_table import SimulationTableBuilder
 
 
 def test_extra_output_with_sum_connections() -> None:
@@ -16,13 +16,25 @@ def test_extra_output_with_sum_connections() -> None:
     GEN model defines balance_port.flow = var("gen").
     Expected: total_flow at node_1 == 5.0.
     """
-    from gems.expression import var
-    from gems.expression.expression import literal, port_field
-    from gems.model.model import ModelPort, model
-    from gems.model.port import PortField, PortFieldDefinition, PortFieldId, PortType
-    from gems.model.variable import float_variable
-    from gems.simulation import TimeBlock, build_problem
-    from gems.study import Component, DataBase, PortRef, Study, System, create_component
+    from gems_craft.expression import var
+    from gems_craft.expression.expression import literal, port_field
+    from gems_craft.model.model import ModelPort, model
+    from gems_craft.model.port import (
+        PortField,
+        PortFieldDefinition,
+        PortFieldId,
+        PortType,
+    )
+    from gems_craft.model.variable import float_variable
+    from gems_craft.study import (
+        Component,
+        DataBase,
+        PortRef,
+        Study,
+        System,
+        create_component,
+    )
+    from gems_runner.simulation import TimeBlock, build_problem
 
     BALANCE_PORT_TYPE = PortType(id="balance", fields=[PortField("flow")])
 
@@ -87,12 +99,12 @@ def test_extra_output_nonlinear() -> None:
     Setup: one component with variable a=3 (fixed). Extra output squared = a*a.
     Expected: squared = 9.0.
     """
-    from gems.expression import var
-    from gems.expression.expression import literal
-    from gems.model.model import model
-    from gems.model.variable import float_variable
-    from gems.simulation import TimeBlock, build_problem
-    from gems.study import DataBase, Study, System, create_component
+    from gems_craft.expression import var
+    from gems_craft.expression.expression import literal
+    from gems_craft.model.model import model
+    from gems_craft.model.variable import float_variable
+    from gems_craft.study import DataBase, Study, System, create_component
+    from gems_runner.simulation import TimeBlock, build_problem
 
     SIMPLE_MODEL = model(
         id="SIMPLE_NL",
@@ -124,12 +136,12 @@ def test_extra_output_abs_round_on_variable() -> None:
     outputs (post-solve evaluation), even though they would be rejected as
     nonlinear inside a constraint or bound.
     """
-    from gems.expression import var
-    from gems.expression.expression import literal
-    from gems.model.model import model
-    from gems.model.variable import float_variable
-    from gems.simulation import TimeBlock, build_problem
-    from gems.study import DataBase, Study, System, create_component
+    from gems_craft.expression import var
+    from gems_craft.expression.expression import literal
+    from gems_craft.model.model import model
+    from gems_craft.model.variable import float_variable
+    from gems_craft.study import DataBase, Study, System, create_component
+    from gems_runner.simulation import TimeBlock, build_problem
 
     SIMPLE_MODEL = model(
         id="SIMPLE_ABS_ROUND",

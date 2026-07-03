@@ -18,7 +18,7 @@ the problem, and writes results to `output/<run_id>/`.
 
 ~~~ python
 from pathlib import Path
-from gems.study.runner import run_study
+from gems_runner.study.runner import run_study
 
 run_study(Path("my_study"))
 ~~~
@@ -38,9 +38,9 @@ and lets you inspect the returned `SimulationTable` in memory.
 
 ~~~ python
 from pathlib import Path
-from gems.study.folder import load_study
-from gems.session import SimulationSession
-from gems.optim_config import load_optim_config
+from gems_craft.study.folder import load_study
+from gems_runner.session import SimulationSession
+from gems_craft.optim_config import load_optim_config
 
 study = load_study(Path("my_study"))
 optim_config = load_optim_config(Path("my_study/input/optim-config.yml"))
@@ -65,9 +65,9 @@ multiple solve calls.
 
 ~~~ python
 from pathlib import Path
-from gems.study import Study
-from gems.study.folder import load_study
-from gems.simulation import build_problem, TimeBlock
+from gems_craft.study import Study
+from gems_craft.study.folder import load_study
+from gems_runner.simulation import build_problem, TimeBlock
 
 study = load_study(Path("my_study"))
 

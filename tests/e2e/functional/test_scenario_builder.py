@@ -14,19 +14,19 @@ from pathlib import Path
 
 import pytest
 
-from gems.model.parsing import parse_yaml_library
-from gems.model.resolve_library import resolve_library
-from gems.simulation import build_problem
-from gems.simulation.time_block import TimeBlock
-from gems.study import Study
-from gems.study.data import DataBase
-from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import (
+from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.resolve_library import resolve_library
+from gems_craft.study import Study
+from gems_craft.study.data import DataBase
+from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.resolve_components import (
     build_data_base,
     consistency_check,
     resolve_system,
 )
-from gems.study.scenario_builder import ScenarioBuilder
+from gems_craft.study.scenario_builder import ScenarioBuilder
+from gems_runner.simulation import build_problem
+from gems_runner.simulation.time_block import TimeBlock
 
 
 @pytest.fixture

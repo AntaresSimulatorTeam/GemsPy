@@ -14,18 +14,21 @@ from pathlib import Path
 
 import pytest
 
-from gems.expression import literal, param, var
-from gems.expression.equality import expressions_equal, expressions_equal_if_present
-from gems.expression.expression import (
+from gems_craft.expression import literal, param, var
+from gems_craft.expression.equality import (
+    expressions_equal,
+    expressions_equal_if_present,
+)
+from gems_craft.expression.expression import (
     DualNode,
     ReducedCostNode,
     maximum,
     minimum,
     port_field,
 )
-from gems.expression.indexing_structure import IndexingStructure
-from gems.expression.parsing.parse_expression import ParsingException
-from gems.model import (
+from gems_craft.expression.indexing_structure import IndexingStructure
+from gems_craft.expression.parsing.parse_expression import ParsingException
+from gems_craft.model import (
     Constraint,
     ModelPort,
     PortField,
@@ -35,9 +38,9 @@ from gems.model import (
     float_variable,
     model,
 )
-from gems.model.model import PortFieldDefinition, PortFieldId
-from gems.model.parsing import parse_yaml_library
-from gems.model.resolve_library import resolve_library
+from gems_craft.model.model import PortFieldDefinition, PortFieldId
+from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.resolve_library import resolve_library
 
 CONSTANT = IndexingStructure(False, False)
 

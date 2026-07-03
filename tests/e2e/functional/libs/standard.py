@@ -14,14 +14,14 @@
 The standard module contains the definition of standard models.
 """
 
-from gems.expression import literal, param, var
-from gems.expression.expression import port_field
-from gems.expression.indexing_structure import IndexingStructure
-from gems.model.constraint import Constraint
-from gems.model.model import ModelPort, model
-from gems.model.parameter import float_parameter, int_parameter
-from gems.model.port import PortField, PortFieldDefinition, PortFieldId, PortType
-from gems.model.variable import float_variable, int_variable
+from gems_craft.expression import literal, param, var
+from gems_craft.expression.expression import port_field
+from gems_craft.expression.indexing_structure import IndexingStructure
+from gems_craft.model.constraint import Constraint
+from gems_craft.model.model import ModelPort, model
+from gems_craft.model.parameter import float_parameter, int_parameter
+from gems_craft.model.port import PortField, PortFieldDefinition, PortFieldId, PortType
+from gems_craft.model.variable import float_variable, int_variable
 
 CONSTANT = IndexingStructure(False, False)
 TIME_AND_SCENARIO_FREE = IndexingStructure(True, True)
