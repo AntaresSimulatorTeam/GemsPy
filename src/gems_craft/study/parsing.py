@@ -21,12 +21,6 @@ from yaml import safe_dump, safe_load
 from gems_craft.utils import ModifiedBaseModel
 
 
-class AreaConnectionsSchema(ModifiedBaseModel):
-    component: str
-    port: str
-    area: str
-
-
 class PortConnectionsSchema(ModifiedBaseModel):
     component1: str
     port1: str
@@ -60,7 +54,6 @@ class SystemSchema(ModifiedBaseModel):
     model_libraries: Optional[str] = None  # Parsed but unused for now
     components: List[ComponentSchema] = Field(default_factory=list)
     connections: Optional[List[PortConnectionsSchema]] = None
-    area_connections: Optional[List[AreaConnectionsSchema]] = None
 
 
 _S = TypeVar("_S", bound=SystemSchema)

@@ -12,15 +12,14 @@
 
 from typing import List, Optional
 
-from gems_craft.study.parsing import AreaConnectionsSchema, SystemSchema
+from gems_craft.study.parsing import SystemSchema
 from gems_craft.utils import ModifiedBaseModel
 
-__all__ = [
-    "AreaConnectionsSchema",
-    "ThermalComponentSchema",
-    "ThermalCapacityConnectionSchema",
-    "HybridSystemSchema",
-]
+
+class AreaConnectionsSchema(ModifiedBaseModel):
+    component: str
+    port: str
+    area: str
 
 
 class ThermalComponentSchema(ModifiedBaseModel):
@@ -35,4 +34,5 @@ class ThermalCapacityConnectionSchema(ModifiedBaseModel):
 
 
 class HybridSystemSchema(SystemSchema):
+    area_connections: Optional[List[AreaConnectionsSchema]] = None
     thermal_capacity_connections: Optional[List[ThermalCapacityConnectionSchema]] = None

@@ -64,7 +64,7 @@ An optional `optim-config.yml` activates decomposition: variables and constraint
 The codebase is split into three packages along a solver-dependency boundary:
 
 - **`gems_craft`** (`src/gems_craft/`) — the domain model and all YAML I/O. No solver dependency; installable and usable on its own (`pip install gemspy`, without the `runner` extra) for building, editing, validating, and querying systems (e.g. an API layer). Deps: `numpy`, `pandas`, `PyYAML`, `pydantic`, `anytree`, `antlr4-python3-runtime`.
-- **`gems_craft_hybrid`** (`src/gems_craft_hybrid/`) — read/write support for *hybrid* GEMS studies, an extended format used to interoperate with Antares Simulator. No solver dependency; depends only on `gems_craft`. Hybrid studies cannot be simulated by GemsPy — this package only extends the `gems_craft` parsing schemas (`HybridLibrarySchema`, `HybridSystemSchema`) with the extra fields (`area-connection`, `thermal-capacity-connection` on port-types; `thermal-capacity-connections` on systems), reusing `gems_craft`'s schema-parameterized `parse_yaml_library`/`load_input_system`/`parse_yaml_components`/`write_yaml_library`/`write_yaml_system`.
+- **`gems_craft_hybrid`** (`src/gems_craft_hybrid/`) — read/write support for *hybrid* GEMS studies, an extended format used to interoperate with Antares Simulator. No solver dependency; depends only on `gems_craft`. Hybrid studies cannot be simulated by GemsPy — this package only extends the `gems_craft` parsing schemas (`HybridLibrarySchema`, `HybridSystemSchema`) with the extra fields (`area-connection`, `thermal-capacity-connection` on port-types; `area-connections`, `thermal-capacity-connections` on systems), reusing `gems_craft`'s schema-parameterized `parse_yaml_library`/`load_input_system`/`parse_yaml_components`/`write_yaml_library`/`write_yaml_system`.
 - **`gems_runner`** (`src/gems_runner/`) — solve-time execution. Depends on `gems_craft` plus the `runner` extra (`linopy`, `xarray`, `highspy`).
 
 ### Core Modules
@@ -96,7 +96,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 
 **`gems_craft_hybrid/model/`** — `HybridLibrarySchema(LibrarySchema)`, `HybridPortTypeSchema(PortTypeSchema)`: adds `area-connection` (`AreaConnectionSchema`) and `thermal-capacity-connection` (`PortThermalCapacitySchema`) per port-type.
 
-**`gems_craft_hybrid/study/`** — `HybridSystemSchema(SystemSchema)`: adds `thermal-capacity-connections` (`ThermalCapacityConnectionSchema`, referencing a `ThermalComponentSchema`); `area-connections` is inherited unchanged from `SystemSchema`.
+**`gems_craft_hybrid/study/`** — `HybridSystemSchema(SystemSchema)`: adds `area-connections` (`AreaConnectionsSchema`) and `thermal-capacity-connections` (`ThermalCapacityConnectionSchema`, referencing a `ThermalComponentSchema`).
 
 **`gems_runner/simulation/`** — Optimization problem construction and solving.
 - `OptimizationProblem` (`optimization.py`): main interface; translates a `Study` into a linopy model solved by HiGHS

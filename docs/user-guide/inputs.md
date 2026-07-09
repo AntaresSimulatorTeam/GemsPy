@@ -127,13 +127,12 @@ interoperate with [Antares Simulator](https://antares-simulator.org/).
 
 ### Hybrid system
 
-A hybrid `system.yml` builds on two optional `system.yml` sections:
+`HybridSystemSchema` extends the standard format with two optional sections:
 
 - `area-connections`: maps component ports to areas (`component`, `port`,
-  `area`) — already available on the standard `SystemSchema`.
+  `area`).
 - `thermal-capacity-connections`: maps component ports to Antares thermal
-  clusters, each identified by `area` and `cluster-id` — added by
-  `HybridSystemSchema`.
+  clusters, each identified by `area` and `cluster-id`.
 
 ~~~ yaml
 system:
