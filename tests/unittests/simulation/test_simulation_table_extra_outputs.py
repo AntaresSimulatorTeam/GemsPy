@@ -168,15 +168,6 @@ def test_extra_output_min_on_variable() -> None:
     """
     min(variable, parameter) is allowed in extra outputs and evaluated
     element-wise post-solve.
-
-    The system also holds a second, unrelated model/component (OTHER_MODEL /
-    comp_2) alongside SIMPLE_MIN / comp_1. When multiple models coexist,
-    linopy's merged solution Dataset outer-joins their component coordinates,
-    padding each model's own variable arrays with NaN entries for the other
-    model's components. minimum()/maximum() (implemented via xr.where) are
-    sensitive to that misalignment, so this setup guards against a regression
-    where solution/dual arrays handed to VectorizedExtraOutputBuilder aren't
-    filtered back down to each model's own components.
     """
     from gems.expression import param, var
     from gems.expression.expression import literal, minimum
