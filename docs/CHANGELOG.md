@@ -6,12 +6,14 @@ All notable changes to GemsPy are documented here.
 
 ### Added
 
+- **`version` field on library YAML** - `LibrarySchema` (standard, not
+  hybrid-specific) gains an optional top-level `version` string, for
+  tracking the version of a library.
 - **Hybrid studies (`gems_craft_hybrid`)** - new package for reading and
   writing GEMS studies extended with fields used to interoperate with
   Antares Simulator. Hybrid studies cannot be simulated by GemsPy.
   - `HybridLibrarySchema` / `HybridPortTypeSchema` add `area-connection` and
-    `thermal-capacity-connection` per port-type; `LibrarySchema` gains a
-    `version` field.
+    `thermal-capacity-connection` per port-type.
   - `HybridSystemSchema` adds `thermal-capacity-connections`
     (`area-connections` was already available on the standard `SystemSchema`).
   - `gems_craft.model.parsing.parse_yaml_library` and

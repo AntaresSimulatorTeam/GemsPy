@@ -60,6 +60,19 @@ system:
 
 Duplicate ids for properties are rejected.
 
+## Library YAML: optional field `version`
+
+A library YAML may declare an optional top-level `version` string, for
+tracking the version of the library itself:
+
+~~~ yaml
+library:
+  id: my_lib
+  version: "1.0"
+  port-types: []
+  models: []
+~~~
+
 ### Loading the library and the system
 
 ~~~ python
@@ -163,8 +176,9 @@ write_yaml_system(system, Path("output/system.yml"))
 
 ### Hybrid library
 
-A hybrid library YAML may include a top-level `version` field, and each
-port-type may carry two additional sub-fields:
+Each port-type of a hybrid library YAML may carry two additional sub-fields
+(the top-level `version` field is a standard `LibrarySchema` field, see
+above — not hybrid-specific):
 
 - `area-connection`: maps port roles to port fields for area coupling
   (`injection-to-balance`, `spillage-bound`, `unsupplied-energy-bound`).
