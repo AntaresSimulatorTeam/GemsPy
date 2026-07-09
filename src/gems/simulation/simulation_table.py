@@ -271,7 +271,11 @@ class SimulationTableBuilder:
         if solution is not None:
             for (mk, vname), lv in problem._linopy_vars.items():
                 if lv.name in solution:
-                    var_solution_arrays[(mk, vname)] = solution[lv.name]
+                    sol_da = solution[lv.name]
+                    if "component" in sol_da.dims:
+                        own_components = list(lv.coords["component"].values)
+                        sol_da = sol_da.sel(component=own_components)
+                    var_solution_arrays[(mk, vname)] = sol_da
 
         constraint_dual_arrays = self._collect_constraint_duals(problem)
         var_reduced_cost_arrays = self._collect_reduced_costs(problem)
@@ -339,9 +343,10 @@ class SimulationTableBuilder:
         """Return constraint shadow prices keyed by (model_key, constraint_name)."""
         dual_dataset = problem.linopy_model.dual
         result: Dict[Tuple[str, str], xr.DataArray] = {}
-        for mk in problem.study.model_components:
+        for mk, components in problem.study.model_components.items():
             model = problem.study.models[mk]
             prefix = mk.replace("-", "_")
+            own_components = [c.id for c in components]
             all_constraints = {**model.constraints, **model.binding_constraints}
             for cname in all_constraints:
                 safe = cname.replace(" ", "_").replace("-", "_")
@@ -355,6 +360,8 @@ class SimulationTableBuilder:
                     dual_val = dual_val + dual_dataset[lb_name]  # type: ignore[operator]
                 if ub_name in dual_dataset:
                     dual_val = dual_val + dual_dataset[ub_name]  # type: ignore[operator]
+                if "component" in dual_val.dims:
+                    dual_val = dual_val.sel(component=own_components)
                 result[(mk, cname)] = dual_val
         return result
 
