@@ -11,20 +11,13 @@
 # This file is part of the Antares project.
 import typing
 from dataclasses import dataclass
-from typing import List, Optional
+from pathlib import Path
+from typing import List, Optional, Type, TypeVar, overload
 
 from pydantic import ConfigDict, Field, ValidationError
-from yaml import safe_load
+from yaml import safe_dump, safe_load
 
 from gems_craft.utils import ModifiedBaseModel
-
-
-def parse_yaml_library(input: typing.TextIO) -> "LibrarySchema":
-    tree = safe_load(input)
-    try:
-        return LibrarySchema.model_validate(tree["library"])
-    except ValidationError as e:
-        raise ValueError(f"An error occurred during parsing: {e}")
 
 
 class ParameterSchema(ModifiedBaseModel):
@@ -114,3 +107,30 @@ class LibrarySchema(ModifiedBaseModel):
     port_types: List[PortTypeSchema] = Field(default_factory=list)
     models: List[ModelSchema] = Field(default_factory=list)
     description: Optional[str] = None
+    version: Optional[str] = None
+
+
+_L = TypeVar("_L", bound=LibrarySchema)
+
+
+@overload
+def parse_yaml_library(input: typing.TextIO) -> LibrarySchema: ...
+@overload
+def parse_yaml_library(input: typing.TextIO, schema: Type[_L]) -> _L: ...
+def parse_yaml_library(
+    input: typing.TextIO, schema: Type[LibrarySchema] = LibrarySchema
+) -> LibrarySchema:
+    tree = safe_load(input)
+    try:
+        return schema.model_validate(tree["library"])
+    except ValidationError as e:
+        raise ValueError(f"An error occurred during parsing: {e}")
+
+
+def write_yaml_library(library: LibrarySchema, path: Path) -> None:
+    data = {
+        "library": library.model_dump(by_alias=True, exclude_none=True, mode="json")
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        safe_dump(data, f, allow_unicode=True, sort_keys=False)

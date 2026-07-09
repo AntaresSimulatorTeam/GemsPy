@@ -1,0 +1,50 @@
+library:
+  id: hybrid_basic
+  version: "1.0"
+  port-types:
+    - id: flow
+      description: A port which transfers power flow
+      fields:
+        - id: flow
+      area-connection:
+        injection-to-balance: flow
+        spillage-bound: flow
+        unsupplied-energy-bound:
+      thermal-capacity-connection:
+        capacity-field: flow
+    - id: signal
+      description: A signal port without area connection
+      fields:
+        - id: value
+  models:
+    - id: node
+      description: A basic balancing node model
+      ports:
+        - id: injection_port
+          type: flow
+      binding-constraints:
+        - id: balance
+          expression: sum_connections(injection_port.flow) = 0
+    - id: generator
+      description: A basic generator model
+      parameters:
+        - id: cost
+          time-dependent: false
+          scenario-dependent: false
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: generation
+          lower-bound: 0
+          upper-bound: p_max
+      ports:
+        - id: injection_port
+          type: flow
+      port-field-definitions:
+        - port: injection_port
+          field: flow
+          definition: generation
+      objective-contributions:
+        - id: generation_cost
+          expression: cost * generation

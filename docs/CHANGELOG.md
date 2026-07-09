@@ -4,6 +4,23 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Hybrid studies (`gems_craft_hybrid`)** - new package for reading and
+  writing GEMS studies extended with fields used to interoperate with
+  Antares Simulator. Hybrid studies cannot be simulated by GemsPy.
+  - `HybridLibrarySchema` / `HybridPortTypeSchema` add `area-connection` and
+    `thermal-capacity-connection` per port-type; `LibrarySchema` gains a
+    `version` field.
+  - `HybridSystemSchema` adds `thermal-capacity-connections`
+    (`area-connections` was already available on the standard `SystemSchema`).
+  - `gems_craft.model.parsing.parse_yaml_library` and
+    `gems_craft.study.parsing.load_input_system` /
+    `parse_yaml_components` now accept an optional `schema` parameter to
+    validate against a subclass (e.g. the hybrid schemas above); new
+    `write_yaml_library` / `write_yaml_system` functions support the
+    corresponding round-trip.
+
 ### Changed
 
 - **Package split** - the monolithic `gems` package is split into `gems_craft`
