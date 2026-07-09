@@ -60,19 +60,6 @@ system:
 
 Duplicate ids for properties are rejected.
 
-## Library YAML: optional field `version`
-
-A library YAML may declare an optional top-level `version` string, for
-tracking the version of the library itself:
-
-~~~ yaml
-library:
-  id: my_lib
-  version: "1.0"
-  port-types: []
-  models: []
-~~~
-
 ### Loading the library and the system
 
 ~~~ python
