@@ -17,27 +17,33 @@ components), this module computes heuristic bounds per component and scenario
 and injects them as additional linopy constraints before a second solve.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Union
 
 import xarray as xr
 
-from gems.optim_config.parsing import HeuristicConfig, HeuristicElementConfig, ModelElementAccessType, OptimConfig
-from gems.simulation.thermal_heuristic import find_min_generation_fast, find_nb_units_accurate
+from gems.optim_config.parsing import (
+    HeuristicConfig,
+    HeuristicElementConfig,
+    ModelElementAccessType,
+    OptimConfig,
+)
+from gems.simulation.thermal_heuristic import (
+    find_min_generation_fast,
+    find_nb_units_accurate,
+)
 from gems.study.parsing import HeuristicId, IntegerStrategyId
 
 if TYPE_CHECKING:
     from gems.simulation.optimization import OptimizationProblem
     from gems.study.study import Study
 
-_HEURISTIC_FUNCTIONS = {
+_HEURISTIC_FUNCTIONS: Dict[HeuristicId, Callable[..., List]] = {
     HeuristicId.FAST: find_min_generation_fast,
     HeuristicId.ACCURATE: find_nb_units_accurate,
 }
 
 
-def should_apply_heuristics(
-    study: "Study"
-) -> bool:
+def should_apply_heuristics(study: "Study") -> bool:
     """Return True when the two-pass heuristic solve is needed."""
     return any(
         c.integer_strategy.id == IntegerStrategyId.HEURISTIC
@@ -45,9 +51,7 @@ def should_apply_heuristics(
     )
 
 
-def _get_linopy_var(
-    problem: "OptimizationProblem", model_id: str, name: str
-) -> Any:
+def _get_linopy_var(problem: "OptimizationProblem", model_id: str, name: str) -> Any:
     linopy_var = problem._linopy_vars.get((model_id, name))
     if linopy_var is None:
         raise ValueError(f"Variable '{name}' not found in model '{model_id}'.")
@@ -82,16 +86,26 @@ def _resolve_input_for_heuristic(
             raise RuntimeError("Problem must be solved before applying heuristics.")
         return _read_da(solution[linopy_var.name], component_id, local_scenario_idx)
     elif access == ModelElementAccessType.VARIABLE_LOWER_BOUND:
-        return _read_da(_get_linopy_var(problem, model_id, name).lower, component_id, local_scenario_idx)
+        return _read_da(
+            _get_linopy_var(problem, model_id, name).lower,
+            component_id,
+            local_scenario_idx,
+        )
     elif access == ModelElementAccessType.VARIABLE_UPPER_BOUND:
-        return _read_da(_get_linopy_var(problem, model_id, name).upper, component_id, local_scenario_idx)
+        return _read_da(
+            _get_linopy_var(problem, model_id, name).upper,
+            component_id,
+            local_scenario_idx,
+        )
     elif access == ModelElementAccessType.PARAMETER:
         param_arr = problem.param_arrays.get((model_id, name))
         if param_arr is None:
             raise ValueError(f"Parameter '{name}' not found in model '{model_id}'.")
         return _read_da(param_arr, component_id, local_scenario_idx)
     else:
-        raise ValueError(f"Unknown access type '{access}' for heuristic input '{name}'.")
+        raise ValueError(
+            f"Unknown access type '{access}' for heuristic input '{name}'."
+        )
 
 
 def _apply_heuristic_bounds(
@@ -108,7 +122,9 @@ def _apply_heuristic_bounds(
     elif access == ModelElementAccessType.VARIABLE_UPPER_BOUND:
         bound = linopy_var.upper
     else:
-        raise ValueError(f"Invalid output type '{access}' — only variable bounds are allowed.")
+        raise ValueError(
+            f"Invalid output type '{access}' — only variable bounds are allowed."
+        )
 
     comp_selector = bound.sel(component=component_id)
     if has_scenario_dim:
@@ -143,7 +159,8 @@ def apply_thermal_heuristics(
     }
 
     heuristic_comps = [
-        c for c in problem.study.system.all_components
+        c
+        for c in problem.study.system.all_components
         if c.integer_strategy.id == IntegerStrategyId.HEURISTIC
         and c.integer_strategy.heuristic_id is not None
     ]
@@ -182,9 +199,7 @@ def apply_thermal_heuristics(
             )
 
             for output in heuristic_config.outputs:
-                linopy_var = problem._linopy_vars.get(
-                    (model_id, output.id)
-                )
+                linopy_var = problem._linopy_vars.get((model_id, output.id))
                 if linopy_var is None:
                     raise ValueError(
                         f"Heuristic output variable '{output.id}' not found "

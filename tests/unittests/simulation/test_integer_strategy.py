@@ -39,7 +39,9 @@ def _build(strategies: list[IntegerStrategyId]) -> build_problem:  # type: ignor
     system = System("test")
     for i, strategy in enumerate(strategies):
         component = Component(
-            model=MIXED_MODEL, id=f"c{i+1}", integer_strategy=IntegerStrategy(id=strategy)
+            model=MIXED_MODEL,
+            id=f"c{i+1}",
+            integer_strategy=IntegerStrategy(id=strategy),
         )
         system.add_component(component)
     return build_problem(Study(system, DataBase()), TimeBlock(1, [0]), scenario_ids=[0])

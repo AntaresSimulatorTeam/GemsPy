@@ -33,7 +33,10 @@ import pytest
 
 from gems.optim_config.parsing import load_optim_config
 from gems.simulation import TimeBlock, build_problem
-from gems.simulation.heuristic_runner import apply_thermal_heuristics, should_apply_heuristics
+from gems.simulation.heuristic_runner import (
+    apply_thermal_heuristics,
+    should_apply_heuristics,
+)
 from gems.simulation.simulation_table import SimulationTableBuilder
 from gems.study.folder import load_study
 
@@ -287,5 +290,8 @@ def test_fast_heuristic() -> None:
     assert_output_per_timestep(
         "N",
         "spilled_energy",
-        [0 if t not in [i for i in range(10, 20)] else (50 if t==12 else 100) for t in range(168)],
+        [
+            0 if t not in [i for i in range(10, 20)] else (50 if t == 12 else 100)
+            for t in range(168)
+        ],
     )

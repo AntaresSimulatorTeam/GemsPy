@@ -568,7 +568,9 @@ class _OptimizationProblemBuilder:
                 needs_split = var.data_type in (
                     ValueType.INTEGER,
                     ValueType.BINARY,
-                ) and any(c.integer_strategy.id in RELAXED_STRATEGIES for c in components)
+                ) and any(
+                    c.integer_strategy.id in RELAXED_STRATEGIES for c in components
+                )
 
                 if needs_split:
                     groups: Dict[bool, List[Component]] = {}

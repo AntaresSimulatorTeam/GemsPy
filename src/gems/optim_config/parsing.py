@@ -17,8 +17,6 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
 
-from gems.study.parsing import HeuristicId
-
 from pydantic import (
     Field,
     PrivateAttr,
@@ -37,6 +35,7 @@ from gems.expression.expression import (
     UnaryOperatorNode,
     VariableNode,
 )
+from gems.study.parsing import HeuristicId
 from gems.utils import ModifiedBaseModel
 
 if TYPE_CHECKING:
@@ -91,11 +90,23 @@ class HeuristicElementConfig(ModifiedBaseModel):
 
 _HEURISTIC_SCHEMA: Dict[HeuristicId, Dict[str, Set[str]]] = {
     HeuristicId.ACCURATE: {
-        "inputs": {"nb_units_on_opt", "nb_units_max", "min_up_duration", "min_down_duration"},
+        "inputs": {
+            "nb_units_on_opt",
+            "nb_units_max",
+            "min_up_duration",
+            "min_down_duration",
+        },
         "outputs": {"minimum_nb_units_on"},
     },
     HeuristicId.FAST: {
-        "inputs": {"generation_power", "cluster_max_generation", "min_power_per_unit", "max_power_per_unit", "min_up_duration", "min_down_duration"},
+        "inputs": {
+            "generation_power",
+            "cluster_max_generation",
+            "min_power_per_unit",
+            "max_power_per_unit",
+            "min_up_duration",
+            "min_down_duration",
+        },
         "outputs": {"minimum_generation_power"},
     },
 }
@@ -124,7 +135,8 @@ class HeuristicConfig(ModifiedBaseModel):
         invalid_output_types = {
             out.heuristic_element
             for out in self.outputs
-            if out.type not in (
+            if out.type
+            not in (
                 ModelElementAccessType.VARIABLE_LOWER_BOUND,
                 ModelElementAccessType.VARIABLE_UPPER_BOUND,
             )
@@ -569,7 +581,10 @@ def _check_no_integer_variables_in_subproblems(
     from gems.model.common import ValueType
     from gems.study.parsing import IntegerStrategyId
 
-    subproblem_locs = {ElementLocation.SUBPROBLEMS, ElementLocation.MASTER_AND_SUBPROBLEMS}
+    subproblem_locs = {
+        ElementLocation.SUBPROBLEMS,
+        ElementLocation.MASTER_AND_SUBPROBLEMS,
+    }
 
     model_components: Dict[str, List] = {}
     for c in system.all_components:
@@ -593,7 +608,10 @@ def _check_no_integer_variables_in_subproblems(
         for var_name, var in model.variables.items():
             if var.data_type not in (ValueType.INTEGER, ValueType.BINARY):
                 continue
-            if explicit_locs.get(var_name, ElementLocation.SUBPROBLEMS) in subproblem_locs:
+            if (
+                explicit_locs.get(var_name, ElementLocation.SUBPROBLEMS)
+                in subproblem_locs
+            ):
                 errors.append(
                     f"Integer variable '{var_name}' of model '{model_id}' "
                     f"is assigned to subproblems, which is forbidden in Benders "

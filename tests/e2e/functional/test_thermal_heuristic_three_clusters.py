@@ -32,7 +32,10 @@ import pytest
 
 from gems.optim_config.parsing import load_optim_config
 from gems.simulation import TimeBlock, build_problem
-from gems.simulation.heuristic_runner import apply_thermal_heuristics, should_apply_heuristics
+from gems.simulation.heuristic_runner import (
+    apply_thermal_heuristics,
+    should_apply_heuristics,
+)
 from gems.simulation.simulation_table import SimulationTable, SimulationTableBuilder
 from gems.study.folder import load_study
 from tests.e2e.functional.expected_outputs_three_clusters import (

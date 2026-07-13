@@ -18,7 +18,10 @@ from uuid import uuid4
 import xarray as xr
 
 from gems.optim_config.parsing import OptimConfig, ResolutionMode, load_optim_config
-from gems.simulation.heuristic_runner import apply_thermal_heuristics, should_apply_heuristics
+from gems.simulation.heuristic_runner import (
+    apply_thermal_heuristics,
+    should_apply_heuristics,
+)
 from gems.simulation.optimization import OptimizationProblem, build_problem
 from gems.simulation.simulation_table import (
     SimulationTable,
