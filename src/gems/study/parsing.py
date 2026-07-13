@@ -61,10 +61,20 @@ class ComponentPropertySchema(ModifiedBaseModel):
     value: str
 
 
-class IntegerStrategy(str, Enum):
+class IntegerStrategyId(str, Enum):
     EXACT = "exact"
     RELAXED = "relaxed"
     HEURISTIC = "heuristic"
+
+
+class HeuristicId(str, Enum):
+    FAST = "fast"
+    ACCURATE = "accurate"
+
+
+class IntegerStrategy(ModifiedBaseModel):
+    id: IntegerStrategyId = IntegerStrategyId.EXACT
+    heuristic_id: Optional[HeuristicId] = None
 
 
 class ComponentSchema(ModifiedBaseModel):
@@ -73,7 +83,7 @@ class ComponentSchema(ModifiedBaseModel):
     scenario_group: Optional[str] = None
     parameters: Optional[List[ComponentParameterSchema]] = None
     properties: Optional[List[ComponentPropertySchema]] = None
-    integer_strategy: IntegerStrategy = IntegerStrategy.EXACT
+    integer_strategy: IntegerStrategy = Field(default_factory=IntegerStrategy)
 
 
 class SystemSchema(ModifiedBaseModel):

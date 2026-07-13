@@ -52,7 +52,7 @@ from gems.simulation.linearize import (
 )
 from gems.simulation.time_block import TimeBlock
 from gems.simulation.vectorized_builder import ShiftValidityVisitor
-from gems.study.parsing import IntegerStrategy
+from gems.study.parsing import IntegerStrategyId
 from gems.study.study import Study
 from gems.study.system import Component
 
@@ -558,7 +558,7 @@ class _OptimizationProblemBuilder:
     def _create_variables_for_model(
         self, model: Model, components: List[Component]
     ) -> None:
-        RELAXED_STRATEGIES = {IntegerStrategy.RELAXED, IntegerStrategy.HEURISTIC}
+        RELAXED_STRATEGIES = {IntegerStrategyId.RELAXED, IntegerStrategyId.HEURISTIC}
         comp_ids = [c.id for c in components]
 
         for var in model.variables.values():
@@ -568,13 +568,13 @@ class _OptimizationProblemBuilder:
                 needs_split = var.data_type in (
                     ValueType.INTEGER,
                     ValueType.BINARY,
-                ) and any(c.integer_strategy in RELAXED_STRATEGIES for c in components)
+                ) and any(c.integer_strategy.id in RELAXED_STRATEGIES for c in components)
 
                 if needs_split:
                     groups: Dict[bool, List[Component]] = {}
                     for c in components:
                         groups.setdefault(
-                            c.integer_strategy in RELAXED_STRATEGIES, []
+                            c.integer_strategy.id in RELAXED_STRATEGIES, []
                         ).append(c)
                     partial = [
                         self._add_variable_for_group(

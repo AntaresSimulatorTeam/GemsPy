@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+﻿# Copyright (c) 2024, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -14,7 +14,9 @@ system:
   components:
     - id: G1
       model: antares_legacy_models.thermal
-      integer-strategy: heuristic
+      integer-strategy:
+        id: heuristic
+        heuristic-id: fast
       parameters:
         - id: max_power_per_unit
           value: 1318.5
