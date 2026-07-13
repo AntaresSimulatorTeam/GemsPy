@@ -1,0 +1,19 @@
+models:
+  - id: antares_legacy_models.thermal_with_ramp
+    heuristic:
+      - id: accurate
+        inputs:
+          - heuristic-element: nb_units_on_opt
+            id: num_units_on
+            type: variable-solution
+          - heuristic-element: nb_units_max
+            id: num_units_on
+            type: variable-upper-bound
+          - heuristic-element: min_up_duration
+            id: min_up_duration
+          - heuristic-element: min_down_duration
+            id: min_down_duration
+        outputs:
+          - heuristic-element: minimum_nb_units_on
+            id: num_units_on
+            type: variable-lower-bound
