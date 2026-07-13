@@ -483,6 +483,89 @@ def _check_master_objectives_use_master_variables(
                     )
 
 
+def _check_heuristic_ids_declared(
+    config: "OptimConfig",
+    system: "System",
+    errors: List[str],
+) -> None:
+    """Check that every HEURISTIC component references a declared heuristic in optim-config."""
+    from gems.study.parsing import IntegerStrategyId
+
+    declared = {
+        (mc.id, h_cfg.id.value)
+        for mc in config.models
+        for h_cfg in (mc.heuristic or [])
+    }
+
+    for comp in system.all_components:
+        if comp.integer_strategy.id != IntegerStrategyId.HEURISTIC:
+            continue
+        assert comp.integer_strategy.heuristic_id is not None
+        key = (comp.model.id, comp.integer_strategy.heuristic_id.value)
+        if key not in declared:
+            errors.append(
+                f"Component '{comp.id}' references heuristic "
+                f"'{comp.integer_strategy.heuristic_id.value}' on model '{comp.model.id}', "
+                f"but this heuristic is not declared in optim-config."
+            )
+
+
+def _check_no_heuristic_with_benders(
+    system: "System",
+    errors: List[str],
+) -> None:
+    """Check that no component uses integer-strategy 'heuristic' with Benders decomposition."""
+    from gems.study.parsing import IntegerStrategyId
+
+    errors.extend(
+        f"Component '{comp.id}' uses integer-strategy 'heuristic', "
+        f"which is incompatible with Benders decomposition."
+        for comp in system.all_components
+        if comp.integer_strategy.id == IntegerStrategyId.HEURISTIC
+    )
+
+
+def _check_no_integer_variables_in_subproblems(
+    config: "OptimConfig",
+    system: "System",
+    errors: List[str],
+) -> None:
+    """Check that no integer or binary variable is assigned to Benders subproblems."""
+    from gems.model.common import ValueType
+    from gems.study.parsing import IntegerStrategyId
+
+    subproblem_locs = {ElementLocation.SUBPROBLEMS, ElementLocation.MASTER_AND_SUBPROBLEMS}
+
+    model_components: Dict[str, List] = {}
+    for c in system.all_components:
+        model_components.setdefault(c.model.id, []).append(c)
+
+    explicit_locs_by_model: Dict[str, Dict[str, ElementLocation]] = {}
+    for model_config in config.models:
+        if model_config.model_decomposition is not None:
+            explicit_locs_by_model[model_config.id] = {
+                v_cfg.id: v_cfg.location
+                for v_cfg in model_config.model_decomposition.variables
+            }
+
+    for model_id, comps in model_components.items():
+        if not any(c.integer_strategy.id == IntegerStrategyId.EXACT for c in comps):
+            continue
+
+        model = comps[0].model
+        explicit_locs = explicit_locs_by_model.get(model_id, {})
+
+        for var_name, var in model.variables.items():
+            if var.data_type not in (ValueType.INTEGER, ValueType.BINARY):
+                continue
+            if explicit_locs.get(var_name, ElementLocation.SUBPROBLEMS) in subproblem_locs:
+                errors.append(
+                    f"Integer variable '{var_name}' of model '{model_id}' "
+                    f"is assigned to subproblems, which is forbidden in Benders "
+                    f"decomposition. Assign it to 'master' in the decomposition config."
+                )
+
+
 def validate_optim_config(
     config: OptimConfig,
     system: "System",
@@ -534,6 +617,12 @@ def validate_optim_config(
                     model_config.id,
                     errors,
                 )
+
+    _check_heuristic_ids_declared(config, system, errors)
+
+    if config.resolution.mode == ResolutionMode.BENDERS_DECOMPOSITION:
+        _check_no_heuristic_with_benders(system, errors)
+        _check_no_integer_variables_in_subproblems(config, system, errors)
 
     if errors:
         raise ValueError(

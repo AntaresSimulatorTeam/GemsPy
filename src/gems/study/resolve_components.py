@@ -93,6 +93,17 @@ def _resolve_component(
             f"{missing}."
         )
 
+    from gems.study.parsing import IntegerStrategyId
+
+    if (
+        component.integer_strategy.id == IntegerStrategyId.HEURISTIC
+        and component.integer_strategy.heuristic_id is None
+    ):
+        raise ValueError(
+            f"Component '{component.id}' uses integer-strategy 'heuristic' "
+            f"but has no heuristic-id."
+        )
+
     return Component(
         model=model,
         id=component.id,
