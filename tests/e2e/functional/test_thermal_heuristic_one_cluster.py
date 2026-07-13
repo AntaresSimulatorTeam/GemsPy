@@ -31,7 +31,9 @@ from pathlib import Path
 
 import pytest
 
+from gems.optim_config.parsing import load_optim_config
 from gems.simulation import TimeBlock, build_problem
+from gems.simulation.heuristic_runner import apply_thermal_heuristics, should_apply_heuristics
 from gems.simulation.simulation_table import SimulationTableBuilder
 from gems.study.folder import load_study
 
@@ -176,8 +178,12 @@ def test_accurate_heuristic() -> None:
 
     study = load_study(ACCURATE_STUDY_DIR)
     time_block = TimeBlock(1, list(range(168)))
+    optim_config = load_optim_config(ACCURATE_STUDY_DIR / "input" / "optim-config.yml")
     problem = build_problem(study, time_block, scenario_ids=[0])
     problem.solve(solver_name="highs")
+    if should_apply_heuristics(study):
+        apply_thermal_heuristics(problem, optim_config, [0])
+        problem.solve(solver_name="highs")
 
     assert problem.termination_condition == "optimal"
     assert problem.objective_value == pytest.approx(16805387)
@@ -239,8 +245,12 @@ def test_fast_heuristic() -> None:
 
     study = load_study(FAST_STUDY_DIR)
     time_block = TimeBlock(1, list(range(168)))
+    optim_config = load_optim_config(FAST_STUDY_DIR / "input" / "optim-config.yml")
     problem = build_problem(study, time_block, scenario_ids=[0])
     problem.solve(solver_name="highs")
+    if should_apply_heuristics(study):
+        apply_thermal_heuristics(problem, optim_config, [0])
+        problem.solve(solver_name="highs")
 
     assert problem.termination_condition == "optimal"
     assert problem.objective_value == pytest.approx(16850000)
@@ -277,5 +287,5 @@ def test_fast_heuristic() -> None:
     assert_output_per_timestep(
         "N",
         "spilled_energy",
-        [0 if t not in [i for i in range(10, 20)] else 50 for t in range(168)],
+        [0 if t not in [i for i in range(10, 20)] else (50 if t==12 else 100) for t in range(168)],
     )

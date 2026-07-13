@@ -18,6 +18,7 @@ from uuid import uuid4
 import xarray as xr
 
 from gems.optim_config.parsing import OptimConfig, ResolutionMode, load_optim_config
+from gems.simulation.heuristic_runner import apply_thermal_heuristics, should_apply_heuristics
 from gems.simulation.optimization import OptimizationProblem, build_problem
 from gems.simulation.simulation_table import (
     SimulationTable,
@@ -192,11 +193,15 @@ class SimulationSession:
             optim_config=self.optim_config,
             initial_values=initial_values,
         )
-        problem.solve(
-            solver_name=self.optim_config.solver_options.name,
-            solver_logs=self.optim_config.solver_options.logs,
+        solver_name = self.optim_config.solver_options.name
+        solver_kwargs = {
+            "solver_logs": self.optim_config.solver_options.logs,
             **self.optim_config.solver_options.parsed_parameters(),
-        )
+        }
+        problem.solve(solver_name=solver_name, **solver_kwargs)
+        if should_apply_heuristics(self.study):
+            apply_thermal_heuristics(problem, self.optim_config, scenario_ids)
+            problem.solve(solver_name=solver_name, **solver_kwargs)
         table = SimulationTableBuilder().build(
             problem, scenario_ids_remap=scenario_ids, table_id=self.run_id
         )

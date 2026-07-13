@@ -23,7 +23,7 @@ from gems.model.model import model
 from gems.model.variable import float_variable, int_variable
 from gems.simulation import TimeBlock, build_problem
 from gems.study import DataBase, Study, System
-from gems.study.parsing import IntegerStrategy
+from gems.study.parsing import IntegerStrategy, IntegerStrategyId
 from gems.study.system import Component
 
 MIXED_MODEL = model(
@@ -35,18 +35,18 @@ MIXED_MODEL = model(
 )
 
 
-def _build(strategies: list[IntegerStrategy]) -> build_problem:  # type: ignore[valid-type]
+def _build(strategies: list[IntegerStrategyId]) -> build_problem:  # type: ignore[valid-type]
     system = System("test")
     for i, strategy in enumerate(strategies):
         component = Component(
-            model=MIXED_MODEL, id=f"c{i+1}", integer_strategy=strategy
+            model=MIXED_MODEL, id=f"c{i+1}", integer_strategy=IntegerStrategy(id=strategy)
         )
         system.add_component(component)
     return build_problem(Study(system, DataBase()), TimeBlock(1, [0]), scenario_ids=[0])
 
 
 def test_exact_strategy_keeps_integer_variable() -> None:
-    problem = _build([IntegerStrategy.EXACT, IntegerStrategy.EXACT])
+    problem = _build([IntegerStrategyId.EXACT, IntegerStrategyId.EXACT])
     assert (
         problem.linopy_model.variables["mixed_model__nb_units"].data.attrs["integer"]
         is True
@@ -58,7 +58,7 @@ def test_exact_strategy_keeps_integer_variable() -> None:
 
 
 def test_relaxed_strategy_makes_integer_variable_continuous() -> None:
-    problem = _build([IntegerStrategy.RELAXED, IntegerStrategy.RELAXED])
+    problem = _build([IntegerStrategyId.RELAXED, IntegerStrategyId.RELAXED])
     assert (
         problem.linopy_model.variables["mixed_model__nb_units__relaxed"].data.attrs[
             "integer"
@@ -72,7 +72,7 @@ def test_relaxed_strategy_makes_integer_variable_continuous() -> None:
 
 
 def test_heuristic_strategy_makes_integer_variable_continuous() -> None:
-    problem = _build([IntegerStrategy.HEURISTIC, IntegerStrategy.HEURISTIC])
+    problem = _build([IntegerStrategyId.HEURISTIC, IntegerStrategyId.HEURISTIC])
     assert (
         problem.linopy_model.variables["mixed_model__nb_units__relaxed"].data.attrs[
             "integer"
@@ -87,7 +87,7 @@ def test_heuristic_strategy_makes_integer_variable_continuous() -> None:
 
 def test_mixed_strategies_work() -> None:
     """Components with different strategies in the same model are supported."""
-    problem = _build([IntegerStrategy.EXACT, IntegerStrategy.RELAXED])
+    problem = _build([IntegerStrategyId.EXACT, IntegerStrategyId.RELAXED])
     assert (
         problem.linopy_model.variables["mixed_model__generation"].data.attrs["integer"]
         is False
@@ -103,7 +103,7 @@ def test_mixed_strategies_work() -> None:
         is False
     )
 
-    problem2 = _build([IntegerStrategy.HEURISTIC, IntegerStrategy.EXACT])
+    problem2 = _build([IntegerStrategyId.HEURISTIC, IntegerStrategyId.EXACT])
     assert (
         problem2.linopy_model.variables["mixed_model__generation"].data.attrs["integer"]
         is False

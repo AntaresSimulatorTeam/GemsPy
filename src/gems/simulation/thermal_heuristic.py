@@ -95,6 +95,8 @@ def find_min_generation_fast(
     List[float]
         Minimum generation power per timestep (MW), clamped by cluster_max_generation.
     """
+    min_up_duration = int(min_up_duration)
+    min_down_duration = int(min_down_duration)
     nb_timesteps = len(generation_power)
     nb_units_on = [0] * nb_timesteps
 
@@ -181,6 +183,8 @@ def find_nb_units_accurate(
     AssertionError
         If the LP has no feasible solution.
     """
+    min_up_duration = int(min_up_duration)
+    min_down_duration = int(min_down_duration)
     # round before ceil to absorb LP solver numerical noise (e.g. 10.0000001 → 10, not 11)
     nb_units_required = [math.ceil(round(v, 6)) for v in nb_units_on_opt]
 

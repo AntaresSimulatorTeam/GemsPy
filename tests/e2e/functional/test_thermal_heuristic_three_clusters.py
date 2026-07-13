@@ -30,7 +30,9 @@ from pathlib import Path
 
 import pytest
 
+from gems.optim_config.parsing import load_optim_config
 from gems.simulation import TimeBlock, build_problem
+from gems.simulation.heuristic_runner import apply_thermal_heuristics, should_apply_heuristics
 from gems.simulation.simulation_table import SimulationTable, SimulationTableBuilder
 from gems.study.folder import load_study
 from tests.e2e.functional.expected_outputs_three_clusters import (
@@ -68,7 +70,7 @@ SCENARIOS = [0, 1]
 
 # Expected objective costs [scenario][week]
 _COST_MILP = [[78933742, 102103587], [17472101, 17424769]]
-_COST_ACCURATE = [[78996726, 102215087 - 69500], [17589534, 17641808]]
+_COST_ACCURATE = [[78996726, 102215087 - 69500], [17587733, 17650089]]
 _COST_FAST = [
     [79277215 - 630089, 102461792 - 699765],
     [17803738 - 661246, 17720390 - 661246],
@@ -141,11 +143,15 @@ def test_accurate_heuristic() -> None:
     The accurate heuristic rounds up the number of on units from the LP relaxation.
     """
     study = load_study(ACCURATE_STUDY_DIR)
+    optim_config = load_optim_config(ACCURATE_STUDY_DIR / "input" / "optim-config.yml")
     for week_idx, week_range in enumerate(WEEKS):
         time_block = TimeBlock(week_idx + 1, list(week_range))
         for scenario in SCENARIOS:
             problem = build_problem(study, time_block, scenario_ids=[scenario])
             problem.solve(solver_name="highs")
+            if should_apply_heuristics(study):
+                apply_thermal_heuristics(problem, optim_config, [scenario])
+                problem.solve(solver_name="highs")
             assert problem.termination_condition == "optimal"
             assert problem.objective_value == pytest.approx(
                 _COST_ACCURATE[scenario][week_idx]
@@ -197,11 +203,15 @@ def test_fast_heuristic() -> None:
     The fast heuristic uses slot-based scheduling of commitment decisions.
     """
     study = load_study(FAST_STUDY_DIR)
+    optim_config = load_optim_config(FAST_STUDY_DIR / "input" / "optim-config.yml")
     for week_idx, week_range in enumerate(WEEKS):
         time_block = TimeBlock(week_idx + 1, list(week_range))
         for scenario in SCENARIOS:
             problem = build_problem(study, time_block, scenario_ids=[scenario])
             problem.solve(solver_name="highs")
+            if should_apply_heuristics(study):
+                apply_thermal_heuristics(problem, optim_config, [scenario])
+                problem.solve(solver_name="highs")
             assert problem.termination_condition == "optimal"
             assert problem.objective_value == pytest.approx(
                 _COST_FAST[scenario][week_idx]

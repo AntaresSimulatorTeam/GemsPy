@@ -3,19 +3,20 @@ models:
     heuristic:
       - id: fast
         inputs:
-          - id: generation_power
-            value: generation_power
-          - id: cluster_max_generation
-            value: cluster_max_generation
-          - id: min_power_per_unit
-            value: min_power_per_unit
-          - id: max_power_per_unit
-            value: max_power_per_unit
-          - id: min_up_duration
-            value: min_up_duration
-          - id: min_down_duration
-            value: min_down_duration
+          - heuristic-element: generation_power
+            id: generation_power
+            type: variable-solution
+          - heuristic-element: cluster_max_generation
+            id: cluster_max_generation
+          - heuristic-element: min_power_per_unit
+            id: min_power_per_unit
+          - heuristic-element: max_power_per_unit
+            id: max_power_per_unit
+          - heuristic-element: min_up_duration
+            id: min_up_duration
+          - heuristic-element: min_down_duration
+            id: min_down_duration
         outputs:
-          - id: minimum_generation_power
-            variable: generation_power
-            field: lower-bound
+          - heuristic-element: minimum_generation_power
+            id: generation_power
+            type: variable-lower-bound

@@ -78,20 +78,6 @@ library:
           lower-bound: min(max(cluster_max_generation*(1-spinning/100), min_power_per_unit * ceil(cluster_max_generation / max_power_per_unit)), cluster_min_gen_modulation * num_units * max_power_per_unit) # real expression before simplification : min(upper-bound(generation_power),cluster_min_gen_modulation * num_units * max_power_per_unit) = min(max(cluster_max_generation*(1-spinning/100), min_power_per_unit * ceil(cluster_max_generation*(1-spinning/100) / (max_power_per_unit*(1-spinning/100)))), cluster_min_gen_modulation * num_units * max_power_per_unit)
           upper-bound: max(cluster_max_generation*(1-spinning/100), min_power_per_unit * ceil(cluster_max_generation / max_power_per_unit)) # real expression before simplification : max(cluster_max_generation*(1-spinning/100), min_power_per_unit * ceil(cluster_max_generation*(1-spinning/100) / (max_power_per_unit*(1-spinning/100))))
           variable-type: continuous
-        - id: num_units_on
-          lower-bound: ceil(min(cluster_max_generation/max_power_per_unit, cluster_min_gen_modulation * num_units * max_power_per_unit/(max_power_per_unit*(1-spinning/100)))) # real expression before simplification : ceil(lower-bound(generation_power)/(max_power_per_unit*(1-spinning/100))) = ceil(min(max(cluster_max_generation*(1-spinning/100), min_power_per_unit * ceil(cluster_max_generation / max_power_per_unit)), cluster_min_gen_modulation * num_units * max_power_per_unit)/(max_power_per_unit*(1-spinning/100)))
-          upper-bound: ceil(cluster_max_generation/max_power_per_unit) # real expression before simplification : ceil(upper-bound(generation_power)/(max_power_per_unit*(1-spinning/100))) = ceil(max(cluster_max_generation*(1-spinning/100), min_power_per_unit * ceil(cluster_max_generation*(1-spinning/100) / (max_power_per_unit*(1-spinning/100))))/(max_power_per_unit*(1-spinning/100)))
-          variable-type: continuous
-        - id: num_units_starting
-          lower-bound: 0
-          variable-type: continuous
-        - id: num_units_stopping
-          lower-bound: 0
-          variable-type: continuous
-        - id: num_units_failing
-          lower-bound: 0
-          upper-bound: max(0, (ceil(cluster_max_generation/max_power_per_unit))[t-1] - (ceil(cluster_max_generation/max_power_per_unit)))
-          variable-type: continuous
       ports:
         - id: balance_port
           type: flow
@@ -99,23 +85,13 @@ library:
         - port: balance_port
           field: flow
           definition: generation_power
-      constraints:
-        - id: max_generation
-          expression: generation_power <= num_units_on * max_power_per_unit*(1-spinning/100)
-        - id: min_generation
-          expression: generation_power >= num_units_on * min_power_per_unit
-        - id: on_units_dynamics
-          expression: num_units_on = num_units_on[t-1] + num_units_starting - num_units_stopping
-        - id: num_units_failing_lower_than_stopping
-          expression: num_units_failing <= num_units_stopping
-        - id: min_up_duration_cst
-          expression: sum(t-min_up_duration + 1 .. t, num_units_starting - num_units_failing) <= num_units_on
-        - id: min_down_duration_cst
-          expression: sum(t-min_down_duration + 1 .. t, num_units_stopping) <= ((ceil(cluster_max_generation/max_power_per_unit)))[t-min_down_duration] - num_units_on + sum(t-min_down_duration + 1 .. t, max(0, ceil(cluster_max_generation/max_power_per_unit) - (ceil(cluster_max_generation/max_power_per_unit))[t-1]))
       objective-contributions:
         - id: objective
-          expression: expec(sum(market_bid_cost * generation_power + startup_cost * num_units_starting + fixed_cost * num_units_on))
-
+          expression: expec(sum(market_bid_cost * generation_power))
+      extra-outputs:
+        - id: num_units_on
+          expression: ceil(generation_power / max_power_per_unit)
+     
     - id: bc
       parameters:
         - id: upper_bound
