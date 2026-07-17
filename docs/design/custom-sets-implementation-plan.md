@@ -253,8 +253,15 @@ phase (rare — global ordinal sets almost always have an obvious fixed size).
 
 **Validation, at library-load time (`resolve_library.py`), before any `Model`/`Library` is
 constructed:**
-1. Naming collisions: a set id can't collide with a parameter/variable id in the same model, any
-   visible global set id, or the literal `t`.
+1. Naming collisions: a local set id can't collide with a parameter/variable id in the same model or
+   the literal `t`. More generally, **no locally-declared id in a model — parameter, variable, local
+   set, port, constraint, binding-constraint, objective-contribution, or extra-output — may collide
+   with any global set id visible in that library**, since a global set's id is resolvable bare from
+   inside any model without local declaration (via `indexed-by` or a bare current-position reference),
+   creating the same ambiguity a local-set/parameter collision would. Implemented as one check: compute
+   `all_visible_ids` (every parameter/variable/local-set/port/constraint/binding-constraint/objective-
+   contribution/extra-output id declared in the model) and validate it has no overlap with the
+   library's global set ids, in addition to the narrower local-set-vs-parameter/`t` check.
 2. Every `indexed-by` entry resolves to a real, visible set (local ∪ global).
 3. A local set's `cardinality`-parameter reference must itself be scalar and not itself `indexed-by`
    anything (no circular set-size dependency).
