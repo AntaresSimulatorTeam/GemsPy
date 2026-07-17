@@ -16,7 +16,7 @@ from gems_craft.expression import literal
 from gems_craft.expression.expression import port_field
 from gems_craft.model import Constraint, ModelPort, PortType, model
 from gems_craft.study import Component, PortRef, PortsConnection, create_component
-from tests.unittests.system.libs.standard import DEMAND_MODEL
+from tests.unittests.gems_craft.system.libs.standard import DEMAND_MODEL
 
 
 def test_port_type_compatibility_ko() -> None:
