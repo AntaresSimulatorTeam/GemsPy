@@ -237,6 +237,17 @@ One dataclass for `SetDeclaration` (not a 2×2 local/global × ordinal/enumerate
 `scope`/`kind` pair of enums is enough, and avoids forcing every generic piece of downstream code to
 special-case four types.
 
+**Clarifying `is_resolved()`'s exact role, since `SetDeclaration` is frozen:** a `SetDeclaration` built
+from `Model.sets`/`Library.sets` is never mutated once constructed — `is_resolved()` reflects only
+what the model/library itself provided (true for a local ordinal set with a literal `cardinality`, or
+a local enumerated set with `elements` given directly; **always `False`** for every global set, and for
+a local enumerated set deferred to `system.yml`, since neither ever carries a concrete value at this
+stage). Resolution never mutates or replaces the `SetDeclaration` stored on `Model`/`Library` — it
+produces an entirely separate, authoritative structure, `Component.resolved_sets: Dict[str, SetDomain]`
+(below), built fresh by `resolve_components.py`. Anything needing a set's concrete value at
+solve/vectorization time (PR #4) must read `Component.resolved_sets`, never attempt to re-derive it
+from a `SetDeclaration`.
+
 `Model.sets: Dict[str, SetDeclaration]` (local) and `Library.sets: Dict[str, SetDeclaration]` (global,
 a new top-level collection sibling to `port-types`/`models`, per the doc). `PortField` gains
 `indexed_by: Tuple[str, ...] = ()`.
@@ -267,14 +278,17 @@ port-type `FieldSchema`.
 **Validation, at library-load time (`resolve_library.py`), before any `Model`/`Library` is
 constructed:**
 1. Naming collisions: a local set id can't collide with a parameter/variable id in the same model or
-   the literal `t`. More generally, **no locally-declared id in a model — parameter, variable, local
-   set, port, constraint, binding-constraint, objective-contribution, or extra-output — may collide
-   with any global set id visible in that library**, since a global set's id is resolvable bare from
-   inside any model without local declaration (via `indexed-by` or a bare current-position reference),
-   creating the same ambiguity a local-set/parameter collision would. Implemented as one check: compute
-   `all_visible_ids` (every parameter/variable/local-set/port/constraint/binding-constraint/objective-
-   contribution/extra-output id declared in the model) and validate it has no overlap with the
-   library's global set ids, in addition to the narrower local-set-vs-parameter/`t` check.
+   the literal `t`; a **global** set id likewise can't be the literal `t` either (checked when
+   `Library.sets` is built, since a global set's id is just as usable bare as a local set's). More
+   generally, **no locally-declared id in a model — parameter, variable, local set, port, constraint,
+   binding-constraint, objective-contribution, or extra-output — may collide with any global set id
+   visible in that library**, since a global set's id is resolvable bare from inside any model without
+   local declaration (via `indexed-by` or a bare current-position reference), creating the same
+   ambiguity a local-set/parameter collision would. Implemented as two checks: (a) library-load time,
+   `Library.sets`' ids must not include `t`; (b) per-model, compute `all_visible_ids` (every
+   parameter/variable/local-set/port/constraint/binding-constraint/objective-contribution/extra-output
+   id declared in the model) and validate it has no overlap with the library's global set ids, in
+   addition to the narrower local-set-vs-parameter/`t` check.
 2. Every `indexed-by` entry resolves to a real, visible set (local ∪ global).
 3. A local set's `cardinality`-parameter reference must itself be scalar and not itself `indexed-by`
    anything (no circular set-size dependency).
@@ -322,8 +336,12 @@ set (`GlobalSetSchema`, `kind`-only, no `cardinality`/`elements` accepted — as
 `cardinality`/`elements` key on a library-level set entry is rejected), a local ordinal set with a
 parameter-referenced cardinality (plus the scalar/non-circular validation errors), a local enumerated
 set deferred to `system.yml`, a port-type field indexed by a global set (plus the local-id-rejected
-error case), and all three naming-collision error cases (`t`, parameter-id collision, global-set-id
-collision). `tests/unittests/system/` — `system.yml`'s two new `sets:` blocks resolving correctly for
+error case), and the naming-collision error cases: a local set id equal to `t`, a local set id
+colliding with a parameter/variable id, a global set id equal to `t`, and — covering the full breadth
+of the broadened rule, not just one representative case — a global-set-id collision for *each* other
+locally-declared entity kind in turn (a variable, a port, a constraint, a binding-constraint, an
+objective-contribution, and an extra-output each separately named the same as a visible global set).
+`tests/unittests/system/` — `system.yml`'s two new `sets:` blocks resolving correctly for
 both an ordinal and an enumerated global set, a missing-global-set-entry error, a
 kind-mismatch error (e.g. `elements` given in `system.yml` for a set the library declared
 `kind: ordinal`), missing-local-set-elements error.
