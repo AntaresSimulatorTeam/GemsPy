@@ -217,10 +217,7 @@ class SetDeclaration:
     scope: SetScope
     kind: SetKind
     description: Optional[str] = None
-    cardinality: Optional[int] = None             # literal, if resolved
-    cardinality_parameter: Optional[str] = None   # LOCAL + ORDINAL only
-    elements: Optional[Tuple[str, ...]] = None    # resolved order, if ENUMERATED and resolved
-    def is_resolved(self) -> bool: ...
+    cardinality_parameter: Optional[str] = None   # LOCAL + ORDINAL only; names a scalar parameter
 
 @dataclass(frozen=True)
 class OrdinalSetDomain:
@@ -237,38 +234,42 @@ One dataclass for `SetDeclaration` (not a 2×2 local/global × ordinal/enumerate
 `scope`/`kind` pair of enums is enough, and avoids forcing every generic piece of downstream code to
 special-case four types.
 
-**Clarifying `is_resolved()`'s exact role, since `SetDeclaration` is frozen:** a `SetDeclaration` built
-from `Model.sets`/`Library.sets` is never mutated once constructed — `is_resolved()` reflects only
-what the model/library itself provided (true for a local ordinal set with a literal `cardinality`, or
-a local enumerated set with `elements` given directly; **always `False`** for every global set, and for
-a local enumerated set deferred to `system.yml`, since neither ever carries a concrete value at this
-stage). Resolution never mutates or replaces the `SetDeclaration` stored on `Model`/`Library` — it
-produces an entirely separate, authoritative structure, `Component.resolved_sets: Dict[str, SetDomain]`
-(below), built fresh by `resolve_components.py`. Anything needing a set's concrete value at
-solve/vectorization time (PR #4) must read `Component.resolved_sets`, never attempt to re-derive it
-from a `SetDeclaration`.
+**A `SetDeclaration` never carries a concrete value, for either scope, full stop** — this was a design
+fork resolved in favor of full uniformity: local sets used to optionally allow a literal `cardinality`
+or directly-given `elements` in the model, but that option is now removed, so `SetDeclaration` has no
+`cardinality`/`elements` fields at all (only `cardinality_parameter`, which is a *reference*, not a
+value, and only ever set for a local ordinal set). There is therefore no `is_resolved()` method to
+reason about anymore — a `SetDeclaration` built from `Model.sets`/`Library.sets` is a pure structural
+declaration, permanently. The sole source of concrete values is a separate structure,
+`Component.resolved_sets: Dict[str, SetDomain]` (below), built fresh by `resolve_components.py` from
+`system.yml`. Anything needing a set's concrete value at solve/vectorization time (PR #4) reads
+`Component.resolved_sets`, never a `SetDeclaration`.
 
 `Model.sets: Dict[str, SetDeclaration]` (local) and `Library.sets: Dict[str, SetDeclaration]` (global,
 a new top-level collection sibling to `port-types`/`models`, per the doc). `PortField` gains
 `indexed_by: Tuple[str, ...] = ()`.
 
-**Two distinct YAML schemas, since local and global sets now have genuinely different field sets** (an
-earlier version of this plan used one shared `SetSchema` for both — that's no longer viable, per the
-doc: a global set's `cardinality`/`elements` are **never** given in the library at all, only in
-`system.yml`):
+**Two YAML schemas, nearly identical, since local and global sets now differ by exactly one field**
+(an earlier version of this plan gave local sets more flexibility than global sets — `cardinality` as
+either a literal or a parameter reference, and `elements` given directly — both now removed, per the
+doc's full alignment: *no* set, local or global, ever gives a concrete value in the library or model):
 
-- `LocalSetSchema` (used in `ModelSchema.sets`): `id`, `description`, `cardinality` (`Union[int, str]`
-  — literal or a scalar-parameter id), `elements` (`Optional[List[str]]`) — unchanged from before.
 - `GlobalSetSchema` (used in `LibrarySchema.sets`): `id`, `description`, `kind` (`Literal["ordinal",
-  "enumerated"]`, **mandatory**) — no `cardinality`/`elements` field at all. Using a separate schema
-  class makes it structurally impossible to give a global set concrete contents in the library (a
-  Pydantic `extra="forbid"` on stray `cardinality`/`elements` keys, rather than a field-validator check
-  that would otherwise need to guess which scope it's validating from inside a shared class).
+  "enumerated"]`, **mandatory**). No `cardinality`/`elements` field at all.
+- `LocalSetSchema` (used in `ModelSchema.sets`): identical, plus one additional field —
+  `cardinality` (`Optional[str]`, a scalar-parameter id — **never a literal integer**), required when
+  `kind: ordinal` and forbidden when `kind: enumerated`. There is no `elements` field here at all; an
+  enumerated local set's concrete elements are always supplied per component in `system.yml` (see
+  below), exactly like a global set's are always supplied once, study-wide.
+
+Both schemas use Pydantic `extra="forbid"` so a stray `cardinality`/`elements` key structurally cannot
+appear where it isn't allowed (e.g. `elements` on any set declaration, or a literal `cardinality` on a
+local one) — enforced by the schema shape itself, not a runtime check that would need to guess intent.
 
 This also resolves what an earlier version of this plan flagged as a spec ambiguity (the `kind` of a
 fully-deferred global set, since neither `cardinality` nor `elements` was ever given at library level)
-— `kind` is now a required field on `GlobalSetSchema`, so there's no ambiguity or default to reason
-about; every global set states its kind explicitly, always.
+— `kind` is now a required field on both schemas, so there's no ambiguity or default to reason about;
+every set states its kind explicitly, always.
 
 An `indexed_by` field (`Optional[Union[str, List[str]]]`, normalized to a tuple immediately after
 parsing) is added to `ParameterSchema`, `VariableSchema`, `ConstraintSchema` (covers constraints and
@@ -290,13 +291,12 @@ constructed:**
    id declared in the model) and validate it has no overlap with the library's global set ids, in
    addition to the narrower local-set-vs-parameter/`t` check.
 2. Every `indexed-by` entry resolves to a real, visible set (local ∪ global).
-3. A local set's `cardinality`-parameter reference must itself be scalar and not itself `indexed-by`
-   anything (no circular set-size dependency).
-4. A global set's `SetDeclaration` (built from `GlobalSetSchema`) never has `cardinality`/`elements`
-   populated at this stage at all — enforced structurally by using a distinct schema class with no such
-   fields, not by a runtime check. `is_resolved()` is therefore always `False` for a `SetDeclaration`
-   built directly from a library; it only ever becomes resolved once `resolve_components.py` fills in
-   the concrete value from `system.yml` (see below).
+3. A local ordinal set's `cardinality`-parameter reference must itself be scalar and not itself
+   `indexed-by` anything (no circular set-size dependency).
+4. No `SetDeclaration`, local or global, ever carries a concrete `cardinality`/`elements` value —
+   enforced structurally by both `GlobalSetSchema` and `LocalSetSchema` having no such fields at all
+   (`extra="forbid"`), not by a runtime check. Every set's concrete value is resolved later, exclusively
+   by `resolve_components.py`, from `system.yml` (see below).
 5. Port-field-definition indexing consistency (a field's declared `indexed-by` must match its
    definition's inferred structure) — this specific check is deferred to PR #3, since it needs
    `compute_indexation`, but the schema plumbing that makes it checkable belongs here.
@@ -309,21 +309,23 @@ rather than silently producing an empty lookup.
 
 **`system.yml` schema (`src/gems/study/parsing.py`):** `SystemSetSchema` (`id`, `cardinality`,
 `elements`) in a new top-level `sets:` list (sibling to `components`/`connections`), for **study-wide**
-instantiation of **every** library-level global set (not just some — no global set is ever resolved
-any other way); `ComponentSetSchema` (`id`, `elements`) in a new per-component `sets:` list, for
-per-component instantiation of deferred **local** enumerated sets (mirrors how `properties` values are
-supplied per-component while their keys are declared in the model).
+instantiation of **every** library-level global set (no global set is ever resolved any other way);
+`ComponentSetSchema` (`id`, `elements`) in a new per-component `sets:` list, for per-component
+instantiation of **every** local enumerated set any instantiated model declares (no local enumerated
+set is ever resolved any other way either — mirrors how `properties` values are supplied per-component
+while their keys are declared in the model).
 
 **Resolution (`src/gems/study/resolve_components.py`):** for every library-level global set declared by
-any library the system uses, look it up in `SystemSchema.sets`; error if it's missing (there is no
-"already resolved in the library" case to distinguish anymore — every global set always needs an
-entry), and error if the entry's shape (`cardinality` vs. `elements`) doesn't match the library's
-declared `kind` for that set. For every unresolved local enumerated set, every instantiating component
-must supply matching elements; error listing missing ids, in the same style as the existing
-missing-parameter/missing-property checks. `Component` gains `resolved_sets: Dict[str, SetDomain] =
-field(default_factory=dict)` — local sets specific to that component, plus every global set of its
-model, fully concrete. `Study` gains a `check_set_consistency()` validation, mirroring the existing
-time/scenario data-requirement check.
+any library the system uses, look it up in `SystemSchema.sets`; error if it's missing, and error if the
+entry's shape (`cardinality` vs. `elements`) doesn't match the library's declared `kind` for that set.
+For every local ordinal set, its size comes from the ordinary per-component parameter-assignment
+mechanism (the model's `cardinality` field just names which parameter — no separate `sets:` entry is
+involved). For every local enumerated set, every instantiating component must supply matching elements
+in its own `ComponentSetSchema.sets` entry; error listing missing ids, in the same style as the
+existing missing-parameter/missing-property checks. `Component` gains `resolved_sets: Dict[str,
+SetDomain] = field(default_factory=dict)` — local sets specific to that component, plus every global
+set of its model, fully concrete. `Study` gains a `check_set_consistency()` validation, mirroring the
+existing time/scenario data-requirement check.
 
 **Interaction with PR #1:** this PR's `resolve_library.py` changes populate `ModelIdentifiers.sets`
 (the field PR #1 introduces, empty by default) with the union of a model's local set ids and every
@@ -334,8 +336,10 @@ logical dependency exists between the two.
 **Testing:** `tests/unittests/lib_parsing/` — round-trip parsing of an ordinal and an enumerated global
 set (`GlobalSetSchema`, `kind`-only, no `cardinality`/`elements` accepted — assert a stray
 `cardinality`/`elements` key on a library-level set entry is rejected), a local ordinal set with a
-parameter-referenced cardinality (plus the scalar/non-circular validation errors), a local enumerated
-set deferred to `system.yml`, a port-type field indexed by a global set (plus the local-id-rejected
+parameter-referenced cardinality (plus the scalar/non-circular validation errors, and a rejection test
+for a literal integer `cardinality` on a local set — `LocalSetSchema.cardinality` is string-only), a
+local enumerated set (asserting it never accepts an `elements` key — `LocalSetSchema` has none —
+always resolved in `system.yml`), a port-type field indexed by a global set (plus the local-id-rejected
 error case), and the naming-collision error cases: a local set id equal to `t`, a local set id
 colliding with a parameter/variable id, a global set id equal to `t`, and — covering the full breadth
 of the broadened rule, not just one representative case — a global-set-id collision for *each* other
@@ -430,23 +434,18 @@ PR #1) stays a **permanent** raise; only `sum_over` and the three new node types
 implementations added to `indexing.py` in this PR, following the exact `time_sum`/`scenario_operator`
 collapse-one-dimension pattern.
 
-**Named-element access requires `elements` known at library-load time — permanently true for global
-sets, optionally true for local sets:** named-element access (`X{gas}`) can only resolve eagerly if the
-target enumerated set's `elements` are already known when `resolve_set_indexing` runs. Since a global
-set's `elements` are now *never* given in the library (always resolved later, from `system.yml` — see
-PR #2), **this case is a permanent, structural restriction for every global set, not a
-phase-limited gap**: `resolve_set_indexing` raises a clear error whenever a bare identifier inside a
-`{}` slot targets a global set and isn't itself that set's own id (i.e. isn't the current-position/
-shift/explicit-integer forms) — steering authors toward ordinal-style access instead (bare set-id /
-shift / explicit integer position). For a **local** enumerated set, this is still only a *conditional*
-restriction: it resolves fine when the model gives `elements` directly, and only hits the same error
-when the model defers `elements` to per-component `system.yml` instantiation. Fully supporting
-deferred-local-set + named-element sugar would require re-walking stored ASTs during `Study`
-construction to patch in the final element positions, per component — a small, sharply-scoped,
-worth-revisiting-later follow-up, not a blocker for the initial implementation. (There is no equivalent
-follow-up for global sets — the restriction there is permanent by design, not a temporary gap, since
-`system.yml`'s instantiation is study-wide and a `Model`'s stored, shared AST can't hold a
-per-study-specific resolution regardless.)
+**Named-element access is never resolvable, for any set — this is now a permanent, structural
+restriction, not a conditional one:** named-element access (`X{gas}`) can only resolve eagerly if the
+target enumerated set's `elements` are already known when `resolve_set_indexing` runs. Since *no* set
+— local or global, ordinal or enumerated — ever gives concrete `elements` in the library or model (see
+PR #2: `LocalSetSchema`/`GlobalSetSchema` have no `elements` field at all; every enumerated set's
+elements are always resolved later, from `system.yml`, either once study-wide or per component), this
+case can never be resolved, for any set, ever. `resolve_set_indexing` unconditionally raises a clear
+error whenever a bare identifier inside a `{}` slot isn't itself the target set's own id (i.e. isn't
+one of the current-position / shift / explicit-integer forms) — steering authors toward those instead.
+There is no follow-up work item for this one, unlike some other restrictions in this plan: the
+restriction is permanent by design for every set, since a `Model`'s stored, shared AST can never hold a
+per-study- or per-component-specific resolution regardless of what mechanism might be added later.
 
 **Breaking change contained in this PR:** `Model.objective_contributions`/`Model.extra_outputs` change
 from `Dict[str, ExpressionNode]` to `Dict[str, IndexedExpression]` (a two-field wrapper carrying
@@ -458,12 +457,13 @@ call sites in PR #4's territory are listed there.
 order-independent for equality; `sum_over` collapses only its own dimension; a cross-product structural
 check (a term that's both time- and set-indexed reports both). New
 `tests/unittests/model/test_set_resolution.py` — one test per classification case in the resolution
-pass (current-element drop, shift, explicit literal, named element on a local set with `elements`
-given directly, named-element error on a local set deferred to `system.yml`, named-element error on
-**any** global set — including one whose `system.yml` instantiation, if it were resolved early for
-some other reason, happens to contain that exact element name, to prove the restriction is
-structural/permanent and not merely "not yet resolved" — standalone bare set-id, unknown-identifier
-error), plus a multi-set case with mixed forms (`X{segment, fuel+1}`). Extend `test_model.py` for the
+pass (current-element drop, shift, explicit literal, standalone bare set-id, unknown-identifier error),
+plus a multi-set case with mixed forms (`X{segment, fuel+1}`). Named-element access
+(`X{gas}`-style) gets its own dedicated cases, run against **both** a local and a global set to prove
+the restriction is uniform: assert `resolve_set_indexing` raises in both, including a case where the
+target set's `system.yml` instantiation, if it were resolved early for some other reason, happens to
+contain that exact element name — to prove the restriction is structural/permanent for every set and
+not merely "not yet resolved" in this particular test's setup. Extend `test_model.py` for the
 `IndexedExpression` round-trip and the port-field-definition consistency check.
 
 **Files touched:** new `src/gems/model/set_resolution.py`; modify `src/gems/expression/expression.py`,
