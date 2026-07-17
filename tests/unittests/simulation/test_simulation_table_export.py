@@ -126,7 +126,7 @@ def test_to_dataset_values_match_data_single_scenario() -> None:
         expected = float(row[SimulationColumns.VALUE.value])
         actual = float(
             ds[output].sel(
-                component=comp, **{"absolute-time-index": t, "scenario-index": s}
+                component=comp, **{"absolute_time_index": t, "scenario_index": s}
             )
         )
         assert actual == pytest.approx(expected)
@@ -144,7 +144,7 @@ def test_to_dataset_values_match_data_multi_scenario() -> None:
         expected = float(row[SimulationColumns.VALUE.value])
         actual = float(
             ds[output].sel(
-                component=comp, **{"absolute-time-index": t, "scenario-index": s}
+                component=comp, **{"absolute_time_index": t, "scenario_index": s}
             )
         )
         assert actual == pytest.approx(expected)

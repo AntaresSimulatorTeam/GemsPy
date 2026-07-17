@@ -83,8 +83,8 @@ _SEQUENTIAL_CONFIG = textwrap.dedent("""\
 _KEY_COLS = [
     "component",
     "output",
-    "absolute-time-index",
-    "scenario-index",
+    "absolute_time_index",
+    "scenario_index",
 ]
 
 

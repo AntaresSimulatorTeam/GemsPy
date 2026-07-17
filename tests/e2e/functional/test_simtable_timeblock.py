@@ -18,7 +18,7 @@ Test: `test_simtable_on_partial_timeblock`
   - System: 3 components — node, generator (pmax=200), demand (timevarying: demand[t]=t)
   - Data horizon: 150 timesteps
   - TimeBlock: [40, 90)  →  50 timesteps (indices 40–89)
-  - Checks that SimulationTable absolute-time-index, block-time-index, and
+  - Checks that SimulationTable absolute_time_index, block_time_index, and
     generation values are all consistent with the partial block.
 """
 
@@ -55,8 +55,8 @@ def test_simtable_on_partial_timeblock(lib_dict_unittest: dict[str, Library]) ->
     With demand[t] = t and pmax = 200, the optimizer sets generation[t] = t at
     every timestep, making all three assertions self-consistent:
       1. generation values equal their absolute timestep index.
-      2. absolute-time-index runs from 40 to 89 (not 0–149 or 0–49).
-      3. block-time-index runs from 0 to 49 and equals absolute-time-index − 40.
+      2. absolute_time_index runs from 40 to 89 (not 0–149 or 0–49).
+      3. block_time_index runs from 0 to 49 and equals absolute_time_index − 40.
     """
     node_model = lib_dict_unittest["basic"].models["basic.node"]
     generator_model = lib_dict_unittest["basic"].models["basic.generator"]
@@ -123,7 +123,7 @@ def test_simtable_on_partial_timeblock(lib_dict_unittest: dict[str, Library]) ->
     assert abs_times == list(range(BLOCK_START, BLOCK_END))
     assert block_times == list(range(BLOCK_END - BLOCK_START))
 
-    # absolute-time-index = block-time-index + BLOCK_START for every row
+    # absolute_time_index = block_time_index + BLOCK_START for every row
     offset = (
         gen_rows[SimulationColumns.ABSOLUTE_TIME_INDEX.value].astype(int)
         - gen_rows[SimulationColumns.BLOCK_TIME_INDEX.value].astype(int)

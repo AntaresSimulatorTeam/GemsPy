@@ -20,6 +20,17 @@ All notable changes to GemsPy are documented here.
   - All `gems.*` imports must be updated to `gems_craft.*` or `gems_runner.*`
     accordingly; see the module lists above. The `gemspy` console script now
     points at `gems_runner.main.main:main_cli`.
+    
+### Fixed
+- Comparison operators (`>=`, `<=`, `=`) in extra-output expressions no longer raise
+  `NotImplementedError` at post-solve evaluation; they now evaluate to a 0/1 indicator
+  (e.g. `dual(balance) >= unsupplied_cost - 5`).
+- Extra-output `minimum()`/`maximum()` no longer break when several models coexist
+  in the same problem: solution and constraint-dual arrays are now filtered back
+  down to each model's own components before evaluation, instead of keeping the
+  NaN-padded entries introduced by linopy's outer join across models.
+
+---
 
 ## [0.1.2] - 2026-06-11
 

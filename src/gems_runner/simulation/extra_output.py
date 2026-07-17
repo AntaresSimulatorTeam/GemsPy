@@ -26,14 +26,19 @@ Port arrays for ``sum_connections`` support are built by calling
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, cast
 
 import numpy as np
 import xarray as xr
 
-from gems_craft.expression.expression import DualNode, ReducedCostNode, VariableNode
-from gems_craft.model.port import PortFieldId
-from gems_craft.study.system import Component
+from gems_craft.expression.expression import (
+    Comparator,
+    ComparisonNode,
+    DualNode,
+    ReducedCostNode,
+    VariableNode,
+)
+from gems_craft.expression.visitor import visit
 from gems_runner.simulation.vectorized_builder import VectorizedBuilderBase
 
 
@@ -146,3 +151,22 @@ class VectorizedExtraOutputBuilder(VectorizedBuilderBase[xr.DataArray]):
                 f"{self.model_id!r}."
             )
         return self.var_reduced_cost_arrays[key]
+
+    def comparison(self, node: ComparisonNode) -> xr.DataArray:
+        """Evaluate a comparison post-solve as a float indicator DataArray.
+
+        Both operands resolve to concrete ``xr.DataArray`` values (solved
+        variables, duals, parameters, ...), so the comparison is evaluated
+        element-wise and returned as ``1.0`` where it holds and ``0.0``
+        otherwise. This is only meaningful post-solve; the pre-solve builder
+        keeps rejecting comparisons (they are constraints, not values).
+        """
+        left = cast(xr.DataArray, visit(node.left, self))
+        right = cast(xr.DataArray, visit(node.right, self))
+        if node.comparator == Comparator.LESS_THAN:  # "<="
+            indicator = left <= right
+        elif node.comparator == Comparator.GREATER_THAN:  # ">="
+            indicator = left >= right
+        else:  # Comparator.EQUAL -> "="
+            indicator = left == right
+        return cast(xr.DataArray, indicator).astype(float)

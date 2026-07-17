@@ -120,7 +120,7 @@ def _get_value(raw, component: str, output: str, timestep: int) -> float:
     mask = (
         (raw["component"] == component)
         & (raw["output"] == output)
-        & (raw["absolute-time-index"] == timestep)
+        & (raw["absolute_time_index"] == timestep)
     )
     rows = raw[mask]
     assert (

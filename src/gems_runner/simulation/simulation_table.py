@@ -15,7 +15,7 @@ class OutputView:
     """
 
     def __init__(self, df: pd.DataFrame) -> None:
-        # df: index = absolute-time-index, columns = scenario-index
+        # df: index = absolute_time_index, columns = scenario_index
         self._df = df
 
     @property
@@ -32,8 +32,8 @@ class OutputView:
 
         Called with no arguments returns the full Time × Scenario DataFrame.
         Called with one argument returns a ``pd.Series``:
-        - ``value(scenario_index=s)`` → Series indexed by absolute-time-index
-        - ``value(time_index=t)``     → Series indexed by scenario-index
+        - ``value(scenario_index=s)`` → Series indexed by absolute_time_index
+        - ``value(time_index=t)``     → Series indexed by scenario_index
         Called with both arguments returns a scalar ``float``.
         """
         if time_index is None and scenario_index is None:
@@ -142,7 +142,7 @@ class SimulationTable:
         """Return simulation results as an xr.Dataset.
 
         Each output variable becomes a DataArray with dimensions
-        (component, absolute-time-index, scenario-index).
+        (component, absolute_time_index, scenario_index).
         Scalar rows without component/time/scenario (e.g. objective-value)
         are stored as zero-dimensional variables.
         """
@@ -174,11 +174,11 @@ class SimulationColumns(str, Enum):
     BLOCK = "block"
     COMPONENT = "component"
     OUTPUT = "output"
-    ABSOLUTE_TIME_INDEX = "absolute-time-index"
-    BLOCK_TIME_INDEX = "block-time-index"
-    SCENARIO_INDEX = "scenario-index"
+    ABSOLUTE_TIME_INDEX = "absolute_time_index"
+    BLOCK_TIME_INDEX = "block_time_index"
+    SCENARIO_INDEX = "scenario_index"
     VALUE = "value"
-    BASIS_STATUS = "basis-status"
+    BASIS_STATUS = "basis_status"
 
 
 class SimulationTableBuilder:
@@ -271,7 +271,11 @@ class SimulationTableBuilder:
         if solution is not None:
             for (mk, vname), lv in problem._linopy_vars.items():
                 if lv.name in solution:
-                    var_solution_arrays[(mk, vname)] = solution[lv.name]
+                    sol_da = solution[lv.name]
+                    if "component" in sol_da.dims:
+                        own_components = list(lv.coords["component"].values)
+                        sol_da = sol_da.sel(component=own_components)
+                    var_solution_arrays[(mk, vname)] = sol_da
 
         constraint_dual_arrays = self._collect_constraint_duals(problem)
         var_reduced_cost_arrays = self._collect_reduced_costs(problem)
@@ -339,9 +343,10 @@ class SimulationTableBuilder:
         """Return constraint shadow prices keyed by (model_key, constraint_name)."""
         dual_dataset = problem.linopy_model.dual
         result: Dict[Tuple[str, str], xr.DataArray] = {}
-        for mk in problem.study.model_components:
+        for mk, components in problem.study.model_components.items():
             model = problem.study.models[mk]
             prefix = mk.replace("-", "_")
+            own_components = [c.id for c in components]
             all_constraints = {**model.constraints, **model.binding_constraints}
             for cname in all_constraints:
                 safe = cname.replace(" ", "_").replace("-", "_")
@@ -355,6 +360,8 @@ class SimulationTableBuilder:
                     dual_val = dual_val + dual_dataset[lb_name]  # type: ignore[operator]
                 if ub_name in dual_dataset:
                     dual_val = dual_val + dual_dataset[ub_name]  # type: ignore[operator]
+                if "component" in dual_val.dims:
+                    dual_val = dual_val.sel(component=own_components)
                 result[(mk, cname)] = dual_val
         return result
 
@@ -441,7 +448,7 @@ class SimulationTableBuilder:
     ) -> pd.DataFrame:
         """Vectorize a [component?, time?, scenario?] DataArray into a DataFrame.
 
-        Index columns (absolute-time-index, block-time-index, scenario-index) are
+        Index columns (absolute_time_index, block_time_index, scenario_index) are
         set to None for dimensions that are absent from the original DataArray,
         signalling that the output is independent of that dimension.
         """
