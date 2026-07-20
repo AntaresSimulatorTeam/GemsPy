@@ -4,6 +4,12 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Added
+- **`taxonomy` and `version` on `LibrarySchema`** - optional free-form string
+  fields on the library YAML schema; no validation is attached to either.
+  `taxonomy` is also carried through to the resolved `Library` class,
+  `version` stays schema-only.
+
 ### Changed
 
 - **Package split** - the monolithic `gems` package is split into `gems_craft`
