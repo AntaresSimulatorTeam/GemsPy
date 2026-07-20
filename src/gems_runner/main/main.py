@@ -19,7 +19,7 @@ from gems_craft.model.resolve_library import resolve_library
 from gems_craft.optim_config.parsing import OptimConfig
 from gems_craft.study import Study
 from gems_craft.study.data import DataBase
-from gems_craft.study.parsing import parse_cli, parse_yaml_components
+from gems_craft.study.parsing import parse_cli, parse_yaml_system
 from gems_craft.study.resolve_components import build_data_base, resolve_system
 from gems_craft.study.system import System
 from gems_runner.simulation import DecomposedProblems, build_couplings, dump_couplings
@@ -41,12 +41,12 @@ def input_libs(yaml_lib_paths: List[Path]) -> Dict[str, Library]:
 
 def input_database(study_path: Path, timeseries_path: Optional[Path]) -> DataBase:
     with study_path.open() as comp:
-        return build_data_base(parse_yaml_components(comp), timeseries_path)
+        return build_data_base(parse_yaml_system(comp), timeseries_path)
 
 
 def input_system(study_path: Path, libraries: Dict[str, Library]) -> System:
     with study_path.open() as comp:
-        return resolve_system(parse_yaml_components(comp), libraries)
+        return resolve_system(parse_yaml_system(comp), libraries)
 
 
 def _write_structure_txt(

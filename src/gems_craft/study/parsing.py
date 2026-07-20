@@ -74,10 +74,10 @@ def load_input_system(
 
 
 @overload
-def parse_yaml_components(input_study: TextIO) -> SystemSchema: ...
+def parse_yaml_system(input_study: TextIO) -> SystemSchema: ...
 @overload
-def parse_yaml_components(input_study: TextIO, schema: Type[_S]) -> _S: ...
-def parse_yaml_components(
+def parse_yaml_system(input_study: TextIO, schema: Type[_S]) -> _S: ...
+def parse_yaml_system(
     input_study: TextIO, schema: Type[SystemSchema] = SystemSchema
 ) -> SystemSchema:
     tree = safe_load(input_study)

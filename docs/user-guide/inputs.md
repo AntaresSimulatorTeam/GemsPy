@@ -44,7 +44,7 @@ parts of the study from in-memory data.
 ~~~ python
 from gems_craft.model.parsing import parse_yaml_library
 from gems_craft.model.resolve_library import resolve_library
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import resolve_system, build_data_base
 from pathlib import Path
 
@@ -52,7 +52,7 @@ with open("simple_library.yml") as lib_file:
     input_libraries = [parse_yaml_library(lib_file)]
 
 with open("system_example.yml") as compo_file:
-    input_system = parse_yaml_components(compo_file)
+    input_system = parse_yaml_system(compo_file)
 
 result_lib = resolve_library(input_libraries)
 system = resolve_system(input_system, result_lib)
@@ -127,15 +127,15 @@ system:
         cluster-id: nuclear1
 ~~~
 
-Load and write hybrid systems with `parse_yaml_components` / `write_yaml_system`
+Load and write hybrid systems with `parse_yaml_system` / `write_yaml_system`
 passing `HybridSystemSchema` as the schema:
 
 ~~~ python
-from gems_craft.study.parsing import parse_yaml_components, write_yaml_system
+from gems_craft.study.parsing import parse_yaml_system, write_yaml_system
 from gems_craft_hybrid.study.parsing import HybridSystemSchema
 
 with open("system.yml") as f:
-    system = parse_yaml_components(f, HybridSystemSchema)
+    system = parse_yaml_system(f, HybridSystemSchema)
 write_yaml_system(system, Path("output/system.yml"))
 ~~~
 

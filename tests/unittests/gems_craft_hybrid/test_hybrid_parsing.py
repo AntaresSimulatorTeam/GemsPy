@@ -24,7 +24,7 @@ from gems_craft.model.parsing import (
 )
 from gems_craft.study.parsing import (
     SystemSchema,
-    parse_yaml_components,
+    parse_yaml_system,
     write_yaml_system,
 )
 from gems_craft_hybrid.model.parsing import (
@@ -53,7 +53,7 @@ def _load_library(path: Path, schema: Type[_L]) -> _L:
 
 def _load_system(path: Path, schema: Type[_S]) -> _S:
     with path.open() as f:
-        return parse_yaml_components(f, schema)
+        return parse_yaml_system(f, schema)
 
 
 # ---------------------------------------------------------------------------
@@ -79,10 +79,10 @@ def test_load_hybrid_system_parses_standard_fields() -> None:
 
 
 def test_load_standard_system_on_hybrid_file_raises() -> None:
-    """parse_yaml_components (standard) rejects hybrid-only fields due to extra='forbid'."""
+    """parse_yaml_system (standard) rejects hybrid-only fields due to extra='forbid'."""
     with FIXTURES.joinpath("hybrid_system.yml").open() as f:
         with pytest.raises(ValueError):
-            parse_yaml_components(f)
+            parse_yaml_system(f)
 
 
 # ---------------------------------------------------------------------------

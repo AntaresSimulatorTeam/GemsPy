@@ -20,7 +20,7 @@ All notable changes to GemsPy are documented here.
     never consumed by the standard resolve/solve pipeline.
   - `gems_craft.model.parsing.parse_yaml_library` and
     `gems_craft.study.parsing.load_input_system` /
-    `parse_yaml_components` now accept an optional `schema` parameter to
+    `parse_yaml_system` now accept an optional `schema` parameter to
     validate against a subclass (e.g. the hybrid schemas above); new
     `write_yaml_library` / `write_yaml_system` functions support the
     corresponding round-trip.
