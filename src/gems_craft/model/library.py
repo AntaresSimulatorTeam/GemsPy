@@ -10,7 +10,7 @@
 #
 # This file is part of the Antares project.
 from dataclasses import dataclass
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Optional
 
 from gems_craft.model import Model, PortType
 
@@ -20,15 +20,18 @@ class Library:
     id: str
     port_types: Dict[str, PortType]
     models: Dict[str, Model]
+    taxonomy: Optional[str] = None
 
 
 def library(
     id: str,
     port_types: Iterable[PortType],
     models: Iterable[Model],
+    taxonomy: Optional[str] = None,
 ) -> Library:
     return Library(
         id=id,
         port_types=dict((p.id, p) for p in port_types),
         models=dict((m.id, m) for m in models),
+        taxonomy=taxonomy,
     )

@@ -106,7 +106,12 @@ def resolve_library(
 
         while import_stack:
             cur_yaml_lib = yaml_lib_dict[import_stack[-1]]
-            current_lib = Library(id=cur_yaml_lib.id, port_types={}, models={})
+            current_lib = Library(
+                id=cur_yaml_lib.id,
+                port_types={},
+                models={},
+                taxonomy=cur_yaml_lib.taxonomy,
+            )
 
             # Add already parsed port types from dependencies in current lib
             _add_preloaded_port_types_to_current_lib(preloaded_port_types, current_lib)

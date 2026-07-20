@@ -114,3 +114,5 @@ class LibrarySchema(ModifiedBaseModel):
     port_types: List[PortTypeSchema] = Field(default_factory=list)
     models: List[ModelSchema] = Field(default_factory=list)
     description: Optional[str] = None
+    taxonomy: Optional[str] = None
+    version: Optional[str] = None
