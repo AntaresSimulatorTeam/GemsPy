@@ -23,7 +23,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from gems.expression.expression import (
+from gems_craft.expression.expression import (
     AllTimeSumNode,
     LiteralNode,
     MaxNode,
@@ -37,10 +37,10 @@ from gems.expression.expression import (
     param,
     var,
 )
-from gems.expression.visitor import visit
-from gems.model.port import PortFieldId
-from gems.simulation.linearize import VectorizedLinearExprBuilder
-from gems.simulation.vectorized_builder import VectorizedBuilderBase, _linopy_add
+from gems_craft.expression.visitor import visit
+from gems_craft.model.port import PortFieldId
+from gems_runner.simulation.linearize import VectorizedLinearExprBuilder
+from gems_runner.simulation.vectorized_builder import VectorizedBuilderBase, _linopy_add
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -757,7 +757,7 @@ def test_port_field_found() -> None:
         port_arrays={key: da},
         block_length=1,
     )
-    from gems.expression.expression import port_field
+    from gems_craft.expression.expression import port_field
 
     result = visit(port_field("port_a", "flow"), b)
     assert float(result) == pytest.approx(99.0)
@@ -766,7 +766,7 @@ def test_port_field_found() -> None:
 def test_port_field_missing_raises_key_error(
     empty_builder: VectorizedLinearExprBuilder,
 ) -> None:
-    from gems.expression.expression import port_field
+    from gems_craft.expression.expression import port_field
 
     with pytest.raises(KeyError):
         visit(port_field("no_such_port", "flow"), empty_builder)
@@ -787,7 +787,7 @@ def test_port_sum_with_connection_returns_expression() -> None:
         port_arrays={key: da},
         block_length=1,
     )
-    from gems.expression.expression import port_field
+    from gems_craft.expression.expression import port_field
 
     expr = port_field("port_a", "flow").sum_connections()
     result = visit(expr, b)
@@ -798,7 +798,7 @@ def test_port_sum_no_connection_returns_zero(
     empty_builder: VectorizedLinearExprBuilder,
 ) -> None:
     """PortFieldAggregatorNode with no matching port returns DataArray(0.0)."""
-    from gems.expression.expression import port_field
+    from gems_craft.expression.expression import port_field
 
     expr = port_field("absent_port", "flow").sum_connections()
     result = visit(expr, empty_builder)
@@ -808,7 +808,7 @@ def test_port_sum_no_connection_returns_zero(
 
 def test_unsupported_port_aggregator_raises_at_node_construction() -> None:
     """Only 'PortSum' is valid; other aggregator names raise at node construction."""
-    from gems.expression.expression import PortFieldAggregatorNode, port_field
+    from gems_craft.expression.expression import PortFieldAggregatorNode, port_field
 
     with pytest.raises(NotImplementedError):
         PortFieldAggregatorNode(operand=port_field("p", "f"), aggregator="PortMax")

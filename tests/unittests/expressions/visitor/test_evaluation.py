@@ -12,16 +12,13 @@
 
 import pytest
 
-from gems.expression import (
+from gems_craft.expression import (
     AdditionNode,
     DivisionNode,
-    EvaluationContext,
-    EvaluationVisitor,
     ExpressionNode,
     LiteralNode,
     ParameterNode,
     PrinterVisitor,
-    ValueProvider,
     VariableNode,
     literal,
     param,
@@ -29,8 +26,9 @@ from gems.expression import (
     var,
     visit,
 )
-from gems.expression.equality import expressions_equal
-from gems.expression.expression import DualNode, ReducedCostNode
+from gems_craft.expression.equality import expressions_equal
+from gems_craft.expression.expression import DualNode, ReducedCostNode
+from gems_runner.expression import EvaluationContext, EvaluationVisitor, ValueProvider
 
 
 def test_ast() -> None:
@@ -66,7 +64,7 @@ def test_sum_expressions() -> None:
 
 
 def test_floor_ceil_max_min() -> None:
-    from gems.expression.expression import maximum, minimum
+    from gems_craft.expression.expression import maximum, minimum
 
     context = EvaluationContext(parameters={"p": 2.7, "q": 1.3})
 

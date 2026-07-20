@@ -16,11 +16,10 @@ from typing import cast
 
 import pandas as pd
 
-from gems.expression.expression import ExpressionNode, literal, param, var
-from gems.expression.indexing_structure import IndexingStructure
-from gems.model import float_parameter, float_variable, model
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_craft.expression.expression import ExpressionNode, literal, param, var
+from gems_craft.expression.indexing_structure import IndexingStructure
+from gems_craft.model import float_parameter, float_variable, model
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -29,7 +28,8 @@ from gems.study import (
     System,
     create_component,
 )
-from gems.study.data import TimeScenarioSeriesData
+from gems_craft.study.data import TimeScenarioSeriesData
+from gems_runner.simulation import TimeBlock, build_problem
 from tests.e2e.functional.libs.standard import (
     DEMAND_MODEL,
     GENERATOR_MODEL,

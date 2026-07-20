@@ -16,9 +16,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from gems.expression import param, var
-from gems.expression.indexing_structure import IndexingStructure
-from gems.model import (
+from gems_craft.expression import param, var
+from gems_craft.expression.indexing_structure import IndexingStructure
+from gems_craft.model import (
     Constraint,
     Model,
     ModelPort,
@@ -26,8 +26,8 @@ from gems.model import (
     float_variable,
     model,
 )
-from gems.model.port import PortFieldDefinition, PortFieldId
-from gems.study import (
+from gems_craft.model.port import PortFieldDefinition, PortFieldId
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -40,7 +40,7 @@ from gems.study import (
     TimeSeriesData,
     create_component,
 )
-from gems.study.data import load_ts_from_file
+from gems_craft.study.data import load_ts_from_file
 from tests.unittests.system.libs.standard import (
     BALANCE_PORT_TYPE,
     CONSTANT,

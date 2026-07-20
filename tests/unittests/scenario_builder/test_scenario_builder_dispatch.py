@@ -15,9 +15,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import build_data_base
-from gems.study.scenario_builder import ScenarioBuilder
+from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.resolve_components import build_data_base
+from gems_craft.study.scenario_builder import ScenarioBuilder
 
 
 @pytest.fixture(scope="session")

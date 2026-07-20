@@ -14,10 +14,10 @@ from pathlib import Path
 
 import pytest
 
-from gems.model.library import Library
-from gems.model.parsing import parse_yaml_library
-from gems.model.resolve_library import resolve_library
-from gems.study.system import Component, System
+from gems_craft.model.library import Library
+from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.resolve_library import resolve_library
+from gems_craft.study.system import Component, System
 
 
 @pytest.fixture(scope="session")

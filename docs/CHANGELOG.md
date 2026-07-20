@@ -4,6 +4,23 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Package split** - the monolithic `gems` package is split into `gems_craft`
+  and `gems_runner`.
+  - `gems_craft` holds the solver-independent domain model and I/O: `expression`
+    (AST, parsing, linearity/indexing analysis), `model`, `optim_config`,
+    `study` (`System`, `Component`, `Study`, data, YAML parsing/resolution),
+    `utils`, `libs`. Its dependencies are `numpy`, `pandas`, `PyYAML`,
+    `pydantic`, `anytree`, `antlr4-python3-runtime` - no solver required.
+  - `gems_runner` holds solve-time execution: `expression.evaluate`,
+    `session`, `simulation`, `study.runner`, `main` (the `gemspy` CLI). It
+    depends on `gems_craft` plus the new `runner` extra (`linopy`, `xarray`,
+    `highspy`).
+  - All `gems.*` imports must be updated to `gems_craft.*` or `gems_runner.*`
+    accordingly; see the module lists above. The `gemspy` console script now
+    points at `gems_runner.main.main:main_cli`.
+    
 ### Fixed
 - Comparison operators (`>=`, `<=`, `=`) in extra-output expressions no longer raise
   `NotImplementedError` at post-solve evaluation; they now evaluate to a 0/1 indicator

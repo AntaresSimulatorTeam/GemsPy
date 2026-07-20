@@ -12,9 +12,9 @@
 
 import pytest
 
-from gems.expression import ExpressionNode, copy_expression, literal, param, var
-from gems.expression.equality import expressions_equal
-from gems.expression.expression import DualNode, ReducedCostNode, maximum, minimum
+from gems_craft.expression import ExpressionNode, copy_expression, literal, param, var
+from gems_craft.expression.equality import expressions_equal
+from gems_craft.expression.expression import DualNode, ReducedCostNode, maximum, minimum
 
 
 @pytest.mark.parametrize(

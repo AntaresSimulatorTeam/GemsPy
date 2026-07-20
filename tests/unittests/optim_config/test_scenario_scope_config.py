@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from gems.optim_config.parsing import ScenarioScopeConfig
+from gems_craft.optim_config.parsing import ScenarioScopeConfig
 
 # ---------------------------------------------------------------------------
 # Inline form — include only
@@ -271,14 +271,14 @@ def test_playlist_file_boolean_values_rejected(tmp_path: Path) -> None:
 
 
 def test_yaml_inline_include_only() -> None:
-    from gems.optim_config.parsing import OptimConfig
+    from gems_craft.optim_config.parsing import OptimConfig
 
     cfg = OptimConfig.model_validate({"scenario-scope": {"include": ["0-2", 4]}})
     assert cfg.scenario_scope.scenario_ids == [0, 1, 2, 4]
 
 
 def test_yaml_inline_include_exclude() -> None:
-    from gems.optim_config.parsing import OptimConfig
+    from gems_craft.optim_config.parsing import OptimConfig
 
     cfg = OptimConfig.model_validate(
         {"scenario-scope": {"include": ["0-4"], "exclude": [2]}}
@@ -289,7 +289,7 @@ def test_yaml_inline_include_exclude() -> None:
 def test_yaml_playlist_file_relative_resolved_by_load_optim_config(
     tmp_path: Path,
 ) -> None:
-    from gems.optim_config.parsing import load_optim_config
+    from gems_craft.optim_config.parsing import load_optim_config
 
     playlist = tmp_path / "playlist.json"
     playlist.write_text(json.dumps([0, 1, 2]))
@@ -303,7 +303,7 @@ def test_yaml_playlist_file_relative_resolved_by_load_optim_config(
 
 
 def test_yaml_nb_scenarios_rejected() -> None:
-    from gems.optim_config.parsing import OptimConfig
+    from gems_craft.optim_config.parsing import OptimConfig
 
     with pytest.raises(ValueError):
         OptimConfig.model_validate({"scenario-scope": {"nb-scenarios": 1}})
@@ -364,7 +364,7 @@ def test_scenario_ids_cached_inline() -> None:
 def test_scenario_ids_cached_playlist_file_via_load_optim_config(
     tmp_path: Path,
 ) -> None:
-    from gems.optim_config.parsing import load_optim_config
+    from gems_craft.optim_config.parsing import load_optim_config
 
     playlist = tmp_path / "playlist.json"
     playlist.write_text(json.dumps([0, 1, 2]))
@@ -386,9 +386,9 @@ def test_scenario_ids_cached_playlist_file_via_load_optim_config(
 def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
     import numpy as np
 
-    from gems.optim_config.parsing import OptimConfig, validate_optim_config
-    from gems.study.scenario_builder import ScenarioBuilder
-    from gems.study.system import System
+    from gems_craft.optim_config.parsing import OptimConfig, validate_optim_config
+    from gems_craft.study.scenario_builder import ScenarioBuilder
+    from gems_craft.study.system import System
 
     config = OptimConfig.model_validate(
         {"scenario-scope": {"include": ["0-4"]}}  # scenarios 0,1,2,3,4
@@ -404,9 +404,9 @@ def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
 def test_validate_optim_config_scenario_builder_accepts_valid_playlist() -> None:
     import numpy as np
 
-    from gems.optim_config.parsing import OptimConfig, validate_optim_config
-    from gems.study.scenario_builder import ScenarioBuilder
-    from gems.study.system import System
+    from gems_craft.optim_config.parsing import OptimConfig, validate_optim_config
+    from gems_craft.study.scenario_builder import ScenarioBuilder
+    from gems_craft.study.system import System
 
     config = OptimConfig.model_validate(
         {"scenario-scope": {"include": ["0-2"]}}  # scenarios 0,1,2

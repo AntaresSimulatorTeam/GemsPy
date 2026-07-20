@@ -14,7 +14,7 @@ import warnings
 
 import pytest
 
-from gems.expression.expression import (
+from gems_craft.expression.expression import (
     ExpressionNode,
     ScenarioOperatorNode,
     literal,
@@ -22,11 +22,11 @@ from gems.expression.expression import (
     port_field,
     var,
 )
-from gems.expression.indexing_structure import IndexingStructure
-from gems.model import Constraint, float_variable, model
-from gems.model.common import ValueType
-from gems.model.port import port_field_def
-from gems.model.variable import bool_var, int_variable
+from gems_craft.expression.indexing_structure import IndexingStructure
+from gems_craft.model import Constraint, float_variable, model
+from gems_craft.model.common import ValueType
+from gems_craft.model.port import port_field_def
+from gems_craft.model.variable import bool_var, int_variable
 
 
 @pytest.mark.parametrize(

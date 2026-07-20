@@ -10,8 +10,8 @@
 #
 # This file is part of the Antares project.
 
-from gems.expression import ExpressionNode, PrinterVisitor, param, var, visit
-from gems.expression.expression import DualNode, ReducedCostNode
+from gems_craft.expression import ExpressionNode, PrinterVisitor, param, var, visit
+from gems_craft.expression.expression import DualNode, ReducedCostNode
 
 
 def test_comparison() -> None:
@@ -23,7 +23,7 @@ def test_comparison() -> None:
 
 
 def test_floor_ceil_max_min_printer() -> None:
-    from gems.expression.expression import maximum, minimum
+    from gems_craft.expression.expression import maximum, minimum
 
     p = param("p")
     q = param("q")

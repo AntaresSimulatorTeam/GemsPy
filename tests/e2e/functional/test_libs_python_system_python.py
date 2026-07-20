@@ -37,12 +37,11 @@ Several cases are tested:
 import pandas as pd
 import pytest
 
-from gems.expression import literal, param, var
-from gems.expression.indexing_structure import IndexingStructure
-from gems.model import Model, ModelPort, float_parameter, float_variable, model
-from gems.model.port import PortFieldDefinition, PortFieldId
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_craft.expression import literal, param, var
+from gems_craft.expression.indexing_structure import IndexingStructure
+from gems_craft.model import Model, ModelPort, float_parameter, float_variable, model
+from gems_craft.model.port import PortFieldDefinition, PortFieldId
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -53,6 +52,7 @@ from gems.study import (
     TimeScenarioSeriesData,
     create_component,
 )
+from gems_runner.simulation import TimeBlock, build_problem
 from tests.e2e.functional.libs.standard import (
     BALANCE_PORT_TYPE,
     DEMAND_MODEL,

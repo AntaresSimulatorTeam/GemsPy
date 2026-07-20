@@ -15,8 +15,7 @@ from typing import List
 import pandas as pd
 import pytest
 
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -25,7 +24,8 @@ from gems.study import (
     System,
     create_component,
 )
-from gems.study.data import TimeScenarioSeriesData
+from gems_craft.study.data import TimeScenarioSeriesData
+from gems_runner.simulation import TimeBlock, build_problem
 from tests.e2e.functional.libs.standard import (
     DEMAND_MODEL,
     NODE_BALANCE_MODEL,
