@@ -91,79 +91,9 @@ interoperate with [Antares Simulator](https://antares-simulator.org/).
 > `gems_craft_hybrid` package only provides reading and writing of hybrid
 > files.
 
-### Hybrid system
+### Hybrid libraries and hybrid systems
 
-`HybridSystemSchema` extends the standard format with two optional sections:
-
-- `area-connections`: maps component ports to areas (`component`, `port`,
-  `area`).
-- `thermal-capacity-connections`: maps component ports to Antares thermal
-  clusters, each identified by `area` and `cluster-id`.
-
-~~~ yaml
-system:
-  components:
-    - id: G
-      model: basic.generator
-      parameters:
-        - id: cost
-          value: 30
-        - id: p_max
-          value: 100
-  connections:
-    - component1: N
-      port1: injection_port
-      component2: G
-      port2: injection_port
-  area-connections:
-    - component: G
-      port: injection_port
-      area: fr
-  thermal-capacity-connections:
-    - component: G
-      port: injection_port
-      thermal-component:
-        area: fr
-        cluster-id: nuclear1
-~~~
-
-Load and write hybrid systems with `parse_yaml_hybrid_system` / `write_yaml_system`:
-
-~~~ python
-from gems_craft.study.parsing import write_yaml_system
-from gems_craft_hybrid.study.parsing import parse_yaml_hybrid_system
-
-with open("system.yml") as f:
-    system = parse_yaml_hybrid_system(f)
-write_yaml_system(system, Path("output/system.yml"))
-~~~
-
-### Hybrid library
-
-Each port-type of a hybrid library YAML may carry two additional sub-fields
-(the top-level `version` field is a standard `LibrarySchema` field, see
-above — not hybrid-specific):
-
-- `area-connection`: maps port roles to port fields for area coupling
-  (`injection-to-balance`, `spillage-bound`, `unsupplied-energy-bound`).
-- `thermal-capacity-connection`: identifies the port field that carries
-  thermal capacity (`capacity-field`).
-
-~~~ yaml
-library:
-  id: my_lib
-  version: "1.0"
-  port-types:
-    - id: flow
-      fields:
-        - id: flow
-      area-connection:
-        injection-to-balance: flow
-        spillage-bound: flow
-        unsupplied-energy-bound:
-      thermal-capacity-connection:
-        capacity-field: flow
-~~~
+For the YAML fields in library and system files associated with the hybrid mode, see [this page](https://gems-energy.readthedocs.io/en/latest/interoperability/hybrid/hybrid-connections/) of the GEMS documentation website.
 
 Load and write hybrid libraries with `parse_yaml_hybrid_library` / `write_yaml_library`:
 
@@ -171,7 +101,23 @@ Load and write hybrid libraries with `parse_yaml_hybrid_library` / `write_yaml_l
 from gems_craft.model.parsing import write_yaml_library
 from gems_craft_hybrid.model.parsing import parse_yaml_hybrid_library
 
-with open("lib.yml") as f:
+with open("hybrid_lib.yml") as f:
     library = parse_yaml_hybrid_library(f)
-write_yaml_library(library, Path("output/lib.yml"))
+write_yaml_library(library, Path("output/hybrid_lib.yml"))
 ~~~
+
+
+Load and write hybrid systems with `parse_yaml_hybrid_system` / `write_yaml_system`:
+
+~~~ python
+from gems_craft.study.parsing import write_yaml_system
+from gems_craft_hybrid.study.parsing import parse_yaml_hybrid_system
+
+with open("hybrid_system.yml") as f:
+    system = parse_yaml_hybrid_system(f)
+write_yaml_system(system, Path("output/hybrid_system.yml"))
+~~~
+
+
+
+
