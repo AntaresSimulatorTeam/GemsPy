@@ -41,7 +41,7 @@ from gems_craft.study import (
     create_component,
 )
 from gems_craft.study.data import load_ts_from_file
-from tests.unittests.system.libs.standard import (
+from tests.unittests.gems_craft.system.libs.standard import (
     BALANCE_PORT_TYPE,
     CONSTANT,
     DEMAND_MODEL,
