@@ -19,7 +19,7 @@ library:
   id: basic
   description: Basic library
   taxonomy: basic_taxonomy_of_models  # optional: id of the taxonomy this library conforms to
-  version: "1.0.0"                  # optional: free-form library version
+  version: 1.0.0                # optional: free-form library version
 
   port-types:
     - id: flow
