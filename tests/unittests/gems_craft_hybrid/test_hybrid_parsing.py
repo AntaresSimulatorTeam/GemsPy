@@ -32,12 +32,14 @@ from gems_craft_hybrid.model.parsing import (
     HybridLibrarySchema,
     HybridPortTypeSchema,
     PortThermalCapacitySchema,
+    parse_yaml_hybrid_library,
 )
 from gems_craft_hybrid.study.parsing import (
     AreaConnectionsSchema,
     HybridSystemSchema,
     ThermalCapacityConnectionSchema,
     ThermalComponentSchema,
+    parse_yaml_hybrid_system,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -85,6 +87,15 @@ def test_load_standard_system_on_hybrid_file_raises() -> None:
             parse_yaml_system(f)
 
 
+def test_parse_yaml_hybrid_system_reads_hybrid_fields() -> None:
+    with FIXTURES.joinpath("hybrid_system.yml").open() as f:
+        system = parse_yaml_hybrid_system(f)
+    assert isinstance(system, HybridSystemSchema)
+    assert system.area_connections is not None
+    assert system.thermal_capacity_connections is not None
+    assert system == _load_system(FIXTURES / "hybrid_system.yml", HybridSystemSchema)
+
+
 # ---------------------------------------------------------------------------
 # HybridSystemSchema — roundtrip via write_yaml_system
 # ---------------------------------------------------------------------------
@@ -125,6 +136,16 @@ def test_load_standard_library_on_hybrid_file_raises() -> None:
     with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
         with pytest.raises(ValueError):
             parse_yaml_library(f)
+
+
+def test_parse_yaml_hybrid_library_reads_hybrid_fields() -> None:
+    with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
+        lib = parse_yaml_hybrid_library(f)
+    flow_port = next(pt for pt in lib.port_types if pt.id == "flow")
+    assert isinstance(flow_port, HybridPortTypeSchema)
+    assert flow_port.area_connection is not None
+    assert flow_port.thermal_capacity_connection is not None
+    assert lib == _load_library(FIXTURES / "hybrid_lib.yml", HybridLibrarySchema)
 
 
 # ---------------------------------------------------------------------------

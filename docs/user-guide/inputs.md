@@ -127,15 +127,14 @@ system:
         cluster-id: nuclear1
 ~~~
 
-Load and write hybrid systems with `parse_yaml_system` / `write_yaml_system`
-passing `HybridSystemSchema` as the schema:
+Load and write hybrid systems with `parse_yaml_hybrid_system` / `write_yaml_system`:
 
 ~~~ python
-from gems_craft.study.parsing import parse_yaml_system, write_yaml_system
-from gems_craft_hybrid.study.parsing import HybridSystemSchema
+from gems_craft.study.parsing import write_yaml_system
+from gems_craft_hybrid.study.parsing import parse_yaml_hybrid_system
 
 with open("system.yml") as f:
-    system = parse_yaml_system(f, HybridSystemSchema)
+    system = parse_yaml_hybrid_system(f)
 write_yaml_system(system, Path("output/system.yml"))
 ~~~
 
@@ -166,14 +165,13 @@ library:
         capacity-field: flow
 ~~~
 
-Load and write hybrid libraries with `parse_yaml_library` / `write_yaml_library`
-passing `HybridLibrarySchema` as the schema:
+Load and write hybrid libraries with `parse_yaml_hybrid_library` / `write_yaml_library`:
 
 ~~~ python
-from gems_craft.model.parsing import parse_yaml_library, write_yaml_library
-from gems_craft_hybrid.model.parsing import HybridLibrarySchema
+from gems_craft.model.parsing import write_yaml_library
+from gems_craft_hybrid.model.parsing import parse_yaml_hybrid_library
 
 with open("lib.yml") as f:
-    library = parse_yaml_library(f, HybridLibrarySchema)
+    library = parse_yaml_hybrid_library(f)
 write_yaml_library(library, Path("output/lib.yml"))
 ~~~

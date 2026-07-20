@@ -10,9 +10,9 @@
 #
 # This file is part of the Antares project.
 
-from typing import List, Optional
+from typing import List, Optional, TextIO
 
-from gems_craft.study.parsing import SystemSchema
+from gems_craft.study.parsing import SystemSchema, parse_yaml_system
 from gems_craft.utils import ModifiedBaseModel
 
 
@@ -36,3 +36,7 @@ class ThermalCapacityConnectionSchema(ModifiedBaseModel):
 class HybridSystemSchema(SystemSchema):
     area_connections: Optional[List[AreaConnectionsSchema]] = None
     thermal_capacity_connections: Optional[List[ThermalCapacityConnectionSchema]] = None
+
+
+def parse_yaml_hybrid_system(input_study: TextIO) -> HybridSystemSchema:
+    return parse_yaml_system(input_study, HybridSystemSchema)
