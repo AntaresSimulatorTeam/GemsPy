@@ -1,6 +1,6 @@
 library:
   id: hybrid_basic
-  version: "1.0"
+  version: 0.1
   port-types:
     - id: flow
       description: A port which transfers power flow
@@ -10,12 +10,12 @@ library:
         injection-to-balance: flow
         spillage-bound: flow
         unsupplied-energy-bound:
-      thermal-capacity-connection:
-        capacity-field: flow
-    - id: signal
-      description: A signal port without area connection
+    - id: antares_thermal_cluster_capacity
+      description: A port which represents the capacity of a thermal cluster
       fields:
-        - id: value
+        - id: capacity
+      thermal-capacity-connection:
+        capacity-field: capacity
   models:
     - id: node
       description: A basic balancing node model
@@ -48,3 +48,29 @@ library:
       objective-contributions:
         - id: generation_cost
           expression: cost * generation
+    - id: investment_decision
+      description: A basic investment decision model
+      ports:
+        - id: investment_port
+          type: antares_thermal_cluster_capacity
+      parameters:
+        - id: investment_cost
+          time-dependent: false
+          scenario-dependent: false
+        - id: max_capacity
+          time-dependent: false
+          scenario-dependent: false
+        - id: availability_factor
+          time-dependent: true
+          scenario-dependent: true
+      variables:
+        - id: capacity_var
+          lower-bound: 0
+          upper-bound: max_capacity
+      port-field-definitions:
+        - port: investment_port
+          field: capacity
+          definition: capacity_var * availability_factor
+      objective-contributions:
+        - id: investment_cost_contribution
+          expression: investment_cost * capacity_var
