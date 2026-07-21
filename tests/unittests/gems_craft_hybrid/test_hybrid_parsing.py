@@ -69,13 +69,13 @@ def test_load_hybrid_system_parses_area_connections() -> None:
     assert system.area_connections is not None
     assert len(system.area_connections) == 1
     assert system.area_connections[0] == AreaConnectionsSchema(
-        component="G", port="injection_port", area="fr"
+        component="G2", port="injection_port", area="fr"
     )
 
 
 def test_load_hybrid_system_parses_standard_fields() -> None:
     system = _load_system(FIXTURES / "hybrid_system.yml", HybridSystemSchema)
-    assert len(system.components) == 2
+    assert len(system.components) == 4
     assert system.connections is not None
     assert len(system.connections) == 1
 
@@ -127,7 +127,7 @@ def test_load_hybrid_library_parses_area_connection() -> None:
 
 def test_load_hybrid_library_port_type_without_area_connection() -> None:
     lib = _load_library(FIXTURES / "hybrid_lib.yml", HybridLibrarySchema)
-    signal_port = next(pt for pt in lib.port_types if pt.id == "signal")
+    signal_port = next(pt for pt in lib.port_types if pt.id == "antares_thermal_cluster_capacity")
     assert signal_port.area_connection is None
 
 
@@ -141,10 +141,11 @@ def test_load_standard_library_on_hybrid_file_raises() -> None:
 def test_parse_yaml_hybrid_library_reads_hybrid_fields() -> None:
     with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
         lib = parse_yaml_hybrid_library(f)
-    flow_port = next(pt for pt in lib.port_types if pt.id == "flow")
+    flow_port = next(pt for pt in lib.port_types if pt.id == "flow") 
+    capacity_port = next(pt for pt in lib.port_types if pt.id == "antares_thermal_cluster_capacity")
     assert isinstance(flow_port, HybridPortTypeSchema)
     assert flow_port.area_connection is not None
-    assert flow_port.thermal_capacity_connection is not None
+    assert capacity_port.thermal_capacity_connection is not None
     assert lib == _load_library(FIXTURES / "hybrid_lib.yml", HybridLibrarySchema)
 
 
@@ -168,17 +169,17 @@ def test_write_yaml_library_roundtrip_hybrid(tmp_path: Path) -> None:
 
 def test_load_hybrid_library_parses_thermal_capacity_connection() -> None:
     lib = _load_library(FIXTURES / "hybrid_lib.yml", HybridLibrarySchema)
-    flow_port = next(pt for pt in lib.port_types if pt.id == "flow")
-    assert isinstance(flow_port, HybridPortTypeSchema)
-    assert flow_port.thermal_capacity_connection == PortThermalCapacitySchema(
-        capacity_field="flow"
+    capacity_port = next(pt for pt in lib.port_types if pt.id == "antares_thermal_cluster_capacity")
+    assert isinstance(capacity_port, HybridPortTypeSchema)
+    assert capacity_port.thermal_capacity_connection == PortThermalCapacitySchema(
+        capacity_field="capacity"
     )
 
 
 def test_load_hybrid_library_port_type_without_thermal_capacity_connection() -> None:
     lib = _load_library(FIXTURES / "hybrid_lib.yml", HybridLibrarySchema)
-    signal_port = next(pt for pt in lib.port_types if pt.id == "signal")
-    assert signal_port.thermal_capacity_connection is None
+    flow_port = next(pt for pt in lib.port_types if pt.id == "flow")
+    assert flow_port.thermal_capacity_connection is None
 
 
 # ---------------------------------------------------------------------------
@@ -192,8 +193,8 @@ def test_load_hybrid_system_parses_thermal_capacity_connections() -> None:
     assert len(system.thermal_capacity_connections) == 1
     conn = system.thermal_capacity_connections[0]
     assert isinstance(conn, ThermalCapacityConnectionSchema)
-    assert conn.component == "G"
-    assert conn.port == "injection_port"
+    assert conn.component == "I"
+    assert conn.port == "investment_port"
     assert conn.thermal_component == ThermalComponentSchema(
         area="fr", cluster_id="nuclear1"
     )
