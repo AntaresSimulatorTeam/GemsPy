@@ -1,6 +1,6 @@
 library:
   id: hybrid_basic
-  version: 0.1
+  version: 0.0.1
   port-types:
     - id: flow
       description: A port which transfers power flow
