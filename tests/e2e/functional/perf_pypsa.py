@@ -9,7 +9,7 @@ from gems_craft.model.parsing import parse_yaml_library
 from gems_craft.model.resolve_library import resolve_library
 from gems_craft.study import Study
 from gems_craft.study.data import DataBase
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import (
     build_data_base,
     consistency_check,
@@ -27,7 +27,7 @@ def setup_data(pypsa_dir: Path) -> Tuple[System, DataBase]:
         input_library = parse_yaml_library(lib)
 
     with study_file.open() as c:
-        input_study = parse_yaml_components(c)
+        input_study = parse_yaml_system(c)
     lib_dict = resolve_library([input_library])
     system = resolve_system(input_study, lib_dict)
     consistency_check(system, lib_dict["pypsa_models"].models)

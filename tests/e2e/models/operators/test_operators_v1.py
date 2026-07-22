@@ -20,7 +20,7 @@ import pytest
 from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
 from gems_craft.model.resolve_library import resolve_library
 from gems_craft.study import Study
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import build_data_base, resolve_system
 from gems_runner.simulation import build_problem
 from gems_runner.simulation.simulation_table import SimulationTableBuilder
@@ -102,7 +102,7 @@ def test_model_behaviour(
     timesteps = list(range(first_timestep, last_timestep + 1))
 
     with open(system_file) as compo_file:
-        input_component = parse_yaml_components(compo_file)
+        input_component = parse_yaml_system(compo_file)
 
     result_lib = resolve_library(input_libraries)
     system_input = resolve_system(input_component, result_lib)

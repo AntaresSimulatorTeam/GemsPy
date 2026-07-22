@@ -13,31 +13,12 @@
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, TextIO, Union
+from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
 
 from pydantic import Field, ValidationError
-from yaml import safe_load
+from yaml import safe_dump, safe_load
 
 from gems_craft.utils import ModifiedBaseModel
-
-
-def load_input_system(input_study: Path) -> "SystemSchema":
-    try:
-        with input_study.open() as f:
-            return SystemSchema.model_validate(safe_load(f))
-    except ValidationError as e:
-        raise ValueError(f"An error occurred during parsing: {e}")
-
-
-def parse_yaml_components(input_study: TextIO) -> "SystemSchema":
-    tree = safe_load(input_study)
-    return SystemSchema.model_validate(tree["system"])
-
-
-class AreaConnectionsSchema(ModifiedBaseModel):
-    component: str
-    port: str
-    area: str
 
 
 class PortConnectionsSchema(ModifiedBaseModel):
@@ -73,7 +54,41 @@ class SystemSchema(ModifiedBaseModel):
     model_libraries: Optional[str] = None  # Parsed but unused for now
     components: List[ComponentSchema] = Field(default_factory=list)
     connections: Optional[List[PortConnectionsSchema]] = None
-    area_connections: Optional[List[AreaConnectionsSchema]] = None
+
+
+_S = TypeVar("_S", bound=SystemSchema)
+
+
+@overload
+def load_input_system(input_study: Path) -> SystemSchema: ...
+@overload
+def load_input_system(input_study: Path, schema: Type[_S]) -> _S: ...
+def load_input_system(
+    input_study: Path, schema: Type[SystemSchema] = SystemSchema
+) -> SystemSchema:
+    try:
+        with input_study.open() as f:
+            return schema.model_validate(safe_load(f))
+    except ValidationError as e:
+        raise ValueError(f"An error occurred during parsing: {e}")
+
+
+@overload
+def parse_yaml_system(input_study: TextIO) -> SystemSchema: ...
+@overload
+def parse_yaml_system(input_study: TextIO, schema: Type[_S]) -> _S: ...
+def parse_yaml_system(
+    input_study: TextIO, schema: Type[SystemSchema] = SystemSchema
+) -> SystemSchema:
+    tree = safe_load(input_study)
+    return schema.model_validate(tree["system"])
+
+
+def write_yaml_system(system: SystemSchema, path: Path) -> None:
+    data = {"system": system.model_dump(by_alias=True, exclude_none=True, mode="json")}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        safe_dump(data, f, allow_unicode=True, sort_keys=False)
 
 
 @dataclass(frozen=True)

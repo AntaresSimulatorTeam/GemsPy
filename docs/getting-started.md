@@ -202,14 +202,14 @@ Here is the GemsPy syntax to read a test case described by
 from pathlib import Path
 from gems_craft.model.parsing import parse_yaml_library
 from gems_craft.model.resolve_library import resolve_library
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import resolve_system, build_data_base
 
 with open("library.yml") as lib_file:
     input_libraries = [parse_yaml_library(lib_file)]
 
 with open("system.yml") as compo_file:
-    input_system = parse_yaml_components(compo_file)
+    input_system = parse_yaml_system(compo_file)
 
 result_lib = resolve_library(input_libraries)
 system = resolve_system(input_system, result_lib)

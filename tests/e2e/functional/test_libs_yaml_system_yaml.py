@@ -44,7 +44,7 @@ import pytest
 from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
 from gems_craft.model.resolve_library import resolve_library
 from gems_craft.study.data import DataBase
-from gems_craft.study.parsing import SystemSchema, parse_yaml_components
+from gems_craft.study.parsing import SystemSchema, parse_yaml_system
 from gems_craft.study.resolve_components import (
     build_data_base,
     consistency_check,
@@ -84,7 +84,7 @@ def setup_test(
             input_library = parse_yaml_library(lib)
 
         with study_file.open() as c:
-            input_system = parse_yaml_components(c)
+            input_system = parse_yaml_system(c)
         lib_dict = resolve_library([input_library])
         system = resolve_system(input_system, lib_dict)
         consistency_check(system, lib_dict["basic"].models)
