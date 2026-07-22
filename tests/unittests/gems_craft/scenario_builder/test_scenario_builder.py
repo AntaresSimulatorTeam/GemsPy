@@ -17,7 +17,7 @@ import pytest
 
 from gems_craft.study import DataBase
 from gems_craft.study.data import ComponentParameterIndex
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import build_data_base
 from gems_craft.study.scenario_builder import ScenarioBuilder
 
@@ -37,7 +37,7 @@ def database(series_dir: Path, scenario_builder: ScenarioBuilder) -> DataBase:
     system_path = Path(__file__).parent / "systems/with_scenarization.yml"
     with system_path.open() as components:
         return build_data_base(
-            parse_yaml_components(components), series_dir, scenario_builder
+            parse_yaml_system(components), series_dir, scenario_builder
         )
 
 

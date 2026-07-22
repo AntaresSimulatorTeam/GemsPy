@@ -16,7 +16,7 @@ from gems_craft.study import Component, PortRef, PortsConnection
 from gems_craft.study.parsing import (
     SystemSchema,
     load_input_system,
-    parse_yaml_components,
+    parse_yaml_system,
 )
 from gems_craft.study.resolve_components import consistency_check, resolve_system
 
@@ -26,7 +26,7 @@ COMPO_FILE = Path(__file__).parent / "systems/system.yml"
 @pytest.fixture
 def input_system() -> SystemSchema:
     with COMPO_FILE.open() as c:
-        return parse_yaml_components(c)
+        return parse_yaml_system(c)
 
 
 @pytest.fixture
@@ -191,8 +191,8 @@ system:
 """
 
 
-def test_parse_yaml_components_properties_optional_and_normalized() -> None:
-    system = parse_yaml_components(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
+def test_parse_yaml_system_properties_optional_and_normalized() -> None:
+    system = parse_yaml_system(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
     props_by_id = {c.id: c.properties for c in system.components}
     assert props_by_id["load"] is None
     raw = props_by_id["nuclear_1"]
@@ -206,7 +206,7 @@ def test_parse_yaml_components_properties_optional_and_normalized() -> None:
 def test_resolve_system_normalizes_list_properties_to_dict(
     input_library: LibrarySchema,
 ) -> None:
-    system = parse_yaml_components(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
+    system = parse_yaml_system(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
     lib_dict = resolve_library([input_library])
     resolved = resolve_system(system, lib_dict)
     assert resolved.get_component("nuclear_1").properties == {
@@ -225,9 +225,9 @@ system:
 """
 
 
-def test_parse_yaml_components_properties_missing_key_raises() -> None:
+def test_parse_yaml_system_properties_missing_key_raises() -> None:
     with pytest.raises(ValidationError):
-        parse_yaml_components(io.StringIO(_SYSTEM_WITH_PROPERTIES_MISSING_KEY))
+        parse_yaml_system(io.StringIO(_SYSTEM_WITH_PROPERTIES_MISSING_KEY))
 
 
 _SYSTEM_WITH_PROPERTIES_DUPLICATE_KEYS = """\
@@ -246,7 +246,7 @@ system:
 def test_resolve_component_properties_duplicate_keys_raises(
     input_library: LibrarySchema,
 ) -> None:
-    system = parse_yaml_components(io.StringIO(_SYSTEM_WITH_PROPERTIES_DUPLICATE_KEYS))
+    system = parse_yaml_system(io.StringIO(_SYSTEM_WITH_PROPERTIES_DUPLICATE_KEYS))
     lib_dict = resolve_library([input_library])
     with pytest.raises(ValueError, match="duplicate properties id"):
         resolve_system(system, lib_dict)
@@ -262,9 +262,9 @@ system:
 """
 
 
-def test_parse_yaml_components_system_level_properties_rejected() -> None:
+def test_parse_yaml_system_system_level_properties_rejected() -> None:
     with pytest.raises(ValidationError):
-        parse_yaml_components(io.StringIO(_SYSTEM_WITH_SYSTEM_LEVEL_PROPERTIES))
+        parse_yaml_system(io.StringIO(_SYSTEM_WITH_SYSTEM_LEVEL_PROPERTIES))
 
 
 # --- model-declared properties ---
@@ -281,7 +281,7 @@ library:
 
 def test_resolve_component_with_declared_property_ok() -> None:
     lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
-    system = parse_yaml_components(io.StringIO("""\
+    system = parse_yaml_system(io.StringIO("""\
 system:
   components:
     - id: G
@@ -296,7 +296,7 @@ system:
 
 def test_resolve_component_missing_declared_property_raises() -> None:
     lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
-    system = parse_yaml_components(io.StringIO("""\
+    system = parse_yaml_system(io.StringIO("""\
 system:
   components:
     - id: G
@@ -325,7 +325,7 @@ library:
 
 def test_resolve_component_with_declared_parameters_ok() -> None:
     lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PARAMETERS))
-    system = parse_yaml_components(io.StringIO("""\
+    system = parse_yaml_system(io.StringIO("""\
 system:
   components:
     - id: G
@@ -342,7 +342,7 @@ system:
 
 def test_resolve_component_missing_declared_parameter_raises() -> None:
     lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PARAMETERS))
-    system = parse_yaml_components(io.StringIO("""\
+    system = parse_yaml_system(io.StringIO("""\
 system:
   components:
     - id: G
@@ -357,7 +357,7 @@ system:
 
 def test_resolve_component_extra_undeclared_property_allowed() -> None:
     lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
-    system = parse_yaml_components(io.StringIO("""\
+    system = parse_yaml_system(io.StringIO("""\
 system:
   components:
     - id: G

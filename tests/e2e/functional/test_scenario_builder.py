@@ -18,7 +18,7 @@ from gems_craft.model.parsing import parse_yaml_library
 from gems_craft.model.resolve_library import resolve_library
 from gems_craft.study import Study
 from gems_craft.study.data import DataBase
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import (
     build_data_base,
     consistency_check,
@@ -41,7 +41,7 @@ def database(
     system_path = systems_dir / "with_scenarization.yml"
     with system_path.open() as components:
         return build_data_base(
-            parse_yaml_components(components), series_dir, scenario_builder
+            parse_yaml_system(components), series_dir, scenario_builder
         )
 
 
@@ -55,7 +55,7 @@ def test_system_with_scenarization(
 
     components_path = systems_dir / "with_scenarization.yml"
     with components_path.open("r") as file:
-        yaml_comp = parse_yaml_components(file)
+        yaml_comp = parse_yaml_system(file)
         components = resolve_system(yaml_comp, lib_dict)
 
     consistency_check(components, lib_dict["basic"].models)

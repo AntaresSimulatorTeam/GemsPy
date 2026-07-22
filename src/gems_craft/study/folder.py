@@ -12,7 +12,7 @@ from pathlib import Path
 from gems_craft.model.model import Model
 from gems_craft.model.parsing import parse_yaml_library
 from gems_craft.model.resolve_library import resolve_library
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import (
     build_data_base,
     consistency_check,
@@ -46,7 +46,7 @@ def load_study(study_dir: Path) -> Study:
             input_libraries.append(parse_yaml_library(lib))
 
     with system_file.open() as c:
-        input_study = parse_yaml_components(c)
+        input_study = parse_yaml_system(c)
     lib_dict = resolve_library(input_libraries)
     system = resolve_system(input_study, lib_dict)
     model_dict: dict[str, Model] = {}
