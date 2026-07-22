@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import build_data_base
 from gems_craft.study.scenario_builder import ScenarioBuilder
 
@@ -68,7 +68,7 @@ def test_dispatch_mc_scenarios_to_columns(
     import io
 
     db = build_data_base(
-        parse_yaml_components(io.StringIO(dispatch_system_yml)),
+        parse_yaml_system(io.StringIO(dispatch_system_yml)),
         dispatch_series_dir,
         scenario_builder=sb,
     )

@@ -110,7 +110,7 @@ log_cli = true
 
 [tool.mypy]
 mypy_path = "src"
-packages = ["gems_craft", "gems_runner"]
+packages = ["gems_craft", "gems_craft_hybrid", "gems_runner"]
 disallow_untyped_defs = true
 disallow_untyped_calls = true
 

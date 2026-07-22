@@ -97,7 +97,7 @@ from gems_craft.study import (
     TimeScenarioSeriesData,
     create_component,
 )
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import (
     build_data_base,
     consistency_check,
@@ -409,7 +409,7 @@ def test_two_components_different_lags_yaml(
     with lib_file.open() as f:
         input_library = parse_yaml_library(f)
     with system_file.open() as f:
-        input_system = parse_yaml_components(f)
+        input_system = parse_yaml_system(f)
 
     lib_dict = resolve_library([input_library])
     system = resolve_system(input_system, lib_dict)

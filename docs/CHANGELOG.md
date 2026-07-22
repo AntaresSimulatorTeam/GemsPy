@@ -5,10 +5,27 @@ All notable changes to GemsPy are documented here.
 ## [Unreleased]
 
 ### Added
-- **`taxonomy` and `version` on `LibrarySchema`** - optional free-form string
-  fields on the library YAML schema; no validation is attached to either.
-  `taxonomy` is also carried through to the resolved `Library` class,
-  `version` stays schema-only.
+- **`taxonomy` field on `LibrarySchema`** - optional free-form string field on
+  the library YAML schema; no validation is attached. `taxonomy` is also
+  carried through to the resolved `Library` class.
+- **`version` field on library YAML** - `LibrarySchema` (standard, not
+  hybrid-specific) gains an optional top-level `version` string, for
+  tracking the version of a library.
+- **Hybrid studies (`gems_craft_hybrid`)** - new package for reading and
+  writing GEMS studies extended with fields used to interoperate with
+  Antares Simulator. Hybrid studies cannot be simulated by GemsPy.
+  - `HybridLibrarySchema` / `HybridPortTypeSchema` add `area-connection` and
+    `thermal-capacity-connection` per port-type.
+  - `HybridSystemSchema` adds `area-connections` and
+    `thermal-capacity-connections`. `AreaConnectionsSchema` moved from the
+    standard `SystemSchema` into `HybridSystemSchema` — it was parsed but
+    never consumed by the standard resolve/solve pipeline.
+  - `gems_craft.model.parsing.parse_yaml_library` and
+    `gems_craft.study.parsing.load_input_system` /
+    `parse_yaml_system` now accept an optional `schema` parameter to
+    validate against a subclass (e.g. the hybrid schemas above); new
+    `write_yaml_library` / `write_yaml_system` functions support the
+    corresponding round-trip.
 
 ### Changed
 

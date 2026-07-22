@@ -29,7 +29,7 @@ from gems_craft.study.data import (
     dataframe_to_time_series,
     load_ts_from_file,
 )
-from gems_craft.study.parsing import parse_yaml_components
+from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import _build_data, build_data_base
 from gems_craft.study.scenario_builder import ScenarioBuilder
 
@@ -206,7 +206,7 @@ def test_build_data_base_param_group_overrides_component_group(
     (tmp_path / "series.txt").write_text("100 200\n")
     sb = ScenarioBuilder()
     db = build_data_base(
-        parse_yaml_components(io.StringIO(_SYSTEM_WITH_PARAM_GROUP)),
+        parse_yaml_system(io.StringIO(_SYSTEM_WITH_PARAM_GROUP)),
         tmp_path,
         scenario_builder=sb,
     )
