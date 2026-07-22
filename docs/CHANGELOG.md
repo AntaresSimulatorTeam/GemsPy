@@ -8,6 +8,7 @@ All notable changes to GemsPy are documented here.
 - **`taxonomy` field on `LibrarySchema`** - optional free-form string field on
   the library YAML schema; no validation is attached. `taxonomy` is also
   carried through to the resolved `Library` class.
+
 - **`version` field on library YAML** - `LibrarySchema` (standard, not
   hybrid-specific) gains an optional top-level `version` string, for
   tracking the version of a library.
