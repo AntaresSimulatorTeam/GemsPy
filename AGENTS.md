@@ -63,9 +63,9 @@ An optional `optim-config.yml` activates decomposition: variables and constraint
 
 The codebase is split into three packages along a solver-dependency boundary:
 
-- **`gems_craft`** (`src/gems_craft/`) — the domain model and all YAML I/O. No solver dependency; installable and usable on its own (`pip install gemspy`, without the `runner` extra) for building, editing, validating, and querying systems (e.g. an API layer). Deps: `numpy`, `pandas`, `PyYAML`, `pydantic`, `anytree`, `antlr4-python3-runtime`.
+- **`gems_craft`** (`src/gems_craft/`) — the domain model and all YAML I/O. No solver dependency at the module level; importable on its own for building, editing, validating, and querying systems (e.g. an API layer) without touching solve-time code. Deps: `numpy`, `pandas`, `PyYAML`, `pydantic`, `anytree`, `antlr4-python3-runtime`.
 - **`gems_craft_hybrid`** (`src/gems_craft_hybrid/`) — read/write support for *hybrid* GEMS studies, an extended format used to interoperate with Antares Simulator. No solver dependency; depends only on `gems_craft`. Hybrid studies cannot be simulated by GemsPy — this package only extends the `gems_craft` parsing schemas (`HybridLibrarySchema`, `HybridSystemSchema`) with the extra fields (`area-connection`, `thermal-capacity-connection` on port-types; `area-connections`, `thermal-capacity-connections` on systems), reusing `gems_craft`'s schema-parameterized `parse_yaml_library`/`load_input_system`/`parse_yaml_system`/`write_yaml_library`/`write_yaml_system`.
-- **`gems_runner`** (`src/gems_runner/`) — solve-time execution. Depends on `gems_craft` plus the `runner` extra (`linopy`, `xarray`, `highspy`).
+- **`gems_runner`** (`src/gems_runner/`) — solve-time execution. Depends on `gems_craft` plus `linopy`, `xarray`, `highspy`, all installed as part of the base `gemspy` package (`pip install gemspy` installs the full solver stack, not just `gems_craft`'s dependencies).
 
 ### Core Modules
 
