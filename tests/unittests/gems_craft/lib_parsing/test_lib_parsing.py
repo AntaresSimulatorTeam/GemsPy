@@ -163,6 +163,18 @@ library:
     assert input_lib.models[0].taxonomy_category == "balance"
 
 
+def test_library_version_parsing() -> None:
+    yaml_content = """
+library:
+  id: versioned_lib
+  version: 1.0.1
+  models:
+    - id: generator
+"""
+    input_lib = parse_yaml_library(io.StringIO(yaml_content))
+    assert input_lib.version == "1.0.1"
+
+
 _LIB_WITH_MODEL_PROPERTIES = """\
 library:
   id: basic
