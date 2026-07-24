@@ -684,12 +684,16 @@ dependencies = [
     { name = "antlr4-python3-runtime" },
     { name = "anytree" },
     { name = "attrs" },
+    { name = "highspy" },
+    { name = "linopy" },
     { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pandas", version = "3.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pydantic" },
     { name = "pyyaml" },
+    { name = "xarray", version = "2025.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "xarray", version = "2026.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
 [package.optional-dependencies]
@@ -698,12 +702,6 @@ doc = [
     { name = "mkdocs-material" },
     { name = "mkdocs-material-extensions" },
     { name = "mkdocstrings-python" },
-]
-runner = [
-    { name = "highspy" },
-    { name = "linopy" },
-    { name = "xarray", version = "2025.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "xarray", version = "2026.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
 [package.dev-dependencies]
@@ -730,8 +728,8 @@ requires-dist = [
     { name = "antlr4-python3-runtime", specifier = ">=4.13.2" },
     { name = "anytree", specifier = ">=2.13" },
     { name = "attrs", specifier = ">=26.0" },
-    { name = "highspy", marker = "extra == 'runner'", specifier = ">=1.14" },
-    { name = "linopy", marker = "extra == 'runner'", specifier = ">=0.6" },
+    { name = "highspy", specifier = ">=1.14" },
+    { name = "linopy", specifier = ">=0.6" },
     { name = "mkdocs", marker = "extra == 'doc'" },
     { name = "mkdocs-material", marker = "extra == 'doc'" },
     { name = "mkdocs-material-extensions", marker = "extra == 'doc'" },
@@ -740,9 +738,9 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.2" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
-    { name = "xarray", marker = "extra == 'runner'", specifier = ">=2025.3" },
+    { name = "xarray", specifier = ">=2025.3" },
 ]
-provides-extras = ["doc", "runner"]
+provides-extras = ["doc"]
 
 [package.metadata.requires-dev]
 dev = [
