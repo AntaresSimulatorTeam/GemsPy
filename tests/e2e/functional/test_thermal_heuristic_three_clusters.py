@@ -13,7 +13,7 @@
 """
 End-to-end test for the thermal three-clusters study using SimulationTable.
 
-Study: tests/e2e/functional/studies/thermal_heuristic_three_clusters_*
+Study: tests/e2e/functional/studies/thermal_heuristic_three_clusters
 Components:
   - N  : node (area model)
   - D  : fixed demand (load model, timeseries demand-ts)
@@ -26,21 +26,10 @@ Week 0 uses time indices 0-167, week 1 uses 168-335.
 Scenario 0 and scenario 1 correspond to columns 0 and 1 of the timeseries files.
 """
 
-from pathlib import Path
-
 import pytest
 
-from gems_craft.optim_config.parsing import load_optim_config
-from gems_craft.study.folder import load_study
-from gems_runner.simulation import TimeBlock, build_problem
-from gems_runner.simulation.heuristic_runner import (
-    apply_thermal_heuristics,
-    should_apply_heuristics,
-)
-from gems_runner.simulation.simulation_table import (
-    SimulationTable,
-    SimulationTableBuilder,
-)
+from gems_craft.optim_config.parsing import ResolutionConfig, ResolutionMode
+from gems_runner.session.session import SimulationSession
 from tests.e2e.functional.expected_outputs_three_clusters import (
     GEN_G1_ACCURATE,
     GEN_G1_FAST,
@@ -64,12 +53,13 @@ from tests.e2e.functional.expected_outputs_three_clusters import (
     UNSP_FAST,
     UNSP_MILP,
 )
+from tests.e2e.functional.thermal_heuristic_helpers import (
+    build_thermal_study,
+    check_output,
+    optim_config_for,
+)
 
-STUDIES_DIR = Path(__file__).parent / "studies"
-
-MILP_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_three_clusters_milp"
-ACCURATE_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_three_clusters_accurate"
-FAST_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_three_clusters_fast"
+CASE_ID = "three_clusters"
 
 WEEKS = [range(168), range(168, 336)]
 SCENARIOS = [0, 1]
@@ -83,64 +73,86 @@ _COST_FAST = [
 ]
 
 
-def _assert_per_timestep(
-    st: SimulationTable,
-    component_id: str,
-    output_id: str,
-    expected_values: list,
-    time_offset: int = 0,
-    abs: float = 1e-6,
-) -> None:
-    for t, expected in enumerate(expected_values):
-        actual = (
-            st.component(component_id)
-            .output(output_id)
-            .value(time_index=time_offset + t, scenario_index=0)
-        )
-        assert actual == pytest.approx(expected, abs=abs), (  # type: ignore[operator]
-            f"{component_id}.{output_id} at t={time_offset + t}: expected {expected}, got {actual}"
-        )
-
-
 def test_milp_version() -> None:
     """Solve weekly problems with MILP (integer commitment variables)."""
-    study = load_study(MILP_STUDY_DIR)
-    for week_idx, week_range in enumerate(WEEKS):
-        time_block = TimeBlock(week_idx + 1, list(week_range))
-        for scenario in SCENARIOS:
-            problem = build_problem(study, time_block, scenario_ids=[scenario])
-            problem.solve(solver_name="highs")
-            assert problem.termination_condition == "optimal"
-            assert problem.objective_value == pytest.approx(
-                _COST_MILP[scenario][week_idx]
-            )
+    study = build_thermal_study(CASE_ID, "milp")
+    config = optim_config_for(
+        CASE_ID,
+        "milp",
+        WEEKS[0].start,
+        WEEKS[-1].stop - 1,
+        SCENARIOS,
+        resolution=ResolutionConfig(
+            mode=ResolutionMode.PARALLEL_SUBPROBLEMS, block_length=168
+        ),
+    )
+    st = SimulationSession(study, config).run()
+    # objective-value rows carry no scenario_index; recover [scenario][week] from
+    # _run_parallel's solve order (scenarios outer in SCENARIOS order, weeks inner).
+    objective_values = st.data.loc[
+        st.data["output"] == "objective-value", "value"
+    ].tolist()
+    for scenario in SCENARIOS:
+        for week_idx in range(len(WEEKS)):
+            objective = objective_values[scenario * len(WEEKS) + week_idx]
+            assert objective == pytest.approx(_COST_MILP[scenario][week_idx])
 
-            st = SimulationTableBuilder().build(problem)
-            offset = week_idx * 168
-            _assert_per_timestep(
-                st, "G1", "generation_power", GEN_G1_MILP[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "G2", "generation_power", GEN_G2_MILP[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "G3", "generation_power", GEN_G3_MILP[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "G1", "num_units_on", NODU_G1_MILP[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "G2", "num_units_on", NODU_G2_MILP[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "G3", "num_units_on", NODU_G3_MILP[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "N", "spilled_energy", SPIL_MILP[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "N", "unsupplied_energy", UNSP_MILP[scenario][week_idx], offset
-            )
+        check_output(
+            st,
+            "G1",
+            "generation_power",
+            GEN_G1_MILP[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G2",
+            "generation_power",
+            GEN_G2_MILP[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G3",
+            "generation_power",
+            GEN_G3_MILP[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G1",
+            "num_units_on",
+            NODU_G1_MILP[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G2",
+            "num_units_on",
+            NODU_G2_MILP[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G3",
+            "num_units_on",
+            NODU_G3_MILP[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "N",
+            "spilled_energy",
+            SPIL_MILP[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "N",
+            "unsupplied_energy",
+            UNSP_MILP[scenario],
+            scenario_index=scenario,
+        )
 
 
 def test_accurate_heuristic() -> None:
@@ -148,59 +160,84 @@ def test_accurate_heuristic() -> None:
     Solve weekly problems with the accurate heuristic of Antares.
     The accurate heuristic rounds up the number of on units from the LP relaxation.
     """
-    study = load_study(ACCURATE_STUDY_DIR)
-    optim_config = load_optim_config(ACCURATE_STUDY_DIR / "input" / "optim-config.yml")
-    for week_idx, week_range in enumerate(WEEKS):
-        time_block = TimeBlock(week_idx + 1, list(week_range))
-        for scenario in SCENARIOS:
-            problem = build_problem(study, time_block, scenario_ids=[scenario])
-            problem.solve(solver_name="highs")
-            if should_apply_heuristics(study):
-                apply_thermal_heuristics(problem, optim_config, [scenario])
-                problem.solve(solver_name="highs")
-            assert problem.termination_condition == "optimal"
-            assert problem.objective_value == pytest.approx(
-                _COST_ACCURATE[scenario][week_idx]
-            )
+    study = build_thermal_study(CASE_ID, "accurate")
+    config = optim_config_for(
+        CASE_ID,
+        "accurate",
+        WEEKS[0].start,
+        WEEKS[-1].stop - 1,
+        SCENARIOS,
+        resolution=ResolutionConfig(
+            mode=ResolutionMode.PARALLEL_SUBPROBLEMS, block_length=168
+        ),
+    )
+    st = SimulationSession(study, config).run()
+    # objective-value rows carry no scenario_index; recover [scenario][week] from
+    # _run_parallel's solve order (scenarios outer in SCENARIOS order, weeks inner).
+    objective_values = st.data.loc[
+        st.data["output"] == "objective-value", "value"
+    ].tolist()
+    for scenario in SCENARIOS:
+        for week_idx in range(len(WEEKS)):
+            objective = objective_values[scenario * len(WEEKS) + week_idx]
+            assert objective == pytest.approx(_COST_ACCURATE[scenario][week_idx])
 
-            st = SimulationTableBuilder().build(problem)
-            offset = week_idx * 168
-            _assert_per_timestep(
-                st,
-                "G1",
-                "generation_power",
-                GEN_G1_ACCURATE[scenario][week_idx],
-                offset,
-            )
-            _assert_per_timestep(
-                st,
-                "G2",
-                "generation_power",
-                GEN_G2_ACCURATE[scenario][week_idx],
-                offset,
-            )
-            _assert_per_timestep(
-                st,
-                "G3",
-                "generation_power",
-                GEN_G3_ACCURATE[scenario][week_idx],
-                offset,
-            )
-            _assert_per_timestep(
-                st, "G1", "num_units_on", NODU_G1_ACCURATE[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "G2", "num_units_on", NODU_G2_ACCURATE[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "G3", "num_units_on", NODU_G3_ACCURATE[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "N", "spilled_energy", SPIL_ACCURATE[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "N", "unsupplied_energy", UNSP_ACCURATE[scenario][week_idx], offset
-            )
+        check_output(
+            st,
+            "G1",
+            "generation_power",
+            GEN_G1_ACCURATE[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G2",
+            "generation_power",
+            GEN_G2_ACCURATE[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G3",
+            "generation_power",
+            GEN_G3_ACCURATE[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G1",
+            "num_units_on",
+            NODU_G1_ACCURATE[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G2",
+            "num_units_on",
+            NODU_G2_ACCURATE[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G3",
+            "num_units_on",
+            NODU_G3_ACCURATE[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "N",
+            "spilled_energy",
+            SPIL_ACCURATE[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "N",
+            "unsupplied_energy",
+            UNSP_ACCURATE[scenario],
+            scenario_index=scenario,
+        )
 
 
 def test_fast_heuristic() -> None:
@@ -208,36 +245,62 @@ def test_fast_heuristic() -> None:
     Solve weekly problems with the fast heuristic of Antares.
     The fast heuristic uses slot-based scheduling of commitment decisions.
     """
-    study = load_study(FAST_STUDY_DIR)
-    optim_config = load_optim_config(FAST_STUDY_DIR / "input" / "optim-config.yml")
-    for week_idx, week_range in enumerate(WEEKS):
-        time_block = TimeBlock(week_idx + 1, list(week_range))
-        for scenario in SCENARIOS:
-            problem = build_problem(study, time_block, scenario_ids=[scenario])
-            problem.solve(solver_name="highs")
-            if should_apply_heuristics(study):
-                apply_thermal_heuristics(problem, optim_config, [scenario])
-                problem.solve(solver_name="highs")
-            assert problem.termination_condition == "optimal"
-            assert problem.objective_value == pytest.approx(
-                _COST_FAST[scenario][week_idx]
-            )
+    study = build_thermal_study(CASE_ID, "fast")
+    config = optim_config_for(
+        CASE_ID,
+        "fast",
+        WEEKS[0].start,
+        WEEKS[-1].stop - 1,
+        SCENARIOS,
+        resolution=ResolutionConfig(
+            mode=ResolutionMode.PARALLEL_SUBPROBLEMS, block_length=168
+        ),
+    )
+    st = SimulationSession(study, config).run()
+    # objective-value rows carry no scenario_index; recover [scenario][week] from
+    # _run_parallel's solve order (scenarios outer in SCENARIOS order, weeks inner).
+    objective_values = st.data.loc[
+        st.data["output"] == "objective-value", "value"
+    ].tolist()
 
-            st = SimulationTableBuilder().build(problem)
-            offset = week_idx * 168
-            _assert_per_timestep(
-                st, "G1", "generation_power", GEN_G1_FAST[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "G2", "generation_power", GEN_G2_FAST[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "G3", "generation_power", GEN_G3_FAST[scenario][week_idx], offset
-            )
-            # fast heuristic does not check num_units_on (slot-based, not per-unit)
-            _assert_per_timestep(
-                st, "N", "spilled_energy", SPIL_FAST[scenario][week_idx], offset
-            )
-            _assert_per_timestep(
-                st, "N", "unsupplied_energy", UNSP_FAST[scenario][week_idx], offset
-            )
+    for scenario in SCENARIOS:
+        for week_idx in range(len(WEEKS)):
+            objective = objective_values[scenario * len(WEEKS) + week_idx]
+            assert objective == pytest.approx(_COST_FAST[scenario][week_idx])
+
+        check_output(
+            st,
+            "G1",
+            "generation_power",
+            GEN_G1_FAST[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G2",
+            "generation_power",
+            GEN_G2_FAST[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G3",
+            "generation_power",
+            GEN_G3_FAST[scenario],
+            scenario_index=scenario,
+        )
+        # fast heuristic does not check num_units_on (slot-based, not per-unit)
+        check_output(
+            st,
+            "N",
+            "spilled_energy",
+            SPIL_FAST[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "N",
+            "unsupplied_energy",
+            UNSP_FAST[scenario],
+            scenario_index=scenario,
+        )

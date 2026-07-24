@@ -13,39 +13,25 @@
 """
 End-to-end test for the thermal one-cluster study using SimulationTable.
 
-Study: tests/e2e/functional/data/thermal_heuristic_one_cluster
+Study: tests/e2e/functional/studies/thermal_heuristic_one_cluster
 Components:
   - N  : node (NODE_BALANCE_MODEL)
   - D  : fixed demand (FIXED_DEMAND, timeseries demand-ts)
   - G  : thermal generator (GEN, p_max=1000, p_min=700, cost=50, ...)
   - S  : spillage (SPI, cost=0)
   - U  : unsupplied energy (UNSP, cost=1000)
-
-The study directory must have the load_study-compatible structure:
-  input/system.yml
-  input/model-libraries/<library>.yml
-  input/data-series/demand-ts.txt   (copy of data/thermal_heuristic_one_cluster/demand-ts.txt)
 """
-
-from pathlib import Path
 
 import pytest
 
-from gems_craft.optim_config.parsing import load_optim_config
-from gems_craft.study.folder import load_study
-from gems_runner.simulation import TimeBlock, build_problem
-from gems_runner.simulation.heuristic_runner import (
-    apply_thermal_heuristics,
-    should_apply_heuristics,
+from gems_runner.session.session import SimulationSession
+from tests.e2e.functional.thermal_heuristic_helpers import (
+    build_thermal_study,
+    check_output,
+    optim_config_for,
 )
-from gems_runner.simulation.simulation_table import SimulationTableBuilder
 
-STUDIES_DIR = Path(__file__).parent / "studies"
-
-MILP_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_milp"
-LP_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_lp"
-ACCURATE_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_accurate"
-FAST_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_fast"
+CASE_ID = "one_cluster"
 
 
 def test_milp_version() -> None:
@@ -74,42 +60,19 @@ def test_milp_version() -> None:
         + 3 x 1 (fixed cost step 13)
         = 16 805 387
     """
-    study = load_study(MILP_STUDY_DIR)
-    time_block = TimeBlock(1, list(range(168)))
-    problem = build_problem(study, time_block, scenario_ids=[0])
-    problem.solve(solver_name="highs")
+    study = build_thermal_study(CASE_ID, "milp")
+    config = optim_config_for(CASE_ID, "milp", 0, 167, [0])
+    st = SimulationSession(study, config).run()
 
-    assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(16805387)
-
-    st = SimulationTableBuilder().build(problem)
-
-    def assert_output_per_timestep(
-        component_id: str,
-        output_id: str,
-        expected_values: list,
-        abs: float = 1e-6,
-    ) -> None:
-        for t, expected in enumerate(expected_values):
-            actual = (
-                st.component(component_id)
-                .output(output_id)
-                .value(time_index=t, scenario_index=0)
-            )
-            assert actual == pytest.approx(
-                expected, abs=abs
-            ), f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
-
-    assert_output_per_timestep(
-        "G", "generation_power", [2000 if t != 12 else 2100 for t in range(168)]
+    assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
+        0
+    ] == pytest.approx(16805387)
+    check_output(
+        st, "G", "generation_power", [2000 if t != 12 else 2100 for t in range(168)]
     )
-    assert_output_per_timestep(
-        "G", "num_units_on", [2 if t != 12 else 3 for t in range(168)]
-    )
-    assert_output_per_timestep("N", "unsupplied_energy", [0.0] * 168)
-    assert_output_per_timestep(
-        "N", "spilled_energy", [0 if t != 12 else 50 for t in range(168)]
-    )
+    check_output(st, "G", "num_units_on", [2 if t != 12 else 3 for t in range(168)])
+    check_output(st, "N", "unsupplied_energy", [0.0] * 168)
+    check_output(st, "N", "spilled_energy", [0 if t != 12 else 50 for t in range(168)])
 
 
 def test_lp_version() -> None:
@@ -133,92 +96,43 @@ def test_lp_version() -> None:
     The optimal cost is then :
           50 x 2000 x 167 (prod step 1-12 and 14-168)
         + 50 x 2050 (prod step 13)
-        + 2 x 1 x 168 (fixed cost step 1-12 and 14-168)
+        + 2 x 1 x 167 (fixed cost step 1-12 and 14-168)
         + 2050/1000 x 1 (fixed cost step 13)
         + 0,05 x 50 (start up cost step 13)
-        = 16 802 840,55
+        = 16 802 838,55
     """
-    study = load_study(LP_STUDY_DIR)
-    time_block = TimeBlock(1, list(range(168)))
-    problem = build_problem(study, time_block, scenario_ids=[0])
-    problem.solve(solver_name="highs")
+    study = build_thermal_study(CASE_ID, "lp")
+    config = optim_config_for(CASE_ID, "lp", 0, 167, [0])
+    st = SimulationSession(study, config).run()
 
-    assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(16802840.55)
-
-    st = SimulationTableBuilder().build(problem)
-
-    def assert_output_per_timestep(
-        component_id: str,
-        output_id: str,
-        expected_values: list,
-        abs: float = 1e-6,
-    ) -> None:
-        for t, expected in enumerate(expected_values):
-            actual = (
-                st.component(component_id)
-                .output(output_id)
-                .value(time_index=t, scenario_index=0)
-            )
-            assert actual == pytest.approx(
-                expected, abs=abs
-            ), f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
-
-    assert_output_per_timestep(
-        "G", "generation_power", [2000 if t != 12 else 2050 for t in range(168)]
+    assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
+        0
+    ] == pytest.approx(16802838.55)
+    check_output(
+        st, "G", "generation_power", [2000 if t != 12 else 2050 for t in range(168)]
     )
-    assert_output_per_timestep(
-        "G", "num_units_on", [2 if t != 12 else 2.05 for t in range(168)]
-    )
-    assert_output_per_timestep("N", "unsupplied_energy", [0.0] * 168)
-    assert_output_per_timestep("N", "spilled_energy", [0.0] * 168)
+    check_output(st, "G", "num_units_on", [2 if t != 12 else 2.05 for t in range(168)])
+    check_output(st, "N", "unsupplied_energy", [0.0] * 168)
+    check_output(st, "N", "spilled_energy", [0.0] * 168)
 
 
 def test_accurate_heuristic() -> None:
     """
     Solve the same problem as before with the heuristic accurate of Antares. The accurate heuristic is able to retrieve the milp optimal solution because when the number of on units found in the linear relaxation is ceiled, we found the optimal number of on units which is already feasible.
     """
+    study = build_thermal_study(CASE_ID, "accurate")
+    config = optim_config_for(CASE_ID, "accurate", 0, 167, [0])
+    st = SimulationSession(study, config).run()
 
-    study = load_study(ACCURATE_STUDY_DIR)
-    time_block = TimeBlock(1, list(range(168)))
-    optim_config = load_optim_config(ACCURATE_STUDY_DIR / "input" / "optim-config.yml")
-    problem = build_problem(study, time_block, scenario_ids=[0])
-    problem.solve(solver_name="highs")
-    if should_apply_heuristics(study):
-        apply_thermal_heuristics(problem, optim_config, [0])
-        problem.solve(solver_name="highs")
-
-    assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(16805387)
-
-    st = SimulationTableBuilder().build(problem)
-
-    def assert_output_per_timestep(
-        component_id: str,
-        output_id: str,
-        expected_values: list,
-        abs: float = 1e-6,
-    ) -> None:
-        for t, expected in enumerate(expected_values):
-            actual = (
-                st.component(component_id)
-                .output(output_id)
-                .value(time_index=t, scenario_index=0)
-            )
-            assert actual == pytest.approx(
-                expected, abs=abs
-            ), f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
-
-    assert_output_per_timestep(
-        "G", "generation_power", [2000 if t != 12 else 2100 for t in range(168)]
+    assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
+        0
+    ] == pytest.approx(16805387)
+    check_output(
+        st, "G", "generation_power", [2000 if t != 12 else 2100 for t in range(168)]
     )
-    assert_output_per_timestep(
-        "G", "num_units_on", [2 if t != 12 else 3 for t in range(168)]
-    )
-    assert_output_per_timestep("N", "unsupplied_energy", [0.0] * 168)
-    assert_output_per_timestep(
-        "N", "spilled_energy", [0 if t != 12 else 50 for t in range(168)]
-    )
+    check_output(st, "G", "num_units_on", [2 if t != 12 else 3 for t in range(168)])
+    check_output(st, "N", "unsupplied_energy", [0.0] * 168)
+    check_output(st, "N", "spilled_energy", [0 if t != 12 else 50 for t in range(168)])
 
 
 def test_fast_heuristic() -> None:
@@ -245,53 +159,29 @@ def test_fast_heuristic() -> None:
         + 50 x 2100 x 10 (prod step 10-19)
         = 16 850 000
     """
+    study = build_thermal_study(CASE_ID, "fast")
+    config = optim_config_for(CASE_ID, "fast", 0, 167, [0])
+    st = SimulationSession(study, config).run()
 
-    study = load_study(FAST_STUDY_DIR)
-    time_block = TimeBlock(1, list(range(168)))
-    optim_config = load_optim_config(FAST_STUDY_DIR / "input" / "optim-config.yml")
-    problem = build_problem(study, time_block, scenario_ids=[0])
-    problem.solve(solver_name="highs")
-    if should_apply_heuristics(study):
-        apply_thermal_heuristics(problem, optim_config, [0])
-        problem.solve(solver_name="highs")
-
-    assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(16850000)
-
-    st = SimulationTableBuilder().build(problem)
-
-    def assert_output_per_timestep(
-        component_id: str,
-        output_id: str,
-        expected_values: list,
-        abs: float = 1e-6,
-    ) -> None:
-        for t, expected in enumerate(expected_values):
-            actual = (
-                st.component(component_id)
-                .output(output_id)
-                .value(time_index=t, scenario_index=0)
-            )
-            assert actual == pytest.approx(
-                expected, abs=abs
-            ), f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
-
-    assert_output_per_timestep(
+    assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
+        0
+    ] == pytest.approx(16850000)
+    check_output(
+        st,
         "G",
         "generation_power",
-        [2000 if t not in [i for i in range(10, 20)] else 2100 for t in range(168)],
+        [2000 if t not in range(10, 20) else 2100 for t in range(168)],
     )
-    assert_output_per_timestep(
+    check_output(
+        st,
         "G",
         "num_units_on",
-        [2 if t not in [i for i in range(10, 20)] else 3 for t in range(168)],
+        [2 if t not in range(10, 20) else 3 for t in range(168)],
     )
-    assert_output_per_timestep("N", "unsupplied_energy", [0.0] * 168)
-    assert_output_per_timestep(
+    check_output(st, "N", "unsupplied_energy", [0.0] * 168)
+    check_output(
+        st,
         "N",
         "spilled_energy",
-        [
-            0 if t not in [i for i in range(10, 20)] else (50 if t == 12 else 100)
-            for t in range(168)
-        ],
+        [0 if t not in range(10, 20) else (50 if t == 12 else 100) for t in range(168)],
     )

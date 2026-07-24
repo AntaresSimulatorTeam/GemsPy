@@ -215,6 +215,11 @@ class SimulationSession:
         if should_apply_heuristics(self.study):
             apply_thermal_heuristics(problem, self.optim_config, scenario_ids)
             problem.solve(solver_name=solver_name, **solver_kwargs)
+        if problem.status != "ok":
+            raise RuntimeError(
+                f"Problem {problem.name!r} was not solved to optimality"
+                f"(termination_condition={problem.termination_condition!r})."
+            )
         table = SimulationTableBuilder().build(
             problem, scenario_ids_remap=scenario_ids, table_id=self.run_id
         )

@@ -23,27 +23,16 @@ Components:
 1 scenario x 1 week of 168 hours. Low residual load case with significant spillage.
 """
 
-from pathlib import Path
-
 import pytest
 
-from gems_craft.optim_config.parsing import load_optim_config
-from gems_craft.study.folder import load_study
-from gems_runner.simulation import TimeBlock, build_problem
-from gems_runner.simulation.heuristic_runner import (
-    apply_thermal_heuristics,
-    should_apply_heuristics,
-)
-from gems_runner.simulation.simulation_table import (
-    SimulationTable,
-    SimulationTableBuilder,
+from gems_runner.session.session import SimulationSession
+from tests.e2e.functional.thermal_heuristic_helpers import (
+    build_thermal_study,
+    check_output,
+    optim_config_for,
 )
 
-STUDIES_DIR = Path(__file__).parent / "studies"
-
-MILP_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_two_clusters_low_load_milp"
-ACCURATE_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_two_clusters_low_load_accurate"
-FAST_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_two_clusters_low_load_fast"
+CASE_ID = "two_clusters_low_load"
 
 # fmt: off
 _G1_GEN_MILP = [21000.0, 21000.0, 21000.0, 22127.0, 23903.0, 23800.0, 29152.0, 28840.0, 30246.0, 29912.0, 27437.0, 31500.0, 31500.0, 31500.0, 31115.0, 22643.0, 17874.0, 18589.0, 19041.0, 16725.0, 12498.0, 11493.0, 11256.0, 6724.0, 600.0, 600.0, 600.0, 600.0, 600.0, 600.0, 721.0, 900.0, 1517.0, 2673.0, 3280.0, 8042.0, 12600.0, 12600.0, 9425.0, 8400.0, 8400.0, 9800.0, 11457.0, 11380.0, 12093.0, 12033.0, 14400.0, 11061.0, 11667.0, 12827.0, 10929.0, 10209.0, 9642.0, 12172.0, 17738.0, 19634.0, 19800.0, 17800.0, 13403.0, 16393.0, 19334.0, 17565.0, 14124.0, 14137.0, 13316.0, 16819.0, 19358.0, 15619.0, 9638.0, 5564.0, 5242.0, 1687.0, 900.0, 600.0, 600.0, 600.0, 600.0, 1743.0, 9673.0, 13595.0, 13627.0, 13017.0, 11365.0, 16806.0, 17100.0, 17100.0, 16679.0, 14606.0, 13176.0, 15619.0, 17100.0, 14818.0, 11174.0, 8535.0, 7899.0, 4224.0, 2209.0, 811.0, 600.0, 890.0, 789.0, 622.0, 7893.0, 13074.0, 13826.0, 14467.0, 12450.0, 21118.0, 26935.0, 26345.0, 24368.0, 22581.0, 24429.0, 27900.0, 27900.0, 27900.0, 24430.0, 22302.0, 23479.0, 20638.0, 11278.0, 9600.0, 9600.0, 9600.0, 9600.0, 12925.0, 21222.0, 28128.0, 29724.0, 29975.0, 24316.0, 27662.0, 32183.0, 30524.0, 30265.0, 31729.0, 35121.0, 40762.0, 44185.0, 45000.0, 41891.0, 41048.0, 41509.0, 39384.0, 34533.0, 34661.0, 33049.0, 31777.0, 31616.0, 31693.0, 38073.0, 39023.0, 38405.0, 36189.0, 30393.0, 35535.0, 42843.0, 43891.0, 42826.0, 43974.0, 45000.0, 45000.0, 45000.0, 45000.0, 42494.0, 38634.0, 39132.0, 36502.0]
@@ -69,44 +58,24 @@ _UNSP_FAST = [0.0] * 168
 # fmt: on
 
 
-def _assert_per_timestep(
-    st: SimulationTable,
-    component_id: str,
-    output_id: str,
-    expected_values: list,
-    abs: float = 1e-6,
-) -> None:
-    for t, expected in enumerate(expected_values):
-        actual = (
-            st.component(component_id)
-            .output(output_id)
-            .value(time_index=t, scenario_index=0)
-        )
-        assert actual == pytest.approx(expected, abs=abs), (  # type: ignore[operator]
-            f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
-        )
-
-
 def test_milp_version() -> None:
     """
     Solve weekly problem with two clusters and low residual load using MILP.
     Optimal solution has significant spillage due to minimum generation constraints.
     """
-    study = load_study(MILP_STUDY_DIR)
-    time_block = TimeBlock(1, list(range(168)))
-    problem = build_problem(study, time_block, scenario_ids=[0])
-    problem.solve(solver_name="highs")
+    study = build_thermal_study(CASE_ID, "milp")
+    config = optim_config_for(CASE_ID, "milp", 0, 167, [0])
+    st = SimulationSession(study, config).run()
 
-    assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(36036414)
+    objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
+    assert objective == pytest.approx(36036414)
 
-    st = SimulationTableBuilder().build(problem)
-    _assert_per_timestep(st, "G1", "generation_power", _G1_GEN_MILP)
-    _assert_per_timestep(st, "G2", "generation_power", _G2_GEN_MILP)
-    _assert_per_timestep(st, "G1", "num_units_on", _G1_NODU_MILP)
-    _assert_per_timestep(st, "G2", "num_units_on", _G2_NODU_MILP)
-    _assert_per_timestep(st, "N", "unsupplied_energy", _UNSP_MILP)
-    _assert_per_timestep(st, "N", "spilled_energy", _SPIL_MILP)
+    check_output(st, "G1", "generation_power", _G1_GEN_MILP)
+    check_output(st, "G2", "generation_power", _G2_GEN_MILP)
+    check_output(st, "G1", "num_units_on", _G1_NODU_MILP)
+    check_output(st, "G2", "num_units_on", _G2_NODU_MILP)
+    check_output(st, "N", "unsupplied_energy", _UNSP_MILP)
+    check_output(st, "N", "spilled_energy", _SPIL_MILP)
     assert sum(_SPIL_MILP) == pytest.approx(15884)
 
 
@@ -115,25 +84,19 @@ def test_accurate_heuristic() -> None:
     Solve the same problem with the accurate heuristic of Antares.
     Spillage is larger than with MILP due to the rounding of commitment decisions.
     """
-    study = load_study(ACCURATE_STUDY_DIR)
-    time_block = TimeBlock(1, list(range(168)))
-    optim_config = load_optim_config(ACCURATE_STUDY_DIR / "input" / "optim-config.yml")
-    problem = build_problem(study, time_block, scenario_ids=[0])
-    problem.solve(solver_name="highs")
-    if should_apply_heuristics(study):
-        apply_thermal_heuristics(problem, optim_config, [0])
-        problem.solve(solver_name="highs")
+    study = build_thermal_study(CASE_ID, "accurate")
+    config = optim_config_for(CASE_ID, "accurate", 0, 167, [0])
+    st = SimulationSession(study, config).run()
 
-    assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(36060641)
+    objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
+    assert objective == pytest.approx(36060641)
 
-    st = SimulationTableBuilder().build(problem)
-    _assert_per_timestep(st, "G1", "generation_power", _G1_GEN_ACCURATE)
-    _assert_per_timestep(st, "G2", "generation_power", _G2_GEN_ACCURATE)
-    _assert_per_timestep(st, "G1", "num_units_on", _G1_NODU_ACCURATE)
-    _assert_per_timestep(st, "G2", "num_units_on", _G2_NODU_ACCURATE)
-    _assert_per_timestep(st, "N", "unsupplied_energy", _UNSP_ACCURATE)
-    _assert_per_timestep(st, "N", "spilled_energy", _SPIL_ACCURATE)
+    check_output(st, "G1", "generation_power", _G1_GEN_ACCURATE)
+    check_output(st, "G2", "generation_power", _G2_GEN_ACCURATE)
+    check_output(st, "G1", "num_units_on", _G1_NODU_ACCURATE)
+    check_output(st, "G2", "num_units_on", _G2_NODU_ACCURATE)
+    check_output(st, "N", "unsupplied_energy", _UNSP_ACCURATE)
+    check_output(st, "N", "spilled_energy", _SPIL_ACCURATE)
     assert sum(_SPIL_ACCURATE) == pytest.approx(22191)
 
 
@@ -142,22 +105,16 @@ def test_fast_heuristic() -> None:
     Solve the same problem with the fast heuristic of Antares.
     Spillage is even larger due to slot-based commitment scheduling.
     """
-    study = load_study(FAST_STUDY_DIR)
-    time_block = TimeBlock(1, list(range(168)))
-    optim_config = load_optim_config(FAST_STUDY_DIR / "input" / "optim-config.yml")
-    problem = build_problem(study, time_block, scenario_ids=[0])
-    problem.solve(solver_name="highs")
-    if should_apply_heuristics(study):
-        apply_thermal_heuristics(problem, optim_config, [0])
-        problem.solve(solver_name="highs")
+    study = build_thermal_study(CASE_ID, "fast")
+    config = optim_config_for(CASE_ID, "fast", 0, 167, [0])
+    st = SimulationSession(study, config).run()
 
-    assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(35774633)
+    objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
+    assert objective == pytest.approx(35774633)
 
-    st = SimulationTableBuilder().build(problem)
-    _assert_per_timestep(st, "G1", "generation_power", _G1_GEN_FAST)
-    _assert_per_timestep(st, "G2", "generation_power", _G2_GEN_FAST)
+    check_output(st, "G1", "generation_power", _G1_GEN_FAST)
+    check_output(st, "G2", "generation_power", _G2_GEN_FAST)
     # fast heuristic does not check num_units_on (slot-based, not per-unit)
-    _assert_per_timestep(st, "N", "unsupplied_energy", _UNSP_FAST)
-    _assert_per_timestep(st, "N", "spilled_energy", _SPIL_FAST)
+    check_output(st, "N", "unsupplied_energy", _UNSP_FAST)
+    check_output(st, "N", "spilled_energy", _SPIL_FAST)
     assert sum(_SPIL_FAST) == pytest.approx(255873)

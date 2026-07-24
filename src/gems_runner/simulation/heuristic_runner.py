@@ -58,6 +58,21 @@ def _get_linopy_var(problem: "OptimizationProblem", model_id: str, name: str) ->
     return linopy_var
 
 
+def _get_component_linopy_var(
+    problem: "OptimizationProblem", model_id: str, name: str, component_id: str
+) -> Any:
+    """Like ``_get_linopy_var``, but returns the actually-registered Variable for
+    *component_id* rather than the (possibly relaxed/exact-merged) one in
+    ``problem._linopy_vars`` — bound mutations only reach the solver through this one.
+    """
+    linopy_var = problem.get_component_variable(model_id, name, component_id)
+    if linopy_var is None:
+        raise ValueError(
+            f"Variable '{name}' not found in model '{model_id}' for component '{component_id}'."
+        )
+    return linopy_var
+
+
 def _read_da(
     da: "xr.DataArray", component_id: str, local_scenario_idx: int
 ) -> Union[float, int, List[float], List[int]]:
@@ -87,13 +102,13 @@ def _resolve_input_for_heuristic(
         return _read_da(solution[linopy_var.name], component_id, local_scenario_idx)
     elif access == ModelElementAccessType.VARIABLE_LOWER_BOUND:
         return _read_da(
-            _get_linopy_var(problem, model_id, name).lower,
+            _get_component_linopy_var(problem, model_id, name, component_id).lower,
             component_id,
             local_scenario_idx,
         )
     elif access == ModelElementAccessType.VARIABLE_UPPER_BOUND:
         return _read_da(
-            _get_linopy_var(problem, model_id, name).upper,
+            _get_component_linopy_var(problem, model_id, name, component_id).upper,
             component_id,
             local_scenario_idx,
         )
@@ -199,12 +214,9 @@ def apply_thermal_heuristics(
             )
 
             for output in heuristic_config.outputs:
-                linopy_var = problem._linopy_vars.get((model_id, output.id))
-                if linopy_var is None:
-                    raise ValueError(
-                        f"Heuristic output variable '{output.id}' not found "
-                        f"in model '{model_id}'."
-                    )
+                linopy_var = _get_component_linopy_var(
+                    problem, model_id, output.id, component.id
+                )
 
                 _apply_heuristic_bounds(
                     linopy_var, result_da, output.type, component.id, local_idx

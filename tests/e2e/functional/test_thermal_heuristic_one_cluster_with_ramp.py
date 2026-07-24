@@ -13,7 +13,7 @@
 """
 End-to-end tests for the thermal one-cluster-with-ramp study.
 
-Study: tests/e2e/functional/studies/thermal_heuristic_one_cluster_with_ramp_*
+Study: tests/e2e/functional/studies/thermal_heuristic_one_cluster_with_ramp
 Components:
   - N : node (area model, spillage_cost=100, unsupplied_energy_cost=10000)
   - D : fixed demand (ramps 0->300 MW over 7 hours, then back to 0 at t=12, zeros thereafter)
@@ -36,58 +36,28 @@ Three variants of the same study are compared:
     though the solver reports an optimal LP solution.
 """
 
-from pathlib import Path
-
 import pytest
 
-from gems_craft.optim_config.parsing import load_optim_config
-from gems_craft.study.folder import load_study
-from gems_runner.simulation import TimeBlock, build_problem
-from gems_runner.simulation.heuristic_runner import (
-    apply_thermal_heuristics,
-    should_apply_heuristics,
-)
-from gems_runner.simulation.simulation_table import (
-    SimulationTable,
-    SimulationTableBuilder,
+from gems_runner.session.session import SimulationSession
+from tests.e2e.functional.thermal_heuristic_helpers import (
+    build_thermal_study,
+    check_output,
+    optim_config_for,
 )
 
-STUDIES_DIR = Path(__file__).parent / "studies"
-MILP_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_with_ramp_milp"
-ACCURATE_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_with_ramp_accurate"
-FAST_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_with_ramp_fast"
-
-
-def _assert_per_timestep(
-    st: SimulationTable,
-    component_id: str,
-    output_id: str,
-    expected_values: list,
-    abs: float = 1e-2,
-) -> None:
-    for t, expected in enumerate(expected_values):
-        actual = (
-            st.component(component_id)
-            .output(output_id)
-            .value(time_index=t, scenario_index=0)
-        )
-        assert actual == pytest.approx(expected, abs=abs), (  # type: ignore[operator]
-            f"{component_id}.{output_id} at t={t}: expected {expected}, got {actual}"
-        )
+CASE_ID = "one_cluster_with_ramp"
 
 
 def test_milp_version() -> None:
     """Solve weekly problem with one cluster and ramp constraints with milp."""
-    study = load_study(MILP_STUDY_DIR)
-    time_block = TimeBlock(1, list(range(168)))
-    problem = build_problem(study, time_block, scenario_ids=[0])
-    problem.solve(solver_name="highs")
+    study = build_thermal_study(CASE_ID, "milp")
+    config = optim_config_for(CASE_ID, "milp", 0, 12, [0])
+    st = SimulationSession(study, config).run()
 
-    assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(29040)
+    objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
+    assert objective == pytest.approx(29040)
 
-    st = SimulationTableBuilder().build(problem)
-    _assert_per_timestep(
+    check_output(
         st,
         "G",
         "generation_power",
@@ -104,16 +74,17 @@ def test_milp_version() -> None:
             150.0,
             100.0,
             100.0,
+            0.0
         ],
     )
-    _assert_per_timestep(
+    check_output(
         st,
         "G",
         "num_units_on",
-        [0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0],
+        [0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 0.0],
     )
-    _assert_per_timestep(st, "N", "spilled_energy", [0.0, 50.0] + [0.0] * 9 + [50.0])
-    _assert_per_timestep(st, "N", "unsupplied_energy", [0.0] * 12)
+    check_output(st, "N", "spilled_energy", [0.0, 50.0] + [0.0] * 9 + [50.0, 0.])
+    check_output(st, "N", "unsupplied_energy", [0.0] * 13)
 
 
 def test_accurate_heuristic() -> None:
@@ -122,20 +93,14 @@ def test_accurate_heuristic() -> None:
     num_units_on values, because it has no integer constraint on the number of
     starting/stopping units.
     """
-    study = load_study(ACCURATE_STUDY_DIR)
-    time_block = TimeBlock(1, list(range(168)))
-    optim_config = load_optim_config(ACCURATE_STUDY_DIR / "input" / "optim-config.yml")
-    problem = build_problem(study, time_block, scenario_ids=[0])
-    problem.solve(solver_name="highs")
-    if should_apply_heuristics(study):
-        apply_thermal_heuristics(problem, optim_config, [0])
-        problem.solve(solver_name="highs")
+    study = build_thermal_study(CASE_ID, "accurate")
+    config = optim_config_for(CASE_ID, "accurate", 0, 12, [0])
+    st = SimulationSession(study, config).run()
 
-    assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(29011.4616736)
+    objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
+    assert objective == pytest.approx(29011.4616736)
 
-    st = SimulationTableBuilder().build(problem)
-    _assert_per_timestep(
+    check_output(
         st,
         "G",
         "num_units_on",
@@ -154,8 +119,9 @@ def test_accurate_heuristic() -> None:
             1.0,
             0.0,
         ],
+        abs=1e-2,
     )  # non-integer values, as expected from the accurate heuristic's relaxed LP
-    _assert_per_timestep(
+    check_output(
         st,
         "G",
         "num_units_starting",
@@ -174,8 +140,9 @@ def test_accurate_heuristic() -> None:
             0.0,
             0.0,
         ],
+        abs=1e-2,
     )
-    _assert_per_timestep(
+    check_output(
         st,
         "G",
         "num_units_stopping",
@@ -194,6 +161,7 @@ def test_accurate_heuristic() -> None:
             0.0,
             1.0,
         ],
+        abs=1e-2,
     )
 
 
@@ -204,20 +172,14 @@ def test_fast_heuristic() -> None:
     30 MW/unit: the resulting dispatch is ramp-infeasible even though the LP reports
     an optimal solution.
     """
-    study = load_study(FAST_STUDY_DIR)
-    time_block = TimeBlock(1, list(range(168)))
-    optim_config = load_optim_config(FAST_STUDY_DIR / "input" / "optim-config.yml")
-    problem = build_problem(study, time_block, scenario_ids=[0])
-    problem.solve(solver_name="highs")
-    if should_apply_heuristics(study):
-        apply_thermal_heuristics(problem, optim_config, [0])
-        problem.solve(solver_name="highs")
+    study = build_thermal_study(CASE_ID, "fast")
+    config = optim_config_for(CASE_ID, "fast", 0, 12, [0])
+    st = SimulationSession(study, config).run()
 
-    assert problem.termination_condition == "optimal"
-    assert problem.objective_value == pytest.approx(29000)
+    objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
+    assert objective == pytest.approx(29000)
 
-    st = SimulationTableBuilder().build(problem)
-    _assert_per_timestep(
+    check_output(
         st,
         "G",
         "generation_power",
@@ -234,6 +196,7 @@ def test_fast_heuristic() -> None:
             150.0,
             100.0,
             100.0,
+            0.0
         ],
     )
-    _assert_per_timestep(st, "G", "num_units_on", [0.0] + [1.0] * 11)
+    check_output(st, "G", "num_units_on", [0.0] + [1.0] * 11 + [0.0])

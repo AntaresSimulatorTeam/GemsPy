@@ -328,12 +328,16 @@ class OptimizationProblem:
         linopy_vars: Dict[Tuple[str, str], linopy.Variable],
         param_arrays: Dict[Tuple[str, str], xr.DataArray],
         objective_constant: float = 0.0,
+        linopy_vars_by_component: Optional[
+            Dict[Tuple[str, str, str], linopy.Variable]
+        ] = None,
     ) -> None:
         self.name = name
         self.linopy_model = linopy_model
         self.study = study
         self.block = block
         self._linopy_vars = linopy_vars
+        self._linopy_vars_by_component = linopy_vars_by_component or {}
         self.param_arrays = param_arrays
         # Constant term of the objective (linopy cannot represent pure-constant objectives).
         self._objective_constant: float = objective_constant
@@ -373,6 +377,20 @@ class OptimizationProblem:
     def export_lp(self, path: Path) -> None:
         """Write the problem to an LP file at *path*."""
         self.linopy_model.to_file(path, explicit_coordinate_names=True)
+
+    def get_component_variable(
+        self, model_id: str, var_name: str, component_id: str
+    ) -> Optional[linopy.Variable]:
+        """Return the actually-registered linopy Variable that *component_id* was
+        created on for (model_id, var_name).
+
+        Unlike ``get_variable_labels``/the internal ``_linopy_vars`` dict — which,
+        for a model split across relaxed/exact strategy groups, holds a merged
+        Variable rebuilt via ``xr.concat`` and detached from the real registered
+        objects — this is safe to mutate bounds on (e.g. for heuristics), since
+        the mutation reaches what the solver actually reads.
+        """
+        return self._linopy_vars_by_component.get((model_id, var_name, component_id))
 
     def get_variable_labels(
         self, model_id: str, var_name: str
@@ -427,6 +445,13 @@ class _OptimizationProblemBuilder:
         # Populated during build
         self.linopy_model = linopy.Model()
         self.linopy_vars: Dict[Tuple[str, str], linopy.Variable] = {}
+        # Unlike linopy_vars (which, for a model whose components are split
+        # across relaxed/exact groups, holds a *merged* Variable rebuilt via
+        # xr.concat — a copy, detached from the actually-registered per-group
+        # Variable objects), this maps each individual component to the real
+        # Variable it was created on, so bound mutations (heuristics) reach
+        # the model.
+        self.linopy_vars_by_component: Dict[Tuple[str, str, str], linopy.Variable] = {}
         self.param_arrays: Dict[Tuple[str, str], xr.DataArray] = {}
         self.port_arrays: Dict[str, Dict[PortFieldId, VectorizedExpr]] = {}
 
@@ -490,6 +515,7 @@ class _OptimizationProblemBuilder:
             study=self.study,
             block=self.block,
             linopy_vars=self.linopy_vars,
+            linopy_vars_by_component=self.linopy_vars_by_component,
             param_arrays=self.param_arrays,
             objective_constant=objective_constant,
         )
@@ -590,8 +616,13 @@ class _OptimizationProblemBuilder:
                             relax=relax,
                             name_suffix=f"__relaxed" if relax else "",
                         )
-                        for i, (relax, group) in enumerate(groups.items())
+                        for relax, group in groups.items()
                     ]
+                    for group_var, group in zip(partial, groups.values()):
+                        for c in group:
+                            self.linopy_vars_by_component[
+                                (model.id, var.name, c.id)
+                            ] = group_var
                     merged = cast(
                         xr.Dataset,
                         xr.concat([lv.data for lv in partial], dim="component"),
@@ -600,11 +631,14 @@ class _OptimizationProblemBuilder:
                         merged, partial[0].model, partial[0].name
                     )
                 else:
-                    self.linopy_vars[(model.id, var.name)] = (
-                        self._add_variable_for_group(
-                            model, var, components, relax=False
-                        )
+                    single_var = self._add_variable_for_group(
+                        model, var, components, relax=False
                     )
+                    self.linopy_vars[(model.id, var.name)] = single_var
+                    for c in components:
+                        self.linopy_vars_by_component[(model.id, var.name, c.id)] = (
+                            single_var
+                        )
 
     def _add_variable_for_group(
         self,
