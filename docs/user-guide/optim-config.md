@@ -363,27 +363,9 @@ config_pf = OptimConfig(
 
 # Pass to SimulationSession
 from gems.session import SimulationSession
-from gems.optim_config import validate_optim_config
 from gems.study.folder import load_study
 
 study = load_study(Path("my_study"))
-validate_optim_config(config, study.system)
 session = SimulationSession(study=study, optim_config=config)
 results = session.run()
 ~~~
-
-> **Note** — Regardless of how the `OptimConfig` is built (from a file with
-> `load_optim_config()` or programmatically), always call
-> `validate_optim_config(config, study.system)` before starting a session.
-> This cross-validation checks:
->
-> - every model ID referenced in `models` exists in the system;
-> - every component with `integer-strategy: heuristic` has a `heuristic-id`
->   that is declared in the optim-config for its model;
-> - if using Benders decomposition: no component uses `integer-strategy:
->   heuristic`, and no integer/binary variable is assigned to subproblems;
-> - if a scenario builder is provided: every scenario index in the playlist
->   is defined for every scenario group.
->
-> When using `run_study()` this call is automatic; when building a
-> `SimulationSession` manually, it is your responsibility.

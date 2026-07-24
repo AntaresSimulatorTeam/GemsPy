@@ -8,11 +8,10 @@
 from pathlib import Path
 from gems.study.folder import load_study
 from gems.session import SimulationSession
-from gems.optim_config import load_optim_config, validate_optim_config
+from gems.optim_config import load_optim_config
 
 study = load_study(Path("my_study"))
 optim_config = load_optim_config(Path("my_study/input/optim-config.yml"))
-validate_optim_config(optim_config, study.system)
 
 session = SimulationSession(study=study, optim_config=optim_config)
 results = session.run()  # SimulationTable

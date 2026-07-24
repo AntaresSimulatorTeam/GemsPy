@@ -10,14 +10,17 @@
 #
 # This file is part of the Antares project.
 
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 
 import xarray as xr
 
-from gems.optim_config.parsing import OptimConfig, ResolutionMode, load_optim_config
+from gems.optim_config.parsing import (
+    OptimConfig,
+    ResolutionMode,
+    validate_optim_config,
+)
 from gems.simulation.heuristic_runner import (
     apply_thermal_heuristics,
     should_apply_heuristics,
@@ -29,16 +32,22 @@ from gems.simulation.simulation_table import (
     merge_simulation_tables,
 )
 from gems.simulation.time_block import TimeBlock
-from gems.study.folder import load_study
 from gems.study.study import Study
 
 
-@dataclass
 class SimulationSession:
-    study: Study
-    optim_config: OptimConfig
-    run_id: str = field(default_factory=lambda: str(uuid4()))
-    output_dir: Optional[Path] = None
+    def __init__(
+        self,
+        study: Study,
+        optim_config: OptimConfig,
+        run_id: Optional[str] = None,
+        output_dir: Optional[Path] = None,
+    ) -> None:
+        validate_optim_config(optim_config, study.system, study.scenario_builder)
+        self.study = study
+        self.optim_config = optim_config
+        self.run_id = run_id or str(uuid4())
+        self.output_dir = output_dir
 
     @property
     def scenario_ids(self) -> List[int]:
