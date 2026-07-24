@@ -613,7 +613,7 @@ def _check_no_heuristic_with_benders(
     errors: List[str],
 ) -> None:
     """Check that no component uses integer-strategy 'heuristic' with Benders decomposition."""
-    from gems.study.parsing import IntegerStrategyId
+    from gems_craft.study.parsing import IntegerStrategyId
 
     errors.extend(
         f"Component '{comp.id}' uses integer-strategy 'heuristic', "
