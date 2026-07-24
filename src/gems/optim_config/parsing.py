@@ -40,6 +40,8 @@ from gems.utils import ModifiedBaseModel
 
 if TYPE_CHECKING:
     from gems.model.model import Model
+    from gems.model.parameter import Parameter
+    from gems.model.variable import Variable
     from gems.study.scenario_builder import ScenarioBuilder
     from gems.study.system import System
 
@@ -109,6 +111,22 @@ _HEURISTIC_SCHEMA: Dict[HeuristicId, Dict[str, Set[str]]] = {
         },
         "outputs": {"minimum_generation_power"},
     },
+}
+
+
+_HEURISTIC_ELEMENT_TIME_DEPENDENCE: Dict[str, Optional[bool]] = {
+    # True: must vary per timestep. False: must be a single constant value for the whole
+    # block. None: either is accepted, the heuristic function broadcasts a constant.
+    "min_up_duration": False,
+    "min_down_duration": False,
+    "min_power_per_unit": False,
+    "max_power_per_unit": False,
+    "nb_units_on_opt": True,
+    "generation_power": True,
+    "minimum_nb_units_on": True,
+    "minimum_generation_power": True,
+    "nb_units_max": None,
+    "cluster_max_generation": None,
 }
 
 
@@ -557,6 +575,39 @@ def _check_heuristic_ids_declared(
             )
 
 
+def _check_heuristic_elements(
+    heuristic_config: HeuristicConfig,
+    model: "Model",
+    errors: List[str],
+) -> None:
+    """Every heuristic input/output id must exist in the model — as a parameter or a
+    variable depending on its declared access type — and have the time-dependence the
+    heuristic function expects."""
+    for element_config in [*heuristic_config.inputs, *heuristic_config.outputs]:
+        declared: Optional[Union["Parameter", "Variable"]]
+        if element_config.type == ModelElementAccessType.PARAMETER:
+            declared = model.parameters.get(element_config.id)
+        else:
+            declared = model.variables.get(element_config.id)
+
+        if declared is None:
+            errors.append(
+                f"Heuristic '{heuristic_config.id.value}' in model '{model.id}': "
+                f"'{element_config.id}' bound to heuristic element "
+                f"'{element_config.heuristic_element}' not found in model."
+            )
+            continue
+
+        expected = _HEURISTIC_ELEMENT_TIME_DEPENDENCE[element_config.heuristic_element]
+        if expected is not None and declared.structure.time != expected:
+            errors.append(
+                f"Heuristic '{heuristic_config.id.value}' in model '{model.id}': "
+                f"'{element_config.id}' bound to heuristic element "
+                f"'{element_config.heuristic_element}' must be "
+                f"'time-dependent:{expected}'."
+            )
+
+
 def _check_no_heuristic_with_benders(
     system: "System",
     errors: List[str],
@@ -632,6 +683,8 @@ def validate_optim_config(
     - Master variables are time-independent.
     - Master constraints and objective contributions only reference variables
       assigned to ``master`` or ``master-and-subproblems``.
+    - Heuristic inputs/outputs reference existing model parameters/variables with the
+      time-dependence the heuristic function expects.
     - If ``scenario_builder`` is provided, every scenario index in
       ``config.scenario_scope.scenario_ids`` is defined for every scenario
       group in the builder.
@@ -670,6 +723,8 @@ def validate_optim_config(
                     model_config.id,
                     errors,
                 )
+            for heuristic_config in model_config.heuristic:
+                _check_heuristic_elements(heuristic_config, model, errors)
 
     _check_heuristic_ids_declared(config, system, errors)
 

@@ -11,13 +11,26 @@
 # This file is part of the Antares project.
 
 import math
-from typing import List
+import warnings
+from typing import List, Union
 
 import linopy
 import numpy as np
 import xarray as xr
 
 ZERO = 1e-6
+
+
+def _round_to_int_duration(value: float, name: str) -> int:
+    rounded = round(value)
+    if abs(value - rounded) > ZERO:
+        warnings.warn(
+            f"'{name}' should be a whole number of timesteps, got {value}; "
+            f"rounding to {rounded}.",
+            UserWarning,
+            stacklevel=2,
+        )
+    return int(rounded)
 
 
 def _compute_nb_units_from_window_max(
@@ -61,11 +74,11 @@ def _compute_nb_units_from_window_max(
 
 def find_min_generation_fast(
     generation_power: List[float],
-    cluster_max_generation: List[float],
+    cluster_max_generation: Union[float, List[float]],
     min_power_per_unit: float,
     max_power_per_unit: float,
-    min_up_duration: int,
-    min_down_duration: int,
+    min_up_duration: float,
+    min_down_duration: float,
 ) -> List[float]:
     """
     Fast heuristic: derives the minimum generation power from the optimised production
@@ -80,7 +93,8 @@ def find_min_generation_fast(
     generation_power:
         Optimal production per timestep (MW).
     cluster_max_generation:
-        Maximum available generation per timestep (MW).
+        Maximum available generation (MW), either per timestep or as a single constant
+        applied to every timestep.
     min_power_per_unit:
         Minimum power output per unit (MW). If ~0, all units are considered off.
     max_power_per_unit:
@@ -95,10 +109,13 @@ def find_min_generation_fast(
     List[float]
         Minimum generation power per timestep (MW), clamped by cluster_max_generation.
     """
-    min_up_duration = int(min_up_duration)
-    min_down_duration = int(min_down_duration)
+    min_up_duration = _round_to_int_duration(min_up_duration, "min_up_duration")
+    min_down_duration = _round_to_int_duration(min_down_duration, "min_down_duration")
     nb_timesteps = len(generation_power)
     nb_units_on = [0] * nb_timesteps
+
+    if isinstance(cluster_max_generation, (int, float)):
+        cluster_max_generation = [float(cluster_max_generation)] * nb_timesteps
 
     if abs(min_power_per_unit) < ZERO:
         return [0.0] * nb_timesteps
@@ -143,9 +160,9 @@ def find_min_generation_fast(
 
 def find_nb_units_accurate(
     nb_units_on_opt: List[float],
-    nb_units_max: List[int],
-    min_up_duration: int,
-    min_down_duration: int,
+    nb_units_max: Union[float, List[float]],
+    min_up_duration: float,
+    min_down_duration: float,
 ) -> List[int]:
     """
     Accurate heuristic: enforces min up/down time constraints on the number of running
@@ -167,7 +184,8 @@ def find_nb_units_accurate(
     nb_units_on_opt:
         Number of units on per timestep from the optimisation (float, before ceiling).
     nb_units_max:
-        Maximum number of available units per timestep.
+        Maximum number of available units, either per timestep or as a single constant
+        applied to every timestep.
     min_up_duration:
         Minimum consecutive hours a unit must stay on after starting.
     min_down_duration:
@@ -183,25 +201,27 @@ def find_nb_units_accurate(
     AssertionError
         If the LP has no feasible solution.
     """
-    min_up_duration = int(min_up_duration)
-    min_down_duration = int(min_down_duration)
+    min_up_duration = _round_to_int_duration(min_up_duration, "min_up_duration")
+    min_down_duration = _round_to_int_duration(min_down_duration, "min_down_duration")
+    if isinstance(nb_units_max, (int, float)):
+        nb_units_max = [nb_units_max] * len(nb_units_on_opt)
     # round before ceil to absorb LP solver numerical noise (e.g. 10.0000001 → 10, not 11)
-    nb_units_required = [math.ceil(round(v, 6)) for v in nb_units_on_opt]
+    nb_units_required = [float(math.ceil(round(v, 6))) for v in nb_units_on_opt]
 
     # Variables per timestep: nb_on, nb_outages, nb_starting, nb_stopping
     problem = linopy.Model()
     timesteps = range(len(nb_units_on_opt))
 
     nb_on_var = problem.add_variables(
-        lower=np.array([float(v) for v in nb_units_required]),
-        upper=np.array([float(v) for v in nb_units_max]),
+        lower=np.array(nb_units_required),
+        upper=np.array(nb_units_max),
         coords=[timesteps],
         name="nb_on",
     )
     nb_outages_var = problem.add_variables(
         lower=0.0,
         upper=np.array(
-            [float(max(nb_units_max[t - 1] - nb_units_max[t], 0)) for t in timesteps]
+            [max(nb_units_max[t - 1] - nb_units_max[t], 0) for t in timesteps]
         ),
         coords=[timesteps],
         name="nb_outages",
