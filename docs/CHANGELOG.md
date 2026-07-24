@@ -4,6 +4,8 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-24
+
 ### Added
 - **`taxonomy` field on `LibrarySchema`** - optional free-form string field on
   the library YAML schema; no validation is attached. `taxonomy` is also
