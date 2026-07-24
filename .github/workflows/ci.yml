@@ -35,7 +35,7 @@ jobs:
         run: uv run mypy
 
       - name: Test
-        run: uv run pytest --cov gems --cov-report xml
+        run: uv run pytest --cov gems_craft --cov gems_runner --cov-report xml
 
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4

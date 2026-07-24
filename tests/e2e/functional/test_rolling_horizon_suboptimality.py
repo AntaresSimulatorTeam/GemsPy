@@ -64,7 +64,7 @@ from pathlib import Path
 
 import pytest
 
-from gems.study.runner import run_study
+from gems_runner.study.runner import run_study
 
 _STUDY_SRC = Path(__file__).parent / "studies" / "rolling_horizon_suboptimality"
 
@@ -120,7 +120,7 @@ def _get_value(raw, component: str, output: str, timestep: int) -> float:
     mask = (
         (raw["component"] == component)
         & (raw["output"] == output)
-        & (raw["absolute-time-index"] == timestep)
+        & (raw["absolute_time_index"] == timestep)
     )
     rows = raw[mask]
     assert (

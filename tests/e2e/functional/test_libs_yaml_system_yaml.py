@@ -41,18 +41,18 @@ from typing import Callable, Tuple
 
 import pytest
 
-from gems.model.parsing import LibrarySchema, parse_yaml_library
-from gems.model.resolve_library import resolve_library
-from gems.simulation import TimeBlock, build_problem
-from gems.study.data import DataBase
-from gems.study.parsing import SystemSchema, parse_yaml_components
-from gems.study.resolve_components import (
+from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
+from gems_craft.model.resolve_library import resolve_library
+from gems_craft.study.data import DataBase
+from gems_craft.study.parsing import SystemSchema, parse_yaml_system
+from gems_craft.study.resolve_components import (
     build_data_base,
     consistency_check,
     resolve_system,
 )
-from gems.study.study import Study
-from gems.study.system import System
+from gems_craft.study.study import Study
+from gems_craft.study.system import System
+from gems_runner.simulation import TimeBlock, build_problem
 
 
 def test_basic_balance_using_yaml(
@@ -84,7 +84,7 @@ def setup_test(
             input_library = parse_yaml_library(lib)
 
         with study_file.open() as c:
-            input_system = parse_yaml_components(c)
+            input_system = parse_yaml_system(c)
         lib_dict = resolve_library([input_library])
         system = resolve_system(input_system, lib_dict)
         consistency_check(system, lib_dict["basic"].models)

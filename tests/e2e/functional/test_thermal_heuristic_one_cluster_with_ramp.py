@@ -40,14 +40,17 @@ from pathlib import Path
 
 import pytest
 
-from gems.optim_config.parsing import load_optim_config
-from gems.simulation import TimeBlock, build_problem
-from gems.simulation.heuristic_runner import (
+from gems_craft.optim_config.parsing import load_optim_config
+from gems_craft.study.folder import load_study
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.simulation.heuristic_runner import (
     apply_thermal_heuristics,
     should_apply_heuristics,
 )
-from gems.simulation.simulation_table import SimulationTable, SimulationTableBuilder
-from gems.study.folder import load_study
+from gems_runner.simulation.simulation_table import (
+    SimulationTable,
+    SimulationTableBuilder,
+)
 
 STUDIES_DIR = Path(__file__).parent / "studies"
 MILP_STUDY_DIR = STUDIES_DIR / "thermal_heuristic_one_cluster_with_ramp_milp"

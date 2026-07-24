@@ -28,7 +28,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from gems.study.runner import run_study
+from gems_runner.study.runner import run_study
 
 _STUDY_SRC = Path(__file__).parent / "studies" / "dsr_3_blocks"
 
@@ -83,8 +83,8 @@ _SEQUENTIAL_CONFIG = textwrap.dedent("""\
 _KEY_COLS = [
     "component",
     "output",
-    "absolute-time-index",
-    "scenario-index",
+    "absolute_time_index",
+    "scenario_index",
 ]
 
 

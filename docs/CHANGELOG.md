@@ -2,6 +2,59 @@
 
 All notable changes to GemsPy are documented here.
 
+## [Unreleased]
+
+### Added
+- **`taxonomy` field on `LibrarySchema`** - optional free-form string field on
+  the library YAML schema; no validation is attached. `taxonomy` is also
+  carried through to the resolved `Library` class.
+
+- **`version` field on library YAML** - `LibrarySchema` (standard, not
+  hybrid-specific) gains an optional top-level `version` string, for
+  tracking the version of a library.
+- **Hybrid studies (`gems_craft_hybrid`)** - new package for reading and
+  writing GEMS studies extended with fields used to interoperate with
+  Antares Simulator. Hybrid studies cannot be simulated by GemsPy.
+  - `HybridLibrarySchema` / `HybridPortTypeSchema` add `area-connection` and
+    `thermal-capacity-connection` per port-type.
+  - `HybridSystemSchema` adds `area-connections` and
+    `thermal-capacity-connections`. `AreaConnectionsSchema` moved from the
+    standard `SystemSchema` into `HybridSystemSchema` — it was parsed but
+    never consumed by the standard resolve/solve pipeline.
+  - `gems_craft.model.parsing.parse_yaml_library` and
+    `gems_craft.study.parsing.load_input_system` /
+    `parse_yaml_system` now accept an optional `schema` parameter to
+    validate against a subclass (e.g. the hybrid schemas above); new
+    `write_yaml_library` / `write_yaml_system` functions support the
+    corresponding round-trip.
+
+### Changed
+
+- **Package split** - the monolithic `gems` package is split into `gems_craft`
+  and `gems_runner`.
+  - `gems_craft` holds the solver-independent domain model and I/O: `expression`
+    (AST, parsing, linearity/indexing analysis), `model`, `optim_config`,
+    `study` (`System`, `Component`, `Study`, data, YAML parsing/resolution),
+    `utils`, `libs`. Its dependencies are `numpy`, `pandas`, `PyYAML`,
+    `pydantic`, `anytree`, `antlr4-python3-runtime` - no solver required.
+  - `gems_runner` holds solve-time execution: `expression.evaluate`,
+    `session`, `simulation`, `study.runner`, `main` (the `gemspy` CLI). It
+    depends on `gems_craft` plus `linopy`, `xarray`, `highspy`.
+  - All `gems.*` imports must be updated to `gems_craft.*` or `gems_runner.*`
+    accordingly; see the module lists above. The `gemspy` console script now
+    points at `gems_runner.main.main:main_cli`.
+
+### Fixed
+- Comparison operators (`>=`, `<=`, `=`) in extra-output expressions no longer raise
+  `NotImplementedError` at post-solve evaluation; they now evaluate to a 0/1 indicator
+  (e.g. `dual(balance) >= unsupplied_cost - 5`).
+- Extra-output `minimum()`/`maximum()` no longer break when several models coexist
+  in the same problem: solution and constraint-dual arrays are now filtered back
+  down to each model's own components before evaluation, instead of keeping the
+  NaN-padded entries introduced by linopy's outer join across models.
+
+---
+
 ## [0.1.2] - 2026-06-11
 
 ### Added

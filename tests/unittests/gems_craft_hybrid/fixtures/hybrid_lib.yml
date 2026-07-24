@@ -1,0 +1,76 @@
+library:
+  id: hybrid_basic
+  version: 0.0.1
+  port-types:
+    - id: flow
+      description: A port which transfers power flow
+      fields:
+        - id: flow
+      area-connection:
+        injection-to-balance: flow
+        spillage-bound: flow
+        unsupplied-energy-bound:
+    - id: antares_thermal_cluster_capacity
+      description: A port which represents the capacity of a thermal cluster
+      fields:
+        - id: capacity
+      thermal-capacity-connection:
+        capacity-field: capacity
+  models:
+    - id: node
+      description: A basic balancing node model
+      ports:
+        - id: injection_port
+          type: flow
+      binding-constraints:
+        - id: balance
+          expression: sum_connections(injection_port.flow) = 0
+    - id: generator
+      description: A basic generator model
+      parameters:
+        - id: cost
+          time-dependent: false
+          scenario-dependent: false
+        - id: p_max
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: generation
+          lower-bound: 0
+          upper-bound: p_max
+      ports:
+        - id: injection_port
+          type: flow
+      port-field-definitions:
+        - port: injection_port
+          field: flow
+          definition: generation
+      objective-contributions:
+        - id: generation_cost
+          expression: cost * generation
+    - id: investment_decision
+      description: A basic investment decision model
+      ports:
+        - id: investment_port
+          type: antares_thermal_cluster_capacity
+      parameters:
+        - id: investment_cost
+          time-dependent: false
+          scenario-dependent: false
+        - id: max_capacity
+          time-dependent: false
+          scenario-dependent: false
+        - id: availability_factor
+          time-dependent: true
+          scenario-dependent: true
+      variables:
+        - id: capacity_var
+          lower-bound: 0
+          upper-bound: max_capacity
+      port-field-definitions:
+        - port: investment_port
+          field: capacity
+          definition: capacity_var * availability_factor
+      objective-contributions:
+        - id: investment_cost_contribution
+          expression: investment_cost * capacity_var

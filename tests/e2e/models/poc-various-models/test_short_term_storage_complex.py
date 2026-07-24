@@ -9,8 +9,7 @@ from libs.standard import (
 )
 from libs.standard_sc import SHORT_TERM_STORAGE_COMPLEX
 
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -20,6 +19,7 @@ from gems.study import (
     TimeScenarioSeriesData,
     create_component,
 )
+from gems_runner.simulation import TimeBlock, build_problem
 
 
 def generate_data(

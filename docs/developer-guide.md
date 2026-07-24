@@ -1,6 +1,6 @@
 # Developer guide
 
-This page aims at providing useful information for contributors.
+This page provides useful information for contributors on GemsPy-specific local development tasks. The authoritative branching, versioning, CI/CD, and release process shared across all GEMS repositories (including GemsPy) lives in the **[GEMS Developer Guidelines](https://gems-energy.readthedocs.io/en/latest/support/dev-guidelines/)** — read it before any branching, versioning, or release work.
 
 ## Install dev requirements
 

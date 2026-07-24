@@ -60,7 +60,7 @@ doc = [
 ]
 
 [project.scripts]
-gemspy = "gems.main.main:main_cli"
+gemspy = "gems_runner.main.main:main_cli"
 
 [project.urls]
 Repository = "https://github.com/AntaresSimulatorTeam/GemsPy"
@@ -108,7 +108,7 @@ log_cli = true
 
 [tool.mypy]
 mypy_path = "src"
-packages = ["gems"]
+packages = ["gems_craft", "gems_craft_hybrid", "gems_runner"]
 disallow_untyped_defs = true
 disallow_untyped_calls = true
 
@@ -117,5 +117,5 @@ module = ["anytree.*", "linopy.*", "xarray.*", "antlr4.*", "pytest.*", "pydantic
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["gems.expression.parsing.antlr.*"]
+module = ["gems_craft.expression.parsing.antlr.*"]
 ignore_errors = true

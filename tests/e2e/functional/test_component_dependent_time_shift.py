@@ -80,15 +80,14 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from gems.expression import literal, param, var
-from gems.expression.indexing_structure import IndexingStructure
-from gems.model import ModelPort, float_parameter, float_variable, model
-from gems.model.constraint import Constraint
-from gems.model.parsing import parse_yaml_library
-from gems.model.port import PortFieldDefinition, PortFieldId
-from gems.model.resolve_library import resolve_library
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_craft.expression import literal, param, var
+from gems_craft.expression.indexing_structure import IndexingStructure
+from gems_craft.model import ModelPort, float_parameter, float_variable, model
+from gems_craft.model.constraint import Constraint
+from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.port import PortFieldDefinition, PortFieldId
+from gems_craft.model.resolve_library import resolve_library
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -98,12 +97,13 @@ from gems.study import (
     TimeScenarioSeriesData,
     create_component,
 )
-from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import (
+from gems_craft.study.parsing import parse_yaml_system
+from gems_craft.study.resolve_components import (
     build_data_base,
     consistency_check,
     resolve_system,
 )
+from gems_runner.simulation import TimeBlock, build_problem
 from tests.e2e.functional.libs.standard import (
     BALANCE_PORT_TYPE,
     DEMAND_MODEL,
@@ -409,7 +409,7 @@ def test_two_components_different_lags_yaml(
     with lib_file.open() as f:
         input_library = parse_yaml_library(f)
     with system_file.open() as f:
-        input_system = parse_yaml_components(f)
+        input_system = parse_yaml_system(f)
 
     lib_dict = resolve_library([input_library])
     system = resolve_system(input_system, lib_dict)

@@ -15,12 +15,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gems.simulation.thermal_heuristic import (
+from gems_craft.study.data import ComponentParameterIndex
+from gems_craft.study.folder import load_study
+from gems_runner.simulation.thermal_heuristic import (
     find_min_generation_fast,
     find_nb_units_accurate,
 )
-from gems.study.data import ComponentParameterIndex
-from gems.study.folder import load_study
 
 DATA_DIR = Path(__file__).parent / "data/thermal_heuristic_six_clusters"
 STUDY_DIR = Path(__file__).parent / "studies/thermal_heuristic_six_clusters"

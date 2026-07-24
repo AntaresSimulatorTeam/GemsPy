@@ -33,9 +33,8 @@ parameters, and solves the problem. Assertions are made to ensure the solver's r
 import pandas as pd
 import pytest
 
-from gems.model.library import Library
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_craft.model.library import Library
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -45,6 +44,7 @@ from gems.study import (
     TimeScenarioSeriesData,
     create_component,
 )
+from gems_runner.simulation import TimeBlock, build_problem
 
 # TODO : Use fixtures for models and components used several times to simplify this test file
 

@@ -12,10 +12,8 @@
 
 import math
 
-from gems.model.library import Library
-from gems.simulation import TimeBlock, build_problem
-from gems.simulation.simulation_table import SimulationTableBuilder
-from gems.study import (
+from gems_craft.model.library import Library
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -24,6 +22,8 @@ from gems.study import (
     System,
     create_component,
 )
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.simulation.simulation_table import SimulationTableBuilder
 
 """
 This file tests various modellings for an electrolyser with multiple inputs. The models are read from a YAML model file.

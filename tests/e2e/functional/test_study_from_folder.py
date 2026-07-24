@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from gems.study.folder import load_study
-from gems.study.runner import run_study
+from gems_craft.study.folder import load_study
+from gems_runner.study.runner import run_study
 
 
 def test_load_study():

@@ -18,6 +18,8 @@ The first category of input files mentioned above comprises libraries of models.
 library:
   id: basic
   description: Basic library
+  taxonomy: basic_taxonomy_of_models  # optional: id of the taxonomy this library conforms to
+  version: 1.0.0                # optional: free-form library version
 
   port-types:
     - id: flow
@@ -168,9 +170,9 @@ If your inputs are organised in a study directory (see [Reading input files](use
 
 ~~~ python
 from pathlib import Path
-from gems.study.folder import load_study
-from gems.session import SimulationSession
-from gems.optim_config import load_optim_config
+from gems_craft.study.folder import load_study
+from gems_runner.session import SimulationSession
+from gems_craft.optim_config import load_optim_config
 
 study = load_study(Path("my_study"))
 optim_config = load_optim_config(Path("my_study/input/optim-config.yml"))
@@ -183,7 +185,7 @@ Or, in a single call:
 
 ~~~ python
 from pathlib import Path
-from gems.study.runner import run_study
+from gems_runner.study.runner import run_study
 
 run_study(Path("my_study"))
 ~~~
@@ -198,16 +200,16 @@ Here is the GemsPy syntax to read a test case described by
 
 ~~~ python
 from pathlib import Path
-from gems.model.parsing import parse_yaml_library
-from gems.model.resolve_library import resolve_library
-from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import resolve_system, build_data_base
+from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.resolve_library import resolve_library
+from gems_craft.study.parsing import parse_yaml_system
+from gems_craft.study.resolve_components import resolve_system, build_data_base
 
 with open("library.yml") as lib_file:
     input_libraries = [parse_yaml_library(lib_file)]
 
 with open("system.yml") as compo_file:
-    input_system = parse_yaml_components(compo_file)
+    input_system = parse_yaml_system(compo_file)
 
 result_lib = resolve_library(input_libraries)
 system = resolve_system(input_system, result_lib)
@@ -217,8 +219,8 @@ database = build_data_base(input_system, Path(series_dir))
 ### Building the optimisation problem
 
 ~~~ python
-from gems.study import Study
-from gems.simulation import build_problem, TimeBlock
+from gems_craft.study import Study
+from gems_runner.simulation import build_problem, TimeBlock
 
 problem = build_problem(
     Study(system, database),

@@ -28,7 +28,7 @@
 Rules for automated agents (CI bots, AI coding assistants, Dependabot, etc.):
 
 1. **Never auto-merge** to `main`; all changes require at least one human review.
-2. **Do not edit generated files** under `src/gems/expression/parsing/antlr/`; regenerate them
+2. **Do not edit generated files** under `src/gems_craft/expression/parsing/antlr/`; regenerate them
    from `grammar/Expr.g4` instead.
 3. **Do not modify `pyproject.toml` version** manually; version bumps are handled via the
    `feat(release):` commit workflow.

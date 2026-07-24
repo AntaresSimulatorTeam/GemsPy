@@ -17,9 +17,9 @@ This file tests that the modeller is able to generate investment problems proble
 import pandas as pd
 import pytest
 
-from gems.expression.expression import literal, param, var
-from gems.expression.indexing_structure import IndexingStructure
-from gems.model import (
+from gems_craft.expression.expression import literal, param, var
+from gems_craft.expression.indexing_structure import IndexingStructure
+from gems_craft.model import (
     Constraint,
     Model,
     ModelPort,
@@ -28,8 +28,8 @@ from gems.model import (
     int_variable,
     model,
 )
-from gems.model.port import PortFieldDefinition, PortFieldId
-from gems.optim_config.parsing import (
+from gems_craft.model.port import PortFieldDefinition, PortFieldId
+from gems_craft.optim_config.parsing import (
     ElementLocation,
     ElementLocationConfig,
     ModelDecompositionConfig,
@@ -37,9 +37,7 @@ from gems.optim_config.parsing import (
     OptimConfig,
     validate_optim_config,
 )
-from gems.simulation import TimeBlock, build_problem
-from gems.simulation.simulation_table import SimulationTableBuilder
-from gems.study import (
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -49,6 +47,8 @@ from gems.study import (
     TimeScenarioSeriesData,
     create_component,
 )
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.simulation.simulation_table import SimulationTableBuilder
 from tests.e2e.functional.libs.standard import (
     BALANCE_PORT_TYPE,
     CONSTANT,

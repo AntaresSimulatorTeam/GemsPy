@@ -12,9 +12,9 @@
 
 from libs.standard import CONSTANT, TIME_AND_SCENARIO_FREE
 
-from gems.expression import literal, param, var
-from gems.expression.expression import port_field
-from gems.model import (
+from gems_craft.expression import literal, param, var
+from gems_craft.expression.expression import port_field
+from gems_craft.model import (
     Constraint,
     ModelPort,
     PortField,
@@ -23,9 +23,8 @@ from gems.model import (
     float_variable,
     model,
 )
-from gems.model.port import PortFieldDefinition, PortFieldId
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_craft.model.port import PortFieldDefinition, PortFieldId
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -34,6 +33,7 @@ from gems.study import (
     System,
     create_component,
 )
+from gems_runner.simulation import TimeBlock, build_problem
 
 ELECTRICAL_PORT = PortType(id="electrical_port", fields=[PortField("flow")])
 

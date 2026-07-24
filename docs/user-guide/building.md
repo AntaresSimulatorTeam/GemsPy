@@ -10,7 +10,7 @@ The Pydantic schema classes used to describe systems programmatically follow the
 The syntax to build components with the GemsPy API is the following:
 
 ~~~ python
-from gems.study.parsing import ComponentSchema, ComponentParameterSchema
+from gems_craft.study.parsing import ComponentSchema, ComponentParameterSchema
 
 components = []
 
@@ -76,7 +76,7 @@ components.append(
 The syntax to build connections between components with the GemsPy API is the following:
 
 ~~~ python
-from gems.study.parsing import PortConnectionsSchema
+from gems_craft.study.parsing import PortConnectionsSchema
 
 connections = []
 
@@ -102,7 +102,7 @@ connections.append(
 ## Defining a SystemSchema
 
 ~~~ python
-from gems.study.parsing import SystemSchema
+from gems_craft.study.parsing import SystemSchema
 
 input_system = SystemSchema(
     components=components,
@@ -110,4 +110,4 @@ input_system = SystemSchema(
 )
 ~~~
 
-The `input_system` variable can then be used in the same way as when it was created using the [parse_yaml_components](inputs.md) method.
+The `input_system` variable can then be used in the same way as when it was created using the [parse_yaml_system](inputs.md) method.

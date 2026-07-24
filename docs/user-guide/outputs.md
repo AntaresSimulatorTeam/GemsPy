@@ -6,9 +6,9 @@
 
 ~~~ python
 from pathlib import Path
-from gems.study.folder import load_study
-from gems.session import SimulationSession
-from gems.optim_config import load_optim_config
+from gems_craft.study.folder import load_study
+from gems_runner.session import SimulationSession
+from gems_craft.optim_config import load_optim_config
 
 study = load_study(Path("my_study"))
 optim_config = load_optim_config(Path("my_study/input/optim-config.yml"))
@@ -22,7 +22,7 @@ results = session.run()  # SimulationTable
 When using `build_problem()` directly, build the table from the solved problem:
 
 ~~~ python
-from gems.simulation.simulation_table import SimulationTableBuilder
+from gems_runner.simulation.simulation_table import SimulationTableBuilder
 
 results = SimulationTableBuilder().build(problem)
 ~~~
@@ -56,7 +56,7 @@ df = results.data
 ~~~
 
 The DataFrame has columns: `block`, `component`, `output`,
-`absolute-time-index`, `block-time-index`, `scenario-index`, `value`, `basis-status`.
+`absolute_time_index`, `block_time_index`, `scenario_index`, `value`, `basis_status`.
 
 Reading the value of the optimisation variable `var_id` of component `component_id`
 for a single time step and scenario:
@@ -65,12 +65,12 @@ for a single time step and scenario:
 value = df[(df["component"] == component_id) & (df["output"] == var_id)]["value"].iloc[0]
 ~~~
 
-For multi-time or multi-scenario results, filter additionally by `block-time-index`
-and `scenario-index`:
+For multi-time or multi-scenario results, filter additionally by `block_time_index`
+and `scenario_index`:
 
 ~~~ python
 sub = df[(df["component"] == component_id) & (df["output"] == var_id)]
-value_s0_t1 = sub[(sub["scenario-index"] == 0) & (sub["block-time-index"] == 1)]["value"].iloc[0]
+value_s0_t1 = sub[(sub["scenario_index"] == 0) & (sub["block_time_index"] == 1)]["value"].iloc[0]
 ~~~
 
 ---

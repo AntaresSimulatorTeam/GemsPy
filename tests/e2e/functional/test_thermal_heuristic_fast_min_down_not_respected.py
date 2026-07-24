@@ -15,9 +15,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gems.simulation.thermal_heuristic import find_min_generation_fast
-from gems.study.data import ComponentParameterIndex
-from gems.study.folder import load_study
+from gems_craft.study.data import ComponentParameterIndex
+from gems_craft.study.folder import load_study
+from gems_runner.simulation.thermal_heuristic import find_min_generation_fast
 
 DATA_DIR = Path(__file__).parent / "data/thermal_heuristic_fast_min_down_not_respected"
 STUDY_DIR = (

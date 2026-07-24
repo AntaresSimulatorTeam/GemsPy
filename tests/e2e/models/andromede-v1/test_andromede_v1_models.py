@@ -17,13 +17,13 @@ from typing import List
 import pandas as pd
 import pytest
 
-from gems.model.parsing import LibrarySchema, parse_yaml_library
-from gems.model.resolve_library import resolve_library
-from gems.simulation import build_problem
-from gems.simulation.time_block import TimeBlock
-from gems.study import Study
-from gems.study.parsing import parse_yaml_components
-from gems.study.resolve_components import build_data_base, resolve_system
+from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
+from gems_craft.model.resolve_library import resolve_library
+from gems_craft.study import Study
+from gems_craft.study.parsing import parse_yaml_system
+from gems_craft.study.resolve_components import build_data_base, resolve_system
+from gems_runner.simulation import build_problem
+from gems_runner.simulation.time_block import TimeBlock
 
 
 @pytest.fixture
@@ -123,7 +123,7 @@ def test_model_behaviour(
 ) -> None:
     scenarios = 1
     with open(systems_dir / system_file) as compo_file:
-        input_component = parse_yaml_components(compo_file)
+        input_component = parse_yaml_system(compo_file)
     result_lib = resolve_library(input_libraries)
     system_input = resolve_system(input_component, result_lib)
     database = build_data_base(input_component, Path(series_dir))

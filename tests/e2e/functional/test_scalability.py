@@ -3,8 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from gems.simulation import TimeBlock, build_problem
-from gems.study import (
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -14,6 +13,7 @@ from gems.study import (
     TimeScenarioSeriesData,
     create_component,
 )
+from gems_runner.simulation import TimeBlock, build_problem
 from tests.e2e.functional.libs.standard import (
     DEMAND_MODEL,
     GENERATOR_MODEL_WITH_STORAGE,

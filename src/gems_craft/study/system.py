@@ -1,0 +1,200 @@
+# Copyright (c) 2024, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+"""
+The system module defines the data model for an instance of a system,
+including components and connections.
+"""
+
+from dataclasses import dataclass, field, replace
+from typing import Any, Dict, Iterable, List, Optional
+
+from gems_craft.expression.degree import is_linear
+from gems_craft.expression.uses_sum_connections_on import uses_sum_connections_on
+from gems_craft.model import PortField, PortType
+from gems_craft.model.model import Model
+from gems_craft.model.port import PortFieldId
+from gems_craft.study.parsing import IntegerStrategy
+from gems_craft.utils import require_not_none
+
+
+@dataclass(frozen=True)
+class Component:
+    """
+    A component is an instance of a model, with specified parameter values.
+    """
+
+    model: Model
+    id: str
+    scenario_group: Optional[str] = None
+    properties: Dict[str, str] = field(default_factory=dict)
+    integer_strategy: IntegerStrategy = field(default_factory=IntegerStrategy)
+
+    def is_variable_in_model(self, var_id: str) -> bool:
+        return var_id in self.model.variables.keys()
+
+    def replicate(self, /, **changes: Any) -> "Component":
+        return replace(self, **changes)
+
+
+def create_component(
+    model: Model,
+    id: str,
+    scenario_group: Optional[str] = None,
+    properties: Optional[Dict[str, str]] = None,
+) -> Component:
+    return Component(
+        model=model,
+        id=id,
+        scenario_group=scenario_group,
+        properties=properties or {},
+    )
+
+
+@dataclass(frozen=True)
+class PortRef:
+    component: Component
+    port_id: str
+
+
+def _check_linear_sum_connections(
+    master_ref: PortRef, slave_ref: PortRef, field_name: str
+) -> None:
+    master_model = master_ref.component.model
+    slave_model = slave_ref.component.model
+    master_port_id = PortFieldId(port_name=master_ref.port_id, field_name=field_name)
+    master_def = master_model.port_fields_definitions.get(master_port_id)
+    if master_def is None or is_linear(master_def.definition):
+        return
+    for bc in slave_model.binding_constraints.values():
+        if uses_sum_connections_on(bc.expression, slave_ref.port_id, field_name):
+            raise ValueError(
+                f"Port-field definition '{master_port_id}' is non-linear and cannot be "
+                f"aggregated via sum_connections in a binding-constraint of model "
+                f"'{slave_model.id}'."
+            )
+
+
+@dataclass()
+class PortsConnection:
+    port1: PortRef
+    port2: PortRef
+    master_port: Dict[PortField, PortRef] = field(init=False, default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.__validate_ports()
+
+    def __validate_ports(self) -> None:
+        model1 = self.port1.component.model
+        model2 = self.port2.component.model
+        port_1 = model1.ports.get(self.port1.port_id)
+        port_2 = model2.ports.get(self.port2.port_id)
+
+        if port_1 is None or port_2 is None:
+            raise ValueError(f"Missing port: {port_1} or {port_2} ")
+        if port_1.port_type != port_2.port_type:
+            raise ValueError(
+                f"Incompatible portTypes {port_1.port_type} != {port_2.port_type}"
+            )
+
+        for field_name in [f.name for f in port_1.port_type.fields]:
+            def1: bool = (
+                PortFieldId(port_name=port_1.port_name, field_name=field_name)
+                in model1.port_fields_definitions
+            )
+            def2: bool = (
+                PortFieldId(port_name=port_2.port_name, field_name=field_name)
+                in model2.port_fields_definitions
+            )
+            if not def1 and not def2:
+                raise ValueError(
+                    f"No definition for port field {field_name} on {port_1.port_name}."
+                )
+            if def1 and def2:
+                raise ValueError(
+                    f"Port field {field_name} on {port_1.port_name} has 2 definitions."
+                )
+
+            master_ref = self.port1 if def1 else self.port2
+            slave_ref = self.port2 if def1 else self.port1
+            self.master_port[PortField(name=field_name)] = master_ref
+            _check_linear_sum_connections(master_ref, slave_ref, field_name)
+
+    def get_port_type(self) -> PortType:
+        port_1 = self.port1.component.model.ports.get(self.port1.port_id)
+
+        if port_1 is None:
+            raise ValueError(f"Missing port: {port_1}")
+        return port_1.port_type
+
+    def replicate(self, /, **changes: Any) -> "PortsConnection":
+        # Shallow copy
+        return replace(self, **changes)
+
+
+@dataclass
+class System:
+    """
+    A system model consisting of components and their connections.
+    """
+
+    id: str
+    _components: Dict[str, Component] = field(init=False, default_factory=dict)
+    _connections: List[PortsConnection] = field(init=False, default_factory=list)
+
+    def _check_model_id_unique(self, model: Model) -> None:
+        for existing in self.all_components:
+            if existing.model is not model and existing.model.id == model.id:
+                raise ValueError(
+                    f"Model id '{model.id}' is already used by a different model object in this system."
+                )
+
+    def add_component(self, component: Component) -> None:
+        require_not_none(component)
+        self._check_model_id_unique(component.model)
+        self._components[component.id] = component
+
+    def get_component(self, component_id: str) -> Component:
+        return self._components[component_id]
+
+    @property
+    def components(self) -> Iterable[Component]:
+        return self._components.values()
+
+    @property
+    def all_components(self) -> Iterable[Component]:
+        return self._components.values()
+
+    def connect(self, port1: PortRef, port2: PortRef) -> None:
+        ports_connection = PortsConnection(port1, port2)
+        self._connections.append(ports_connection)
+
+    @property
+    def connections(self) -> Iterable[PortsConnection]:
+        return self._connections
+
+    def get_connection(self, idx: int) -> PortsConnection:
+        return self._connections[idx]
+
+    def is_empty(self) -> bool:
+        return (not self._components) and (not self._connections)
+
+    def replicate(self, /, **changes: Any) -> "System":
+        replica: System = replace(self, **changes)
+
+        for component in self.components:
+            replica.add_component(component.replicate())
+
+        for connection in self.connections:
+            replica._connections.append(connection.replicate())
+
+        return replica

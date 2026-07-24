@@ -19,9 +19,7 @@ import math
 from libs.standard import DEMAND_MODEL, LINK_MODEL, NODE_BALANCE_MODEL
 from libs.standard_sc import C02_POWER_MODEL, QUOTA_CO2_MODEL
 
-from gems.simulation import TimeBlock, build_problem
-from gems.simulation.simulation_table import SimulationTableBuilder
-from gems.study import (
+from gems_craft.study import (
     Component,
     ConstantData,
     DataBase,
@@ -30,6 +28,8 @@ from gems.study import (
     System,
     create_component,
 )
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.simulation.simulation_table import SimulationTableBuilder
 
 
 def test_quota_co2() -> None:

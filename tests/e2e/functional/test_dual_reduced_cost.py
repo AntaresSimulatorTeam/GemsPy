@@ -25,9 +25,9 @@ from typing import List
 
 import pytest
 
-from gems.simulation import TimeBlock, build_problem
-from gems.simulation.simulation_table import SimulationTableBuilder
-from gems.study.folder import load_study
+from gems_craft.study.folder import load_study
+from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.simulation.simulation_table import SimulationTableBuilder
 
 STUDIES_DIR = Path(__file__).parent / "studies"
 
