@@ -74,7 +74,7 @@ def test_milp_version() -> None:
             150.0,
             100.0,
             100.0,
-            0.0
+            0.0,
         ],
     )
     check_output(
@@ -83,7 +83,7 @@ def test_milp_version() -> None:
         "num_units_on",
         [0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 0.0],
     )
-    check_output(st, "N", "spilled_energy", [0.0, 50.0] + [0.0] * 9 + [50.0, 0.])
+    check_output(st, "N", "spilled_energy", [0.0, 50.0] + [0.0] * 9 + [50.0, 0.0])
     check_output(st, "N", "unsupplied_energy", [0.0] * 13)
 
 
@@ -196,7 +196,7 @@ def test_fast_heuristic() -> None:
             150.0,
             100.0,
             100.0,
-            0.0
+            0.0,
         ],
     )
     check_output(st, "G", "num_units_on", [0.0] + [1.0] * 11 + [0.0])
