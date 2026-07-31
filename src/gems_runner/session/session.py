@@ -49,6 +49,7 @@ class SimulationSession:
         self.optim_config = optim_config
         self.run_id = run_id or str(uuid4())
         self.output_dir = output_dir
+        self._apply_heuristics = should_apply_heuristics(study)
 
     @property
     def scenario_ids(self) -> List[int]:
@@ -212,7 +213,7 @@ class SimulationSession:
             **self.optim_config.solver_options.parsed_parameters(),
         }
         problem.solve(solver_name=solver_name, **solver_kwargs)
-        if should_apply_heuristics(self.study):
+        if self._apply_heuristics:
             apply_thermal_heuristics(problem, self.optim_config, scenario_ids)
             problem.solve(solver_name=solver_name, **solver_kwargs)
         if problem.status != "ok":

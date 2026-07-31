@@ -22,10 +22,10 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Union
 import xarray as xr
 
 from gems_craft.optim_config.parsing import (
-    HeuristicConfig,
     HeuristicElementConfig,
     ModelElementAccessType,
     OptimConfig,
+    get_heuristic_config_map,
 )
 from gems_craft.study.parsing import HeuristicId, IntegerStrategyId
 from gems_runner.simulation.thermal_heuristic import (
@@ -167,11 +167,7 @@ def apply_thermal_heuristics(
     scenario_ids:
         The list of MC scenario indices used when building *problem*.
     """
-    heuristic_config_map: Dict[str, HeuristicConfig] = {
-        f"{mc.id}/{heuristic_config.id.value}": heuristic_config
-        for mc in optim_config.models
-        for heuristic_config in (mc.heuristic or [])
-    }
+    heuristic_config_map = get_heuristic_config_map(optim_config)
 
     heuristic_comps = [
         c
@@ -184,7 +180,7 @@ def apply_thermal_heuristics(
         model_id = component.model.id
         heuristic_id = component.integer_strategy.heuristic_id
         assert heuristic_id is not None
-        key = f"{model_id}/{heuristic_id.value}"
+        key = (model_id, heuristic_id.value)
         if key not in heuristic_config_map:
             raise ValueError(
                 f"Component '{component.id}' references heuristic "

@@ -614,7 +614,7 @@ class _OptimizationProblemBuilder:
                             var,
                             group,
                             relax=relax,
-                            name_suffix=f"__relaxed" if relax else "",
+                            name_suffix="__relaxed" if relax else "",
                         )
                         for relax, group in groups.items()
                     ]

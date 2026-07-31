@@ -33,6 +33,7 @@ from gems_craft.study.data import (
 from gems_craft.study.parsing import (
     ComponentPropertySchema,
     ComponentSchema,
+    IntegerStrategyId,
     PortConnectionsSchema,
     SystemSchema,
 )
@@ -101,8 +102,6 @@ def _resolve_component(
             f"propert{'y' if len(missing) == 1 else 'ies'} declared by the model: "
             f"{missing}."
         )
-
-    from gems_craft.study.parsing import IntegerStrategyId
 
     if (
         component.integer_strategy.id == IntegerStrategyId.HEURISTIC

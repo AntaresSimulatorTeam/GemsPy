@@ -15,7 +15,7 @@ import re
 import warnings
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
 
 from pydantic import (
     Field,
@@ -35,7 +35,7 @@ from gems_craft.expression.expression import (
     UnaryOperatorNode,
     VariableNode,
 )
-from gems_craft.study.parsing import HeuristicId
+from gems_craft.study.parsing import HeuristicId, IntegerStrategyId
 from gems_craft.utils import ModifiedBaseModel
 
 if TYPE_CHECKING:
@@ -548,19 +548,24 @@ def _check_master_objectives_use_master_variables(
                     )
 
 
+def get_heuristic_config_map(
+    config: "OptimConfig",
+) -> Dict[Tuple[str, str], HeuristicConfig]:
+    """Map every declared heuristic to its config, keyed by (model_id, heuristic_id)."""
+    return {
+        (model_cfg.id, heuristic_cfg.id.value): heuristic_cfg
+        for model_cfg in config.models
+        for heuristic_cfg in (model_cfg.heuristic or [])
+    }
+
+
 def _check_heuristic_ids_declared(
     config: "OptimConfig",
     system: "System",
     errors: List[str],
 ) -> None:
     """Check that every HEURISTIC component references a declared heuristic in optim-config."""
-    from gems_craft.study.parsing import IntegerStrategyId
-
-    declared = {
-        (mc.id, h_cfg.id.value)
-        for mc in config.models
-        for h_cfg in (mc.heuristic or [])
-    }
+    declared = get_heuristic_config_map(config)
 
     for comp in system.all_components:
         if comp.integer_strategy.id != IntegerStrategyId.HEURISTIC:
@@ -613,8 +618,6 @@ def _check_no_heuristic_with_benders(
     errors: List[str],
 ) -> None:
     """Check that no component uses integer-strategy 'heuristic' with Benders decomposition."""
-    from gems_craft.study.parsing import IntegerStrategyId
-
     errors.extend(
         f"Component '{comp.id}' uses integer-strategy 'heuristic', "
         f"which is incompatible with Benders decomposition."
@@ -630,7 +633,6 @@ def _check_no_integer_variables_in_subproblems(
 ) -> None:
     """Check that no integer or binary variable is assigned to Benders subproblems."""
     from gems_craft.model.common import ValueType
-    from gems_craft.study.parsing import IntegerStrategyId
 
     subproblem_locs = {
         ElementLocation.SUBPROBLEMS,
