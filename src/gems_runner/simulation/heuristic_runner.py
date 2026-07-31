@@ -51,13 +51,6 @@ def should_apply_heuristics(study: "Study") -> bool:
     )
 
 
-def _get_linopy_var(problem: "OptimizationProblem", model_id: str, name: str) -> Any:
-    linopy_var = problem._linopy_vars.get((model_id, name))
-    if linopy_var is None:
-        raise ValueError(f"Variable '{name}' not found in model '{model_id}'.")
-    return linopy_var
-
-
 def _get_component_linopy_var(
     problem: "OptimizationProblem", model_id: str, name: str, component_id: str
 ) -> Any:
@@ -95,11 +88,12 @@ def _resolve_input_for_heuristic(
     access = input_config.type
 
     if access == ModelElementAccessType.VARIABLE_SOLUTION:
-        linopy_var = _get_linopy_var(problem, model_id, name)
-        solution = problem.linopy_model.solution
-        if solution is None:
+        if problem.linopy_model.solution is None:
             raise RuntimeError("Problem must be solved before applying heuristics.")
-        return _read_da(solution[linopy_var.name], component_id, local_scenario_idx)
+        sol_da = problem.get_variable_solution(model_id, name)
+        if sol_da is None:
+            raise ValueError(f"Variable '{name}' not found in model '{model_id}'.")
+        return _read_da(sol_da, component_id, local_scenario_idx)
     elif access == ModelElementAccessType.VARIABLE_LOWER_BOUND:
         return _read_da(
             _get_component_linopy_var(problem, model_id, name, component_id).lower,

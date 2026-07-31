@@ -69,6 +69,14 @@ class FakeProblem:
     study: FakeStudy = field(default_factory=FakeStudy)
     scenarios: int = 1
 
+    def get_variable_solution(
+        self, model_id: object, var_name: str
+    ) -> Optional[xr.DataArray]:
+        lv = self._linopy_vars.get((model_id, var_name))
+        if lv is None or self.linopy_model is None:
+            return None
+        return self.linopy_model.solution.get(lv.name)
+
 
 def _make_problem(n_scenarios: int = 1) -> FakeProblem:
     """Two time steps, configurable number of scenarios, one component."""

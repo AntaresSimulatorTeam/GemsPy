@@ -124,7 +124,7 @@ def find_min_generation_fast(
 
     nb_units_required = [math.ceil(p / max_power_per_unit) for p in generation_power]
 
-    window_size = max(min_up_duration, min_down_duration)
+    window_size = max(min_up_duration, min_down_duration, 1)
 
     max_window_offset = max(min(window_size, nb_timesteps - window_size), 0)
 

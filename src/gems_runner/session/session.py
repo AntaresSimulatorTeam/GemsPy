@@ -213,18 +213,23 @@ class SimulationSession:
             **self.optim_config.solver_options.parsed_parameters(),
         }
         problem.solve(solver_name=solver_name, **solver_kwargs)
+        self._check_solved(problem)
         if self._apply_heuristics:
             apply_thermal_heuristics(problem, self.optim_config, scenario_ids)
             problem.solve(solver_name=solver_name, **solver_kwargs)
-        if problem.status != "ok":
-            raise RuntimeError(
-                f"Problem {problem.name!r} was not solved to optimality"
-                f"(termination_condition={problem.termination_condition!r})."
-            )
+            self._check_solved(problem)
         table = SimulationTableBuilder().build(
             problem, scenario_ids_remap=scenario_ids, table_id=self.run_id
         )
         return problem, table
+
+    @staticmethod
+    def _check_solved(problem: OptimizationProblem) -> None:
+        if problem.status != "ok":
+            raise RuntimeError(
+                f"Problem {problem.name!r} was not solved to optimality "
+                f"(termination_condition={problem.termination_condition!r})."
+            )
 
     def _reduce(self, tables: List[SimulationTable]) -> SimulationTable:
         """REDUCE: merge SimulationTables from one scenario's blocks into one."""
@@ -237,11 +242,13 @@ class SimulationSession:
     ) -> Dict[Tuple[str, str], xr.DataArray]:
         """Extract variable values at *local_index* for use as initial values in the next block."""
         carry_over: Dict[Tuple[str, str], xr.DataArray] = {}
-        solution = problem.linopy_model.solution
-        if solution is None:
+        if problem.linopy_model.solution is None:
             return carry_over
         for (model, var_name), linopy_var in problem._linopy_vars.items():
-            if "time" in linopy_var.dims and linopy_var.name in solution:
-                sol_da: xr.DataArray = solution[linopy_var.name]
-                carry_over[(model, var_name)] = sol_da.isel(time=local_index, drop=True)
+            if "time" in linopy_var.dims:
+                sol_da = problem.get_variable_solution(model, var_name)
+                if sol_da is not None:
+                    carry_over[(model, var_name)] = sol_da.isel(
+                        time=local_index, drop=True
+                    )
         return carry_over

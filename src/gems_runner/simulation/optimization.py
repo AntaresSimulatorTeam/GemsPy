@@ -405,6 +405,34 @@ class OptimizationProblem:
         lv = self._linopy_vars.get((model_id, var_name))
         return lv.labels if lv is not None else None
 
+    def get_variable_solution(
+        self, model_id: str, var_name: str
+    ) -> Optional[xr.DataArray]:
+        """Return solved values for *var_name* across all its components.
+
+        Unlike ``linopy_model.solution[<name>]``, this is correct even when the
+        variable was split across relaxed/exact strategy groups: the merged
+        ``_linopy_vars`` copy keeps the ``.name`` of only one of the two really
+        -registered group Variables, so indexing the solver's solution Dataset
+        by that name silently drops the other group's components. This instead
+        reads ``.solution`` directly off the real per-component Variables
+        (``_linopy_vars_by_component``) and reassembles them.
+        """
+        by_name: Dict[str, linopy.Variable] = {}
+        for (m, vn, _c), variable in self._linopy_vars_by_component.items():
+            if (m, vn) == (model_id, var_name):
+                by_name[variable.name] = (
+                    variable  # dedupe: components in one group share a Variable
+                )
+        group_vars = list(by_name.values())
+        if not group_vars:
+            return None
+        if len(group_vars) == 1:
+            return group_vars[0].solution
+        return cast(
+            xr.DataArray, xr.concat([v.solution for v in group_vars], dim="component")
+        )
+
 
 # ---------------------------------------------------------------------------
 # Internal builder

@@ -71,6 +71,14 @@ class FakeProblem:
     model_components: dict = field(default_factory=dict)
     study: FakeStudy = field(default_factory=FakeStudy)
 
+    def get_variable_solution(
+        self, model_id: object, var_name: str
+    ) -> Optional[xr.DataArray]:
+        lv = self._linopy_vars.get((model_id, var_name))
+        if lv is None or self.linopy_model is None:
+            return None
+        return self.linopy_model.solution.get(lv.name)
+
 
 def test_simulation_table_builder_manual(tmp_path: Path) -> None:
     """Test SimulationTableBuilder with fake data."""
