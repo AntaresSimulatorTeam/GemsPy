@@ -50,7 +50,9 @@ _NUM_UNITS_ON_OPT = [1.0, 2.0, 3.0, 2.0, 1.0, 0.0, 0.0, 1.0]
 def test_find_num_units_accurate_scalar_matches_constant_list() -> None:
     num_timesteps = len(_NUM_UNITS_ON_OPT)
     result_scalar = find_num_units_accurate(_NUM_UNITS_ON_OPT, 5, 2, 2, "highs")
-    result_list = find_num_units_accurate(_NUM_UNITS_ON_OPT, [5.0] * num_timesteps, 2, 2, "highs")
+    result_list = find_num_units_accurate(
+        _NUM_UNITS_ON_OPT, [5.0] * num_timesteps, 2, 2, "highs"
+    )
     assert result_scalar == result_list
 
 

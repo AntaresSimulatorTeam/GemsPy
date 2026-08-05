@@ -41,10 +41,13 @@ from tests.e2e.functional.expected_outputs_three_clusters import (
     GEN_G3_FAST,
     GEN_G3_MILP,
     NODU_G1_ACCURATE,
+    NODU_G1_FAST,
     NODU_G1_MILP,
     NODU_G2_ACCURATE,
+    NODU_G2_FAST,
     NODU_G2_MILP,
     NODU_G3_ACCURATE,
+    NODU_G3_FAST,
     NODU_G3_MILP,
     SPIL_ACCURATE,
     SPIL_FAST,
@@ -57,20 +60,27 @@ from tests.e2e.functional.thermal_heuristic_helpers import (
     build_thermal_study,
     check_output,
     optim_config_for,
+    total_output_sum,
 )
 
 CASE_ID = "three_clusters"
 
 WEEKS = [range(168), range(168, 336)]
 SCENARIOS = [0, 1]
+THERMAL_COMPONENTS = ["G1", "G2", "G3"]
 
 # Expected objective costs [scenario][week]
 _COST_MILP = [[78933742, 102103587], [17472101, 17424769]]
-_COST_ACCURATE = [[78996726, 102215087 - 69500], [17587733, 17650089]]
+_COST_ACCURATE = [[78996726, 102145587], [17587733, 17650089]]
 _COST_FAST = [
-    [79277215 - 630089, 102461792 - 699765],
-    [17803738 - 661246, 17720390 - 661246],
-]
+    [78647126, 101762027],
+    [17142492, 17059144],
+]  # non_prop_cost not included in objective for fast models
+
+# Expected total non_prop_cost (G1+G2+G3) [scenario][week]
+_NON_PROP_COST_MILP = [[470566, 630191], [407736, 526227]]
+_NON_PROP_COST_ACCURATE = [[560556, 560721], [313783, 313787]]
+_NON_PROP_COST_FAST = [[699554, 838690], [1008660, 1008670]]
 
 
 def test_milp_version() -> None:
@@ -96,6 +106,14 @@ def test_milp_version() -> None:
         for week_idx in range(len(WEEKS)):
             objective = objective_values[scenario * len(WEEKS) + week_idx]
             assert objective == pytest.approx(_COST_MILP[scenario][week_idx])
+
+            assert total_output_sum(
+                st,
+                THERMAL_COMPONENTS,
+                "non_prop_cost",
+                scenario_index=scenario,
+                time_range=WEEKS[week_idx],
+            ) == pytest.approx(_NON_PROP_COST_MILP[scenario][week_idx])
 
         check_output(
             st,
@@ -181,6 +199,14 @@ def test_accurate_heuristic() -> None:
         for week_idx in range(len(WEEKS)):
             objective = objective_values[scenario * len(WEEKS) + week_idx]
             assert objective == pytest.approx(_COST_ACCURATE[scenario][week_idx])
+
+            assert total_output_sum(
+                st,
+                THERMAL_COMPONENTS,
+                "non_prop_cost",
+                scenario_index=scenario,
+                time_range=WEEKS[week_idx],
+            ) == pytest.approx(_NON_PROP_COST_ACCURATE[scenario][week_idx])
 
         check_output(
             st,
@@ -268,6 +294,14 @@ def test_fast_heuristic() -> None:
             objective = objective_values[scenario * len(WEEKS) + week_idx]
             assert objective == pytest.approx(_COST_FAST[scenario][week_idx])
 
+            assert total_output_sum(
+                st,
+                THERMAL_COMPONENTS,
+                "non_prop_cost",
+                scenario_index=scenario,
+                time_range=WEEKS[week_idx],
+            ) == pytest.approx(_NON_PROP_COST_FAST[scenario][week_idx])
+
         check_output(
             st,
             "G1",
@@ -289,7 +323,27 @@ def test_fast_heuristic() -> None:
             GEN_G3_FAST[scenario],
             scenario_index=scenario,
         )
-        # fast heuristic does not check num_units_on (slot-based, not per-unit)
+        check_output(
+            st,
+            "G1",
+            "num_units_on",
+            NODU_G1_FAST[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G2",
+            "num_units_on",
+            NODU_G2_FAST[scenario],
+            scenario_index=scenario,
+        )
+        check_output(
+            st,
+            "G3",
+            "num_units_on",
+            NODU_G3_FAST[scenario],
+            scenario_index=scenario,
+        )
         check_output(
             st,
             "N",

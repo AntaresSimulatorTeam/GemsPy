@@ -59,8 +59,7 @@ def test_accurate_heuristic() -> None:
 
         # num_units_max[t] = ceil(cluster_max_generation[t] / max_power_per_unit)
         num_units_max = [
-            np.ceil(v / max_power_per_unit)
-            for v in _cluster_max_generation(cluster)
+            np.ceil(v / max_power_per_unit) for v in _cluster_max_generation(cluster)
         ]
 
         num_units_on = find_num_units_accurate(

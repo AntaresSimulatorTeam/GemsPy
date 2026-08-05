@@ -115,6 +115,9 @@ library:
       objective-contributions:
         - id: objective
           expression: expec(sum(market_bid_cost * generation_power + startup_cost * num_units_starting + fixed_cost * num_units_on))
+      extra-outputs:
+        - id: non_prop_cost
+          expression: startup_cost * num_units_starting + fixed_cost * num_units_on
     
     - id: thermal_fast
       taxonomy-category: dispatchable_generation
@@ -152,6 +155,9 @@ library:
       extra-outputs:
         - id: num_units_on
           expression: ceil(generation_power / max_power_per_unit)
+        - id: non_prop_cost
+          expression: startup_cost * max(0,ceil(generation_power / max_power_per_unit)-(ceil(generation_power / max_power_per_unit))[t-1])+ fixed_cost * ceil(generation_power / max_power_per_unit)
+
     
     - id: thermal_with_ramp
       taxonomy-category: dispatchable_generation

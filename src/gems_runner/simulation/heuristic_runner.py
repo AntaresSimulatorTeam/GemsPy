@@ -21,6 +21,7 @@ import inspect
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Union
 
 import xarray as xr
+from linopy import Variable
 
 from gems_craft.optim_config.parsing import (
     HeuristicElementConfig,
@@ -33,7 +34,6 @@ from gems_runner.simulation.thermal_heuristic import (
     find_min_generation_fast,
     find_num_units_accurate,
 )
-from linopy import Variable
 
 if TYPE_CHECKING:
     from gems_craft.study.study import Study
@@ -85,7 +85,7 @@ def _resolve_input_for_heuristic(
     input_config: HeuristicElementConfig,
     component_id: str,
     local_scenario_idx: int,
-) -> Union[float, int, List[float], List[int]]:
+) -> Union[float, int, List[float], List[int], str]:
     name = input_config.id
     access = input_config.type
 

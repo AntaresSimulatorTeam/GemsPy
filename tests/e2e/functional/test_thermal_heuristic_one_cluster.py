@@ -64,6 +64,7 @@ def test_milp_version() -> None:
     assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
         0
     ] == pytest.approx(16805387)
+    check_output(st, "G", "non_prop_cost", [2 if t != 12 else 53 for t in range(168)])
     check_output(
         st, "G", "generation_power", [2000 if t != 12 else 2100 for t in range(168)]
     )
@@ -93,6 +94,7 @@ def test_lp_version() -> None:
     assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
         0
     ] == pytest.approx(16802838.55)
+    check_output(st, "G", "non_prop_cost", [2 if t != 12 else 4.55 for t in range(168)])
     check_output(
         st, "G", "generation_power", [2000 if t != 12 else 2050 for t in range(168)]
     )
@@ -116,6 +118,7 @@ def test_accurate_heuristic() -> None:
     assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
         0
     ] == pytest.approx(16805387)
+    check_output(st, "G", "non_prop_cost", [2 if t != 12 else 53 for t in range(168)])
     check_output(
         st, "G", "generation_power", [2000 if t != 12 else 2100 for t in range(168)]
     )
@@ -145,6 +148,12 @@ def test_fast_heuristic() -> None:
     assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
         0
     ] == pytest.approx(16850000)
+    check_output(
+        st,
+        "G",
+        "non_prop_cost",
+        [(3 if t in range(10, 20) else 2) + (50 if t == 10 else 0) for t in range(168)],
+    )
     check_output(
         st,
         "G",

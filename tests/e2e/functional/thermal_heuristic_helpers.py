@@ -65,7 +65,9 @@ from gems_runner.simulation.simulation_table import SimulationTable
 
 STUDIES_DIR = Path(__file__).parent / "studies"
 SHARED_LIB_FILE = Path(__file__).parent / "libs" / "thermal_variants_for_heuristic.yml"
-OPTIM_CONFIG_FILE = Path(__file__).parent / "optim-config" / "thermal_variants_for_heuristic.yml"
+OPTIM_CONFIG_FILE = (
+    Path(__file__).parent / "optim-config" / "thermal_variants_for_heuristic.yml"
+)
 
 # fast mode drops the integer commitment variables entirely rather than relaxing
 # them, so it needs a structurally different model than milp/lp/accurate — both
@@ -255,3 +257,29 @@ def check_output(
         .value(scenario_index=scenario_index),
     )
     assert actual.tolist() == pytest.approx(expected_values, abs=abs)
+
+
+def total_output_sum(
+    st: SimulationTable,
+    component_ids: List[str],
+    output_id: str,
+    scenario_index: int = 0,
+    time_range: Optional[range] = None,
+) -> float:
+    """Return *output_id* summed over *component_ids*.
+
+    Sums every timestep by default; pass *time_range* (e.g. one entry of
+    ``WEEKS``) to restrict the sum to that week's absolute time indices.
+    """
+    total = 0.0
+    for component_id in component_ids:
+        series = cast(
+            "pd.Series[Any]",
+            st.component(component_id)
+            .output(output_id)
+            .value(scenario_index=scenario_index),
+        )
+        if time_range is not None:
+            series = series.loc[time_range.start : time_range.stop - 1]
+        total += series.sum()
+    return total
