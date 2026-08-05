@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -16,7 +16,7 @@ import pytest
 
 from gems_runner.simulation.thermal_heuristic import (
     find_min_generation_fast,
-    find_nb_units_accurate,
+    find_num_units_accurate,
 )
 
 # ---------------------------------------------------------------------------
@@ -27,10 +27,10 @@ _GENERATION_POWER = [50.0, 100.0, 150.0, 100.0, 50.0, 0.0, 0.0, 50.0]
 
 
 def test_find_min_generation_fast_scalar_matches_constant_list() -> None:
-    nb_timesteps = len(_GENERATION_POWER)
+    num_timesteps = len(_GENERATION_POWER)
     result_scalar = find_min_generation_fast(_GENERATION_POWER, 200.0, 50.0, 50.0, 2, 2)
     result_list = find_min_generation_fast(
-        _GENERATION_POWER, [200.0] * nb_timesteps, 50.0, 50.0, 2, 2
+        _GENERATION_POWER, [200.0] * num_timesteps, 50.0, 50.0, 2, 2
     )
     assert result_scalar == result_list
 
@@ -41,16 +41,16 @@ def test_find_min_generation_fast_scalar_clamps_output() -> None:
 
 
 # ---------------------------------------------------------------------------
-# find_nb_units_accurate — scalar nb_units_max broadcast
+# find_num_units_accurate — scalar num_units_max broadcast
 # ---------------------------------------------------------------------------
 
-_NB_UNITS_ON_OPT = [1.0, 2.0, 3.0, 2.0, 1.0, 0.0, 0.0, 1.0]
+_NUM_UNITS_ON_OPT = [1.0, 2.0, 3.0, 2.0, 1.0, 0.0, 0.0, 1.0]
 
 
-def test_find_nb_units_accurate_scalar_matches_constant_list() -> None:
-    nb_timesteps = len(_NB_UNITS_ON_OPT)
-    result_scalar = find_nb_units_accurate(_NB_UNITS_ON_OPT, 5, 2, 2)
-    result_list = find_nb_units_accurate(_NB_UNITS_ON_OPT, [5.0] * nb_timesteps, 2, 2)
+def test_find_num_units_accurate_scalar_matches_constant_list() -> None:
+    num_timesteps = len(_NUM_UNITS_ON_OPT)
+    result_scalar = find_num_units_accurate(_NUM_UNITS_ON_OPT, 5, 2, 2, "highs")
+    result_list = find_num_units_accurate(_NUM_UNITS_ON_OPT, [5.0] * num_timesteps, 2, 2, "highs")
     assert result_scalar == result_list
 
 
@@ -76,8 +76,8 @@ def test_find_min_generation_fast_no_warning_on_integer_duration() -> None:
         find_min_generation_fast(_GENERATION_POWER, 200.0, 50.0, 50.0, 2, 2)
 
 
-def test_find_nb_units_accurate_warns_on_non_integer_min_down_duration() -> None:
+def test_find_num_units_accurate_warns_on_non_integer_min_down_duration() -> None:
     with pytest.warns(UserWarning, match="min_down_duration"):
-        result_decimal = find_nb_units_accurate(_NB_UNITS_ON_OPT, 5, 2, 1.7)
-    result_rounded = find_nb_units_accurate(_NB_UNITS_ON_OPT, 5, 2, 2)
+        result_decimal = find_num_units_accurate(_NUM_UNITS_ON_OPT, 5, 2, 1.7, "highs")
+    result_rounded = find_num_units_accurate(_NUM_UNITS_ON_OPT, 5, 2, 2, "highs")
     assert result_decimal == result_rounded

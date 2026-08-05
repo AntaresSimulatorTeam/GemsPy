@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -17,7 +17,7 @@ Study: tests/e2e/functional/studies/thermal_heuristic_one_cluster_with_ramp
 Components:
   - N : node (area model, spillage_cost=100, unsupplied_energy_cost=10000)
   - D : fixed demand (ramps 0->300 MW over 7 hours, then back to 0 at t=12, zeros thereafter)
-  - G : thermal cluster (p_max=500, p_min=100, nb_units_max=3, market_bid_cost=10, startup_cost=10,
+  - G : thermal cluster (p_max=500, p_min=100, num_units_max=3, market_bid_cost=10, startup_cost=10,
                          d_min_up=1, d_min_down=1) with ramping constraints (ramp_up=30, ramp_down=30)
 
 The study is solved over a full week (168 timesteps) but only the first 12-13 timesteps
@@ -25,12 +25,12 @@ are asserted, since that is the window where the demand ramp (and therefore the
 interesting heuristic behavior) takes place; all remaining timesteps are flat at zero.
 
 Three variants of the same study are compared:
-  - test_milp_version: reference solution with the full MILP (integer nb_units_on/
+  - test_milp_version: reference solution with the full MILP (integer num_units_on/
     starting/stopping), used as the ground truth for objective value and dispatch.
   - test_accurate_heuristic: the accurate heuristic's second LP has no integer
-    constraint on the number of starting/stopping units, so nb_units_on ends up
+    constraint on the number of starting/stopping units, so num_units_on ends up
     fractional even though the relaxed LP is otherwise feasible.
-  - test_fast_heuristic: the fast heuristic rounds nb_units_on to integers (NODU=1
+  - test_fast_heuristic: the fast heuristic rounds num_units_on to integers (NODU=1
     over the ramp window), but a single unit ramping 100 MW in one step exceeds the
     30 MW/unit ramp constraint, so the resulting dispatch is ramp-infeasible even
     though the solver reports an optimal LP solution.

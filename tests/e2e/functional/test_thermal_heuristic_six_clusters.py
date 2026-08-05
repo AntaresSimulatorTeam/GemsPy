@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -17,7 +17,7 @@ import pytest
 
 from gems_runner.simulation.thermal_heuristic import (
     find_min_generation_fast,
-    find_nb_units_accurate,
+    find_num_units_accurate,
 )
 
 DATA_DIR = Path(__file__).parent / "data/thermal_heuristic_six_clusters"
@@ -42,46 +42,47 @@ def _cluster_max_generation(cluster: str) -> list:
 
 def test_accurate_heuristic() -> None:
     """
-    Check that find_nb_units_accurate produces the same nb_units_on as Antares.
+    Check that find_num_units_accurate produces the expected reference result.
 
-    Input : itr1_accurate_cluster*.txt  — LP fractional nb_on values per timestep.
-    Output: itr2_accurate_cluster*.txt  — integer nb_on after the heuristic,
+    Input : itr1_accurate_cluster*.txt  — LP fractional num_on values per timestep.
+    Output: itr2_accurate_cluster*.txt  — integer num_on after the heuristic,
                                           respecting min_up/min_down constraints.
     """
     for j, (
         cluster,
         (max_power_per_unit, _, min_up_duration, min_down_duration),
     ) in enumerate(CLUSTERS.items()):
-        # itr1: LP fractional nb_on values
-        nb_units_on_opt = np.loadtxt(
+        # itr1: LP fractional num_on values
+        num_units_on_opt = np.loadtxt(
             DATA_DIR / f"accurate/itr1_accurate_cluster{j+1}.txt"
         ).tolist()
 
-        # nb_units_max[t] = ceil(cluster_max_generation[t] / max_power_per_unit)
-        nb_units_max = [
-            int(np.ceil(v / max_power_per_unit))
+        # num_units_max[t] = ceil(cluster_max_generation[t] / max_power_per_unit)
+        num_units_max = [
+            np.ceil(v / max_power_per_unit)
             for v in _cluster_max_generation(cluster)
         ]
 
-        nb_units_on = find_nb_units_accurate(
-            nb_units_on_opt=nb_units_on_opt,
-            nb_units_max=nb_units_max,
+        num_units_on = find_num_units_accurate(
+            num_units_on_opt=num_units_on_opt,
+            num_units_max=num_units_max,
             min_up_duration=min_up_duration,
             min_down_duration=min_down_duration,
+            solver_name="highs",
         )
 
-        # itr2: expected integer nb_on after heuristic
+        # itr2: expected integer num_on after heuristic
         expected_output = np.loadtxt(
             DATA_DIR / f"accurate/itr2_accurate_cluster{j+1}.txt"
         )
         for t in range(NUMBER_HOURS):
-            assert nb_units_on[t] == pytest.approx(expected_output[t])
+            assert num_units_on[t] == pytest.approx(expected_output[t])
 
 
 def test_fast_heuristic() -> None:
     """
-    Check that find_min_generation_fast produces the same min_generating as Antares with
-    the same LP production input.
+    Check that find_min_generation_fast produces the expected reference min_generating
+    values for the same LP production input.
     """
     for j, (
         cluster,

@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -10,8 +10,7 @@
 #
 # This file is part of the Antares project.
 
-# Expected per-timestep outputs for thermal_heuristic_three_clusters tests.
-# Extracted from Antares reference outputs (commit 38c4535).
+# Reference expected per-timestep outputs for thermal_heuristic_three_clusters tests.
 # Keys: [scenario][week][timestep]
 
 # fmt: off

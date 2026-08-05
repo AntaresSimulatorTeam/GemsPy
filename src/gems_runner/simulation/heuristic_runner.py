@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -17,6 +17,7 @@ components), this module computes heuristic bounds per component and scenario
 and injects them as additional linopy constraints before a second solve.
 """
 
+import inspect
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Union
 
 import xarray as xr
@@ -30,8 +31,9 @@ from gems_craft.optim_config.parsing import (
 from gems_craft.study.parsing import HeuristicId, IntegerStrategyId
 from gems_runner.simulation.thermal_heuristic import (
     find_min_generation_fast,
-    find_nb_units_accurate,
+    find_num_units_accurate,
 )
+from linopy import Variable
 
 if TYPE_CHECKING:
     from gems_craft.study.study import Study
@@ -39,7 +41,7 @@ if TYPE_CHECKING:
 
 _HEURISTIC_FUNCTIONS: Dict[HeuristicId, Callable[..., List]] = {
     HeuristicId.FAST: find_min_generation_fast,
-    HeuristicId.ACCURATE: find_nb_units_accurate,
+    HeuristicId.ACCURATE: find_num_units_accurate,
 }
 
 
@@ -53,7 +55,7 @@ def should_apply_heuristics(study: "Study") -> bool:
 
 def _get_component_linopy_var(
     problem: "OptimizationProblem", model_id: str, name: str, component_id: str
-) -> Any:
+) -> Variable:
     """Like ``_get_linopy_var``, but returns the actually-registered Variable for
     *component_id* rather than the (possibly relaxed/exact-merged) one in
     ``problem._linopy_vars`` — bound mutations only reach the solver through this one.
@@ -162,6 +164,7 @@ def apply_thermal_heuristics(
         The list of MC scenario indices used when building *problem*.
     """
     heuristic_config_map = get_heuristic_config_map(optim_config)
+    solver_name = optim_config.solver_options.name
 
     heuristic_comps = [
         c
@@ -173,16 +176,10 @@ def apply_thermal_heuristics(
     for component in heuristic_comps:
         model_id = component.model.id
         heuristic_id = component.integer_strategy.heuristic_id
-        assert heuristic_id is not None
-        key = (model_id, heuristic_id.value)
-        if key not in heuristic_config_map:
-            raise ValueError(
-                f"Component '{component.id}' references heuristic "
-                f"'{heuristic_id.value}' on model '{model_id}', "
-                f"but this heuristic is not declared in optim-config."
-            )
-        heuristic_config = heuristic_config_map[key]
+        assert heuristic_id is not None  # for mypy
+        heuristic_config = heuristic_config_map[(model_id, heuristic_id.value)]
         heuristic_fn = _HEURISTIC_FUNCTIONS[heuristic_config.id]
+        fn_params = inspect.signature(heuristic_fn).parameters
 
         for local_idx in range(len(scenario_ids)):
             kwargs = {
@@ -195,6 +192,8 @@ def apply_thermal_heuristics(
                 )
                 for inp in heuristic_config.inputs
             }
+            if "solver_name" in fn_params:
+                kwargs["solver_name"] = solver_name
             heuristic_result: List = heuristic_fn(**kwargs)  # type: ignore[call-overload]
 
             result_da = xr.DataArray(

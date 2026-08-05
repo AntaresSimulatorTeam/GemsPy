@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -17,8 +17,8 @@ Study: tests/e2e/functional/studies/thermal_heuristic_two_clusters_low_load_*
 Components:
   - N  : node (area model)
   - D  : fixed demand (load model, timeseries demand-ts)
-  - G1 : thermal cluster (p_max=900,  p_min=600, nb_units=50, cluster_max_gen=45000)
-  - G2 : thermal cluster (p_max=1000, p_min=0,   nb_units=10, cluster_max_gen=10000)
+  - G1 : thermal cluster (p_max=900,  p_min=600, num_units=50, cluster_max_gen=45000)
+  - G2 : thermal cluster (p_max=1000, p_min=0,   num_units=10, cluster_max_gen=10000)
 
 1 scenario x 1 week of 168 hours. Low residual load case with significant spillage.
 """
@@ -81,7 +81,7 @@ def test_milp_version() -> None:
 
 def test_accurate_heuristic() -> None:
     """
-    Solve the same problem with the accurate heuristic of Antares.
+    Solve the same problem with the accurate heuristic.
     Spillage is larger than with MILP due to the rounding of commitment decisions.
     """
     study = build_thermal_study(CASE_ID, "accurate")
@@ -102,7 +102,7 @@ def test_accurate_heuristic() -> None:
 
 def test_fast_heuristic() -> None:
     """
-    Solve the same problem with the fast heuristic of Antares.
+    Solve the same problem with the fast heuristic.
     Spillage is even larger due to slot-based commitment scheduling.
     """
     study = build_thermal_study(CASE_ID, "fast")

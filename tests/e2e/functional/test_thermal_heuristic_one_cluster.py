@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -14,12 +14,18 @@
 End-to-end test for the thermal one-cluster study using SimulationTable.
 
 Study: tests/e2e/functional/studies/thermal_heuristic_one_cluster
+Model on 168 time steps with one thermal generation and one demand on a single node.
 Components:
-  - N  : node (NODE_BALANCE_MODEL)
-  - D  : fixed demand (FIXED_DEMAND, timeseries demand-ts)
-  - G  : thermal generator (GEN, p_max=1000, p_min=700, cost=50, ...)
-  - S  : spillage (SPI, cost=0)
-  - U  : unsupplied energy (UNSP, cost=1000)
+  - N : node (NODE_BALANCE_MODEL)
+  - D : fixed demand (FIXED_DEMAND, timeseries demand-ts). Demand is constant to
+        2000 MW except for the 13th hour for which it is 2050 MW
+  - G : thermal generator (GEN):
+        - P_min = 700 MW, P_max = 1000 MW
+        - Min up time = 3, min down time = 10
+        - Generation cost = 50€ / MWh, startup cost = 50, fixed cost = 1 /h
+        - Number of units = 3
+  - S : spillage (SPI, cost = 0 €/MWh)
+  - U : unsupplied energy (UNSP, cost = 1000 €/MWh)
 """
 
 import pytest
@@ -36,21 +42,12 @@ CASE_ID = "one_cluster"
 
 def test_milp_version() -> None:
     """
-    Model on 168 time steps with one thermal generation and demand on a single node.
-        - Demand is constant to 2000 MW except for the 13th hour for which it is 2050 MW
-        - Thermal generation is characterized with:
-            - P_min = 700 MW
-            - P_max = 1000 MW
-            - Min up time = 3
-            - Min down time = 10
-            - Generation cost = 50€ / MWh
-            - Startup cost = 50
-            - Fixed cost = 1 /h
-            - Number of unit = 3
-        - Unsupplied energy = 1000 €/MWh
-        - Spillage = 0 €/MWh
-
-    The optimal milp solution consists in turning on two thermal plants at the begining, turning on a third thermal plant at the 13th hour and turning off the first thermal plant at the 14th hour, the other two thermal plants stay on for the rest of the week producing 1000MW each. At the 13th hour, the production is [700,700,700] to satisfy Pmin constraints.
+    The optimal milp solution consists in turning on two thermal plants at the begining,
+    turning on a third thermal plant at the 13th hour and turning off the first thermal
+    plant at the 14th hour, the other two thermal plants stay on for the rest of the
+    week producing 1000MW each. At the 13th hour, the production is [700,700,700] to
+    satisfy Pmin constraints. This induces 50 MW of spillage at the 13th hour, but this
+    costs 0 since spillage is free.
 
     The optimal cost is then :
           50 x 2 x 1000 x 167 (prod step 1-12 and 14-168)
@@ -77,21 +74,9 @@ def test_milp_version() -> None:
 
 def test_lp_version() -> None:
     """
-    Model on 168 time steps with one thermal generation and one demand on a single node.
-        - Demand is constant to 2000 MW except for the 13th hour for which it is 2050 MW
-        - Thermal generation is characterized with:
-            - P_min = 700 MW
-            - P_max = 1000 MW
-            - Min up time = 3
-            - Min down time = 10
-            - Generation cost = 50€ / MWh
-            - Startup cost = 50
-            - Fixed cost = 1 /h
-            - Number of unit = 3
-        - Unsupplied energy = 1000 €/MWh
-        - Spillage = 0 €/MWh
-
-    The optimal solution of the linear relaxation consists in producing exactly the demand at each hour. The number of on units is equal to the production divided by P_max.
+    The optimal solution of the linear relaxation consists in producing exactly the
+    demand at each hour. The number of on units is equal to the production divided by
+    P_max.
 
     The optimal cost is then :
           50 x 2000 x 167 (prod step 1-12 and 14-168)
@@ -118,7 +103,11 @@ def test_lp_version() -> None:
 
 def test_accurate_heuristic() -> None:
     """
-    Solve the same problem as before with the heuristic accurate of Antares. The accurate heuristic is able to retrieve the milp optimal solution because when the number of on units found in the linear relaxation is ceiled, we found the optimal number of on units which is already feasible.
+    Solve the same problem as before with the accurate heuristic.
+
+    The accurate heuristic is able to retrieve the milp optimal solution because when
+    the number of on units found in the linear relaxation is ceiled, we found the
+    optimal number of on units which is already feasible.
     """
     study = build_thermal_study(CASE_ID, "accurate")
     config = optim_config_for(CASE_ID, "accurate", 0, 167, [0])
@@ -137,22 +126,12 @@ def test_accurate_heuristic() -> None:
 
 def test_fast_heuristic() -> None:
     """
-    Solve the same problem as before with the heuristic fast of Antares
-    Model on 168 time steps with one thermal generation and one demand on a single node.
-        - Demand is constant to 2000 MW except for the 13th hour for which it is 2050 MW
-        - Thermal generation is characterized with:
-            - P_min = 700 MW
-            - P_max = 1000 MW
-            - Min up time = 3
-            - Min down time = 10
-            - Generation cost = 50€ / MWh
-            - Startup cost = 50
-            - Fixed cost = 1 /h
-            - Number of unit = 3
-        - Unsupplied energy = 1000 €/MWh
-        - Spillage = 0 €/MWh
+    Solve the same problem as before with the fast heuristic.
 
-    The optimal solution consists in having 3 units turned on between time steps 10 and 19 with production equal to 2100 to respect pmin and 2 the rest of the time. Fast heuristic turns on 3 units for 10 timesteps because min down time is equal to 10.
+    The optimal solution consists in having 3 units turned on between time steps 10
+    and 19 with production equal to 2100 to respect pmin and 2 the rest of the time.
+    Fast heuristic turns on 3 units for 10 timesteps because min down time is equal
+    to 10.
 
     The optimal cost is then :
           50 x 2000 x 158 (prod step 1-9 and 20-168)

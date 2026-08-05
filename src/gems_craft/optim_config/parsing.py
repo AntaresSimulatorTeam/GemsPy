@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     from gems_craft.model.parameter import Parameter
     from gems_craft.model.variable import Variable
     from gems_craft.study.scenario_builder import ScenarioBuilder
-    from gems_craft.study.system import System
+    from gems_craft.study.system import Component, System
 
 
 class ElementLocation(str, Enum):
@@ -93,12 +93,12 @@ class HeuristicElementConfig(ModifiedBaseModel):
 _HEURISTIC_SCHEMA: Dict[HeuristicId, Dict[str, Set[str]]] = {
     HeuristicId.ACCURATE: {
         "inputs": {
-            "nb_units_on_opt",
-            "nb_units_max",
+            "num_units_on_opt",
+            "num_units_max",
             "min_up_duration",
             "min_down_duration",
         },
-        "outputs": {"minimum_nb_units_on"},
+        "outputs": {"minimum_num_units_on"},
     },
     HeuristicId.FAST: {
         "inputs": {
@@ -121,11 +121,11 @@ _HEURISTIC_ELEMENT_TIME_DEPENDENCE: Dict[str, Optional[bool]] = {
     "min_down_duration": False,
     "min_power_per_unit": False,
     "max_power_per_unit": False,
-    "nb_units_on_opt": True,
+    "num_units_on_opt": True,
     "generation_power": True,
-    "minimum_nb_units_on": True,
+    "minimum_num_units_on": True,
     "minimum_generation_power": True,
-    "nb_units_max": None,
+    "num_units_max": None,
     "cluster_max_generation": None,
 }
 
@@ -171,7 +171,7 @@ class ModelOptimConfig(ModifiedBaseModel):
     id: str
     model_decomposition: Optional[ModelDecompositionConfig] = None
     out_of_bounds_processing: Optional[OutOfBoundsProcessingConfig] = None
-    heuristic: List[HeuristicConfig] = Field(default_factory=list)
+    heuristics: List[HeuristicConfig] = Field(default_factory=list)
 
 
 class ResolutionMode(str, Enum):
@@ -555,7 +555,7 @@ def get_heuristic_config_map(
     return {
         (model_cfg.id, heuristic_cfg.id.value): heuristic_cfg
         for model_cfg in config.models
-        for heuristic_cfg in (model_cfg.heuristic or [])
+        for heuristic_cfg in (model_cfg.heuristics or [])
     }
 
 
@@ -639,7 +639,7 @@ def _check_no_integer_variables_in_subproblems(
         ElementLocation.MASTER_AND_SUBPROBLEMS,
     }
 
-    model_components: Dict[str, List] = {}
+    model_components: Dict[str, List[Component]] = {}
     for c in system.all_components:
         model_components.setdefault(c.model.id, []).append(c)
 
@@ -647,29 +647,26 @@ def _check_no_integer_variables_in_subproblems(
     for model_config in config.models:
         if model_config.model_decomposition is not None:
             explicit_locs_by_model[model_config.id] = {
-                v_cfg.id: v_cfg.location
-                for v_cfg in model_config.model_decomposition.variables
+                variable_config.id: variable_config.location
+                for variable_config in model_config.model_decomposition.variables
             }
 
     for model_id, comps in model_components.items():
-        if not any(c.integer_strategy.id == IntegerStrategyId.EXACT for c in comps):
-            continue
+        if any(c.integer_strategy.id == IntegerStrategyId.EXACT for c in comps):
+            model = comps[0].model
+            explicit_locs = explicit_locs_by_model.get(model_id, {})
 
-        model = comps[0].model
-        explicit_locs = explicit_locs_by_model.get(model_id, {})
-
-        for var_name, var in model.variables.items():
-            if var.data_type not in (ValueType.INTEGER, ValueType.BINARY):
-                continue
-            if (
-                explicit_locs.get(var_name, ElementLocation.SUBPROBLEMS)
-                in subproblem_locs
-            ):
-                errors.append(
-                    f"Integer variable '{var_name}' of model '{model_id}' "
-                    f"is assigned to subproblems, which is forbidden in Benders "
-                    f"decomposition. Assign it to 'master' in the decomposition config."
-                )
+            for var_name, var in model.variables.items():
+                if var.data_type in (ValueType.INTEGER, ValueType.BINARY):
+                    if (
+                        explicit_locs.get(var_name, ElementLocation.SUBPROBLEMS)
+                        in subproblem_locs
+                    ):
+                        errors.append(
+                            f"Integer variable '{var_name}' of model '{model_id}' "
+                            f"is assigned to subproblems, which is forbidden in Benders "
+                            f"decomposition. Consider using a continuous variable or changing the resolution mode."
+                        )
 
 
 def validate_optim_config(
@@ -725,7 +722,7 @@ def validate_optim_config(
                     model_config.id,
                     errors,
                 )
-            for heuristic_config in model_config.heuristic:
+            for heuristic_config in model_config.heuristics:
                 _check_heuristic_elements(heuristic_config, model, errors)
 
     _check_heuristic_ids_declared(config, system, errors)

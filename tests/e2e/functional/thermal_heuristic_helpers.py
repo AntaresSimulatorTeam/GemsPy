@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -64,8 +64,8 @@ from gems_craft.study.study import Study
 from gems_runner.simulation.simulation_table import SimulationTable
 
 STUDIES_DIR = Path(__file__).parent / "studies"
-SHARED_LIB_FILE = Path(__file__).parent / "libs" / "thermal_heuristic.yml"
-OPTIM_CONFIG_FILE = Path(__file__).parent / "optim-config" / "thermal_heuristic.yml"
+SHARED_LIB_FILE = Path(__file__).parent / "libs" / "thermal_variants_for_heuristic.yml"
+OPTIM_CONFIG_FILE = Path(__file__).parent / "optim-config" / "thermal_variants_for_heuristic.yml"
 
 # fast mode drops the integer commitment variables entirely rather than relaxing
 # them, so it needs a structurally different model than milp/lp/accurate — both

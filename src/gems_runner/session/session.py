@@ -44,7 +44,6 @@ class SimulationSession:
         run_id: Optional[str] = None,
         output_dir: Optional[Path] = None,
     ) -> None:
-        validate_optim_config(optim_config, study.system, study.scenario_builder)
         self.study = study
         self.optim_config = optim_config
         self.run_id = run_id or str(uuid4())
@@ -57,6 +56,9 @@ class SimulationSession:
 
     def run(self) -> SimulationTable:
         """Entry point. Dispatches to the appropriate resolution strategy."""
+        validate_optim_config(
+            self.optim_config, self.study.system, self.study.scenario_builder
+        )
         mode = self.optim_config.resolution.mode
         if mode == ResolutionMode.FRONTAL:
             return self._run_frontal()

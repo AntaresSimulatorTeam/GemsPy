@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -39,7 +39,7 @@ def _thermal_model(
     generation_power_time_dependent: bool = True,
     cluster_max_generation_time_dependent: bool = True,
     num_units_on_time_dependent: bool = True,
-    nb_units_max_param_time_dependent: bool = True,
+    num_units_max_param_time_dependent: bool = True,
 ) -> Model:
     return model(
         id="thermal",
@@ -57,7 +57,7 @@ def _thermal_model(
                 _structure(cluster_max_generation_time_dependent),
             ),
             float_parameter(
-                "nb_units_max_param", _structure(nb_units_max_param_time_dependent)
+                "num_units_max_param", _structure(num_units_max_param_time_dependent)
             ),
         ],
         variables=[
@@ -111,21 +111,21 @@ def _fast_heuristic_config(
 
 
 def _accurate_heuristic_config(
-    nb_units_max_id: str = "nb_units_max_param",
-    nb_units_max_type: ModelElementAccessType = ModelElementAccessType.PARAMETER,
+    num_units_max_id: str = "num_units_max_param",
+    num_units_max_type: ModelElementAccessType = ModelElementAccessType.PARAMETER,
 ) -> HeuristicConfig:
     return HeuristicConfig(
         id=HeuristicId.ACCURATE,
         inputs=[
             HeuristicElementConfig(
-                heuristic_element="nb_units_on_opt",
+                heuristic_element="num_units_on_opt",
                 id="num_units_on",
                 type=ModelElementAccessType.VARIABLE_SOLUTION,
             ),
             HeuristicElementConfig(
-                heuristic_element="nb_units_max",
-                id=nb_units_max_id,
-                type=nb_units_max_type,
+                heuristic_element="num_units_max",
+                id=num_units_max_id,
+                type=num_units_max_type,
             ),
             HeuristicElementConfig(
                 heuristic_element="min_up_duration", id="min_up_duration"
@@ -136,7 +136,7 @@ def _accurate_heuristic_config(
         ],
         outputs=[
             HeuristicElementConfig(
-                heuristic_element="minimum_nb_units_on",
+                heuristic_element="minimum_num_units_on",
                 id="num_units_on",
                 type=ModelElementAccessType.VARIABLE_LOWER_BOUND,
             ),
@@ -146,7 +146,7 @@ def _accurate_heuristic_config(
 
 def _validate(model: Model, heuristic_config: HeuristicConfig) -> None:
     config = OptimConfig(
-        models=[ModelOptimConfig(id="thermal", heuristic=[heuristic_config])]
+        models=[ModelOptimConfig(id="thermal", heuristics=[heuristic_config])]
     )
     system = System(id="test")
     system.add_component(create_component(model=model, id="cluster1"))
@@ -176,13 +176,13 @@ def test_cluster_max_generation_accepts_time_independent() -> None:
     _validate(model, _fast_heuristic_config())
 
 
-def test_nb_units_max_accepts_time_dependent() -> None:
-    model = _thermal_model(nb_units_max_param_time_dependent=True)
+def test_num_units_max_accepts_time_dependent() -> None:
+    model = _thermal_model(num_units_max_param_time_dependent=True)
     _validate(model, _accurate_heuristic_config())
 
 
-def test_nb_units_max_accepts_time_independent() -> None:
-    model = _thermal_model(nb_units_max_param_time_dependent=False)
+def test_num_units_max_accepts_time_independent() -> None:
+    model = _thermal_model(num_units_max_param_time_dependent=False)
     _validate(model, _accurate_heuristic_config())
 
 
@@ -215,10 +215,10 @@ def test_generation_power_wrongly_time_independent_raises() -> None:
         _validate(model, _fast_heuristic_config())
 
 
-def test_nb_units_on_opt_wrongly_time_independent_raises() -> None:
+def test_num_units_on_opt_wrongly_time_independent_raises() -> None:
     model = _thermal_model(num_units_on_time_dependent=False)
     with pytest.raises(
-        ValueError, match="nb_units_on_opt.*must be 'time-dependent:True'"
+        ValueError, match="num_units_on_opt.*must be 'time-dependent:True'"
     ):
         _validate(model, _accurate_heuristic_config())
 
@@ -241,8 +241,8 @@ def test_id_of_wrong_kind_raises() -> None:
     # 'min_power_per_unit' exists as a parameter, not as a variable.
     model = _thermal_model()
     heuristic_config = _accurate_heuristic_config(
-        nb_units_max_id="min_power_per_unit",
-        nb_units_max_type=ModelElementAccessType.VARIABLE_UPPER_BOUND,
+        num_units_max_id="min_power_per_unit",
+        num_units_max_type=ModelElementAccessType.VARIABLE_UPPER_BOUND,
     )
     with pytest.raises(ValueError, match="'min_power_per_unit' .* not found in model"):
         _validate(model, heuristic_config)

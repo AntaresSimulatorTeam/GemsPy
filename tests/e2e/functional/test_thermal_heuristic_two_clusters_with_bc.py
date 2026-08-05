@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -17,8 +17,8 @@ Study: tests/e2e/functional/studies/thermal_heuristic_two_clusters_with_bc
 Components:
   - N               : node (area model, spillage_cost=0, unsupplied_cost=1000)
   - D               : fixed demand (2000 MW except t=12 where demand=2050 MW)
-  - G1              : thermal cluster (p_max=1000, p_min=700, nb_units=3, cost=50)
-  - G2              : thermal cluster (p_max=500,  p_min=50,  nb_units=2, cost=150)
+  - G1              : thermal cluster (p_max=1000, p_min=700, num_units=3, cost=50)
+  - G2              : thermal cluster (p_max=500,  p_min=50,  num_units=2, cost=150)
   - upper_bound_sum : binding constraint (G1 + G2 <= 2050 at all times)
 
 Accurate and fast heuristics are INFEASIBLE because the heuristic forces G1 to run

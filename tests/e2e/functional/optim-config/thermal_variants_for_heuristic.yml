@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -10,20 +10,21 @@
 #
 # This file is part of the Antares project.
 #
-# Shared by every non-ramp thermal-heuristic e2e case running in accurate mode
-# (milp/lp modes never look up a heuristic, so they never load this file either).
-# Not valid for fast mode: the fast library's `num_units_on` is an extra-output,
-# not a variable, so the accurate heuristic below would fail validation against
-# it — see thermal_fast.yml for that case.
+# Shared by every thermal-heuristic e2e case, across every mode. Declares
+# heuristics for all four thermal models side by side (thermal, thermal_fast,
+# thermal_with_ramp, thermal_fast_with_ramp); callers
+# (thermal_heuristic_helpers.optim_config_for) trim this down to just the
+# entry matching whichever model the case's components resolve to.
+# milp/lp never look up a heuristic, so those modes use a bare config instead.
 models:
   - id: antares_legacy_models.thermal
-    heuristic:
+    heuristics:
       - id: accurate
         inputs:
-          - heuristic-element: nb_units_on_opt
+          - heuristic-element: num_units_on_opt
             id: num_units_on
             type: variable-solution
-          - heuristic-element: nb_units_max
+          - heuristic-element: num_units_max
             id: num_units_on
             type: variable-upper-bound
           - heuristic-element: min_up_duration
@@ -31,12 +32,12 @@ models:
           - heuristic-element: min_down_duration
             id: min_down_duration
         outputs:
-          - heuristic-element: minimum_nb_units_on
+          - heuristic-element: minimum_num_units_on
             id: num_units_on
             type: variable-lower-bound
     
   - id: antares_legacy_models.thermal_fast
-    heuristic:
+    heuristics:
       - id: fast
         inputs:
           - heuristic-element: generation_power
@@ -58,13 +59,13 @@ models:
             type: variable-lower-bound
   
   - id: antares_legacy_models.thermal_with_ramp
-    heuristic:
+    heuristics:
       - id: accurate
         inputs:
-          - heuristic-element: nb_units_on_opt
+          - heuristic-element: num_units_on_opt
             id: num_units_on
             type: variable-solution
-          - heuristic-element: nb_units_max
+          - heuristic-element: num_units_max
             id: num_units_on
             type: variable-upper-bound
           - heuristic-element: min_up_duration
@@ -72,12 +73,12 @@ models:
           - heuristic-element: min_down_duration
             id: min_down_duration
         outputs:
-          - heuristic-element: minimum_nb_units_on
+          - heuristic-element: minimum_num_units_on
             id: num_units_on
             type: variable-lower-bound
   
   - id: antares_legacy_models.thermal_fast_with_ramp
-    heuristic:
+    heuristics:
       - id: fast
         inputs:
           - heuristic-element: generation_power

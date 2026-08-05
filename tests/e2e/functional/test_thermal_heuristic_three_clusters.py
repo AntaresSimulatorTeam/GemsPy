@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -17,9 +17,9 @@ Study: tests/e2e/functional/studies/thermal_heuristic_three_clusters
 Components:
   - N  : node (area model)
   - D  : fixed demand (load model, timeseries demand-ts)
-  - G1 : thermal cluster (p_max=410, p_min=180, nb_units=1, timeseries series_G1)
-  - G2 : thermal cluster (p_max=90,  p_min=60,  nb_units=3, timeseries series_G2)
-  - G3 : thermal cluster (p_max=275, p_min=150, nb_units=4, timeseries series_G3)
+  - G1 : thermal cluster (p_max=410, p_min=180, num_units=1, timeseries series_G1)
+  - G2 : thermal cluster (p_max=90,  p_min=60,  num_units=3, timeseries series_G2)
+  - G3 : thermal cluster (p_max=275, p_min=150, num_units=4, timeseries series_G3)
 
 2 scenarios x 2 weeks of 168 hours each.
 Week 0 uses time indices 0-167, week 1 uses 168-335.
@@ -157,7 +157,7 @@ def test_milp_version() -> None:
 
 def test_accurate_heuristic() -> None:
     """
-    Solve weekly problems with the accurate heuristic of Antares.
+    Solve weekly problems with the accurate heuristic.
     The accurate heuristic rounds up the number of on units from the LP relaxation.
     """
     study = build_thermal_study(CASE_ID, "accurate")
@@ -242,7 +242,7 @@ def test_accurate_heuristic() -> None:
 
 def test_fast_heuristic() -> None:
     """
-    Solve weekly problems with the fast heuristic of Antares.
+    Solve weekly problems with the fast heuristic.
     The fast heuristic uses slot-based scheduling of commitment decisions.
     """
     study = build_thermal_study(CASE_ID, "fast")
