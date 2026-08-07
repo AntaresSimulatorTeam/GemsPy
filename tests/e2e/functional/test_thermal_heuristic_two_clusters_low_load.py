@@ -65,7 +65,7 @@ def test_milp_version() -> None:
     Optimal solution has significant spillage due to minimum generation constraints.
     """
     study = build_thermal_study(CASE_ID, "milp")
-    config = optim_config_for(CASE_ID, "milp", 0, 167, [0])
+    config = optim_config_for("milp")
     st = SimulationSession(study, config).run()
 
     objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
@@ -89,7 +89,7 @@ def test_accurate_heuristic() -> None:
     Spillage is larger than with MILP due to the rounding of commitment decisions.
     """
     study = build_thermal_study(CASE_ID, "accurate")
-    config = optim_config_for(CASE_ID, "accurate", 0, 167, [0])
+    config = optim_config_for("accurate")
     st = SimulationSession(study, config).run()
 
     objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
@@ -113,7 +113,7 @@ def test_fast_heuristic() -> None:
     Spillage is even larger due to slot-based commitment scheduling.
     """
     study = build_thermal_study(CASE_ID, "fast")
-    config = optim_config_for(CASE_ID, "fast", 0, 167, [0])
+    config = optim_config_for("fast")
     st = SimulationSession(study, config).run()
 
     objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]

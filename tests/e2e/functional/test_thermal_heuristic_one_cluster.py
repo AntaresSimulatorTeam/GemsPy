@@ -58,7 +58,7 @@ def test_milp_version() -> None:
         = 16 805 387
     """
     study = build_thermal_study(CASE_ID, "milp")
-    config = optim_config_for(CASE_ID, "milp", 0, 167, [0])
+    config = optim_config_for("milp")
     st = SimulationSession(study, config).run()
 
     assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
@@ -88,7 +88,7 @@ def test_lp_version() -> None:
         = 16 802 838,55
     """
     study = build_thermal_study(CASE_ID, "lp")
-    config = optim_config_for(CASE_ID, "lp", 0, 167, [0])
+    config = optim_config_for("lp")
     st = SimulationSession(study, config).run()
 
     assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
@@ -112,7 +112,7 @@ def test_accurate_heuristic() -> None:
     optimal number of on units which is already feasible.
     """
     study = build_thermal_study(CASE_ID, "accurate")
-    config = optim_config_for(CASE_ID, "accurate", 0, 167, [0])
+    config = optim_config_for("accurate")
     st = SimulationSession(study, config).run()
 
     assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
@@ -142,7 +142,7 @@ def test_fast_heuristic() -> None:
         = 16 850 000
     """
     study = build_thermal_study(CASE_ID, "fast")
-    config = optim_config_for(CASE_ID, "fast", 0, 167, [0])
+    config = optim_config_for("fast")
     st = SimulationSession(study, config).run()
 
     assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
