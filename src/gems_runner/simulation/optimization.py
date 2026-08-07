@@ -313,6 +313,34 @@ def _build_slave_port_array(
     return total if total is not None else xr.DataArray(0.0)
 
 
+class _MergedGroupVariable(linopy.Variable):
+    """Merged view of a variable split across relaxed/exact strategy groups.
+
+    Detached copy (``xr.concat`` of the real per-group Variables) — safe to
+    read and use in expressions, but writing bounds here wouldn't reach the
+    solver. ``.lower``/``.upper`` setters raise instead of silently no-oping;
+    use :meth:`OptimizationProblem.get_component_variable` to mutate bounds.
+    """
+
+    __slots__ = ()
+
+    @linopy.Variable.lower.setter  # type: ignore[misc]
+    def lower(self, value: object) -> None:
+        raise AttributeError(
+            "Cannot set 'lower' on a merged relaxed/exact variable: it is a "
+            "detached copy and the write would not reach the solver. Use "
+            "OptimizationProblem.get_component_variable(...) instead."
+        )
+
+    @linopy.Variable.upper.setter  # type: ignore[misc]
+    def upper(self, value: object) -> None:
+        raise AttributeError(
+            "Cannot set 'upper' on a merged relaxed/exact variable: it is a "
+            "detached copy and the write would not reach the solver. Use "
+            "OptimizationProblem.get_component_variable(...) instead."
+        )
+
+
 class OptimizationProblem:
     """
     Wraps a linopy.Model and provides the high-level API for solving and
@@ -655,8 +683,16 @@ class _OptimizationProblemBuilder:
                         xr.Dataset,
                         xr.concat([lv.data for lv in partial], dim="component"),
                     ).sel(component=comp_ids)
-                    self.linopy_vars[(model.id, var.name)] = linopy.Variable(
-                        merged, partial[0].model, partial[0].name
+                    # xr.concat keeps only partial[0]'s attrs; widen label_range
+                    # by hand to cover every group's labels.
+                    merged.attrs["label_range"] = (
+                        min(lv.range[0] for lv in partial),
+                        max(lv.range[1] for lv in partial),
+                    )
+                    prefix = model.id.replace("-", "_")
+                    merged_name = f"{prefix}__{var.name}__merged"
+                    self.linopy_vars[(model.id, var.name)] = _MergedGroupVariable(
+                        merged, partial[0].model, merged_name
                     )
                 else:
                     single_var = self._add_variable_for_group(
