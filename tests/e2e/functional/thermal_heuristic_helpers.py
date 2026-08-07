@@ -42,7 +42,11 @@ import pytest
 
 from gems_craft.model.parsing import LibrarySchema, parse_yaml_library
 from gems_craft.model.resolve_library import resolve_library
-from gems_craft.optim_config.parsing import OptimConfig, load_optim_config
+from gems_craft.optim_config.parsing import (
+    OptimConfig,
+    TimeScopeConfig,
+    load_optim_config,
+)
 from gems_craft.study.parsing import (
     HeuristicId,
     IntegerStrategy,
@@ -122,6 +126,13 @@ CASES: Dict[str, ThermalCaseSpec] = {
         base_dir="thermal_heuristic_two_clusters_low_load",
         thermal_components=["G1", "G2"],
     ),
+    # Strategies are fixed directly in this case's system.yml (relaxed/heuristic
+    # fast/exact/heuristic accurate on G1..G4 respectively) rather than toggled
+    # by mode, so it's only ever built with mode="milp" (= no mutation).
+    "four_clusters_mixed_strategies": ThermalCaseSpec(
+        base_dir="thermal_heuristic_four_clusters_mixed_strategies",
+        thermal_components=["G1", "G2", "G3", "G4"],
+    ),
 }
 
 
@@ -181,6 +192,22 @@ def optim_config_for(mode: str) -> OptimConfig:
     shared = _shared_optim_config()
     return shared.model_copy(
         update={"models": [m for m in shared.models if m.id == model_id]}
+    )
+
+
+def optim_config_all_models() -> OptimConfig:
+    """Untrimmed shared optim-config (declares both thermal and thermal_fast),
+    with the time scope narrowed to 24 timesteps.
+
+    optim_config_for() trims to a single model because every other case uses
+    one model at a time; cases that mix models/strategies in one system need
+    both declarations present simultaneously. Unlike every other case, which
+    reuses the shared config's 168-timestep scope as-is, this one is the only
+    case whose study is itself a single day (24 timesteps) of data — one day
+    is enough to exercise every strategy at a different load level.
+    """
+    return _shared_optim_config().model_copy(
+        update={"time_scope": TimeScopeConfig(first_time_step=0, last_time_step=23)}
     )
 
 

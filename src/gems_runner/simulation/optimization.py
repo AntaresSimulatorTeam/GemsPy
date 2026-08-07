@@ -668,6 +668,23 @@ class _OptimizationProblemBuilder:
                             single_var
                         )
 
+    def _param_arrays_for_components(
+        self, model_id: str, comp_ids: List[str]
+    ) -> Dict[Tuple[str, str], xr.DataArray]:
+        """Restrict *model_id*'s parameter arrays to *comp_ids*.
+
+        ``self.param_arrays`` holds one array per (model_id, param_name),
+        carrying every component that shares that model. When a model's
+        variables are split into per-strategy groups (``_create_variables_for_model``),
+        a bound expression evaluated for one group must only see that group's
+        own components — otherwise a component-varying parameter's full-model
+        array gets force-broadcast into the (smaller) group's shape and fails.
+        """
+        return {
+            key: arr.sel(component=comp_ids) if key[0] == model_id else arr
+            for key, arr in self.param_arrays.items()
+        }
+
     def _add_variable_for_group(
         self,
         model: Model,
@@ -702,7 +719,7 @@ class _OptimizationProblemBuilder:
         bound_builder = VectorizedLinearExprBuilder(
             model_id=model.id,
             linopy_vars={},
-            param_arrays=self.param_arrays,
+            param_arrays=self._param_arrays_for_components(model.id, comp_ids),
             port_arrays={},
             block_length=self.block_length,
         )

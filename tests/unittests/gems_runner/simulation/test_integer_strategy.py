@@ -18,10 +18,15 @@ Tests that integer_strategy is correctly reflected in the built linopy model.
 - HEURISTIC → same as RELAXED for the solver
 """
 
-from gems_craft.expression.expression import literal
+import pandas as pd
+
+from gems_craft.expression.expression import literal, param
+from gems_craft.expression.indexing_structure import IndexingStructure
 from gems_craft.model.model import model
+from gems_craft.model.parameter import float_parameter
 from gems_craft.model.variable import float_variable, int_variable
 from gems_craft.study import DataBase, Study, System
+from gems_craft.study.data import TimeSeriesData
 from gems_craft.study.parsing import IntegerStrategy, IntegerStrategyId
 from gems_craft.study.system import Component
 from gems_runner.simulation import TimeBlock, build_problem
@@ -119,4 +124,51 @@ def test_mixed_strategies_work() -> None:
             "integer"
         ]
         is False
+    )
+
+
+MODEL_WITH_TIME_DEPENDENT_BOUND = model(
+    id="model_with_time_dependent_bound",
+    parameters=[
+        float_parameter("cap", structure=IndexingStructure(True, False)),
+    ],
+    variables=[
+        int_variable("nb_units", lower_bound=literal(0), upper_bound=param("cap")),
+    ],
+)
+
+
+def test_mixed_strategies_with_time_dependent_parameter_bound() -> None:
+    """A variable's bound may reference a time-dependent parameter that varies
+    per component (e.g. thermal's cluster_max_generation). When sibling
+    components of the same model use different integer strategies, the split
+    groups built by _create_variables_for_model must each see only their own
+    components' parameter values, not every component sharing the model.
+    """
+    system = System("test")
+    db = DataBase()
+    caps = {"c1": 5.0, "c2": 10.0}
+    for comp_id, strategy in zip(
+        caps, [IntegerStrategyId.EXACT, IntegerStrategyId.RELAXED]
+    ):
+        system.add_component(
+            Component(
+                model=MODEL_WITH_TIME_DEPENDENT_BOUND,
+                id=comp_id,
+                integer_strategy=IntegerStrategy(id=strategy),
+            )
+        )
+        db.add_data(comp_id, "cap", TimeSeriesData(pd.Series([caps[comp_id]])))
+
+    problem = build_problem(Study(system, db), TimeBlock(1, [0]), scenario_ids=[0])
+
+    exact_var = problem.get_component_variable(
+        "model_with_time_dependent_bound", "nb_units", "c1"
+    )
+    relaxed_var = problem.get_component_variable(
+        "model_with_time_dependent_bound", "nb_units", "c2"
+    )
+    assert exact_var is not None and exact_var.upper.sel(component="c1").item() == 5.0
+    assert (
+        relaxed_var is not None and relaxed_var.upper.sel(component="c2").item() == 10.0
     )
