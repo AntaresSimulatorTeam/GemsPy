@@ -27,7 +27,7 @@ from gems_craft.model.parameter import float_parameter
 from gems_craft.model.variable import float_variable, int_variable
 from gems_craft.study import DataBase, Study, System
 from gems_craft.study.data import TimeSeriesData
-from gems_craft.study.parsing import IntegerStrategy, IntegerStrategyId
+from gems_craft.study.parsing import HeuristicId, IntegerStrategy, IntegerStrategyId
 from gems_craft.study.system import Component
 from gems_runner.simulation import TimeBlock, build_problem
 
@@ -46,7 +46,14 @@ def _build(strategies: list[IntegerStrategyId]) -> build_problem:  # type: ignor
         component = Component(
             model=MIXED_MODEL,
             id=f"c{i+1}",
-            integer_strategy=IntegerStrategy(id=strategy),
+            integer_strategy=IntegerStrategy(
+                id=strategy,
+                heuristic_id=(
+                    HeuristicId.FAST
+                    if strategy == IntegerStrategyId.HEURISTIC
+                    else None
+                ),
+            ),
         )
         system.add_component(component)
     return build_problem(Study(system, DataBase()), TimeBlock(1, [0]), scenario_ids=[0])

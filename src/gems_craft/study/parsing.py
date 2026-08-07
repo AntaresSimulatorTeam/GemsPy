@@ -16,7 +16,7 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
 
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, model_validator
 from yaml import safe_dump, safe_load
 
 from gems_craft.utils import ModifiedBaseModel
@@ -56,6 +56,19 @@ class HeuristicId(str, Enum):
 class IntegerStrategy(ModifiedBaseModel):
     id: IntegerStrategyId = IntegerStrategyId.EXACT
     heuristic_id: Optional[HeuristicId] = None
+
+    @model_validator(mode="after")
+    def _heuristic_id_consistency(self) -> "IntegerStrategy":
+        if self.id == IntegerStrategyId.HEURISTIC and self.heuristic_id is None:
+            raise ValueError(
+                "'heuristic-id' is required when integer-strategy is 'heuristic'"
+            )
+        if self.id != IntegerStrategyId.HEURISTIC and self.heuristic_id is not None:
+            raise ValueError(
+                f"'heuristic-id' is only allowed when integer-strategy is 'heuristic', "
+                f"got integer-strategy '{self.id.value}'"
+            )
+        return self
 
 
 class ComponentSchema(ModifiedBaseModel):

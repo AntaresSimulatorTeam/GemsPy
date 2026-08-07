@@ -33,7 +33,6 @@ from gems_craft.study.data import (
 from gems_craft.study.parsing import (
     ComponentPropertySchema,
     ComponentSchema,
-    IntegerStrategyId,
     PortConnectionsSchema,
     SystemSchema,
 )
@@ -101,15 +100,6 @@ def _resolve_component(
             f"Component {component.id!r} (model {model.id!r}) is missing "
             f"propert{'y' if len(missing) == 1 else 'ies'} declared by the model: "
             f"{missing}."
-        )
-
-    if (
-        component.integer_strategy.id == IntegerStrategyId.HEURISTIC
-        and component.integer_strategy.heuristic_id is None
-    ):
-        raise ValueError(
-            f"Component '{component.id}' uses integer-strategy 'heuristic' "
-            f"but has no heuristic-id."
         )
 
     return Component(
