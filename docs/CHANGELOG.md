@@ -4,8 +4,6 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
-## [0.1.3] - 2026-07-24
-
 ### Added
 - **Integer strategy and thermal heuristics** - components can now set
   `integer-strategy` (`exact` (default), `relaxed`, or `heuristic` +
@@ -15,6 +13,10 @@ All notable changes to GemsPy are documented here.
   compute tighter variable bounds from the first solve. Each model declares
   what a heuristic reads/writes via `models[].heuristics` in
   `optim-config.yml`.
+
+## [0.1.3] - 2026-07-24
+
+### Added
 - **`taxonomy` field on `LibrarySchema`** - optional free-form string field on
   the library YAML schema; no validation is attached. `taxonomy` is also
   carried through to the resolved `Library` class.
