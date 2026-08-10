@@ -20,6 +20,7 @@ from gems_craft.expression.expression import (
     DualNode,
     ExpressionNode,
     FloorNode,
+    LowerBoundNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
@@ -29,6 +30,7 @@ from gems_craft.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UpperBoundNode,
 )
 
 from .expression import (
@@ -143,6 +145,12 @@ class PrinterVisitor(ExpressionVisitor[str]):
 
     def reduced_cost(self, node: ReducedCostNode) -> str:
         return f"reduced_cost({node.variable_id})"
+
+    def lower_bound(self, node: LowerBoundNode) -> str:
+        return f"lower_bound({node.variable_id})"
+
+    def upper_bound(self, node: UpperBoundNode) -> str:
+        return f"upper_bound({node.variable_id})"
 
 
 def print_expr(expression: ExpressionNode) -> str:

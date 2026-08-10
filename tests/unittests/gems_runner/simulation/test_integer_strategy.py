@@ -19,8 +19,9 @@ Tests that integer_strategy is correctly reflected in the built linopy model.
 """
 
 import pandas as pd
+import pytest
 
-from gems_craft.expression.expression import literal, param
+from gems_craft.expression.expression import LowerBoundNode, literal, param
 from gems_craft.expression.indexing_structure import IndexingStructure
 from gems_craft.model.model import model
 from gems_craft.model.parameter import float_parameter
@@ -30,6 +31,7 @@ from gems_craft.study.data import TimeSeriesData
 from gems_craft.study.parsing import HeuristicId, IntegerStrategy, IntegerStrategyId
 from gems_craft.study.system import Component
 from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.simulation.simulation_table import SimulationTableBuilder
 
 MIXED_MODEL = model(
     id="mixed_model",
@@ -179,3 +181,55 @@ def test_mixed_strategies_with_time_dependent_parameter_bound() -> None:
     assert (
         relaxed_var is not None and relaxed_var.upper.sel(component="c2").item() == 10.0
     )
+
+
+MIXED_MODEL_WITH_BOUND_OUTPUT = model(
+    id="mixed_model_with_bound_output",
+    variables=[
+        float_variable("generation", lower_bound=literal(0), upper_bound=literal(100)),
+    ],
+    extra_outputs={
+        "gen_lb": LowerBoundNode("generation"),
+    },
+)
+
+
+def test_lower_bound_extra_output_bypasses_merged_group_variable() -> None:
+    """lower_bound() extra-outputs must read the real per-component linopy
+    Variable, not the merged/detached _MergedGroupVariable copy built for
+    models split across relaxed/exact strategy groups — otherwise a
+    heuristic-style bound mutation on one component would not be visible (or
+    would leak across components).
+    """
+    system = System("test")
+    for comp_id, strategy in zip(
+        ["c1", "c2"], [IntegerStrategyId.EXACT, IntegerStrategyId.RELAXED]
+    ):
+        system.add_component(
+            Component(
+                model=MIXED_MODEL_WITH_BOUND_OUTPUT,
+                id=comp_id,
+                integer_strategy=IntegerStrategy(id=strategy),
+            )
+        )
+
+    problem = build_problem(
+        Study(system, DataBase()), TimeBlock(1, [0]), scenario_ids=[0]
+    )
+    problem.solve(solver_name="highs")
+
+    # Simulate what a heuristic does: mutate c2's bound directly via the real
+    # per-component Variable, bypassing the merged/detached copy.
+    c2_var = problem.get_component_variable(
+        "mixed_model_with_bound_output", "generation", "c2"
+    )
+    assert c2_var is not None
+    c2_var.lower.sel(component="c2")[:] = 42.0
+
+    st = SimulationTableBuilder().build(problem)
+
+    c2_lb = st.component("c2").output("gen_lb").value(time_index=0, scenario_index=0)
+    c1_lb = st.component("c1").output("gen_lb").value(time_index=0, scenario_index=0)
+
+    assert c2_lb == pytest.approx(42.0)
+    assert c1_lb == pytest.approx(0.0)

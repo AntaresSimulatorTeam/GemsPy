@@ -154,6 +154,6 @@ library:
           expression: expec(sum(market_bid_cost * generation_power))
       extra-outputs:
         - id: num_units_on
-          expression: ceil(generation_power / max_power_per_unit)
+          expression: max(floor(lower_bound(generation_power) / min_power_per_unit), ceil(generation_power / max_power_per_unit / (1-spinning/100)))
         - id: non_prop_cost
-          expression: startup_cost * max(0,ceil(generation_power / max_power_per_unit)-(ceil(generation_power / max_power_per_unit))[t-1])+ fixed_cost * ceil(generation_power / max_power_per_unit)
+          expression: startup_cost * max(0,max(floor(lower_bound(generation_power) / min_power_per_unit), ceil(generation_power / max_power_per_unit / (1-spinning/100)))-(max(floor(lower_bound(generation_power) / min_power_per_unit), ceil(generation_power / max_power_per_unit / (1-spinning/100))))[t-1])+ fixed_cost * max(floor(lower_bound(generation_power) / min_power_per_unit), ceil(generation_power / max_power_per_unit / (1-spinning/100)))

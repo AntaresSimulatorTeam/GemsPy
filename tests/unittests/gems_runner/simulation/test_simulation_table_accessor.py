@@ -77,6 +77,16 @@ class FakeProblem:
             return None
         return self.linopy_model.solution.get(lv.name)
 
+    def get_variable_lower_bound(
+        self, model_id: object, var_name: str
+    ) -> Optional[xr.DataArray]:
+        return None
+
+    def get_variable_upper_bound(
+        self, model_id: object, var_name: str
+    ) -> Optional[xr.DataArray]:
+        return None
+
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -225,6 +225,87 @@ def test_extra_output_min_on_variable() -> None:
     assert capped == pytest.approx(3.0)
 
 
+def test_extra_output_lower_bound_and_upper_bound() -> None:
+    """
+    lower_bound(x)/upper_bound(x) return the variable's current bounds post-solve.
+    """
+    from gems_craft.expression.expression import LowerBoundNode, UpperBoundNode, literal
+    from gems_craft.model.model import model
+    from gems_craft.model.variable import float_variable
+    from gems_craft.study import DataBase, Study, System, create_component
+    from gems_runner.simulation import TimeBlock, build_problem
+
+    SIMPLE_MODEL = model(
+        id="SIMPLE_BOUNDS",
+        variables=[float_variable("x", lower_bound=literal(2), upper_bound=literal(7))],
+        extra_outputs={
+            "lb": LowerBoundNode("x"),
+            "ub": UpperBoundNode("x"),
+        },
+    )
+
+    database = DataBase()
+    comp = create_component(model=SIMPLE_MODEL, id="comp_1")
+
+    system = System("test_bounds_extra")
+    system.add_component(comp)
+
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), scenario_ids=list(range(1))
+    )
+    problem.solve(solver_name="highs")
+
+    df = SimulationTableBuilder().build(problem)
+    lb = df.component("comp_1").output("lb").value(time_index=0, scenario_index=0)
+    ub = df.component("comp_1").output("ub").value(time_index=0, scenario_index=0)
+    assert lb == pytest.approx(2.0)
+    assert ub == pytest.approx(7.0)
+
+
+def test_extra_output_bound_broadcasts_over_time() -> None:
+    """
+    upper_bound(x), when x's bound is a constant parameter, is broadcast over
+    every timestep of a time-varying variable in the resulting SimulationTable
+    (not just t=0).
+    """
+    from gems_craft.expression import param
+    from gems_craft.expression.expression import UpperBoundNode, literal
+    from gems_craft.expression.indexing_structure import IndexingStructure
+    from gems_craft.model.model import model
+    from gems_craft.model.parameter import float_parameter
+    from gems_craft.model.variable import float_variable
+    from gems_craft.study import ConstantData, DataBase, Study, System, create_component
+    from gems_runner.simulation import TimeBlock, build_problem
+
+    SIMPLE_MODEL = model(
+        id="SIMPLE_BOUND_BROADCAST",
+        parameters=[float_parameter("cap", structure=IndexingStructure(False, False))],
+        variables=[
+            float_variable("x", lower_bound=literal(0), upper_bound=param("cap"))
+        ],
+        extra_outputs={"x_ub": UpperBoundNode("x")},
+    )
+
+    database = DataBase()
+    comp = create_component(model=SIMPLE_MODEL, id="comp_1")
+    database.add_data("comp_1", "cap", ConstantData(7.0))
+
+    system = System("test_bound_broadcast")
+    system.add_component(comp)
+
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0, 1, 2]), scenario_ids=list(range(1))
+    )
+    problem.solve(solver_name="highs")
+
+    df = SimulationTableBuilder().build(problem)
+    for t in range(3):
+        x_ub = (
+            df.component("comp_1").output("x_ub").value(time_index=t, scenario_index=0)
+        )
+        assert x_ub == pytest.approx(7.0), f"x_ub at t={t}: expected 7.0, got {x_ub}"
+
+
 def test_extra_output_comparison() -> None:
     """
     Comparison operators (>=, <=) are allowed in extra outputs and evaluated
