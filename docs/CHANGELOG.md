@@ -4,6 +4,8 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-24
+
 ### Added
 - **Integer strategy and thermal heuristics** - components can now set
   `integer-strategy` (`exact` (default), `relaxed`, or `heuristic` +
