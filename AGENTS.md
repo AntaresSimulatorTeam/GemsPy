@@ -91,6 +91,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `OptimConfig` (`parsing.py`): top-level config loaded from `optim-config.yml`
 - `ResolutionMode` (`parsing.py`): `FRONTAL` (default), `SEQUENTIAL_SUBPROBLEMS`, `PARALLEL_SUBPROBLEMS`, or `BENDERS_DECOMPOSITION`
 - `ModelDecompositionConfig` (`parsing.py`): per-model assignment of variables/constraints/objective contributions to master or subproblems
+- `HeuristicConfig` (`parsing.py`): per-model binding of a built-in heuristic (`fast`/`accurate`) to the model's own parameters/variables
 
 **`gems_craft/libs/`** — Resolves the path to bundled YAML model libraries shipped with the package.
 
@@ -105,6 +106,8 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `VectorizedBuilderBase` (`vectorized_builder.py`): shared base for all vectorized visitors (used by both `linearize.py` and `extra_output.py`)
 - `TimeBlock` (`time_block.py`): defines the temporal window for one solve
 - `SimulationTableBuilder` / `SimulationTableWriter` (`simulation_table.py`): result extraction as a flat pandas `DataFrame`
+- `apply_thermal_heuristics` (`heuristic_runner.py`): injects heuristic-derived bounds into a solved problem
+- `find_min_generation_fast` / `find_num_units_accurate` (`thermal_heuristic.py`): the `fast`/`accurate` heuristic functions
 
 **`gems_runner/session/`** — `SimulationSession`, the stateful entry point wrapping a loaded study for interactive solving.
 

@@ -71,6 +71,39 @@ components.append(
 )
 ~~~
 
+A component may also set `integer_strategy` to relax or heuristically process
+its model's integer/binary variables — see
+[Optimisation configuration](optim-config.md#heuristics-integer-strategy-and-thermal-heuristics):
+
+~~~ python
+from gems_craft.study.parsing import (
+    ComponentSchema,
+    ComponentParameterSchema,
+    IntegerStrategy,
+    IntegerStrategyId,
+    HeuristicId,
+)
+
+components.append(
+    ComponentSchema(
+        id="gen_thermal",
+        model="simple_library.thermal",
+        integer_strategy=IntegerStrategy(
+            id=IntegerStrategyId.HEURISTIC,
+            heuristic_id=HeuristicId.FAST,
+        ),
+        parameters=[
+            ComponentParameterSchema(
+                id="p_max",
+                time_dependent=False,
+                scenario_dependent=False,
+                value=500  # MW
+            ),
+        ],
+    )
+)
+~~~
+
 ## Defining a PortConnectionsSchema
 
 The syntax to build connections between components with the GemsPy API is the following:

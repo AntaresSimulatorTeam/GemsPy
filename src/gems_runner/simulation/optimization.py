@@ -324,7 +324,7 @@ class _MergedGroupVariable(linopy.Variable):
 
     __slots__ = ()
 
-    @linopy.Variable.lower.setter  # type: ignore[misc]
+    @linopy.Variable.lower.setter  # type: ignore[attr-defined]
     def lower(self, value: object) -> None:
         raise AttributeError(
             "Cannot set 'lower' on a merged relaxed/exact variable: it is a "
@@ -332,7 +332,7 @@ class _MergedGroupVariable(linopy.Variable):
             "OptimizationProblem.get_component_variable(...) instead."
         )
 
-    @linopy.Variable.upper.setter  # type: ignore[misc]
+    @linopy.Variable.upper.setter  # type: ignore[attr-defined]
     def upper(self, value: object) -> None:
         raise AttributeError(
             "Cannot set 'upper' on a merged relaxed/exact variable: it is a "
