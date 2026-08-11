@@ -2,11 +2,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from gems_craft.optim_config.parsing import (
-    OptimConfig,
-    load_optim_config,
-    validate_optim_config,
-)
+from gems_craft.optim_config.parsing import OptimConfig, load_optim_config
+from gems_craft.optim_config.validation import validate_optim_config
 from gems_craft.study.folder import load_study
 from gems_runner.session.session import SimulationSession
 

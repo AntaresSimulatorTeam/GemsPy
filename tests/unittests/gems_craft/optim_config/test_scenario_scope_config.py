@@ -386,7 +386,8 @@ def test_scenario_ids_cached_playlist_file_via_load_optim_config(
 def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
     import numpy as np
 
-    from gems_craft.optim_config.parsing import OptimConfig, validate_optim_config
+    from gems_craft.optim_config.parsing import OptimConfig
+    from gems_craft.optim_config.validation import validate_optim_config
     from gems_craft.study.scenario_builder import ScenarioBuilder
     from gems_craft.study.system import System
 
@@ -404,7 +405,8 @@ def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
 def test_validate_optim_config_scenario_builder_accepts_valid_playlist() -> None:
     import numpy as np
 
-    from gems_craft.optim_config.parsing import OptimConfig, validate_optim_config
+    from gems_craft.optim_config.parsing import OptimConfig
+    from gems_craft.optim_config.validation import validate_optim_config
     from gems_craft.study.scenario_builder import ScenarioBuilder
     from gems_craft.study.system import System
 
