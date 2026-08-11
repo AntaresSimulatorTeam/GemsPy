@@ -3,89 +3,26 @@
 
 """Tests for SimulationTable.to_dataset(), write_parquet(), and write_netcdf()."""
 
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
+from simulation_table_fakes import (
+    FakeLinopyModel,
+    FakeLinopyVar,
+    FakeModel,
+    FakeProblem,
+    FakeStudy,
+    to_object_dtype,
+)
 
 from gems_runner.simulation.simulation_table import (
     SimulationColumns,
     SimulationTable,
     SimulationTableBuilder,
 )
-
-# ---------------------------------------------------------------------------
-# Minimal stubs (shared with other simulation table tests)
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class FakeBlock:
-    id: int = 1
-    timesteps: tuple = (0, 1)
-
-
-@dataclass
-class FakeLinopyVar:
-    name: str
-    coords: dict
-
-
-@dataclass
-class FakeModel:
-    extra_outputs: dict = field(default_factory=dict)
-
-
-@dataclass
-class FakeStudy:
-    model_components: dict = field(default_factory=dict)
-    models: dict = field(default_factory=dict)
-
-
-@dataclass
-class FakeLinopyModel:
-    solution: dict
-
-    @property
-    def dual(self) -> xr.Dataset:
-        return xr.Dataset()
-
-    solver_model = None
-
-
-@dataclass
-class FakeProblem:
-    block: FakeBlock = field(default_factory=FakeBlock)
-    block_length: int = 2
-    objective_value: float = 99.0
-    linopy_model: Optional[FakeLinopyModel] = None
-    _linopy_vars: dict = field(default_factory=dict)
-    models: dict = field(default_factory=dict)
-    model_components: dict = field(default_factory=dict)
-    study: FakeStudy = field(default_factory=FakeStudy)
-    scenarios: int = 1
-
-    def get_variable_solution(
-        self, model_id: object, var_name: str
-    ) -> Optional[xr.DataArray]:
-        lv = self._linopy_vars.get((model_id, var_name))
-        if lv is None or self.linopy_model is None:
-            return None
-        return self.linopy_model.solution.get(lv.name)
-
-    def get_variable_lower_bound(
-        self, model_id: object, var_name: str
-    ) -> Optional[xr.DataArray]:
-        return None
-
-    def get_variable_upper_bound(
-        self, model_id: object, var_name: str
-    ) -> Optional[xr.DataArray]:
-        return None
 
 
 def _make_problem(n_scenarios: int = 1) -> FakeProblem:
@@ -105,6 +42,7 @@ def _make_problem(n_scenarios: int = 1) -> FakeProblem:
         coords={"component": xr.DataArray(["comp1"])},
     )
     return FakeProblem(
+        objective_value=99.0,
         linopy_model=FakeLinopyModel(solution={"mod__p": sol_da}),
         _linopy_vars={(0, "p"): fake_var},
         models={0: FakeModel()},
@@ -189,13 +127,6 @@ def test_write_parquet_creates_file(tmp_path: Path) -> None:
     assert path.suffix == ".parquet"
 
 
-def _to_object_dtype(frame: pd.DataFrame) -> pd.DataFrame:
-    """Cast every column to numpy object dtype, normalising all nulls to None."""
-    return pd.DataFrame(
-        {col: frame[col].to_numpy(dtype=object, na_value=None) for col in frame.columns}
-    )
-
-
 def test_write_parquet_content_matches_original(tmp_path: Path) -> None:
     pytest.importorskip("pyarrow")
     st = SimulationTableBuilder().build(_make_problem(), table_id="test")  # type: ignore[arg-type]
@@ -203,8 +134,8 @@ def test_write_parquet_content_matches_original(tmp_path: Path) -> None:
 
     loaded = pd.read_parquet(path)
     pd.testing.assert_frame_equal(
-        _to_object_dtype(loaded.reset_index(drop=True)),
-        _to_object_dtype(st.data.reset_index(drop=True)),
+        to_object_dtype(loaded.reset_index(drop=True)),
+        to_object_dtype(st.data.reset_index(drop=True)),
         check_dtype=False,
     )
 

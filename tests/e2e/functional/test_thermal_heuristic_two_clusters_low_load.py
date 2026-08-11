@@ -106,7 +106,6 @@ def test_accurate_heuristic() -> None:
         2641690
     )
 
-
 def test_fast_heuristic() -> None:
     """
     Solve the same problem with the fast heuristic.
