@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Optional
 
 from gems_craft.optim_config.parsing import OptimConfig, load_optim_config
-from gems_craft.optim_config.validation import validate_optim_config
 from gems_craft.study.folder import load_study
 from gems_runner.session.session import SimulationSession
 
@@ -30,7 +29,6 @@ def run_study(
         study_dir / "input" / "optim-config.yml"
     )
     optim_config = load_optim_config(resolved_config_path) or OptimConfig()
-    validate_optim_config(optim_config, study.system, study.scenario_builder)
 
     run_id = datetime.now().strftime("%Y%m%dT%H%M")
     output_dir = study_dir / "output" / run_id

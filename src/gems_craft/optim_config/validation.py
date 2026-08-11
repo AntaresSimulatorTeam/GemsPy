@@ -10,7 +10,7 @@
 #
 # This file is part of the Antares project.
 
-from typing import TYPE_CHECKING, List, Optional, Set
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
 from gems_craft.expression.expression import (
     AdditionNode,
@@ -21,12 +21,18 @@ from gems_craft.expression.expression import (
     UnaryOperatorNode,
     VariableNode,
 )
+from gems_craft.model.parameter import Parameter
+from gems_craft.model.variable import Variable
 from gems_craft.optim_config.parsing import (
     ElementLocation,
+    HeuristicConfig,
     ModelDecompositionConfig,
+    ModelElementAccessType,
     OptimConfig,
     OutOfBoundsProcessingConfig,
+    ResolutionMode,
 )
+from gems_craft.study.system import Component
 
 if TYPE_CHECKING:
     from gems_craft.model.model import Model
@@ -37,6 +43,22 @@ _MASTER_LOCS: Set[ElementLocation] = {
     ElementLocation.MASTER,
     ElementLocation.MASTER_AND_SUBPROBLEMS,
 }
+
+_HEURISTIC_ELEMENT_TIME_DEPENDENCE: Dict[str, Optional[bool]] = {
+    # True: must vary per timestep. False: must be a single constant value for the whole
+    # block. None: either is accepted, the heuristic function broadcasts a constant.
+    "min_up_duration": False,
+    "min_down_duration": False,
+    "min_power_per_unit": False,
+    "max_power_per_unit": False,
+    "num_units_on_opt": True,
+    "generation_power": True,
+    "minimum_num_units_on": True,
+    "minimum_generation_power": True,
+    "num_units_max": None,
+    "cluster_max_generation": None,
+}
+from gems_craft.study.parsing import IntegerStrategyId
 
 
 def _collect_variable_names(expr: ExpressionNode) -> Set[str]:
@@ -171,6 +193,127 @@ def _check_master_objectives_use_master_variables(
                     )
 
 
+def get_heuristic_config_map(
+    config: "OptimConfig",
+) -> Dict[Tuple[str, str], HeuristicConfig]:
+    """Map every declared heuristic to its config, keyed by (model_id, heuristic_id)."""
+    return {
+        (model_cfg.id, heuristic_cfg.id.value): heuristic_cfg
+        for model_cfg in config.models
+        for heuristic_cfg in (model_cfg.heuristics or [])
+    }
+
+
+def _check_heuristic_ids_declared(
+    config: "OptimConfig",
+    system: "System",
+    errors: List[str],
+) -> None:
+    """Check that every HEURISTIC component references a declared heuristic in optim-config."""
+    declared = get_heuristic_config_map(config)
+
+    for comp in system.all_components:
+        if comp.integer_strategy.id != IntegerStrategyId.HEURISTIC:
+            continue
+        assert comp.integer_strategy.heuristic_id is not None
+        key = (comp.model.id, comp.integer_strategy.heuristic_id.value)
+        if key not in declared:
+            errors.append(
+                f"Component '{comp.id}' references heuristic "
+                f"'{comp.integer_strategy.heuristic_id.value}' on model '{comp.model.id}', "
+                f"but this heuristic is not declared in optim-config."
+            )
+
+
+def _check_heuristic_elements(
+    heuristic_config: HeuristicConfig,
+    model: "Model",
+    errors: List[str],
+) -> None:
+    """Every heuristic input/output id must exist in the model — as a parameter or a
+    variable depending on its declared access type — and have the time-dependence the
+    heuristic function expects."""
+    for element_config in [*heuristic_config.inputs, *heuristic_config.outputs]:
+        declared: Optional[Union["Parameter", "Variable"]]
+        if element_config.type == ModelElementAccessType.PARAMETER:
+            declared = model.parameters.get(element_config.id)
+        else:
+            declared = model.variables.get(element_config.id)
+
+        if declared is None:
+            errors.append(
+                f"Heuristic '{heuristic_config.id.value}' in model '{model.id}': "
+                f"'{element_config.id}' bound to heuristic element "
+                f"'{element_config.heuristic_element}' not found in model."
+            )
+            continue
+
+        expected = _HEURISTIC_ELEMENT_TIME_DEPENDENCE[element_config.heuristic_element]
+        if expected is not None and declared.structure.time != expected:
+            errors.append(
+                f"Heuristic '{heuristic_config.id.value}' in model '{model.id}': "
+                f"'{element_config.id}' bound to heuristic element "
+                f"'{element_config.heuristic_element}' must be "
+                f"'time-dependent:{expected}'."
+            )
+
+
+def _check_no_heuristic_with_benders(
+    system: "System",
+    errors: List[str],
+) -> None:
+    """Check that no component uses integer-strategy 'heuristic' with Benders decomposition."""
+    errors.extend(
+        f"Component '{comp.id}' uses integer-strategy 'heuristic', "
+        f"which is incompatible with Benders decomposition."
+        for comp in system.all_components
+        if comp.integer_strategy.id == IntegerStrategyId.HEURISTIC
+    )
+
+
+def _check_no_integer_variables_in_subproblems(
+    config: "OptimConfig",
+    system: "System",
+    errors: List[str],
+) -> None:
+    """Check that no integer or binary variable is assigned to Benders subproblems."""
+    from gems_craft.model.common import ValueType
+
+    subproblem_locs = {
+        ElementLocation.SUBPROBLEMS,
+        ElementLocation.MASTER_AND_SUBPROBLEMS,
+    }
+
+    model_components: Dict[str, List[Component]] = {}
+    for c in system.all_components:
+        model_components.setdefault(c.model.id, []).append(c)
+
+    explicit_locs_by_model: Dict[str, Dict[str, ElementLocation]] = {}
+    for model_config in config.models:
+        if model_config.model_decomposition is not None:
+            explicit_locs_by_model[model_config.id] = {
+                variable_config.id: variable_config.location
+                for variable_config in model_config.model_decomposition.variables
+            }
+
+    for model_id, comps in model_components.items():
+        if any(c.integer_strategy.id == IntegerStrategyId.EXACT for c in comps):
+            model = comps[0].model
+            explicit_locs = explicit_locs_by_model.get(model_id, {})
+
+            for var_name, var in model.variables.items():
+                if var.data_type in (ValueType.INTEGER, ValueType.BINARY):
+                    if (
+                        explicit_locs.get(var_name, ElementLocation.SUBPROBLEMS)
+                        in subproblem_locs
+                    ):
+                        errors.append(
+                            f"Integer variable '{var_name}' of model '{model_id}' "
+                            f"is assigned to subproblems, which is forbidden in Benders "
+                            f"decomposition. Consider using a continuous variable or changing the resolution mode."
+                        )
+
+
 def validate_optim_config(
     config: OptimConfig,
     system: "System",
@@ -184,6 +327,8 @@ def validate_optim_config(
     - Master variables are time-independent.
     - Master constraints and objective contributions only reference variables
       assigned to ``master`` or ``master-and-subproblems``.
+    - Heuristic inputs/outputs reference existing model parameters/variables with the
+      time-dependence the heuristic function expects.
     - If ``scenario_builder`` is provided, every scenario index in
       ``config.scenario_scope.scenario_ids`` is defined for every scenario
       group in the builder.
@@ -222,6 +367,14 @@ def validate_optim_config(
                     model_config.id,
                     errors,
                 )
+            for heuristic_config in model_config.heuristics:
+                _check_heuristic_elements(heuristic_config, model, errors)
+
+    _check_heuristic_ids_declared(config, system, errors)
+
+    if config.resolution.mode == ResolutionMode.BENDERS_DECOMPOSITION:
+        _check_no_heuristic_with_benders(system, errors)
+        _check_no_integer_variables_in_subproblems(config, system, errors)
 
     if errors:
         raise ValueError(

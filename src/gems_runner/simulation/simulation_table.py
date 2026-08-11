@@ -232,11 +232,11 @@ class SimulationTableBuilder:
         if solution is None:
             return dfs
 
-        for (_, var_name), lv in problem._linopy_vars.items():
-            if lv.name not in solution:
+        for (mk, var_name), lv in problem._linopy_vars.items():
+            sol_da = problem.get_variable_solution(mk, var_name)
+            if sol_da is None:
                 continue
 
-            sol_da: xr.DataArray = solution[lv.name]
             own_components = list(lv.coords["component"].values)
             sol_da = sol_da.sel(component=own_components)
 
@@ -267,15 +267,15 @@ class SimulationTableBuilder:
         dfs: list[pd.DataFrame] = []
 
         var_solution_arrays: Dict[Tuple[str, str], xr.DataArray] = {}
-        solution = problem.linopy_model.solution
-        if solution is not None:
+        if problem.linopy_model.solution is not None:
             for (mk, vname), lv in problem._linopy_vars.items():
-                if lv.name in solution:
-                    sol_da = solution[lv.name]
-                    if "component" in sol_da.dims:
-                        own_components = list(lv.coords["component"].values)
-                        sol_da = sol_da.sel(component=own_components)
-                    var_solution_arrays[(mk, vname)] = sol_da
+                sol_da = problem.get_variable_solution(mk, vname)
+                if sol_da is None:
+                    continue
+                if "component" in sol_da.dims:
+                    own_components = list(lv.coords["component"].values)
+                    sol_da = sol_da.sel(component=own_components)
+                var_solution_arrays[(mk, vname)] = sol_da
 
         constraint_dual_arrays = self._collect_constraint_duals(problem)
         var_reduced_cost_arrays = self._collect_reduced_costs(problem)

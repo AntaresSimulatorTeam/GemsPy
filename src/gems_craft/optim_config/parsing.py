@@ -26,6 +26,7 @@ from pydantic import (
 )
 from yaml import safe_load
 
+from gems_craft.study.parsing import HeuristicId
 from gems_craft.utils import ModifiedBaseModel
 
 
@@ -60,10 +61,85 @@ class OutOfBoundsProcessingConfig(ModifiedBaseModel):
     constraints: List[OutOfBoundsConstraintConfig] = Field(default_factory=list)
 
 
+class ModelElementAccessType(str, Enum):
+    PARAMETER = "parameter"
+    VARIABLE_SOLUTION = "variable-solution"
+    VARIABLE_LOWER_BOUND = "variable-lower-bound"
+    VARIABLE_UPPER_BOUND = "variable-upper-bound"
+
+
+class HeuristicElementConfig(ModifiedBaseModel):
+    heuristic_element: str
+    id: str
+    type: ModelElementAccessType = ModelElementAccessType.PARAMETER
+
+
+_HEURISTIC_SCHEMA: Dict[HeuristicId, Dict[str, Set[str]]] = {
+    HeuristicId.ACCURATE: {
+        "inputs": {
+            "num_units_on_opt",
+            "num_units_max",
+            "min_up_duration",
+            "min_down_duration",
+        },
+        "outputs": {"minimum_num_units_on"},
+    },
+    HeuristicId.FAST: {
+        "inputs": {
+            "generation_power",
+            "cluster_max_generation",
+            "min_power_per_unit",
+            "max_power_per_unit",
+            "min_up_duration",
+            "min_down_duration",
+        },
+        "outputs": {"minimum_generation_power"},
+    },
+}
+
+
+class HeuristicConfig(ModifiedBaseModel):
+    id: HeuristicId
+    inputs: List[HeuristicElementConfig] = Field(default_factory=list)
+    outputs: List[HeuristicElementConfig] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_inputs_outputs(self) -> "HeuristicConfig":
+        schema = _HEURISTIC_SCHEMA[self.id]
+        declared_inputs = {inp.heuristic_element for inp in self.inputs}
+        declared_outputs = {out.heuristic_element for out in self.outputs}
+        if declared_inputs != schema["inputs"]:
+            raise ValueError(
+                f"Heuristic '{self.id.value}': expected inputs {sorted(schema['inputs'])}, "
+                f"got {sorted(declared_inputs)}"
+            )
+        if declared_outputs != schema["outputs"]:
+            raise ValueError(
+                f"Heuristic '{self.id.value}': expected outputs {sorted(schema['outputs'])}, "
+                f"got {sorted(declared_outputs)}"
+            )
+        invalid_output_types = {
+            out.heuristic_element
+            for out in self.outputs
+            if out.type
+            not in (
+                ModelElementAccessType.VARIABLE_LOWER_BOUND,
+                ModelElementAccessType.VARIABLE_UPPER_BOUND,
+            )
+        }
+        if invalid_output_types:
+            raise ValueError(
+                f"Heuristic '{self.id.value}': outputs {sorted(invalid_output_types)} have "
+                f"invalid type — only 'variable-lower-bound' and 'variable-upper-bound' are allowed."
+            )
+        return self
+
+
 class ModelOptimConfig(ModifiedBaseModel):
     id: str
     model_decomposition: Optional[ModelDecompositionConfig] = None
     out_of_bounds_processing: Optional[OutOfBoundsProcessingConfig] = None
+    heuristics: List[HeuristicConfig] = Field(default_factory=list)
 
 
 class ResolutionMode(str, Enum):

@@ -50,6 +50,25 @@ models:
       constraints:
         - id: soc_balance
           mode: cyclic   # wrap time index at horizon boundaries
+
+  - id: thermal
+    heuristics:                          # see section below
+      - id: accurate
+        inputs:
+          - heuristic-element: num_units_on_opt
+            id: num_units_on
+            type: variable-solution
+          - heuristic-element: num_units_max
+            id: num_units_on
+            type: variable-upper-bound
+          - heuristic-element: min_up_duration
+            id: min_up_duration
+          - heuristic-element: min_down_duration
+            id: min_down_duration
+        outputs:
+          - heuristic-element: minimum_num_units_on
+            id: num_units_on
+            type: variable-lower-bound
 ~~~
 
 ---
@@ -322,6 +341,91 @@ models:
     contributions may only reference variables whose location is `master` or
     `master-and-subproblems`.  GemsPy validates these rules at config-load time
     and raises an error for any violation.
+
+### `heuristics` — integer strategy and thermal heuristics
+
+A component's `integer-strategy` controls how its model's integer/binary
+variables are built:
+
+| `id` | Effect |
+|---|---|
+| `exact` (default) | Keep integer/binary types (MILP) |
+| `relaxed` | Relax to continuous |
+| `heuristic` | Relax to continuous, then refine with `heuristic-id` after a first solve |
+
+~~~ yaml
+components:
+  - id: G1
+    model: my_lib.thermal
+    integer-strategy:
+      id: heuristic
+      heuristic-id: fast   # must match a heuristics entry declared below
+                            # for model "my_lib.thermal"
+~~~
+
+Each heuristic's inputs/outputs are bound to the model's own parameters and
+variables via `models[].heuristics`:
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `id` | str | — | Heuristic to run: `fast` or `accurate` |
+| `inputs` | list | `[]` | Model elements fed into the heuristic |
+| `outputs` | list | `[]` | Model elements the heuristic result is written to |
+
+Each `inputs`/`outputs` entry binds a fixed `heuristic-element` name (see
+table below) to one of the model's own parameter/variable ids:
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `heuristic-element` | str | — | Fixed name the heuristic function expects |
+| `id` | str | — | The model's own parameter or variable id |
+| `type` | str | `parameter` | How the element is read/written |
+
+| `type` | Meaning |
+|---|---|
+| `parameter` (default) | Read the model's parameter value (inputs only) |
+| `variable-solution` | Read the variable's solved value from the first solve (inputs only) |
+| `variable-lower-bound` | Read/write the variable's lower bound |
+| `variable-upper-bound` | Read/write the variable's upper bound |
+
+`outputs` entries must use `variable-lower-bound` or `variable-upper-bound`.
+
+~~~ yaml
+models:
+  - id: my_lib.thermal
+    heuristics:
+      - id: accurate
+        inputs:
+          - heuristic-element: num_units_on_opt
+            id: num_units_on
+            type: variable-solution
+          - heuristic-element: num_units_max
+            id: num_units_on
+            type: variable-upper-bound
+          - heuristic-element: min_up_duration
+            id: min_up_duration
+          - heuristic-element: min_down_duration
+            id: min_down_duration
+        outputs:
+          - heuristic-element: minimum_num_units_on
+            id: num_units_on
+            type: variable-lower-bound
+~~~
+
+Two heuristics are built in, each expecting a fixed set of
+`heuristic-element` names:
+
+| Heuristic | `inputs` elements | `outputs` elements |
+|---|---|---|
+| `fast` | `generation_power`, `cluster_max_generation`, `min_power_per_unit`, `max_power_per_unit`, `min_up_duration`, `min_down_duration` | `minimum_generation_power` |
+| `accurate` | `num_units_on_opt`, `num_units_max`, `min_up_duration`, `min_down_duration` | `minimum_num_units_on` |
+
+!!! note
+    The `heuristic` strategy triggers an automatic second solve in
+    `SimulationSession` and is incompatible with `resolution.mode:
+    benders-decomposition`. `validate_optim_config()` checks both the
+    `heuristic-id` ↔ `heuristics` consistency and that every bound `id` exists
+    on the model with the expected time-dependence.
 
 ---
 

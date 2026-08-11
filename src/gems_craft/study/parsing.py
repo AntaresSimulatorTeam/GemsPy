@@ -12,10 +12,11 @@
 
 import argparse
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
 
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, model_validator
 from yaml import safe_dump, safe_load
 
 from gems_craft.utils import ModifiedBaseModel
@@ -41,12 +42,42 @@ class ComponentPropertySchema(ModifiedBaseModel):
     value: str
 
 
+class IntegerStrategyId(str, Enum):
+    EXACT = "exact"
+    RELAXED = "relaxed"
+    HEURISTIC = "heuristic"
+
+
+class HeuristicId(str, Enum):
+    FAST = "fast"
+    ACCURATE = "accurate"
+
+
+class IntegerStrategy(ModifiedBaseModel):
+    id: IntegerStrategyId = IntegerStrategyId.EXACT
+    heuristic_id: Optional[HeuristicId] = None
+
+    @model_validator(mode="after")
+    def _heuristic_id_consistency(self) -> "IntegerStrategy":
+        if self.id == IntegerStrategyId.HEURISTIC and self.heuristic_id is None:
+            raise ValueError(
+                "'heuristic-id' is required when integer-strategy is 'heuristic'"
+            )
+        if self.id != IntegerStrategyId.HEURISTIC and self.heuristic_id is not None:
+            raise ValueError(
+                f"'heuristic-id' is only allowed when integer-strategy is 'heuristic', "
+                f"got integer-strategy '{self.id.value}'"
+            )
+        return self
+
+
 class ComponentSchema(ModifiedBaseModel):
     id: str
     model: str
     scenario_group: Optional[str] = None
     parameters: Optional[List[ComponentParameterSchema]] = None
     properties: Optional[List[ComponentPropertySchema]] = None
+    integer_strategy: IntegerStrategy = Field(default_factory=IntegerStrategy)
 
 
 class SystemSchema(ModifiedBaseModel):
