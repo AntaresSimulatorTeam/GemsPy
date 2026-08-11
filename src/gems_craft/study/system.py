@@ -23,6 +23,7 @@ from gems_craft.expression.uses_sum_connections_on import uses_sum_connections_o
 from gems_craft.model import PortField, PortType
 from gems_craft.model.model import Model
 from gems_craft.model.port import PortFieldId
+from gems_craft.study.parsing import IntegerStrategy
 from gems_craft.utils import require_not_none
 
 
@@ -36,6 +37,7 @@ class Component:
     id: str
     scenario_group: Optional[str] = None
     properties: Dict[str, str] = field(default_factory=dict)
+    integer_strategy: IntegerStrategy = field(default_factory=IntegerStrategy)
 
     def is_variable_in_model(self, var_id: str) -> bool:
         return var_id in self.model.variables.keys()

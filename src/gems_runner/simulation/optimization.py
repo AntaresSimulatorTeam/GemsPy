@@ -32,7 +32,7 @@ optimization problem in four phases:
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, cast
 
 import linopy
 import numpy as np
@@ -44,6 +44,8 @@ from gems_craft.expression.visitor import visit
 from gems_craft.model.common import ValueType
 from gems_craft.model.model import Model
 from gems_craft.model.port import PortField, PortFieldId
+from gems_craft.model.variable import Variable
+from gems_craft.study.parsing import IntegerStrategyId
 from gems_craft.study.study import Study
 from gems_craft.study.system import Component
 from gems_runner.simulation.linearize import (
@@ -311,6 +313,34 @@ def _build_slave_port_array(
     return total if total is not None else xr.DataArray(0.0)
 
 
+class _MergedGroupVariable(linopy.Variable):
+    """Merged view of a variable split across relaxed/exact strategy groups.
+
+    Detached copy (``xr.concat`` of the real per-group Variables) — safe to
+    read and use in expressions, but writing bounds here wouldn't reach the
+    solver. ``.lower``/``.upper`` setters raise instead of silently no-oping;
+    use :meth:`OptimizationProblem.get_component_variable` to mutate bounds.
+    """
+
+    __slots__ = ()
+
+    @linopy.Variable.lower.setter  # type: ignore[attr-defined]
+    def lower(self, value: object) -> None:
+        raise AttributeError(
+            "Cannot set 'lower' on a merged relaxed/exact variable: it is a "
+            "detached copy and the write would not reach the solver. Use "
+            "OptimizationProblem.get_component_variable(...) instead."
+        )
+
+    @linopy.Variable.upper.setter  # type: ignore[attr-defined]
+    def upper(self, value: object) -> None:
+        raise AttributeError(
+            "Cannot set 'upper' on a merged relaxed/exact variable: it is a "
+            "detached copy and the write would not reach the solver. Use "
+            "OptimizationProblem.get_component_variable(...) instead."
+        )
+
+
 class OptimizationProblem:
     """
     Wraps a linopy.Model and provides the high-level API for solving and
@@ -326,12 +356,16 @@ class OptimizationProblem:
         linopy_vars: Dict[Tuple[str, str], linopy.Variable],
         param_arrays: Dict[Tuple[str, str], xr.DataArray],
         objective_constant: float = 0.0,
+        linopy_vars_by_component: Optional[
+            Dict[Tuple[str, str, str], linopy.Variable]
+        ] = None,
     ) -> None:
         self.name = name
         self.linopy_model = linopy_model
         self.study = study
         self.block = block
         self._linopy_vars = linopy_vars
+        self._linopy_vars_by_component = linopy_vars_by_component or {}
         self.param_arrays = param_arrays
         # Constant term of the objective (linopy cannot represent pure-constant objectives).
         self._objective_constant: float = objective_constant
@@ -372,6 +406,20 @@ class OptimizationProblem:
         """Write the problem to an LP file at *path*."""
         self.linopy_model.to_file(path, explicit_coordinate_names=True)
 
+    def get_component_variable(
+        self, model_id: str, var_name: str, component_id: str
+    ) -> Optional[linopy.Variable]:
+        """Return the actually-registered linopy Variable that *component_id* was
+        created on for (model_id, var_name).
+
+        Unlike ``get_variable_labels``/the internal ``_linopy_vars`` dict — which,
+        for a model split across relaxed/exact strategy groups, holds a merged
+        Variable rebuilt via ``xr.concat`` and detached from the real registered
+        objects — this is safe to mutate bounds on (e.g. for heuristics), since
+        the mutation reaches what the solver actually reads.
+        """
+        return self._linopy_vars_by_component.get((model_id, var_name, component_id))
+
     def get_variable_labels(
         self, model_id: str, var_name: str
     ) -> Optional[xr.DataArray]:
@@ -384,6 +432,34 @@ class OptimizationProblem:
         """
         lv = self._linopy_vars.get((model_id, var_name))
         return lv.labels if lv is not None else None
+
+    def get_variable_solution(
+        self, model_id: str, var_name: str
+    ) -> Optional[xr.DataArray]:
+        """Return solved values for *var_name* across all its components.
+
+        Unlike ``linopy_model.solution[<name>]``, this is correct even when the
+        variable was split across relaxed/exact strategy groups: the merged
+        ``_linopy_vars`` copy keeps the ``.name`` of only one of the two really
+        -registered group Variables, so indexing the solver's solution Dataset
+        by that name silently drops the other group's components. This instead
+        reads ``.solution`` directly off the real per-component Variables
+        (``_linopy_vars_by_component``) and reassembles them.
+        """
+        by_name: Dict[str, linopy.Variable] = {}
+        for (m, vn, _c), variable in self._linopy_vars_by_component.items():
+            if (m, vn) == (model_id, var_name):
+                by_name[variable.name] = (
+                    variable  # dedupe: components in one group share a Variable
+                )
+        group_vars = list(by_name.values())
+        if not group_vars:
+            return None
+        if len(group_vars) == 1:
+            return group_vars[0].solution
+        return cast(
+            xr.DataArray, xr.concat([v.solution for v in group_vars], dim="component")
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +501,13 @@ class _OptimizationProblemBuilder:
         # Populated during build
         self.linopy_model = linopy.Model()
         self.linopy_vars: Dict[Tuple[str, str], linopy.Variable] = {}
+        # Unlike linopy_vars (which, for a model whose components are split
+        # across relaxed/exact groups, holds a *merged* Variable rebuilt via
+        # xr.concat — a copy, detached from the actually-registered per-group
+        # Variable objects), this maps each individual component to the real
+        # Variable it was created on, so bound mutations (heuristics) reach
+        # the model.
+        self.linopy_vars_by_component: Dict[Tuple[str, str, str], linopy.Variable] = {}
         self.param_arrays: Dict[Tuple[str, str], xr.DataArray] = {}
         self.port_arrays: Dict[str, Dict[PortFieldId, VectorizedExpr]] = {}
 
@@ -488,6 +571,7 @@ class _OptimizationProblemBuilder:
             study=self.study,
             block=self.block,
             linopy_vars=self.linopy_vars,
+            linopy_vars_by_component=self.linopy_vars_by_component,
             param_arrays=self.param_arrays,
             objective_constant=objective_constant,
         )
@@ -560,90 +644,163 @@ class _OptimizationProblemBuilder:
     def _create_variables_for_model(
         self, model: Model, components: List[Component]
     ) -> None:
+        RELAXED_STRATEGIES = {IntegerStrategyId.RELAXED, IntegerStrategyId.HEURISTIC}
         comp_ids = [c.id for c in components]
 
         for var in model.variables.values():
             if not self._location_filter or self._location_filter.include_variable(
                 model.id, var.name
             ):
-                # Build coords for this variable
-                coords: Dict[str, object] = {"component": comp_ids}
-                dims = ["component"]
-                if var.structure.time:
-                    coords["time"] = self.time_coord
-                    dims.append("time")
-                if var.structure.scenario:
-                    coords["scenario"] = self.local_scenario_coord
-                    dims.append("scenario")
+                needs_split = var.data_type in (
+                    ValueType.INTEGER,
+                    ValueType.BINARY,
+                ) and any(
+                    c.integer_strategy.id in RELAXED_STRATEGIES for c in components
+                )
 
-                # Shape of this variable (used to broadcast scalar bounds)
-                var_shape = tuple(
-                    (
-                        len(comp_ids)
-                        if d == "component"
-                        else (
-                            len(self.time_coord)
-                            if d == "time"
-                            else len(self.local_scenario_coord)
+                if needs_split:
+                    groups: Dict[bool, List[Component]] = {}
+                    for c in components:
+                        groups.setdefault(
+                            c.integer_strategy.id in RELAXED_STRATEGIES, []
+                        ).append(c)
+                    partial = [
+                        self._add_variable_for_group(
+                            model,
+                            var,
+                            group,
+                            relax=relax,
+                            name_suffix="__relaxed" if relax else "",
                         )
+                        for relax, group in groups.items()
+                    ]
+                    for group_var, group in zip(partial, groups.values()):
+                        for c in group:
+                            self.linopy_vars_by_component[
+                                (model.id, var.name, c.id)
+                            ] = group_var
+                    merged = cast(
+                        xr.Dataset,
+                        xr.concat([lv.data for lv in partial], dim="component"),
+                    ).sel(component=comp_ids)
+                    # xr.concat keeps only partial[0]'s attrs; widen label_range
+                    # by hand to cover every group's labels.
+                    merged.attrs["label_range"] = (
+                        min(lv.range[0] for lv in partial),
+                        max(lv.range[1] for lv in partial),
                     )
-                    for d in dims
-                )
-
-                # Build a minimal builder for bound expressions (no variables needed)
-                bound_builder = VectorizedLinearExprBuilder(
-                    model_id=model.id,
-                    linopy_vars={},
-                    param_arrays=self.param_arrays,
-                    port_arrays={},
-                    block_length=self.block_length,
-                )
-
-                lower: object = (
-                    np.full(var_shape, -np.inf)
-                    if var.lower_bound is None
-                    else self._to_bound_array(
-                        visit(var.lower_bound, bound_builder), var_shape, dims
+                    prefix = model.id.replace("-", "_")
+                    merged_name = f"{prefix}__{var.name}__merged"
+                    self.linopy_vars[(model.id, var.name)] = _MergedGroupVariable(
+                        merged, partial[0].model, merged_name
                     )
-                )
-                upper: object = (
-                    np.full(var_shape, np.inf)
-                    if var.upper_bound is None
-                    else self._to_bound_array(
-                        visit(var.upper_bound, bound_builder), var_shape, dims
+                else:
+                    single_var = self._add_variable_for_group(
+                        model, var, components, relax=False
                     )
-                )
-
-                # Validate bounds: upper must be >= lower across all timesteps/scenarios
-                lower_arr = lower if isinstance(lower, np.ndarray) else np.array(lower)
-                upper_arr = upper if isinstance(upper, np.ndarray) else np.array(upper)
-                for ci, comp_id in enumerate(comp_ids):
-                    lo = np.asarray(lower_arr[ci] if lower_arr.ndim > 0 else lower_arr)
-                    up = np.asarray(upper_arr[ci] if upper_arr.ndim > 0 else upper_arr)
-                    finite = np.isfinite(lo) & np.isfinite(up)
-                    violation = finite & (up < lo)
-                    if np.any(violation):
-                        idx = int(np.argmax(violation))
-                        raise ValueError(
-                            f"Upper bound ({float(up.flat[idx]):g}) must be strictly "
-                            f"greater than lower bound ({float(lo.flat[idx]):g}) "
-                            f"for variable {comp_id}.{var.name}"
+                    self.linopy_vars[(model.id, var.name)] = single_var
+                    for c in components:
+                        self.linopy_vars_by_component[(model.id, var.name, c.id)] = (
+                            single_var
                         )
 
-                prefix = model.id.replace("-", "_")
-                name = f"{prefix}__{var.name}"
-                binary = var.data_type == ValueType.BINARY
-                integer = var.data_type == ValueType.INTEGER
+    def _param_arrays_for_components(
+        self, model_id: str, comp_ids: List[str]
+    ) -> Dict[Tuple[str, str], xr.DataArray]:
+        """Restrict *model_id*'s parameter arrays to *comp_ids*.
 
-                lv = self.linopy_model.add_variables(
-                    lower=lower,
-                    upper=upper,
-                    coords=coords,
-                    name=name,
-                    binary=binary,
-                    integer=integer,
+        ``self.param_arrays`` holds one array per (model_id, param_name),
+        carrying every component that shares that model. When a model's
+        variables are split into per-strategy groups (``_create_variables_for_model``),
+        a bound expression evaluated for one group must only see that group's
+        own components — otherwise a component-varying parameter's full-model
+        array gets force-broadcast into the (smaller) group's shape and fails.
+        """
+        return {
+            key: arr.sel(component=comp_ids) if key[0] == model_id else arr
+            for key, arr in self.param_arrays.items()
+        }
+
+    def _add_variable_for_group(
+        self,
+        model: Model,
+        var: Variable,
+        components: List[Component],
+        relax: bool,
+        name_suffix: str = "",
+    ) -> linopy.Variable:
+        comp_ids = [c.id for c in components]
+        coords: Dict[str, object] = {"component": comp_ids}
+        dims = ["component"]
+        if var.structure.time:
+            coords["time"] = self.time_coord
+            dims.append("time")
+        if var.structure.scenario:
+            coords["scenario"] = self.local_scenario_coord
+            dims.append("scenario")
+
+        var_shape = tuple(
+            (
+                len(comp_ids)
+                if d == "component"
+                else (
+                    len(self.time_coord)
+                    if d == "time"
+                    else len(self.local_scenario_coord)
                 )
-                self.linopy_vars[(model.id, var.name)] = lv
+            )
+            for d in dims
+        )
+
+        bound_builder = VectorizedLinearExprBuilder(
+            model_id=model.id,
+            linopy_vars={},
+            param_arrays=self._param_arrays_for_components(model.id, comp_ids),
+            port_arrays={},
+            block_length=self.block_length,
+        )
+
+        is_binary = var.data_type == ValueType.BINARY
+        lower: object = (
+            np.full(var_shape, 0.0 if is_binary else -np.inf)
+            if var.lower_bound is None
+            else self._to_bound_array(
+                visit(var.lower_bound, bound_builder), var_shape, dims
+            )
+        )
+        upper: object = (
+            np.full(var_shape, 1.0 if is_binary else np.inf)
+            if var.upper_bound is None
+            else self._to_bound_array(
+                visit(var.upper_bound, bound_builder), var_shape, dims
+            )
+        )
+
+        lower_arr = lower if isinstance(lower, np.ndarray) else np.array(lower)
+        upper_arr = upper if isinstance(upper, np.ndarray) else np.array(upper)
+        for ci, comp_id in enumerate(comp_ids):
+            lo = np.asarray(lower_arr[ci] if lower_arr.ndim > 0 else lower_arr)
+            up = np.asarray(upper_arr[ci] if upper_arr.ndim > 0 else upper_arr)
+            finite = np.isfinite(lo) & np.isfinite(up)
+            violation = finite & (up < lo)
+            if np.any(violation):
+                idx = int(np.argmax(violation))
+                raise ValueError(
+                    f"Upper bound ({float(up.flat[idx]):g}) must be strictly "
+                    f"greater than lower bound ({float(lo.flat[idx]):g}) "
+                    f"for variable {comp_id}.{var.name}"
+                )
+
+        prefix = model.id.replace("-", "_")
+        name = f"{prefix}__{var.name}{name_suffix}"
+        return self.linopy_model.add_variables(
+            lower=lower,
+            upper=upper,
+            coords=coords,
+            name=name,
+            binary=var.data_type == ValueType.BINARY and not relax,
+            integer=var.data_type == ValueType.INTEGER and not relax,
+        )
 
     # ------------------------------------------------------------------
     # Phase 3 — Port arrays

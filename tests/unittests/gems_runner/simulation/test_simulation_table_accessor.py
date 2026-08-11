@@ -3,13 +3,17 @@
 
 """Tests for SimulationTable fluent accessor API (component / output / value)."""
 
-from dataclasses import dataclass, field
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
+from simulation_table_fakes import (
+    FakeLinopyModel,
+    FakeLinopyVar,
+    FakeModel,
+    FakeProblem,
+    FakeStudy,
+)
 
 from gems_runner.simulation.simulation_table import (
     ComponentView,
@@ -17,58 +21,6 @@ from gems_runner.simulation.simulation_table import (
     SimulationTable,
     SimulationTableBuilder,
 )
-
-# ---------------------------------------------------------------------------
-# Minimal stubs (reused from test_simulation_table_mock.py)
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class FakeBlock:
-    id: int = 1
-    timesteps: tuple = (0, 1)
-
-
-@dataclass
-class FakeLinopyVar:
-    name: str
-    coords: dict
-
-
-@dataclass
-class FakeModel:
-    extra_outputs: dict = field(default_factory=dict)
-
-
-@dataclass
-class FakeStudy:
-    model_components: dict = field(default_factory=dict)
-    models: dict = field(default_factory=dict)
-
-
-@dataclass
-class FakeLinopyModel:
-    solution: dict
-
-    @property
-    def dual(self) -> xr.Dataset:
-        return xr.Dataset()
-
-    solver_model = None
-
-
-@dataclass
-class FakeProblem:
-    block: FakeBlock = field(default_factory=FakeBlock)
-    block_length: int = 3
-    objective_value: float = 0.0
-    linopy_model: Optional[FakeLinopyModel] = None
-    _linopy_vars: dict = field(default_factory=dict)
-    models: dict = field(default_factory=dict)
-    model_components: dict = field(default_factory=dict)
-    study: FakeStudy = field(default_factory=FakeStudy)
-    scenarios: int = 1
-
 
 # ---------------------------------------------------------------------------
 # Helpers
