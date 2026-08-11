@@ -21,8 +21,6 @@ from gems_craft.expression.expression import (
     UnaryOperatorNode,
     VariableNode,
 )
-from gems_craft.model.parameter import Parameter
-from gems_craft.model.variable import Variable
 from gems_craft.optim_config.parsing import (
     ElementLocation,
     HeuristicConfig,
@@ -32,10 +30,13 @@ from gems_craft.optim_config.parsing import (
     OutOfBoundsProcessingConfig,
     ResolutionMode,
 )
+from gems_craft.study.parsing import IntegerStrategyId
 from gems_craft.study.system import Component
 
 if TYPE_CHECKING:
     from gems_craft.model.model import Model
+    from gems_craft.model.parameter import Parameter
+    from gems_craft.model.variable import Variable
     from gems_craft.study.scenario_builder import ScenarioBuilder
     from gems_craft.study.system import System
 
@@ -58,7 +59,6 @@ _HEURISTIC_ELEMENT_TIME_DEPENDENCE: Dict[str, Optional[bool]] = {
     "num_units_max": None,
     "cluster_max_generation": None,
 }
-from gems_craft.study.parsing import IntegerStrategyId
 
 
 def _collect_variable_names(expr: ExpressionNode) -> Set[str]:
