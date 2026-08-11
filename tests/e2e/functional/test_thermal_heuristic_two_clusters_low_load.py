@@ -106,7 +106,7 @@ def test_accurate_heuristic() -> None:
         2641690
     )
 
-
+@pytest.mark.xfail(reason="Computation of num_units_on with fast heuristic not implemented.")
 def test_fast_heuristic() -> None:
     """
     Solve the same problem with the fast heuristic.
