@@ -30,7 +30,8 @@ from pathlib import Path
 
 import pytest
 
-from gems_craft.optim_config.parsing import load_optim_config, validate_optim_config
+from gems_craft.optim_config.parsing import load_optim_config
+from gems_craft.optim_config.validation import validate_optim_config
 from gems_craft.study import Study
 from gems_runner.main.main import (
     _write_structure_txt,

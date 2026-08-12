@@ -19,8 +19,8 @@ import xarray as xr
 from gems_craft.optim_config.parsing import (
     OptimConfig,
     ResolutionMode,
-    validate_optim_config,
 )
+from gems_craft.optim_config.validation import validate_optim_config
 from gems_craft.study.folder import load_study
 from gems_craft.study.study import Study
 from gems_runner.simulation.heuristic_runner import (

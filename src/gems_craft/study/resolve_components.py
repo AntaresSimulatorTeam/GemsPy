@@ -84,6 +84,8 @@ def _resolve_component(
     lib_id, model_id = component.model.split(".")
     model = libraries[lib_id].models[f"{lib_id}.{model_id}"]
 
+    # TODO: this is validation (missing parameters/properties), not resolution —
+    # extract into a dedicated validation module, as done for optim_config/.
     provided_param_ids = {p.id for p in component.parameters or []}
     missing_params = sorted(k for k in model.parameters if k not in provided_param_ids)
     if missing_params:
@@ -130,6 +132,8 @@ def _get_component_by_id(
     return components_dict.get(component_id)
 
 
+# TODO: cross-validation logic mixed into a "resolve" (preprocessing) module —
+# move to a dedicated gems_craft/study/validation.py, mirroring optim_config/.
 def consistency_check(system: System, input_models: Dict[str, Model]) -> bool:
     """
     Checks if all components in the System have a valid model from the library.
