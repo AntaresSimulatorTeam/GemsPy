@@ -67,6 +67,53 @@ database = build_data_base(input_system, Path(series_dir))
 `build_data_base()` reads all timeseries files referenced by the system
 (`.txt` or `.csv`) from `series_dir`.
 
+---
+
+## Parameter time and scenario dependency
+
+Every parameter is declared twice: once in the model library, where
+`time-dependent` and `scenario-dependent` state the **maximum** dependency the
+model's expressions are written for, and once per component in the system file,
+where the same two flags state how that particular component's data actually
+varies.
+
+### The system file may narrow, never extend
+
+A component may declare a parameter *less* dependent than its model does, but
+never *more*:
+
+| Model declares | Component may declare |
+|---|---|
+| `true` | `true` or `false` |
+| `false` | `false` only |
+
+The rule applies to each axis independently. Narrowing is how you share one
+value across scenarios, or one value across the whole horizon, without changing
+the model — the value is simply broadcast over the axes the component declared
+independent, and the optimization problem keeps exactly the shape the model
+declares.
+
+Declaring an axis the model does not is rejected when the system is resolved,
+with an error naming the component, the parameter, and both declarations.
+
+### Data shape must match the component's declaration
+
+The two flags determine the shape of the data expected for the parameter:
+
+| `time-dependent` | `scenario-dependent` | Expected data |
+|---|---|---|
+| `false` | `false` | a number written inline in the system file |
+| `true` | `false` | a data-series file of one column and `T` rows |
+| `false` | `true` | a data-series file of one row and `S` columns |
+| `true` | `true` | a data-series file of `T` rows and `S` columns |
+
+A file whose shape does not match is rejected. In particular, a parameter
+declared time-dependent but scenario-independent takes exactly one timeseries:
+to supply several, declare it `scenario-dependent: true` as well — which
+requires the model to declare it scenario-dependent too. Which column each
+scenario then reads is controlled by the
+[scenario builder](scenario-builder.md).
+
 ### Assembling a Study
 
 Once you have `system` and `database`, wrap them in a `Study`:

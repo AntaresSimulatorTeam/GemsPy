@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Union
 import numpy as np
 import pandas as pd
 
+from gems_craft.expression.indexing_structure import IndexingStructure
+
 if TYPE_CHECKING:
     from gems_craft.study.scenario_builder import ScenarioBuilder
 
@@ -48,9 +50,17 @@ class AbstractDataStructure(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def structure(self) -> "IndexingStructure":
+        """Axes along which this data actually varies."""
+
     def check_requirement(self, time: bool, scenario: bool) -> bool:
-        """Check if the data structure meets certain requirements."""
-        pass
+        """Whether this data may be used for a parameter declared ``(time, scenario)``.
+
+        Data may vary along fewer axes than the parameter declares — it is then
+        broadcast over the missing ones — but never along more.
+        """
+        own = self.structure()
+        return (time or not own.time) and (scenario or not own.scenario)
 
 
 @dataclass(frozen=True)
@@ -64,10 +74,8 @@ class ConstantData(AbstractDataStructure):
     ) -> float:
         return self.value
 
-    def check_requirement(self, time: bool, scenario: bool) -> bool:
-        if not isinstance(self, ConstantData):
-            raise ValueError("Invalid data type for ConstantData")
-        return True
+    def structure(self) -> "IndexingStructure":
+        return IndexingStructure(time=False, scenario=False)
 
 
 @dataclass(frozen=True)
@@ -90,10 +98,8 @@ class TimeSeriesData(AbstractDataStructure):
             )
         return result
 
-    def check_requirement(self, time: bool, scenario: bool) -> bool:
-        if not isinstance(self, TimeSeriesData):
-            raise ValueError("Invalid data type for TimeSeriesData")
-        return time
+    def structure(self) -> "IndexingStructure":
+        return IndexingStructure(time=True, scenario=False)
 
 
 @dataclass(frozen=True)
@@ -119,10 +125,8 @@ class ScenarioSeriesData(AbstractDataStructure):
             )
         return result
 
-    def check_requirement(self, time: bool, scenario: bool) -> bool:
-        if not isinstance(self, ScenarioSeriesData):
-            raise ValueError("Invalid data type for ScenarioSeriesData")
-        return scenario
+    def structure(self) -> "IndexingStructure":
+        return IndexingStructure(time=False, scenario=True)
 
 
 @dataclass(frozen=True)
@@ -142,10 +146,8 @@ class TimeScenarioSeriesData(AbstractDataStructure):
             raise KeyError("Time scenario data requires a scenario index.")
         return self.time_scenario_series.values[np.ix_(np.asarray(timestep), scenario)]
 
-    def check_requirement(self, time: bool, scenario: bool) -> bool:
-        if not isinstance(self, TimeScenarioSeriesData):
-            raise ValueError("Invalid data type for TimeScenarioSeriesData")
-        return time and scenario
+    def structure(self) -> "IndexingStructure":
+        return IndexingStructure(time=True, scenario=True)
 
 
 def load_ts_from_file(
@@ -178,19 +180,31 @@ def load_ts_from_file(
     )
 
 
-def dataframe_to_time_series(ts_dataframe: pd.DataFrame) -> pd.Series:
+def dataframe_to_time_series(
+    ts_dataframe: pd.DataFrame, context: str = ""
+) -> pd.Series:
     if ts_dataframe.shape[1] != 1:
         raise ValueError(
-            f"Could not convert input data to time series data. Expect data series with exactly one column, got shape {ts_dataframe.shape}"
+            f"Could not convert input data to time series data{context}. "
+            f"A time-dependent, scenario-independent parameter expects exactly one "
+            f"column (one timeseries), got shape {ts_dataframe.shape}. "
+            f"To use several timeseries, declare the parameter scenario-dependent "
+            f"(the model must declare it scenario-dependent too)."
         )
     return ts_dataframe.iloc[:, 0]
 
 
-def dataframe_to_scenario_series(ts_dataframe: pd.DataFrame) -> np.ndarray:
+def dataframe_to_scenario_series(
+    ts_dataframe: pd.DataFrame, context: str = ""
+) -> np.ndarray:
     """Return a 1-D numpy array of floats indexed by 0-based column index."""
     if ts_dataframe.shape[0] != 1:
         raise ValueError(
-            f"Could not convert input data to scenario series data. Expect data series with exactly one line, got shape {ts_dataframe.shape}"
+            f"Could not convert input data to scenario series data{context}. "
+            f"A scenario-dependent, time-independent parameter expects exactly one "
+            f"row, got shape {ts_dataframe.shape}. "
+            f"To use time-varying data, declare the parameter time-dependent "
+            f"(the model must declare it time-dependent too)."
         )
     return ts_dataframe.iloc[0, :].to_numpy(dtype=float)
 

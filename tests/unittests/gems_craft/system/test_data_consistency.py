@@ -334,6 +334,81 @@ def test_requirements_consistency_scenario_varying_parameter_with_correct_data_p
     Study(system, database).check_consistency()
 
 
+@pytest.mark.parametrize(
+    "cost_data",
+    [
+        ConstantData(30),
+        TimeSeriesData(pd.Series({TimeIndex(0): 100, TimeIndex(1): 50})),
+    ],
+)
+def test_requirements_consistency_time_varying_parameter_with_narrower_data_passes(
+    mock_generator_with_fixed_scenario_time_varying_param: Model,
+    cost_data: Union[ConstantData, TimeSeriesData],
+) -> None:
+    """A time-dependent parameter accepts constant data, broadcast over time."""
+    node = Component(model=NODE_BALANCE_MODEL, id="1")
+    gen = create_component(
+        model=mock_generator_with_fixed_scenario_time_varying_param, id="G"
+    )
+
+    database = DataBase()
+    database.add_data("G", "p_max", ConstantData(100))
+    database.add_data("G", "cost", cost_data)
+    system = System("test")
+    system.add_component(node)
+    system.add_component(gen)
+    system.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
+
+    # No ValueError should be raised
+    Study(system, database).check_consistency()
+
+
+def test_requirements_consistency_scenario_varying_parameter_with_constant_data_passes(
+    mock_generator_with_scenario_varying_fixed_time_param: Model,
+) -> None:
+    """A scenario-dependent parameter accepts one constant shared by all scenarios."""
+    node = Component(model=NODE_BALANCE_MODEL, id="1")
+    gen = create_component(
+        model=mock_generator_with_scenario_varying_fixed_time_param, id="G"
+    )
+
+    database = DataBase()
+    database.add_data("G", "p_max", ConstantData(100))
+    database.add_data("G", "cost", ConstantData(30))
+    system = System("test")
+    system.add_component(node)
+    system.add_component(gen)
+    system.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
+
+    # No ValueError should be raised
+    Study(system, database).check_consistency()
+
+
+def test_consistency_error_names_data_and_model_structures(
+    mock_generator_with_scenario_varying_fixed_time_param: Model,
+) -> None:
+    """The error reports how the data varies and what the model declares."""
+    node = Component(model=NODE_BALANCE_MODEL, id="1")
+    gen = create_component(
+        model=mock_generator_with_scenario_varying_fixed_time_param, id="G"
+    )
+
+    database = DataBase()
+    database.add_data("G", "p_max", ConstantData(100))
+    database.add_data("G", "cost", TimeSeriesData(pd.Series({TimeIndex(0): 100})))
+    system = System("test")
+    system.add_component(node)
+    system.add_component(gen)
+    system.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
+
+    with pytest.raises(ValueError) as excinfo:
+        Study(system, database).check_consistency()
+
+    message = str(excinfo.value)
+    assert "The data varies along [time]" in message
+    assert "declares the parameter [scenario]" in message
+
+
 def test_load_data_from_txt() -> None:
     txt_file = "gen-costs"
 

@@ -14,6 +14,24 @@ All notable changes to GemsPy are documented here.
   what a heuristic reads/writes via `models[].heuristics` in
   `optim-config.yml`.
 
+### Changed
+- **Parameter time/scenario dependency is validated when the system is
+  resolved** (#258) - a component parameter may declare the same dependency as
+  its model or narrow it (`true` -> `false` on either axis), never extend it.
+  Narrowing already worked at solve time; extending it is now rejected by
+  `resolve_system()` (so `load_study()` fails immediately) instead of raising a
+  bare "Data inconsistency ... Requirement not met" later from
+  `build_problem()`. The new error names the component, the parameter, and both
+  declarations. Solver results are unchanged: parameter arrays keep the
+  dimensions the model declares, and narrowed data is broadcast over the
+  remaining axes as before.
+- **Clearer data-shape errors** - the "exactly one column/row" and "float value
+  is expected" errors now name the offending component and parameter, report
+  the shape that was read, and point at the flag to change (a parameter needing
+  several timeseries must be declared `scenario-dependent`, which its model must
+  allow). The wording of the scenario-series error changed from "exactly one
+  line" to "exactly one row".
+
 ## [0.1.3] - 2026-07-24
 
 ### Added

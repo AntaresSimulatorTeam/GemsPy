@@ -95,6 +95,8 @@ def _resolve_component(
             f"{missing_params}."
         )
 
+    _check_parameter_dependencies(component, model)
+
     properties = _resolve_properties_raw_to_dict(component.properties, component.id)
     missing = sorted(k for k in model.properties if k not in properties)
     if missing:
@@ -111,6 +113,49 @@ def _resolve_component(
         properties=properties,
         integer_strategy=component.integer_strategy,
     )
+
+
+def _format_dependency(time: bool, scenario: bool) -> str:
+    return f"time-dependent: {str(time).lower()}, scenario-dependent: {str(scenario).lower()}"
+
+
+def _check_parameter_dependencies(component: ComponentSchema, model: Model) -> None:
+    """Check that each parameter's dependency does not exceed the model's.
+
+    A component may narrow what the model declares — supplying a constant for a
+    time-dependent parameter, or a single timeseries shared by every scenario for
+    a scenario-dependent one — but it may not add an axis the model does not
+    declare, since the model's expressions are written against that structure.
+
+    Parameters the model does not declare carry no dependency constraint and are
+    skipped; the missing-parameter check in :func:`_resolve_component` already
+    catches misspelled ids.
+    """
+    for param in component.parameters or []:
+        declared = model.parameters.get(param.id)
+        if declared is None:
+            continue
+
+        extra_axes = [
+            axis
+            for axis, in_system, in_model in (
+                ("time", param.time_dependent, declared.structure.time),
+                ("scenario", param.scenario_dependent, declared.structure.scenario),
+            )
+            if in_system and not in_model
+        ]
+        if extra_axes:
+            raise ValueError(
+                f"Component {component.id!r} (model {model.id!r}), parameter "
+                f"{param.id!r}: cannot declare the parameter "
+                f"{' and '.join(f'{a}-dependent' for a in extra_axes)} because the "
+                f"model does not. The model declares "
+                f"[{_format_dependency(declared.structure.time, declared.structure.scenario)}], "
+                f"the system declares "
+                f"[{_format_dependency(param.time_dependent, param.scenario_dependent)}]. "
+                f"A component may only narrow the model's declared dependency, "
+                f"never extend it."
+            )
 
 
 def _resolve_port_refs(
@@ -169,6 +214,7 @@ def build_data_base(
                 param.scenario_dependent,
                 param.value,
                 timeseries_dir,
+                context=f" for component {comp.id!r}, parameter {param.id!r}",
             )
             database.add_data(comp.id, param.id, param_value, scenario_group=group)
 
@@ -180,22 +226,26 @@ def _build_data(
     scenario_dependent: bool,
     param_value: Union[float, str],
     timeseries_dir: Optional[Path],
+    context: str = "",
 ) -> AbstractDataStructure:
     if isinstance(param_value, str):
         ts_data = load_ts_from_file(param_value, timeseries_dir)
         if time_dependent and scenario_dependent:
             return TimeScenarioSeriesData(ts_data)
         elif time_dependent:
-            return TimeSeriesData(dataframe_to_time_series(ts_data))
+            return TimeSeriesData(dataframe_to_time_series(ts_data, context))
         elif scenario_dependent:
-            return ScenarioSeriesData(dataframe_to_scenario_series(ts_data))
+            return ScenarioSeriesData(dataframe_to_scenario_series(ts_data, context))
         else:
             raise ValueError(
-                f"A float value is expected for constant data, got {param_value}"
+                f"A float value is expected for constant data{context}, "
+                f"got the timeseries name {param_value!r}. Declare the parameter "
+                f"time-dependent and/or scenario-dependent to read it from a file."
             )
     else:
         if time_dependent or scenario_dependent:
             raise ValueError(
-                f"A timeseries name is expected for time or scenario dependent data, got {param_value}"
+                f"A timeseries name is expected for time or scenario dependent "
+                f"data{context}, got {param_value}."
             )
         return ConstantData(float(param_value))

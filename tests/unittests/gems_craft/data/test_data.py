@@ -19,7 +19,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from gems_craft.expression.indexing_structure import IndexingStructure
 from gems_craft.study.data import (
+    AbstractDataStructure,
     ConstantData,
     DataBase,
     ScenarioSeriesData,
@@ -86,6 +88,18 @@ def test_dataframe_to_time_series_multi_column_raises() -> None:
         dataframe_to_time_series(df)
 
 
+def test_dataframe_to_time_series_multi_column_error_hints_at_scenarios() -> None:
+    """The error points at the flag that allows several timeseries."""
+    df = pd.DataFrame([[1.0, 2.0], [3.0, 4.0]])
+    with pytest.raises(ValueError) as excinfo:
+        dataframe_to_time_series(df, context=" for component 'G', parameter 'cost'")
+
+    message = str(excinfo.value)
+    assert "for component 'G', parameter 'cost'" in message
+    assert "got shape (2, 2)" in message
+    assert "declare the parameter scenario-dependent" in message
+
+
 # ---------------------------------------------------------------------------
 # dataframe_to_scenario_series
 # ---------------------------------------------------------------------------
@@ -100,8 +114,72 @@ def test_dataframe_to_scenario_series_single_row() -> None:
 def test_dataframe_to_scenario_series_multi_row_raises() -> None:
     """Raises ValueError when the DataFrame has more than one row."""
     df = pd.DataFrame([[1.0, 2.0], [3.0, 4.0]])
-    with pytest.raises(ValueError, match="exactly one line"):
+    with pytest.raises(ValueError, match="exactly one row"):
         dataframe_to_scenario_series(df)
+
+
+def test_dataframe_to_scenario_series_multi_row_error_hints_at_time() -> None:
+    """The error points at the flag that allows time-varying data."""
+    df = pd.DataFrame([[1.0, 2.0], [3.0, 4.0]])
+    with pytest.raises(ValueError) as excinfo:
+        dataframe_to_scenario_series(df, context=" for component 'G', parameter 'cost'")
+
+    message = str(excinfo.value)
+    assert "for component 'G', parameter 'cost'" in message
+    assert "got shape (2, 2)" in message
+    assert "declare the parameter time-dependent" in message
+
+
+# ---------------------------------------------------------------------------
+# Data structures declare the axes they vary along
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "data, expected_time, expected_scenario",
+    [
+        (ConstantData(1.0), False, False),
+        (TimeSeriesData(pd.Series([1.0, 2.0])), True, False),
+        (ScenarioSeriesData(np.array([1.0, 2.0])), False, True),
+        (TimeScenarioSeriesData(pd.DataFrame([[1.0, 2.0], [3.0, 4.0]])), True, True),
+    ],
+)
+def test_data_structure_reports_its_axes(
+    data: AbstractDataStructure, expected_time: bool, expected_scenario: bool
+) -> None:
+    assert data.structure() == IndexingStructure(expected_time, expected_scenario)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        ConstantData(1.0),
+        TimeSeriesData(pd.Series([1.0, 2.0])),
+        ScenarioSeriesData(np.array([1.0, 2.0])),
+        TimeScenarioSeriesData(pd.DataFrame([[1.0, 2.0], [3.0, 4.0]])),
+    ],
+)
+def test_check_requirement_accepts_data_varying_along_fewer_axes(
+    data: AbstractDataStructure,
+) -> None:
+    """Data may always be used for a parameter declared along both axes."""
+    assert data.check_requirement(time=True, scenario=True)
+
+
+@pytest.mark.parametrize(
+    "data, time, scenario",
+    [
+        (TimeSeriesData(pd.Series([1.0, 2.0])), False, True),
+        (ScenarioSeriesData(np.array([1.0, 2.0])), True, False),
+        (TimeScenarioSeriesData(pd.DataFrame([[1.0, 2.0]])), True, False),
+        (TimeScenarioSeriesData(pd.DataFrame([[1.0, 2.0]])), False, True),
+        (TimeScenarioSeriesData(pd.DataFrame([[1.0, 2.0]])), False, False),
+    ],
+)
+def test_check_requirement_rejects_data_varying_along_extra_axes(
+    data: AbstractDataStructure, time: bool, scenario: bool
+) -> None:
+    assert not data.check_requirement(time=time, scenario=scenario)
 
 
 # ---------------------------------------------------------------------------

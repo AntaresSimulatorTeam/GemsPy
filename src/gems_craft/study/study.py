@@ -21,6 +21,11 @@ from gems_craft.study.scenario_builder import ScenarioBuilder
 from gems_craft.study.system import Component, System
 
 
+def _format_axes(time: bool, scenario: bool) -> str:
+    axes = [name for name, on in (("time", time), ("scenario", scenario)) if on]
+    return " and ".join(axes) if axes else "no axis"
+
+
 @dataclass
 class Study:
     """
@@ -69,12 +74,17 @@ class Study:
         for component in self.system.components:
             for param in component.model.parameters.values():
                 data_structure = self.database.get_data(component.id, param.name)
+                declared = param.structure
 
                 if not data_structure.check_requirement(
-                    component.model.parameters[param.name].structure.time,
-                    component.model.parameters[param.name].structure.scenario,
+                    declared.time, declared.scenario
                 ):
+                    actual = data_structure.structure()
                     raise ValueError(
                         f"Data inconsistency for component: {component.id}, "
-                        f"parameter: {param.name}. Requirement not met."
+                        f"parameter: {param.name}. The data varies along "
+                        f"[{_format_axes(actual.time, actual.scenario)}] but the model "
+                        f"{component.model.id!r} declares the parameter "
+                        f"[{_format_axes(declared.time, declared.scenario)}]. Data may "
+                        f"vary along fewer axes than the model declares, never more."
                     )

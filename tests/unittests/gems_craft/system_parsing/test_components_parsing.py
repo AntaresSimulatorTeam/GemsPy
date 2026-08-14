@@ -355,6 +355,125 @@ system:
         resolve_system(system, resolve_library([lib]))
 
 
+# --- parameter time/scenario dependency: the component may only narrow ---
+
+_LIB_WITH_PARAMETER_DEPENDENCY = """\
+library:
+  id: basic
+  models:
+    - id: generator
+      parameters:
+        - id: cost
+          time-dependent: %(time)s
+          scenario-dependent: %(scenario)s
+"""
+
+_SYSTEM_WITH_PARAMETER_DEPENDENCY = """\
+system:
+  components:
+    - id: G
+      model: basic.generator
+      parameters:
+        - id: cost
+          time-dependent: %(time)s
+          scenario-dependent: %(scenario)s
+          value: %(value)s
+"""
+
+
+def _resolve_with_dependencies(
+    model_dependency: tuple[bool, bool],
+    component_dependency: tuple[bool, bool],
+    value: str = "cost_series",
+) -> None:
+    def as_yaml(dependency: tuple[bool, bool]) -> dict[str, str]:
+        return {
+            "time": "true" if dependency[0] else "false",
+            "scenario": "true" if dependency[1] else "false",
+        }
+
+    lib = parse_yaml_library(
+        io.StringIO(_LIB_WITH_PARAMETER_DEPENDENCY % as_yaml(model_dependency))
+    )
+    system = parse_yaml_system(
+        io.StringIO(
+            _SYSTEM_WITH_PARAMETER_DEPENDENCY
+            % {**as_yaml(component_dependency), "value": value}
+        )
+    )
+    resolve_system(system, resolve_library([lib]))
+
+
+@pytest.mark.parametrize(
+    "model_dependency, component_dependency, value",
+    [
+        # Same dependency as the model.
+        ((True, True), (True, True), "cost_series"),
+        ((True, False), (True, False), "cost_series"),
+        ((False, True), (False, True), "cost_series"),
+        ((False, False), (False, False), "30"),
+        # Narrower than the model.
+        ((True, True), (True, False), "cost_series"),
+        ((True, True), (False, True), "cost_series"),
+        ((True, True), (False, False), "30"),
+        ((True, False), (False, False), "30"),
+        ((False, True), (False, False), "30"),
+    ],
+)
+def test_resolve_component_parameter_dependency_narrowing_ok(
+    model_dependency: tuple[bool, bool],
+    component_dependency: tuple[bool, bool],
+    value: str,
+) -> None:
+    """A component may declare the model's dependency, or less."""
+    _resolve_with_dependencies(model_dependency, component_dependency, value)
+
+
+@pytest.mark.parametrize(
+    "model_dependency, component_dependency, extra_axis",
+    [
+        ((False, True), (True, True), "time"),
+        ((False, True), (True, False), "time"),
+        ((True, False), (False, True), "scenario"),
+        ((True, False), (True, True), "scenario"),
+        ((False, False), (True, False), "time"),
+        ((False, False), (False, True), "scenario"),
+        ((False, False), (True, True), "time-dependent and scenario"),
+    ],
+)
+def test_resolve_component_parameter_dependency_extension_raises(
+    model_dependency: tuple[bool, bool],
+    component_dependency: tuple[bool, bool],
+    extra_axis: str,
+) -> None:
+    """A component may not add an axis of variation the model does not declare."""
+    with pytest.raises(
+        ValueError,
+        match=(
+            rf"Component 'G' \(model 'basic.generator'\), parameter 'cost': cannot "
+            rf"declare the parameter {extra_axis}-dependent because the model does not"
+        ),
+    ):
+        _resolve_with_dependencies(model_dependency, component_dependency)
+
+
+def test_resolve_component_parameter_dependency_error_names_both_declarations() -> None:
+    """The error reports the model's and the system's declarations."""
+    with pytest.raises(ValueError) as excinfo:
+        _resolve_with_dependencies((False, True), (True, True))
+
+    message = str(excinfo.value)
+    assert (
+        "The model declares [time-dependent: false, scenario-dependent: true]"
+        in message
+    )
+    assert (
+        "the system declares [time-dependent: true, scenario-dependent: true]"
+        in message
+    )
+    assert "only narrow" in message
+
+
 def test_resolve_component_extra_undeclared_property_allowed() -> None:
     lib = parse_yaml_library(io.StringIO(_LIB_WITH_MODEL_PROPERTIES))
     system = parse_yaml_system(io.StringIO("""\
