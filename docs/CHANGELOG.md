@@ -4,7 +4,31 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING — sequential mode carry-over is now bounded by `block-overlap`**
+  \- in `sequential-subproblems` mode, the carry-over that stitches
+  consecutive blocks together is now governed by a new `resolution` setting,
+  `carry-over-length` (default: `block-overlap`), and pins the *shared*
+  leading timesteps of each block to the previous block's values at the same
+  absolute timesteps. This fixes an incorrect stitching for
+  `block-overlap >= 2`, where the previous hardcoded behaviour pinned block
+  *N+1*'s first timestep to block *N*'s **last** timestep — a different
+  absolute timestep. **Migration**: configs using `block-overlap: 0` (the
+  default) no longer get the previous implicit single-timestep state
+  continuity; if you rely on state carried between blocks (e.g. storage
+  state-of-charge), set `block-overlap: 1` (and optionally
+  `carry-over-length: 1`) to recover the previous behaviour. `block-overlap`
+  is also newly validated: `0 <= block-overlap < block-length`.
+
 ### Added
+
+- **`carry-over-length` resolution setting** - optional int on the
+  `resolution` block (`ResolutionConfig.carry_over_length`), validated as
+  `0 <= carry-over-length <= block-overlap`. Omitted, it defaults to
+  `block-overlap` (the whole overlap zone is pinned); an explicit `0` is
+  legal and means blocks overlap for lag-constraint history but are not
+  stitched at all.
 - **Integer strategy and thermal heuristics** - components can now set
   `integer-strategy` (`exact` (default), `relaxed`, or `heuristic` +
   `heuristic-id`) to control how their model's integer/binary variables are
