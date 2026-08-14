@@ -539,10 +539,22 @@ class _OptimizationProblemBuilder:
             linopy_var = self.linopy_vars.get((mk, var_name))
             if linopy_var is not None and "time" in linopy_var.dims:
                 safe = f"{mk}__{var_name}".replace("-", "_")
-                self.linopy_model.add_constraints(
-                    linopy_var.isel(time=0) == init_val,  # type: ignore[arg-type]
-                    name=f"carry_over__{safe}",
-                )
+                if "time" in init_val.dims:
+                    # Pin the first len(init_val.time) timesteps, clamped to
+                    # this block's horizon (a truncated final block can be
+                    # shorter than the carried window).
+                    pin_length = min(init_val.sizes["time"], self.block_length)
+                    self.linopy_model.add_constraints(
+                        linopy_var.isel(time=slice(0, pin_length))
+                        == init_val.isel(time=slice(0, pin_length)),  # type: ignore[arg-type]
+                        name=f"carry_over__{safe}",
+                    )
+                else:
+                    # Scalar (no time dim): legacy form, pin the first timestep.
+                    self.linopy_model.add_constraints(
+                        linopy_var.isel(time=0) == init_val,  # type: ignore[arg-type]
+                        name=f"carry_over__{safe}",
+                    )
 
         # Extract constant objective contribution (linopy cannot hold pure constants).
         objective_constant = 0.0
@@ -992,9 +1004,13 @@ def build_problem(
     problem_name:
         Label for the linopy model.
     initial_values:
-        Optional carry-over values keyed by ``(model_id, var_name)``.  For
-        each entry a constraint ``var[time=0] == value`` is added, overriding
-        the cyclic border condition for the first timestep.
+        Optional carry-over values keyed by ``(model_id, var_name)``.  Each
+        value is an ``xr.DataArray``; when it carries a ``time`` dimension of
+        length ``k`` (indexed ``0 .. k-1``), constraints
+        ``var[time=i] == value[i]`` are added for the block's first ``k``
+        timesteps, overriding the cyclic border condition on that window.  A
+        value without a ``time`` dimension pins only ``var[time=0]`` (legacy
+        single-timestep form).
     """
     study.check_consistency()
 

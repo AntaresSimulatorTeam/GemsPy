@@ -91,6 +91,7 @@ class SimulationSession:
         cfg = self.optim_config.resolution
         block_length: int = cfg.block_length  # type: ignore[assignment]
         block_overlap: int = cfg.block_overlap
+        carry_over_length: int = cfg.effective_carry_over_length
 
         tables: List[SimulationTable] = []
         for scenario_id in self.scenario_ids:
@@ -111,8 +112,13 @@ class SimulationSession:
                     initial_values=carry_over or None,
                 )
                 tables.append(table)
+                # Block N and block N+1 share `block_overlap` absolute
+                # timesteps: block N's local indices `block_length - overlap
+                # ...` are block N+1's local indices `0 ...`.
                 carry_over = self._extract_carry_over(
-                    problem, local_index=len(timesteps) - 1
+                    problem,
+                    local_start=block_length - block_overlap,
+                    length=carry_over_length,
                 )
                 t_start += block_length - block_overlap
                 block_id += 1
@@ -240,17 +246,28 @@ class SimulationSession:
     @staticmethod
     def _extract_carry_over(
         problem: OptimizationProblem,
-        local_index: int,
+        local_start: int,
+        length: int,
     ) -> Dict[Tuple[str, str], xr.DataArray]:
-        """Extract variable values at *local_index* for use as initial values in the next block."""
+        """Extract variable values over *length* timesteps starting at *local_start*.
+
+        The returned arrays keep a ``time`` dimension re-indexed to
+        ``0 .. length-1`` so they align with the leading timesteps of the next
+        block's variables.  The window is clamped to the solved block's actual
+        horizon (a truncated final block can be shorter than ``block_length``),
+        so fewer than *length* values may be carried over.
+        """
         carry_over: Dict[Tuple[str, str], xr.DataArray] = {}
-        if problem.linopy_model.solution is None:
+        if length <= 0 or problem.linopy_model.solution is None:
             return carry_over
         for (model, var_name), linopy_var in problem._linopy_vars.items():
             if "time" in linopy_var.dims:
                 sol_da = problem.get_variable_solution(model, var_name)
                 if sol_da is not None:
-                    carry_over[(model, var_name)] = sol_da.isel(
-                        time=local_index, drop=True
+                    window = sol_da.isel(time=slice(local_start, local_start + length))
+                    if window.sizes["time"] == 0:
+                        continue
+                    carry_over[(model, var_name)] = window.assign_coords(
+                        time=list(range(window.sizes["time"]))
                     )
         return carry_over
