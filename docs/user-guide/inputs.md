@@ -3,8 +3,6 @@
 GemsPy supports two loading strategies: a directory-based approach that reads
 an entire study at once, and a file-by-file approach for programmatic control.
 
----
-
 ## Directory-based loading (recommended)
 
 When your study follows the standard directory layout, use `load_study()`:
