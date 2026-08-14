@@ -65,7 +65,6 @@ database = build_data_base(input_system, Path(series_dir))
 `build_data_base()` reads all timeseries files referenced by the system
 (`.txt` or `.csv`) from `series_dir`.
 
----
 
 ### Assembling a Study
 
