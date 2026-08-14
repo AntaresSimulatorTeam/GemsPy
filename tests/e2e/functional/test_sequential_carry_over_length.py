@@ -208,9 +208,7 @@ def test_zero_overlap_blocks_fully_independent(tmp_path: Path) -> None:
     """With block-overlap: 0 nothing is carried between blocks: each block is
     solved as if it were alone (no carry-over constraints).
 
-    Older GemsPy versions implicitly seeded each block's first timestep with
-    the previous block's final state even at block-overlap: 0; that seeding is
-    gone (breaking change of issue #271).  Two complementary checks:
+    Two complementary checks:
 
     - Block 1 ([6..11], demand [2,4,0,4,4,0]) serves its t=7 peak by
       pre-charging its *free* initial storage state.  Under the old implicit
