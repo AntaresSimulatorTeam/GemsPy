@@ -193,3 +193,55 @@ def test_zero_carry_over(tmp_path: Path) -> None:
 
     timesteps = set(raw["absolute_time_index"].dropna().astype(int))
     assert timesteps == set(range(12))
+
+
+def _no_overlap_config(mode: str) -> str:
+    return _BASE_CONFIG + textwrap.dedent(f"""\
+        resolution:
+          mode: {mode}
+          block-length: 6
+          block-overlap: 0
+    """)
+
+
+def test_zero_overlap_blocks_fully_independent(tmp_path: Path) -> None:
+    """With block-overlap: 0 nothing is carried between blocks: each block is
+    solved as if it were alone (no carry-over constraints).
+
+    Older GemsPy versions implicitly seeded each block's first timestep with
+    the previous block's final state even at block-overlap: 0; that seeding is
+    gone (breaking change of issue #271).  Two complementary checks:
+
+    - Block 1 ([6..11], demand [2,4,0,4,4,0]) serves its t=7 peak by
+      pre-charging its *free* initial storage state.  Under the old implicit
+      seeding, SoC(t=6) was pinned to block 0's final SoC=0 and the generator
+      (p_max=2, fully used by demand=2 at t=6) could not recharge in time,
+      forcing 2 units of unserved energy at t=7.
+    - The whole solution is identical to parallel-subproblems mode, which
+      solves the same windows independently by construction.
+    """
+    seq_raw = _run(
+        tmp_path, "seq_no_overlap", _no_overlap_config("sequential-subproblems")
+    )
+    par_raw = _run(tmp_path, "parallel", _no_overlap_config("parallel-subproblems"))
+
+    # block-length=6, block-overlap=0, t=0..11 → blocks [0..5] and [6..11]
+    # share no timesteps.
+    assert _shared_timesteps(seq_raw) == {(0, 1): []}
+
+    # No carry-over constraint: block 1's initial SoC is free, the t=7 peak
+    # is fully served.
+    assert _get_value(seq_raw, 1, "bus", "unsupplied", 7) == pytest.approx(
+        0.0, abs=1e-6
+    ), "Block 1 must serve its t=7 peak from a free initial storage state"
+
+    # Fully independent blocks: identical to parallel-subproblems mode
+    # (both modes enumerate the same windows with the same 0-based block ids).
+    for component, output in _OUTPUTS:
+        for t in range(12):
+            v_seq = _get_value(seq_raw, t // 6, component, output, t)
+            v_par = _get_value(par_raw, t // 6, component, output, t)
+            assert v_seq == pytest.approx(v_par, abs=1e-6), (
+                f"sequential (block-overlap: 0) and parallel modes disagree at "
+                f"t={t} for {component}.{output}: {v_seq} != {v_par}"
+            )
