@@ -305,13 +305,6 @@ tooling decides which block's version of a shared timestep is authoritative;
 `carry-over-length` only controls how much two consecutive blocks may
 *disagree* on that shared window.
 
-!!! warning "Breaking change: `block-overlap: 0` no longer carries state"
-    Older GemsPy versions always carried a single timestep of state between
-    blocks, even with `block-overlap: 0`.  Now the carry-over is bounded by
-    the overlap: a `block-overlap: 0` configuration carries **nothing**
-    between blocks.  If you rely on state continuity (e.g. storage
-    state-of-charge), set `block-overlap: 1` (and optionally
-    `carry-over-length: 1`) to recover the previous behaviour.
 
 
 ### `parallel-subproblems`
