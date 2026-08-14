@@ -6,20 +6,8 @@ All notable changes to GemsPy are documented here.
 
 ### Changed
 
-- **BREAKING — sequential mode carry-over is now bounded by `block-overlap`**
-  \- in `sequential-subproblems` mode, the carry-over that stitches
-  consecutive blocks together is now governed by a new `resolution` setting,
-  `carry-over-length` (default: `block-overlap`), and pins the *shared*
-  leading timesteps of each block to the previous block's values at the same
-  absolute timesteps. This fixes an incorrect stitching for
-  `block-overlap >= 2`, where the previous hardcoded behaviour pinned block
-  *N+1*'s first timestep to block *N*'s **last** timestep — a different
-  absolute timestep. **Migration**: configs using `block-overlap: 0` (the
-  default) no longer get the previous implicit single-timestep state
-  continuity; if you rely on state carried between blocks (e.g. storage
-  state-of-charge), set `block-overlap: 1` (and optionally
-  `carry-over-length: 1`) to recover the previous behaviour. `block-overlap`
-  is also newly validated: `0 <= block-overlap < block-length`.
+- **Sequential mode carry-over length can now be controlled by the user through the parameter  `carry-over-length` (default: `block-overlap`) `block-overlap`**. This also fixes an incorrect stitching for `block-overlap >= 2`, where the previous hardcoded behaviour pinned block
+  *N+1*'s first timestep to block *N*'s **last** timestep — a different absolute timestep. 
 
 ### Added
 
