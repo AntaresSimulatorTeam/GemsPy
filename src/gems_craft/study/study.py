@@ -79,7 +79,7 @@ class Study:
                 if not data_structure.check_requirement(
                     declared.time, declared.scenario
                 ):
-                    actual = data_structure.structure()
+                    actual = data_structure.indexing_structure()
                     raise ValueError(
                         f"Data inconsistency for component: {component.id}, "
                         f"parameter: {param.name}. The data varies along "

@@ -50,7 +50,7 @@ class AbstractDataStructure(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def structure(self) -> "IndexingStructure":
+    def indexing_structure(self) -> "IndexingStructure":
         """Axes along which this data actually varies."""
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
@@ -59,7 +59,7 @@ class AbstractDataStructure(ABC):
         Data may vary along fewer axes than the parameter declares — it is then
         broadcast over the missing ones — but never along more.
         """
-        own = self.structure()
+        own = self.indexing_structure()
         return (time or not own.time) and (scenario or not own.scenario)
 
 
@@ -74,7 +74,7 @@ class ConstantData(AbstractDataStructure):
     ) -> float:
         return self.value
 
-    def structure(self) -> "IndexingStructure":
+    def indexing_structure(self) -> "IndexingStructure":
         return IndexingStructure(time=False, scenario=False)
 
 
@@ -98,7 +98,7 @@ class TimeSeriesData(AbstractDataStructure):
             )
         return result
 
-    def structure(self) -> "IndexingStructure":
+    def indexing_structure(self) -> "IndexingStructure":
         return IndexingStructure(time=True, scenario=False)
 
 
@@ -125,7 +125,7 @@ class ScenarioSeriesData(AbstractDataStructure):
             )
         return result
 
-    def structure(self) -> "IndexingStructure":
+    def indexing_structure(self) -> "IndexingStructure":
         return IndexingStructure(time=False, scenario=True)
 
 
@@ -146,7 +146,7 @@ class TimeScenarioSeriesData(AbstractDataStructure):
             raise KeyError("Time scenario data requires a scenario index.")
         return self.time_scenario_series.values[np.ix_(np.asarray(timestep), scenario)]
 
-    def structure(self) -> "IndexingStructure":
+    def indexing_structure(self) -> "IndexingStructure":
         return IndexingStructure(time=True, scenario=True)
 
 

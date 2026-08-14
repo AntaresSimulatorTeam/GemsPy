@@ -147,7 +147,9 @@ def test_dataframe_to_scenario_series_multi_row_error_hints_at_time() -> None:
 def test_data_structure_reports_its_axes(
     data: AbstractDataStructure, expected_time: bool, expected_scenario: bool
 ) -> None:
-    assert data.structure() == IndexingStructure(expected_time, expected_scenario)
+    assert data.indexing_structure() == IndexingStructure(
+        expected_time, expected_scenario
+    )
 
 
 @pytest.mark.parametrize(
