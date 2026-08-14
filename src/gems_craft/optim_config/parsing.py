@@ -153,6 +153,7 @@ class ResolutionConfig(ModifiedBaseModel):
     mode: ResolutionMode = ResolutionMode.FRONTAL
     block_length: Optional[int] = None
     block_overlap: int = 0
+    carry_over_length: Optional[int] = None
 
     @model_validator(mode="after")
     def _block_length_required_for_windowed_modes(self) -> "ResolutionConfig":
@@ -163,6 +164,43 @@ class ResolutionConfig(ModifiedBaseModel):
         if self.mode in windowed and self.block_length is None:
             raise ValueError(f"'block_length' is required for mode '{self.mode.value}'")
         return self
+
+    @model_validator(mode="after")
+    def _validate_block_overlap(self) -> "ResolutionConfig":
+        if self.block_overlap < 0:
+            raise ValueError(f"'block-overlap' must be >= 0, got {self.block_overlap}")
+        if self.block_length is not None and self.block_overlap >= self.block_length:
+            raise ValueError(
+                f"'block-overlap' ({self.block_overlap}) must be < 'block-length' "
+                f"({self.block_length})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_carry_over_length(self) -> "ResolutionConfig":
+        if self.carry_over_length is not None:
+            if self.carry_over_length < 0:
+                raise ValueError(
+                    f"'carry-over-length' must be >= 0, got {self.carry_over_length}"
+                )
+            if self.carry_over_length > self.block_overlap:
+                raise ValueError(
+                    f"'carry-over-length' ({self.carry_over_length}) must be <= "
+                    f"'block-overlap' ({self.block_overlap})"
+                )
+        return self
+
+    @property
+    def effective_carry_over_length(self) -> int:
+        """Resolved carry-over length: explicit value if set, else full pin of
+        the overlap zone (``block_overlap``). ``0`` is a legal explicit value,
+        distinct from "unset", meaning blocks overlap for lag-constraint
+        history but are not stitched at all."""
+        return (
+            self.carry_over_length
+            if self.carry_over_length is not None
+            else self.block_overlap
+        )
 
 
 class TimeScopeConfig(ModifiedBaseModel):
