@@ -15,6 +15,7 @@ from typing import List, Optional, TextIO
 from pydantic import Field
 
 from gems_craft.model.parsing import LibrarySchema, PortTypeSchema, parse_yaml_library
+from gems_craft.model.taxonomy import Taxonomy
 from gems_craft.utils import ModifiedBaseModel
 
 
@@ -37,5 +38,7 @@ class HybridLibrarySchema(LibrarySchema):
     port_types: List[HybridPortTypeSchema] = Field(default_factory=list)  # type: ignore[assignment]
 
 
-def parse_yaml_hybrid_library(input: TextIO) -> HybridLibrarySchema:
-    return parse_yaml_library(input, HybridLibrarySchema)
+def parse_yaml_hybrid_library(
+    input: TextIO, taxonomy: Optional[Taxonomy] = None
+) -> HybridLibrarySchema:
+    return parse_yaml_library(input, HybridLibrarySchema, taxonomy)

@@ -14,6 +14,7 @@ my_study/
 ├── input/
 │   ├── system.yml
 │   ├── optim-config.yml
+│   ├── taxonomy.yml                     ← optional
 │   ├── model-libraries/
 │   │   └── *.yml
 │   └── data-series/
@@ -31,6 +32,39 @@ study = load_study(Path("my_study"))
 `load_study()` returns a `Study` object that bundles the resolved `System`,
 the `DataBase` with all parameter values, and the `ScenarioBuilder` loaded
 from `input/data-series/modeler-scenariobuilder.dat` (if present).
+
+---
+
+## Taxonomy checking
+
+A library may declare the taxonomy it conforms to:
+
+~~~ yaml
+library:
+  id: basic
+  taxonomy: basic_taxonomy_of_models
+~~~
+
+When it does, every model carrying a `taxonomy-category` is checked against the
+matching category of that taxonomy: the model must expose all the variables,
+parameters, ports, port-field-definitions, constraints, binding-constraints,
+extra-outputs and properties the category requires (extra items are allowed).
+
+`load_study()` reads the taxonomy from `input/taxonomy.yml`. A library that
+declares a `taxonomy` fails to load when that file is missing, or when its id
+does not match the declared one. Libraries with no `taxonomy` field are never
+checked, even if their models carry a `taxonomy-category`.
+
+Outside the directory layout, pass the taxonomy explicitly:
+
+~~~ python
+from gems_craft.model.parsing import parse_yaml_library
+from gems_craft.model.taxonomy import load_taxonomy
+
+taxonomy = load_taxonomy(Path("taxonomy.yml"))
+with open("simple_library.yml") as lib_file:
+    library = parse_yaml_library(lib_file, taxonomy=taxonomy)
+~~~
 
 ---
 

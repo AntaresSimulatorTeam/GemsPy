@@ -38,7 +38,7 @@ class TaxonomyCategory(ModifiedBaseModel):
     properties: List[TaxonomyItem] = Field(default_factory=list)
 
 
-class TaxonomyData(ModifiedBaseModel):
+class TaxonomySchema(ModifiedBaseModel):
     id: str
     description: str = ""
     categories: List[TaxonomyCategory] = Field(default_factory=list)
@@ -56,7 +56,7 @@ def load_taxonomy(taxonomy_file: Path) -> Taxonomy:
         raw = yaml.safe_load(f)
     if "taxonomy" not in raw:
         raise ValueError(f"Missing 'taxonomy' key at root of {taxonomy_file}")
-    data = TaxonomyData.model_validate(raw["taxonomy"])
+    data = TaxonomySchema.model_validate(raw["taxonomy"])
     return Taxonomy(
         id=data.id, description=data.description, categories=data.categories
     )

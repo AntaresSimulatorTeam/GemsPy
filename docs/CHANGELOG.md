@@ -14,6 +14,24 @@ All notable changes to GemsPy are documented here.
   what a heuristic reads/writes via `models[].heuristics` in
   `optim-config.yml`.
 
+- **Taxonomy conformance is now enforced at parse time** - `parse_yaml_library`
+  accepts an optional `taxonomy` argument and runs
+  `check_library_against_taxonomy` on every library declaring a `taxonomy`
+  field, which until now was parsed but never validated. `load_study` reads the
+  taxonomy from the new optional `input/taxonomy.yml`; `parse_yaml_hybrid_library`
+  and `gems_runner.main.input_libs` thread the argument through.
+
+### Changed
+
+- **Breaking: a library declaring `taxonomy` no longer parses unchecked** -
+  `parse_yaml_library` raises `ValueError` when such a library is parsed without
+  a taxonomy to check it against, and when the supplied taxonomy's id differs
+  from the declared one. Libraries with no `taxonomy` field are unaffected, even
+  if their models carry a `taxonomy-category`.
+- **Breaking: `TaxonomyData` renamed to `TaxonomySchema`** - aligns with the
+  `LibrarySchema` / `ModelSchema` / `PortTypeSchema` naming used for the other
+  YAML-backed pydantic models. No alias is kept.
+
 ## [0.1.3] - 2026-07-24
 
 ### Added

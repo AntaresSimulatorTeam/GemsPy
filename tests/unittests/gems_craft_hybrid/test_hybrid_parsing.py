@@ -12,6 +12,7 @@
 
 """Tests for gems_craft_hybrid parsing: HybridSystemSchema and HybridLibrarySchema."""
 
+import io
 from pathlib import Path
 from typing import Type, TypeVar
 
@@ -22,6 +23,7 @@ from gems_craft.model.parsing import (
     parse_yaml_library,
     write_yaml_library,
 )
+from gems_craft.model.taxonomy import Taxonomy, TaxonomyCategory, TaxonomyItem
 from gems_craft.study.parsing import (
     SystemSchema,
     parse_yaml_system,
@@ -201,3 +203,47 @@ def test_load_hybrid_system_parses_thermal_capacity_connections() -> None:
     assert conn.thermal_component == ThermalComponentSchema(
         area="fr", cluster_id="nuclear1"
     )
+
+
+# ---------------------------------------------------------------------------
+# Taxonomy check is threaded through the hybrid parser
+# ---------------------------------------------------------------------------
+
+
+_TAXONOMY_LIB = """
+library:
+  id: mylib
+  taxonomy: hybrid_taxonomy
+  port-types:
+    - id: flow
+      fields:
+        - id: flow
+  models:
+    - id: generator
+      taxonomy-category: production
+      ports:
+        - id: injection_port
+          type: flow
+"""
+
+
+def test_parse_hybrid_library_checks_declared_taxonomy() -> None:
+    taxonomy = Taxonomy(
+        id="hybrid_taxonomy",
+        categories=[
+            TaxonomyCategory(id="production", ports=[TaxonomyItem(id="injection_port")])
+        ],
+    )
+    lib = parse_yaml_hybrid_library(io.StringIO(_TAXONOMY_LIB), taxonomy)
+    assert lib.taxonomy == "hybrid_taxonomy"
+
+
+def test_parse_hybrid_library_raises_on_taxonomy_violation() -> None:
+    taxonomy = Taxonomy(
+        id="hybrid_taxonomy",
+        categories=[
+            TaxonomyCategory(id="production", ports=[TaxonomyItem(id="missing_port")])
+        ],
+    )
+    with pytest.raises(ValueError, match="missing_port"):
+        parse_yaml_hybrid_library(io.StringIO(_TAXONOMY_LIB), taxonomy)

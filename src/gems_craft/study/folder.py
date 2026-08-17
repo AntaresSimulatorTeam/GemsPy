@@ -5,6 +5,8 @@ A study is defined by a directory containing:
 - `input/system.yml`: A file describing the system to be simulated.
 - `input/model-libraries/`: A folder containing model library files in YAML format.
 - `input/data-series/`: A folder containing data series files.
+- `input/taxonomy.yml` (optional): A taxonomy that libraries declaring a `taxonomy`
+  field are checked against.
 """
 
 from pathlib import Path
@@ -12,6 +14,7 @@ from pathlib import Path
 from gems_craft.model.model import Model
 from gems_craft.model.parsing import parse_yaml_library
 from gems_craft.model.resolve_library import resolve_library
+from gems_craft.model.taxonomy import load_taxonomy
 from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import (
     build_data_base,
@@ -28,7 +31,8 @@ def load_study(study_dir: Path) -> Study:
 
     This function reads the system definition, model libraries, and data series
     from the study directory, resolves them, and builds the simulation system
-    and database.
+    and database. If `input/taxonomy.yml` exists, every library declaring a
+    `taxonomy` is checked against it.
 
     Args:
         study_dir: The path to the study directory.
@@ -39,11 +43,14 @@ def load_study(study_dir: Path) -> Study:
     system_file = study_dir / "input" / "system.yml"
     lib_folder = study_dir / "input" / "model-libraries"
     series_dir = study_dir / "input" / "data-series"
+    taxonomy_file = study_dir / "input" / "taxonomy.yml"
+
+    taxonomy = load_taxonomy(taxonomy_file) if taxonomy_file.exists() else None
 
     input_libraries = []
     for lib_file in lib_folder.glob("*.yml"):
         with lib_file.open() as lib:
-            input_libraries.append(parse_yaml_library(lib))
+            input_libraries.append(parse_yaml_library(lib, taxonomy=taxonomy))
 
     with system_file.open() as c:
         input_study = parse_yaml_system(c)

@@ -19,6 +19,11 @@ from yaml import safe_dump, safe_load
 
 from gems_craft.utils import ModifiedBaseModel
 
+if typing.TYPE_CHECKING:
+    # Imported for typing only: gems_craft.model.taxonomy depends on this module
+    # for LibrarySchema/ModelSchema, so importing it here would be circular.
+    from gems_craft.model.taxonomy import Taxonomy
+
 
 class ParameterSchema(ModifiedBaseModel):
     id: str
@@ -114,18 +119,52 @@ class LibrarySchema(ModifiedBaseModel):
 _L = TypeVar("_L", bound=LibrarySchema)
 
 
+def _check_declared_taxonomy(
+    library: LibrarySchema, taxonomy: Optional["Taxonomy"]
+) -> None:
+    """Check a library against the taxonomy it declares conformance to.
+
+    Only called for libraries carrying a ``taxonomy`` field. The taxonomy itself is
+    resolved by the caller (see ``load_taxonomy``), so that parsing stays independent
+    of where taxonomy files live.
+    """
+    # Deferred import: gems_craft.model.taxonomy imports this module.
+    from gems_craft.model.taxonomy import check_library_against_taxonomy
+
+    if taxonomy is None:
+        raise ValueError(
+            f"Library '{library.id}' declares taxonomy '{library.taxonomy}' but no "
+            f"taxonomy was provided to check it against."
+        )
+    if library.taxonomy != taxonomy.id:
+        raise ValueError(
+            f"Library '{library.id}' declares taxonomy '{library.taxonomy}' but was "
+            f"checked against taxonomy '{taxonomy.id}'."
+        )
+    check_library_against_taxonomy(library, taxonomy)
+
+
 @overload
-def parse_yaml_library(input: typing.TextIO) -> LibrarySchema: ...
-@overload
-def parse_yaml_library(input: typing.TextIO, schema: Type[_L]) -> _L: ...
 def parse_yaml_library(
-    input: typing.TextIO, schema: Type[LibrarySchema] = LibrarySchema
+    input: typing.TextIO, *, taxonomy: Optional["Taxonomy"] = None
+) -> LibrarySchema: ...
+@overload
+def parse_yaml_library(
+    input: typing.TextIO, schema: Type[_L], taxonomy: Optional["Taxonomy"] = None
+) -> _L: ...
+def parse_yaml_library(
+    input: typing.TextIO,
+    schema: Type[LibrarySchema] = LibrarySchema,
+    taxonomy: Optional["Taxonomy"] = None,
 ) -> LibrarySchema:
     tree = safe_load(input)
     try:
-        return schema.model_validate(tree["library"])
+        library = schema.model_validate(tree["library"])
     except ValidationError as e:
         raise ValueError(f"An error occurred during parsing: {e}")
+    if library.taxonomy is not None:
+        _check_declared_taxonomy(library, taxonomy)
+    return library
 
 
 def write_yaml_library(library: LibrarySchema, path: Path) -> None:

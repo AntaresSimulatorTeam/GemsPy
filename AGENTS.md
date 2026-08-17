@@ -72,7 +72,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 **`gems_craft/model/`** — Immutable model templates.
 - `Model`: defines component behavior (parameters, variables, constraints, ports)
 - `Library`: a collection of models, loaded from YAML
-- `Taxonomy` (`taxonomy.py`): categories naming the items a model must expose. Models opt in via `taxonomy-category`; `check_library_against_taxonomy` enforces conformance.
+- `Taxonomy` (`taxonomy.py`): categories naming the items a model must expose. Models opt in via `taxonomy-category`; `check_library_against_taxonomy` enforces conformance. It is called from `parse_yaml_library` for every library declaring a `taxonomy` field — the caller supplies the `Taxonomy` (`load_study` reads it from the optional `input/taxonomy.yml`), and parsing fails if none is supplied or its id differs from the declared one.
 
 **`gems_craft/expression/`** — Mathematical expression language and AST (structural/static analysis only — no numeric evaluation).
 - `ExpressionNode`: base frozen dataclass for all expression tree nodes
