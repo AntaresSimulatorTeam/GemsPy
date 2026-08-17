@@ -12,13 +12,16 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 import yaml
 from pydantic import Field
 
-from gems_craft.model.parsing import LibrarySchema, ModelSchema
 from gems_craft.utils import ModifiedBaseModel
+
+if TYPE_CHECKING:
+    # Annotations only — parsing.py imports this module, so this would be circular.
+    from gems_craft.model.parsing import LibrarySchema, ModelSchema
 
 
 class TaxonomyItem(ModifiedBaseModel):
@@ -76,7 +79,9 @@ def _missing(
     )
 
 
-def check_library_against_taxonomy(library: LibrarySchema, taxonomy: Taxonomy) -> None:
+def check_library_against_taxonomy(
+    library: "LibrarySchema", taxonomy: Taxonomy
+) -> None:
     """
     Validates that every model declaring a taxonomy_category:
       1. References a category that exists in the taxonomy.

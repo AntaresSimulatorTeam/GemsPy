@@ -17,12 +17,8 @@ from typing import List, Optional, Type, TypeVar, overload
 from pydantic import ConfigDict, Field, ValidationError
 from yaml import safe_dump, safe_load
 
+from gems_craft.model.taxonomy import Taxonomy, check_library_against_taxonomy
 from gems_craft.utils import ModifiedBaseModel
-
-if typing.TYPE_CHECKING:
-    # Imported for typing only: gems_craft.model.taxonomy depends on this module
-    # for LibrarySchema/ModelSchema, so importing it here would be circular.
-    from gems_craft.model.taxonomy import Taxonomy
 
 
 class ParameterSchema(ModifiedBaseModel):
@@ -120,41 +116,31 @@ _L = TypeVar("_L", bound=LibrarySchema)
 
 
 def _check_declared_taxonomy(
-    library: LibrarySchema, taxonomy: Optional["Taxonomy"]
+    library: LibrarySchema, taxonomy: Optional[Taxonomy]
 ) -> None:
-    """Check a library against the taxonomy it declares conformance to.
-
-    The taxonomy is resolved by the caller (see ``load_taxonomy``), so that parsing
-    stays independent of where taxonomy files live.
-    """
-    # Deferred import: gems_craft.model.taxonomy imports this module.
-    from gems_craft.model.taxonomy import check_library_against_taxonomy
-
+    """Check a library against the taxonomy it declares conformance to."""
+    declared = f"Library '{library.id}' declares taxonomy '{library.taxonomy}'"
     if taxonomy is None:
         raise ValueError(
-            f"Library '{library.id}' declares taxonomy '{library.taxonomy}' but no "
-            "taxonomy was provided to check it against."
+            f"{declared} but no taxonomy was provided to check it against."
         )
     if library.taxonomy != taxonomy.id:
-        raise ValueError(
-            f"Library '{library.id}' declares taxonomy '{library.taxonomy}' but was "
-            f"checked against taxonomy '{taxonomy.id}'."
-        )
+        raise ValueError(f"{declared} but was checked against '{taxonomy.id}'.")
     check_library_against_taxonomy(library, taxonomy)
 
 
 @overload
 def parse_yaml_library(
-    input: typing.TextIO, *, taxonomy: Optional["Taxonomy"] = None
+    input: typing.TextIO, *, taxonomy: Optional[Taxonomy] = None
 ) -> LibrarySchema: ...
 @overload
 def parse_yaml_library(
-    input: typing.TextIO, schema: Type[_L], taxonomy: Optional["Taxonomy"] = None
+    input: typing.TextIO, schema: Type[_L], taxonomy: Optional[Taxonomy] = None
 ) -> _L: ...
 def parse_yaml_library(
     input: typing.TextIO,
     schema: Type[LibrarySchema] = LibrarySchema,
-    taxonomy: Optional["Taxonomy"] = None,
+    taxonomy: Optional[Taxonomy] = None,
 ) -> LibrarySchema:
     tree = safe_load(input)
     try:
