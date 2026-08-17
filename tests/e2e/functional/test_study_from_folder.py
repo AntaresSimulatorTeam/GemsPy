@@ -7,7 +7,6 @@ import pytest
 from gems_craft.study.folder import load_study
 from gems_runner.study.runner import run_study
 
-LIB_FILE = Path("input") / "model-libraries" / "antares_historic.yml"
 TAXONOMY_FILE = Path("input") / "taxonomy.yml"
 
 
@@ -38,7 +37,7 @@ def _study_declaring_taxonomy(tmp_path: Path) -> Path:
     study_dir = tmp_path / "7_4"
     shutil.copytree(Path(__file__).parent / "studies" / "7_4", study_dir)
 
-    lib_path = study_dir / LIB_FILE
+    lib_path = study_dir / "input" / "model-libraries" / "antares_historic.yml"
     lib_path.write_text(
         lib_path.read_text().replace(
             "  id: antares-historic-weo",

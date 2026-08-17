@@ -227,23 +227,24 @@ library:
 """
 
 
-def test_parse_hybrid_library_checks_declared_taxonomy() -> None:
-    taxonomy = Taxonomy(
+def _taxonomy_requiring(port_id: str) -> Taxonomy:
+    return Taxonomy(
         id="hybrid_taxonomy",
         categories=[
-            TaxonomyCategory(id="production", ports=[TaxonomyItem(id="injection_port")])
+            TaxonomyCategory(id="production", ports=[TaxonomyItem(id=port_id)])
         ],
     )
-    lib = parse_yaml_hybrid_library(io.StringIO(_TAXONOMY_LIB), taxonomy)
+
+
+def test_parse_hybrid_library_checks_declared_taxonomy() -> None:
+    lib = parse_yaml_hybrid_library(
+        io.StringIO(_TAXONOMY_LIB), _taxonomy_requiring("injection_port")
+    )
     assert lib.taxonomy == "hybrid_taxonomy"
 
 
 def test_parse_hybrid_library_raises_on_taxonomy_violation() -> None:
-    taxonomy = Taxonomy(
-        id="hybrid_taxonomy",
-        categories=[
-            TaxonomyCategory(id="production", ports=[TaxonomyItem(id="missing_port")])
-        ],
-    )
     with pytest.raises(ValueError, match="missing_port"):
-        parse_yaml_hybrid_library(io.StringIO(_TAXONOMY_LIB), taxonomy)
+        parse_yaml_hybrid_library(
+            io.StringIO(_TAXONOMY_LIB), _taxonomy_requiring("missing_port")
+        )

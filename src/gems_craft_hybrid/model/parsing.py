@@ -41,4 +41,4 @@ class HybridLibrarySchema(LibrarySchema):
 def parse_yaml_hybrid_library(
     input: TextIO, taxonomy: Optional[Taxonomy] = None
 ) -> HybridLibrarySchema:
-    return parse_yaml_library(input, HybridLibrarySchema, taxonomy)
+    return parse_yaml_library(input, HybridLibrarySchema, taxonomy=taxonomy)

@@ -124,9 +124,8 @@ def _check_declared_taxonomy(
 ) -> None:
     """Check a library against the taxonomy it declares conformance to.
 
-    Only called for libraries carrying a ``taxonomy`` field. The taxonomy itself is
-    resolved by the caller (see ``load_taxonomy``), so that parsing stays independent
-    of where taxonomy files live.
+    The taxonomy is resolved by the caller (see ``load_taxonomy``), so that parsing
+    stays independent of where taxonomy files live.
     """
     # Deferred import: gems_craft.model.taxonomy imports this module.
     from gems_craft.model.taxonomy import check_library_against_taxonomy
@@ -134,7 +133,7 @@ def _check_declared_taxonomy(
     if taxonomy is None:
         raise ValueError(
             f"Library '{library.id}' declares taxonomy '{library.taxonomy}' but no "
-            f"taxonomy was provided to check it against."
+            "taxonomy was provided to check it against."
         )
     if library.taxonomy != taxonomy.id:
         raise ValueError(

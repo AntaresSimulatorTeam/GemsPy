@@ -448,6 +448,15 @@ library:
       taxonomy-category: production
 """
 
+# Same violating model, but the library itself does not opt in to a taxonomy.
+_LIB_WITHOUT_TAXONOMY = """
+library:
+  id: mylib
+  models:
+    - id: generator
+      taxonomy-category: production
+"""
+
 
 def test_parse_library_declaring_taxonomy_is_checked() -> None:
     taxonomy = _make_taxonomy(_make_category("production", ["injection_port"]))
@@ -478,14 +487,5 @@ def test_parse_library_with_mismatched_taxonomy_id_raises() -> None:
 def test_parse_library_without_declared_taxonomy_is_not_checked() -> None:
     """A model may carry a taxonomy-category without the library opting in."""
     taxonomy = _make_taxonomy(_make_category("production", ["injection_port"]))
-    lib = _parse_lib(
-        """
-library:
-  id: mylib
-  models:
-    - id: generator
-      taxonomy-category: production
-""",
-        taxonomy,
-    )
+    lib = _parse_lib(_LIB_WITHOUT_TAXONOMY, taxonomy)
     assert lib.taxonomy is None
