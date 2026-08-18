@@ -15,17 +15,7 @@ from typing import List, Optional, TextIO
 from pydantic import Field
 
 from gems_craft.model.parsing import LibrarySchema, PortTypeSchema, parse_yaml_library
-from gems_craft.utils import ModifiedBaseModel
-
-
-class AreaConnectionSchema(ModifiedBaseModel):
-    injection_to_balance: Optional[str] = None
-    spillage_bound: Optional[str] = None
-    unsupplied_energy_bound: Optional[str] = None
-
-
-class PortThermalCapacitySchema(ModifiedBaseModel):
-    capacity_field: str
+from gems_craft.model.port_type_schemas import AreaConnectionSchema, PortThermalCapacitySchema
 
 
 class HybridPortTypeSchema(PortTypeSchema):
