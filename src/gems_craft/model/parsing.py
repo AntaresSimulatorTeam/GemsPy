@@ -127,13 +127,11 @@ _L = TypeVar("_L", bound=LibrarySchema)
 
 
 @overload
-def parse_yaml_library(input: typing.TextIO) -> LibrarySchema:
-    ...
+def parse_yaml_library(input: typing.TextIO) -> LibrarySchema: ...
 
 
 @overload
-def parse_yaml_library(input: typing.TextIO, schema: Type[_L]) -> _L:
-    ...
+def parse_yaml_library(input: typing.TextIO, schema: Type[_L]) -> _L: ...
 
 
 def parse_yaml_library(
