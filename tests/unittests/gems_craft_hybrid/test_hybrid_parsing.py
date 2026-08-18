@@ -139,7 +139,9 @@ def test_load_standard_library_on_hybrid_file_parses_area_connection() -> None:
     )
 
 
-def test_load_standard_library_on_hybrid_file_parses_thermal_capacity_connection() -> None:
+def test_load_standard_library_on_hybrid_file_parses_thermal_capacity_connection() -> (
+    None
+):
     """parse_yaml_library (standard) and parses thermal-capacity-connection fields."""
     with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
         lib = parse_yaml_library(f)
