@@ -64,6 +64,8 @@ class PortTypeSchema(ModifiedBaseModel):
     id: str
     fields: List[FieldSchema] = Field(default_factory=list)
     description: Optional[str] = None
+    area_connection: Optional[AreaConnectionSchema] = None
+    thermal_capacity_connection: Optional[PortThermalCapacitySchema] = None
 
 
 class ModelPortSchema(ModifiedBaseModel):
