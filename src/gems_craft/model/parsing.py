@@ -17,6 +17,7 @@ from typing import List, Optional, Type, TypeVar, overload
 from pydantic import ConfigDict, Field, ValidationError
 from yaml import safe_dump, safe_load
 
+from gems_craft.model.port_type_schemas import AreaConnectionSchema, PortThermalCapacitySchema
 from gems_craft.utils import ModifiedBaseModel
 
 
@@ -53,6 +54,8 @@ class FieldSchema(ModifiedBaseModel):
 class PortTypeSchema(ModifiedBaseModel):
     id: str
     fields: List[FieldSchema] = Field(default_factory=list)
+    area_connection: Optional[AreaConnectionSchema] = None
+    thermal_capacity_connection: Optional[PortThermalCapacitySchema] = None
     description: Optional[str] = None
 
 
