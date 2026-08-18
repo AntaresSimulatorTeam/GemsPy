@@ -15,7 +15,10 @@ from typing import List, Optional, TextIO
 from pydantic import Field
 
 from gems_craft.model.parsing import LibrarySchema, PortTypeSchema, parse_yaml_library
-from gems_craft.model.port_type_schemas import AreaConnectionSchema, PortThermalCapacitySchema
+from gems_craft.model.port_type_schemas import (
+    AreaConnectionSchema,
+    PortThermalCapacitySchema,
+)
 
 
 class HybridPortTypeSchema(PortTypeSchema):

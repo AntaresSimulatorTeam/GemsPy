@@ -17,7 +17,10 @@ from typing import List, Optional, Type, TypeVar, overload
 from pydantic import ConfigDict, Field, ValidationError
 from yaml import safe_dump, safe_load
 
-from gems_craft.model.port_type_schemas import AreaConnectionSchema, PortThermalCapacitySchema
+from gems_craft.model.port_type_schemas import (
+    AreaConnectionSchema,
+    PortThermalCapacitySchema,
+)
 from gems_craft.utils import ModifiedBaseModel
 
 
