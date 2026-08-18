@@ -50,6 +50,16 @@ class FieldSchema(ModifiedBaseModel):
     id: str
 
 
+class AreaConnectionSchema(ModifiedBaseModel):
+    injection_to_balance: Optional[str] = None
+    spillage_bound: Optional[str] = None
+    unsupplied_energy_bound: Optional[str] = None
+
+
+class PortThermalCapacitySchema(ModifiedBaseModel):
+    capacity_field: str
+
+
 class PortTypeSchema(ModifiedBaseModel):
     id: str
     fields: List[FieldSchema] = Field(default_factory=list)
