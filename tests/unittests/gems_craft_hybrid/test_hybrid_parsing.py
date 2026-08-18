@@ -13,6 +13,7 @@
 """Tests for gems_craft_hybrid parsing: HybridSystemSchema and HybridLibrarySchema."""
 
 from pathlib import Path
+
 import pytest
 
 from gems_craft.model.parsing import (
