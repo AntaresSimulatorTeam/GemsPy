@@ -6,10 +6,7 @@ All notable changes to GemsPy are documented here.
 
 ### Changed
 - **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
-  to **3.11** accordingly (linopy 0.9 requires Python >= 3.11); Python 3.10 is
-  no longer supported. Note that linopy 0.9 refuses to solve a model with no
-  objective, so every model used in a solve must now contribute at least a
-  null objective (e.g. `expec(sum(0 * some_var))`).
+  to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
 
 ### Added
 - **Integer strategy and thermal heuristics** - components can now set
