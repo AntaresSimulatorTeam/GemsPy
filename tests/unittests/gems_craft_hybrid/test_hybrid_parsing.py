@@ -13,17 +13,14 @@
 """Tests for gems_craft_hybrid parsing: HybridSystemSchema and HybridLibrarySchema."""
 
 from pathlib import Path
-from typing import Type, TypeVar
 
 import pytest
 
 from gems_craft.model.parsing import (
-    LibrarySchema,
     parse_yaml_library,
     write_yaml_library,
 )
 from gems_craft.study.parsing import (
-    SystemSchema,
     parse_yaml_system,
     write_yaml_system,
 )
@@ -130,11 +127,28 @@ def test_load_hybrid_library_port_type_without_area_connection() -> None:
     assert signal_port.area_connection is None
 
 
-def test_load_standard_library_on_hybrid_file_raises() -> None:
-    """parse_yaml_library (standard) rejects hybrid-only fields due to extra='forbid'."""
+def test_load_standard_library_on_hybrid_file_parses_area_connection() -> None:
+    """parse_yaml_library (standard) and parses area-connection fields."""
     with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
-        with pytest.raises(ValueError):
-            parse_yaml_library(f)
+        lib = parse_yaml_library(f)
+    flow_port = next(pt for pt in lib.port_types if pt.id == "flow")
+    assert flow_port.area_connection == AreaConnectionSchema(
+        injection_to_balance="flow",
+        spillage_bound="flow",
+        unsupplied_energy_bound=None,
+    )
+
+
+def test_load_standard_library_on_hybrid_file_parses_thermal_capacity_connection() -> None:
+    """parse_yaml_library (standard) and parses thermal-capacity-connection fields."""
+    with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
+        lib = parse_yaml_library(f)
+    capacity_port = next(
+        pt for pt in lib.port_types if pt.id == "antares_thermal_cluster_capacity"
+    )
+    assert capacity_port.thermal_capacity_connection == PortThermalCapacitySchema(
+        capacity_field="capacity"
+    )
 
 
 def test_parse_yaml_hybrid_library_reads_hybrid_fields() -> None:
