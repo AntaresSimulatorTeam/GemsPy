@@ -24,11 +24,7 @@ from gems_craft.model.parsing import (
     parse_yaml_library,
     write_yaml_library,
 )
-from gems_craft.study.parsing import (
-    SystemSchema,
-    parse_yaml_system,
-    write_yaml_system,
-)
+from gems_craft.study.parsing import parse_yaml_system, write_yaml_system
 from gems_craft_hybrid.study.parsing import (
     AreaConnectionsSchema,
     HybridSystemSchema,
@@ -136,7 +132,9 @@ def test_load_standard_library_on_hybrid_file_parses_area_connection() -> None:
     )
 
 
-def test_load_standard_library_on_hybrid_file_parses_thermal_capacity_connection() -> None:
+def test_load_standard_library_on_hybrid_file_parses_thermal_capacity_connection() -> (
+    None
+):
     with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
         lib = parse_yaml_library(f)
     capacity_port = next(
