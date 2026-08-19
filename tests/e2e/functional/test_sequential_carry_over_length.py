@@ -11,7 +11,7 @@
 # This file is part of the Antares project.
 
 """
-E2E test: multi-timestep carry-over in sequential mode (Issue #271).
+E2E test: multi-timestep carry-over in sequential mode.
 
 Reuses the rolling_horizon_suboptimality study (generator p_max=2/cost=1,
 storage capacity=2/rate=2, bus with ens_cost=100) with a longer, aperiodic
@@ -208,10 +208,7 @@ def test_zero_overlap_blocks_fully_independent(tmp_path: Path) -> None:
     Two complementary checks:
 
     - Block 1 ([6..11], demand [2,4,0,4,4,0]) serves its t=7 peak by
-      pre-charging its *free* initial storage state.  Under the old implicit
-      seeding, SoC(t=6) was pinned to block 0's final SoC=0 and the generator
-      (p_max=2, fully used by demand=2 at t=6) could not recharge in time,
-      forcing 2 units of unserved energy at t=7.
+      pre-charging its *free* initial storage state.  
     - The whole solution is identical to parallel-subproblems mode, which
       solves the same windows independently by construction.
     """
