@@ -193,12 +193,14 @@ def test_zero_carry_over(tmp_path: Path) -> None:
 
 
 def _no_overlap_config(mode: str) -> str:
+    # `block-overlap` is sequential-only and rejected in other modes; parallel
+    # partitions the horizon by construction, which is the same window layout.
+    overlap = "  block-overlap: 0\n" if mode == "sequential-subproblems" else ""
     return _BASE_CONFIG + textwrap.dedent(f"""\
         resolution:
           mode: {mode}
           block-length: 6
-          block-overlap: 0
-    """)
+    """) + overlap
 
 
 def test_zero_overlap_blocks_fully_independent(tmp_path: Path) -> None:
@@ -208,7 +210,7 @@ def test_zero_overlap_blocks_fully_independent(tmp_path: Path) -> None:
     Two complementary checks:
 
     - Block 1 ([6..11], demand [2,4,0,4,4,0]) serves its t=7 peak by
-      pre-charging its *free* initial storage state.  
+      pre-charging its *free* initial storage state.
     - The whole solution is identical to parallel-subproblems mode, which
       solves the same windows independently by construction.
     """

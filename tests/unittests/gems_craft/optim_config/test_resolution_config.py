@@ -161,3 +161,69 @@ def test_carry_over_length_equal_to_overlap_accepted() -> None:
         carry_over_length=4,
     )
     assert cfg.effective_carry_over_length == 4
+
+
+# ---------------------------------------------------------------------------
+# Sequential-only fields rejected in other modes
+# ---------------------------------------------------------------------------
+
+_NON_SEQUENTIAL_MODES = [
+    ResolutionMode.FRONTAL,
+    ResolutionMode.PARALLEL_SUBPROBLEMS,
+    ResolutionMode.BENDERS_DECOMPOSITION,
+]
+
+
+@pytest.mark.parametrize("mode", _NON_SEQUENTIAL_MODES)
+def test_block_overlap_rejected_outside_sequential(mode: ResolutionMode) -> None:
+    with pytest.raises(ValidationError, match="'block-overlap' only applies to mode"):
+        ResolutionConfig(mode=mode, block_length=10, block_overlap=2)
+
+
+@pytest.mark.parametrize("mode", _NON_SEQUENTIAL_MODES)
+def test_carry_over_length_rejected_outside_sequential(mode: ResolutionMode) -> None:
+    with pytest.raises(
+        ValidationError, match="'carry-over-length' only applies to mode"
+    ):
+        ResolutionConfig(mode=mode, block_length=10, carry_over_length=1)
+
+
+def test_both_sequential_only_fields_reported_together() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="'block-overlap', 'carry-over-length' only apply to mode",
+    ):
+        ResolutionConfig(
+            mode=ResolutionMode.FRONTAL, block_overlap=2, carry_over_length=1
+        )
+
+
+def test_explicit_zero_block_overlap_rejected_outside_sequential() -> None:
+    # The check is on the keys the user wrote, not on their values: an explicit
+    # 'block-overlap: 0' is just as ignored as any other value.
+    with pytest.raises(ValidationError, match="'block-overlap' only applies to mode"):
+        ResolutionConfig(mode=ResolutionMode.FRONTAL, block_overlap=0)
+
+
+def test_kebab_aliases_are_detected_as_declared() -> None:
+    with pytest.raises(ValidationError, match="'block-overlap' only applies to mode"):
+        ResolutionConfig.model_validate(
+            {"mode": "parallel-subproblems", "block-length": 6, "block-overlap": 0}
+        )
+
+
+@pytest.mark.parametrize("mode", _NON_SEQUENTIAL_MODES)
+def test_non_sequential_modes_accepted_without_the_fields(mode: ResolutionMode) -> None:
+    cfg = ResolutionConfig(mode=mode, block_length=10)
+    assert cfg.block_overlap == 0
+    assert cfg.effective_carry_over_length == 0
+
+
+def test_sequential_mode_still_accepts_both_fields() -> None:
+    cfg = ResolutionConfig(
+        mode=ResolutionMode.SEQUENTIAL_SUBPROBLEMS,
+        block_length=10,
+        block_overlap=4,
+        carry_over_length=2,
+    )
+    assert cfg.effective_carry_over_length == 2

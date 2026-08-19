@@ -221,8 +221,8 @@ optimisation subproblems.
 |---|---|---|---|
 | `mode` | str | `"frontal"` | Resolution strategy (see below) |
 | `block-length` | int | — | Timesteps per window; required for windowed modes |
-| `block-overlap` | int | `0` | Sequential mode only: shared timesteps between consecutive blocks; must satisfy `0 <= block-overlap < block-length` |
-| `carry-over-length` | int | `block-overlap` | Sequential mode only: how many of the shared timesteps are pinned to the previous block's values; must satisfy `0 <= carry-over-length <= block-overlap` |
+| `block-overlap` | int | `0` | Sequential mode only (rejected in other modes): shared timesteps between consecutive blocks; must satisfy `0 <= block-overlap < block-length` |
+| `carry-over-length` | int | `block-overlap` | Sequential mode only (rejected in other modes): how many of the shared timesteps are pinned to the previous block's values; must satisfy `0 <= carry-over-length <= block-overlap` |
 
 ### `frontal` (default)
 

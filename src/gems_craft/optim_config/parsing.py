@@ -149,6 +149,9 @@ class ResolutionMode(str, Enum):
     BENDERS_DECOMPOSITION = "benders-decomposition"
 
 
+_SEQUENTIAL_ONLY_FIELDS = ("block_overlap", "carry_over_length")
+
+
 class ResolutionConfig(ModifiedBaseModel):
     mode: ResolutionMode = ResolutionMode.FRONTAL
     block_length: Optional[int] = None
@@ -163,6 +166,29 @@ class ResolutionConfig(ModifiedBaseModel):
         }
         if self.mode in windowed and self.block_length is None:
             raise ValueError(f"'block_length' is required for mode '{self.mode.value}'")
+        return self
+
+    @model_validator(mode="after")
+    def _reject_sequential_only_fields(self) -> "ResolutionConfig":
+        """'block-overlap' and 'carry-over-length' steer the stitching of
+        consecutive blocks, which only exists in sequential mode.  Reject them
+        elsewhere instead of dropping them silently.  The check is on the keys
+        the user actually wrote (``model_fields_set``), so an explicit
+        'block-overlap: 0' is rejected too."""
+        if self.mode == ResolutionMode.SEQUENTIAL_SUBPROBLEMS:
+            return self
+        declared = [
+            name for name in _SEQUENTIAL_ONLY_FIELDS if name in self.model_fields_set
+        ]
+        if declared:
+            keys = ", ".join(f"'{name.replace('_', '-')}'" for name in declared)
+            plural = len(declared) > 1
+            raise ValueError(
+                f"{keys} only appl{'y' if plural else 'ies'} to mode "
+                f"'{ResolutionMode.SEQUENTIAL_SUBPROBLEMS.value}', but mode is "
+                f"'{self.mode.value}'; remove {'them' if plural else 'it'} "
+                f"or switch mode"
+            )
         return self
 
     @model_validator(mode="after")
