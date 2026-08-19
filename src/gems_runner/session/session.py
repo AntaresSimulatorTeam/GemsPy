@@ -257,6 +257,11 @@ class SimulationSession:
         block's variables.  The window is clamped to the solved block's actual
         horizon (a truncated final block can be shorter than ``block_length``),
         so fewer than *length* values may be carried over.
+
+        Only variables carrying a ``time`` dimension are extracted.
+        Time-independent variables (e.g. an investment capacity) are
+        deliberately left free in every block, so each block re-optimizes them
+        independently.
         """
         carry_over: Dict[Tuple[str, str], xr.DataArray] = {}
         if length <= 0 or problem.linopy_model.solution is None:
