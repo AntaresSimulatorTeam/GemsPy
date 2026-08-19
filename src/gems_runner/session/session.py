@@ -118,7 +118,7 @@ class SimulationSession:
                 t_start += block_length - block_overlap
                 carry_over = self._extract_carry_over(
                     problem,
-                    local_start=t_start,
+                    local_start=block_length - block_overlap,
                     length=carry_over_length,
                 )
                 block_id += 1
