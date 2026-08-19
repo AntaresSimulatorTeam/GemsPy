@@ -12,7 +12,7 @@
 import typing
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Type, TypeVar, overload
+from typing import List, Optional
 
 from pydantic import ConfigDict, Field, ValidationError
 from yaml import safe_dump, safe_load
@@ -50,10 +50,22 @@ class FieldSchema(ModifiedBaseModel):
     id: str
 
 
+class AreaConnectionSchema(ModifiedBaseModel):
+    injection_to_balance: Optional[str] = None
+    spillage_bound: Optional[str] = None
+    unsupplied_energy_bound: Optional[str] = None
+
+
+class PortThermalCapacitySchema(ModifiedBaseModel):
+    capacity_field: str
+
+
 class PortTypeSchema(ModifiedBaseModel):
     id: str
     fields: List[FieldSchema] = Field(default_factory=list)
     description: Optional[str] = None
+    area_connection: Optional[AreaConnectionSchema] = None
+    thermal_capacity_connection: Optional[PortThermalCapacitySchema] = None
 
 
 class ModelPortSchema(ModifiedBaseModel):
@@ -111,19 +123,10 @@ class LibrarySchema(ModifiedBaseModel):
     version: Optional[str] = None
 
 
-_L = TypeVar("_L", bound=LibrarySchema)
-
-
-@overload
-def parse_yaml_library(input: typing.TextIO) -> LibrarySchema: ...
-@overload
-def parse_yaml_library(input: typing.TextIO, schema: Type[_L]) -> _L: ...
-def parse_yaml_library(
-    input: typing.TextIO, schema: Type[LibrarySchema] = LibrarySchema
-) -> LibrarySchema:
+def parse_yaml_library(input: typing.TextIO) -> LibrarySchema:
     tree = safe_load(input)
     try:
-        return schema.model_validate(tree["library"])
+        return LibrarySchema.model_validate(tree["library"])
     except ValidationError as e:
         raise ValueError(f"An error occurred during parsing: {e}")
 

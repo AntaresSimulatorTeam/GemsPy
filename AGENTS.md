@@ -64,7 +64,7 @@ An optional `optim-config.yml` activates decomposition: variables and constraint
 The codebase is split into three packages along a solver-dependency boundary:
 
 - **`gems_craft`** (`src/gems_craft/`) — the domain model and all YAML I/O. No solver dependency at the module level; importable on its own for building, editing, validating, and querying systems (e.g. an API layer) without touching solve-time code. Deps: `numpy`, `pandas`, `PyYAML`, `pydantic`, `anytree`, `antlr4-python3-runtime`.
-- **`gems_craft_hybrid`** (`src/gems_craft_hybrid/`) — read/write support for *hybrid* GEMS studies, an extended format used to interoperate with Antares Simulator. No solver dependency; depends only on `gems_craft`. Hybrid studies cannot be simulated by GemsPy — this package only extends the `gems_craft` parsing schemas (`HybridLibrarySchema`, `HybridSystemSchema`) with the extra fields (`area-connection`, `thermal-capacity-connection` on port-types; `area-connections`, `thermal-capacity-connections` on systems), reusing `gems_craft`'s schema-parameterized `parse_yaml_library`/`load_input_system`/`parse_yaml_system`/`write_yaml_library`/`write_yaml_system`.
+- **`gems_craft_hybrid`** (`src/gems_craft_hybrid/`) — read/write support for *hybrid* GEMS studies, an extended format used to interoperate with Antares Simulator. No solver dependency; depends only on `gems_craft`. Hybrid studies cannot be simulated by GemsPy. The hybrid-only port-type fields (`area-connection`, `thermal-capacity-connection`) are declared directly on `gems_craft`'s own `PortTypeSchema` and are parsed (but otherwise ignored) for every library, hybrid or not; `gems_craft_hybrid` only adds the system-level extension (`HybridSystemSchema`, adding `area-connections`, `thermal-capacity-connections` on systems), reusing `gems_craft`'s schema-parameterized `load_input_system`/`parse_yaml_system`/`write_yaml_system`.
 - **`gems_runner`** (`src/gems_runner/`) — solve-time execution. Depends on `gems_craft` plus `linopy`, `xarray`, `highspy`, all installed as part of the base `gemspy` package (`pip install gemspy` installs the full solver stack, not just `gems_craft`'s dependencies).
 
 ### Core Modules
@@ -73,6 +73,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `Model`: defines component behavior (parameters, variables, constraints, ports)
 - `Library`: a collection of models, loaded from YAML
 - `Taxonomy` (`taxonomy.py`): categories naming the items a model must expose. Models opt in via `taxonomy-category`; `check_library_against_taxonomy` enforces conformance.
+- `PortTypeSchema` (`parsing.py`) also declares the hybrid-only `area-connection` (`AreaConnectionSchema`) and `thermal-capacity-connection` (`PortThermalCapacitySchema`) fields; `resolve_library.py`'s `_convert_port_type` parses and discards them for every library, hybrid or not.
 
 **`gems_craft/expression/`** — Mathematical expression language and AST (structural/static analysis only — no numeric evaluation).
 - `ExpressionNode`: base frozen dataclass for all expression tree nodes
@@ -94,8 +95,6 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `HeuristicConfig` (`parsing.py`): per-model binding of a built-in heuristic (`fast`/`accurate`) to the model's own parameters/variables
 
 **`gems_craft/libs/`** — Resolves the path to bundled YAML model libraries shipped with the package.
-
-**`gems_craft_hybrid/model/`** — `HybridLibrarySchema(LibrarySchema)`, `HybridPortTypeSchema(PortTypeSchema)`: adds `area-connection` (`AreaConnectionSchema`) and `thermal-capacity-connection` (`PortThermalCapacitySchema`) per port-type.
 
 **`gems_craft_hybrid/study/`** — `HybridSystemSchema(SystemSchema)`: adds `area-connections` (`AreaConnectionsSchema`) and `thermal-capacity-connections` (`ThermalCapacityConnectionSchema`, referencing a `ThermalComponentSchema`).
 
