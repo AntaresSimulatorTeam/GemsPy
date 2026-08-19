@@ -115,10 +115,11 @@ class SimulationSession:
                 # Block N and block N+1 share `block_overlap` absolute
                 # timesteps: block N's local indices `block_length - overlap
                 # ...` are block N+1's local indices `0 ...`.
-                t_start += block_length - block_overlap
+                delta = block_length - block_overlap
+                t_start += delta
                 carry_over = self._extract_carry_over(
                     problem,
-                    local_start=block_length - block_overlap,
+                    local_start=delta,
                     length=carry_over_length,
                 )
                 block_id += 1
