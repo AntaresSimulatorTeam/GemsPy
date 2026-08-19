@@ -4,6 +4,10 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Changed
+- **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
+  to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
+
 ### Added
 - **Integer strategy and thermal heuristics** - components can now set
   `integer-strategy` (`exact` (default), `relaxed`, or `heuristic` +
