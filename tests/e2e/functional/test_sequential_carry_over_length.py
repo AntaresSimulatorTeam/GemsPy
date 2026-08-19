@@ -29,9 +29,6 @@ Consecutive blocks share `block-overlap` = 3 absolute timesteps.  The
 `carry-over-length` first shared timesteps of block N+1 are pinned to block
 N's already-solved values — counted from the *earliest* shared timestep, so
 each pinned constraint matches the same absolute timestep in both blocks.
-Before the fix for issue #271, the code pinned block N+1's first timestep to
-block N's *last* timestep, which is a different absolute timestep whenever
-block-overlap >= 2.
 
 The tests assert, from the merged simulation table (which keeps one row per
 block for overlapping timesteps), that every pinned shared timestep carries
