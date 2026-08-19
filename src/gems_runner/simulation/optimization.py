@@ -496,10 +496,6 @@ class _OptimizationProblemBuilder:
          each time-dependent variable is *fixed*, over the block's first ``k``
          timesteps, to the value the previous block computed for the same
          absolute timestep.  Time-independent variables are never pinned.
-
-    ``initial_values`` maps ``(model_id, var_name)`` to an ``xr.DataArray``
-    carrying a ``time`` dimension indexed ``0 .. k-1``; the shape is checked at
-    construction by :func:`_validate_initial_values`.
     """
 
     def __init__(
