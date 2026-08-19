@@ -96,7 +96,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 
 **`gems_craft/libs/`** — Resolves the path to bundled YAML model libraries shipped with the package.
 
-**`gems_craft_hybrid/study/`** (the only remaining submodule of `gems_craft_hybrid`) — `HybridSystemSchema(SystemSchema)`: adds `area-connections` (`AreaConnectionsSchema`) and `thermal-capacity-connections` (`ThermalCapacityConnectionSchema`, referencing a `ThermalComponentSchema`).
+**`gems_craft_hybrid/study/`** — `HybridSystemSchema(SystemSchema)`: adds `area-connections` (`AreaConnectionsSchema`) and `thermal-capacity-connections` (`ThermalCapacityConnectionSchema`, referencing a `ThermalComponentSchema`).
 
 **`gems_runner/simulation/`** — Optimization problem construction and solving.
 - `OptimizationProblem` (`optimization.py`): main interface; translates a `Study` into a linopy model solved by HiGHS
