@@ -10,7 +10,8 @@
 #
 # This file is part of the Antares project.
 
-"""Tests for gems_craft_hybrid parsing: HybridSystemSchema and HybridLibrarySchema."""
+"""Tests for gems_craft_hybrid parsing: HybridSystemSchema, and the hybrid-only
+area-connection / thermal-capacity-connection fields on the base PortTypeSchema."""
 
 from pathlib import Path
 
@@ -18,9 +19,7 @@ import pytest
 
 from gems_craft.model.parsing import (
     AreaConnectionSchema,
-    LibrarySchema,
     PortThermalCapacitySchema,
-    PortTypeSchema,
     parse_yaml_library,
     write_yaml_library,
 )
@@ -34,11 +33,6 @@ from gems_craft_hybrid.study.parsing import (
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
-
-
-def _load_hybrid_library(path: Path) -> LibrarySchema:
-    with path.open() as f:
-        return parse_yaml_library(f)
 
 
 def _load_hybrid_system(path: Path) -> HybridSystemSchema:
@@ -98,14 +92,14 @@ def test_write_yaml_system_roundtrip_hybrid(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# HybridLibrarySchema — parsing
+# PortTypeSchema — area-connection / thermal-capacity-connection parsing
 # ---------------------------------------------------------------------------
 
 
-def test_load_hybrid_library_parses_area_connection() -> None:
-    lib = _load_hybrid_library(FIXTURES / "hybrid_lib.yml")
+def test_load_library_parses_area_connection() -> None:
+    with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
+        lib = parse_yaml_library(f)
     flow_port = next(pt for pt in lib.port_types if pt.id == "flow")
-    assert isinstance(flow_port, PortTypeSchema)
     assert flow_port.area_connection == AreaConnectionSchema(
         injection_to_balance="flow",
         spillage_bound="flow",
@@ -113,28 +107,16 @@ def test_load_hybrid_library_parses_area_connection() -> None:
     )
 
 
-def test_load_hybrid_library_port_type_without_area_connection() -> None:
-    lib = _load_hybrid_library(FIXTURES / "hybrid_lib.yml")
+def test_load_library_port_type_without_area_connection() -> None:
+    with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
+        lib = parse_yaml_library(f)
     signal_port = next(
         pt for pt in lib.port_types if pt.id == "antares_thermal_cluster_capacity"
     )
     assert signal_port.area_connection is None
 
 
-def test_load_standard_library_on_hybrid_file_parses_area_connection() -> None:
-    with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
-        lib = parse_yaml_library(f)
-    flow_port = next(pt for pt in lib.port_types if pt.id == "flow")
-    assert flow_port.area_connection == AreaConnectionSchema(
-        injection_to_balance="flow",
-        spillage_bound="flow",
-        unsupplied_energy_bound=None,
-    )
-
-
-def test_load_standard_library_on_hybrid_file_parses_thermal_capacity_connection() -> (
-    None
-):
+def test_load_library_parses_thermal_capacity_connection() -> None:
     with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
         lib = parse_yaml_library(f)
     capacity_port = next(
@@ -145,52 +127,26 @@ def test_load_standard_library_on_hybrid_file_parses_thermal_capacity_connection
     )
 
 
-def test_parse_yaml_hybrid_library_reads_hybrid_fields() -> None:
+def test_load_library_port_type_without_thermal_capacity_connection() -> None:
     with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
         lib = parse_yaml_library(f)
     flow_port = next(pt for pt in lib.port_types if pt.id == "flow")
-    capacity_port = next(
-        pt for pt in lib.port_types if pt.id == "antares_thermal_cluster_capacity"
-    )
-    assert isinstance(flow_port, PortTypeSchema)
-    assert flow_port.area_connection is not None
-    assert capacity_port.thermal_capacity_connection is not None
-    assert lib == _load_hybrid_library(FIXTURES / "hybrid_lib.yml")
+    assert flow_port.thermal_capacity_connection is None
 
 
 # ---------------------------------------------------------------------------
-# HybridLibrarySchema — roundtrip via write_yaml_library
+# LibrarySchema — roundtrip via write_yaml_library (hybrid fields)
 # ---------------------------------------------------------------------------
 
 
 def test_write_yaml_library_roundtrip_hybrid(tmp_path: Path) -> None:
-    original = _load_hybrid_library(FIXTURES / "hybrid_lib.yml")
+    with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
+        original = parse_yaml_library(f)
     out = tmp_path / "lib.yml"
     write_yaml_library(original, out)
-    reloaded = _load_hybrid_library(out)
+    with out.open() as f:
+        reloaded = parse_yaml_library(f)
     assert reloaded == original
-
-
-# ---------------------------------------------------------------------------
-# HybridLibrarySchema — thermal-capacity-connections
-# ---------------------------------------------------------------------------
-
-
-def test_load_hybrid_library_parses_thermal_capacity_connection() -> None:
-    lib = _load_hybrid_library(FIXTURES / "hybrid_lib.yml")
-    capacity_port = next(
-        pt for pt in lib.port_types if pt.id == "antares_thermal_cluster_capacity"
-    )
-    assert isinstance(capacity_port, PortTypeSchema)
-    assert capacity_port.thermal_capacity_connection == PortThermalCapacitySchema(
-        capacity_field="capacity"
-    )
-
-
-def test_load_hybrid_library_port_type_without_thermal_capacity_connection() -> None:
-    lib = _load_hybrid_library(FIXTURES / "hybrid_lib.yml")
-    flow_port = next(pt for pt in lib.port_types if pt.id == "flow")
-    assert flow_port.thermal_capacity_connection is None
 
 
 # ---------------------------------------------------------------------------
