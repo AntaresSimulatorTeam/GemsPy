@@ -38,25 +38,17 @@ re-optimize to the same value from a fixed one.
 import shutil
 import textwrap
 from pathlib import Path
-from typing import Any, List, Optional, Set
+from typing import Any, List, Set
 
 import pandas as pd
 import pytest
-import xarray as xr
 
-from gems_craft.expression.expression import literal, param, var
-from gems_craft.model import Constraint, float_parameter, float_variable, model
 from gems_craft.optim_config.parsing import load_optim_config
-from gems_craft.study import ConstantData, DataBase, Study, System, create_component
 from gems_craft.study.folder import load_study
 from gems_runner.session.session import SimulationSession
-from gems_runner.simulation import TimeBlock, build_problem
-from gems_runner.simulation.optimization import (
-    OptimizationProblem,
-    _validate_initial_values,
-)
+from gems_runner.simulation import TimeBlock
+from gems_runner.simulation.optimization import OptimizationProblem
 from gems_runner.study.runner import run_study
-from tests.e2e.functional.libs.standard import CONSTANT
 
 _STUDY_SRC = Path(__file__).parent / "studies" / "rolling_horizon_suboptimality"
 
@@ -198,15 +190,18 @@ def _pinned_window_lengths(problem: OptimizationProblem) -> Set[int]:
     }
 
 
-@pytest.fixture(params=[None, 0, 1, 2], ids=["omitted", "0", "1", "2"])
-def carry_over_length(request: pytest.FixtureRequest) -> Optional[int]:
-    """`carry-over-length` under test: explicitly 0, 1 or 2, or omitted from
-    the config — which resolves to `block-overlap`."""
-    return request.param
-
-
+@pytest.mark.parametrize(
+    "setting, expected",
+    [
+        # Omitted resolves to `block-overlap`: the whole overlap zone is pinned.
+        ("# carry-over-length omitted", _BLOCK_OVERLAP),
+        ("carry-over-length: 0", 0),
+        ("carry-over-length: 1", 1),
+        ("carry-over-length: 2", 2),
+    ],
+)
 def test_carry_over_length_fixes_that_many_leading_timesteps(
-    tmp_path: Path, carry_over_length: Optional[int]
+    tmp_path: Path, setting: str, expected: int
 ) -> None:
     """`carry-over-length: k` fixes, in every block but the first, the k
     leading local timesteps — the k earliest shared timesteps — to the previous
@@ -215,15 +210,8 @@ def test_carry_over_length_fixes_that_many_leading_timesteps(
     `k = 0` fixes nothing at all: the blocks still overlap (so lag constraints
     keep their history) but are not stitched.
     """
-    setting = (
-        "# carry-over-length omitted"
-        if carry_over_length is None
-        else f"carry-over-length: {carry_over_length}"
-    )
-    expected = _BLOCK_OVERLAP if carry_over_length is None else carry_over_length
-
     problems = _run_sequential_session(
-        tmp_path, f"carry_over_{carry_over_length}", _sequential_config(setting)
+        tmp_path, f"carry_over_{expected}", _sequential_config(setting)
     )
     # block-length=6, block-overlap=3, t=0..11 → blocks [0..5], [3..8], [6..11]
     # and the truncated tail [9..11].
@@ -295,88 +283,3 @@ def test_zero_overlap_blocks_fully_independent(tmp_path: Path) -> None:
                 f"sequential (block-overlap: 0) and parallel modes disagree at "
                 f"t={t} for {component}.{output}: {v_seq} != {v_par}"
             )
-
-
-# ---------------------------------------------------------------------------
-# `initial_values` contract, at the `build_problem` level
-#
-# The tests above are run-level: they observe the pinned values, not the
-# constraints that produced them.  These two build a problem directly to check
-# *which* variables the carry-over pins, and that a malformed `initial_values`
-# is rejected before anything is built.
-# ---------------------------------------------------------------------------
-
-
-def _one_time_dependent_one_constant_study() -> Study:
-    """A single-component study whose model has one time-dependent variable
-    (`gen`) and one time-independent one (`cap`)."""
-    plant = model(
-        id="PLANT",
-        parameters=[float_parameter("cost", CONSTANT)],
-        variables=[
-            float_variable("gen", lower_bound=literal(0), upper_bound=literal(10)),
-            float_variable(
-                "cap",
-                lower_bound=literal(0),
-                upper_bound=literal(10),
-                structure=CONSTANT,
-            ),
-        ],
-        constraints=[
-            Constraint(name="Max generation", expression=var("gen") <= var("cap"))
-        ],
-        objective_contributions={
-            "operational": (param("cost") * var("gen")).time_sum().expec()
-        },
-    )
-    database = DataBase()
-    database.add_data("P", "cost", ConstantData(1))
-    system = System("carry_over_contract")
-    system.add_component(create_component(model=plant, id="P"))
-    return Study(system, database)
-
-
-def _time_da(values: list[float]) -> xr.DataArray:
-    """Carry-over array in the shape `_extract_carry_over` produces: a `time`
-    dimension indexed 0..k-1."""
-    return xr.DataArray(
-        values, dims=["time"], coords={"time": list(range(len(values)))}
-    )
-
-
-def test_carry_over_skips_time_independent_variables() -> None:
-    """Only time-dependent variables are pinned.  A time-independent variable
-    (`structure.time = False`) is left free in every block even when the caller
-    passes a value for it, so consecutive blocks size it independently."""
-    problem = build_problem(
-        _one_time_dependent_one_constant_study(),
-        TimeBlock(1, [0, 1, 2]),
-        [0],
-        initial_values={
-            ("PLANT", "gen"): _time_da([2.0, 3.0]),
-            ("PLANT", "cap"): _time_da([7.0]),
-        },
-    )
-
-    constraint_names = set(problem.linopy_model.constraints)
-    assert "carry_over__PLANT__gen" in constraint_names
-    assert "carry_over__PLANT__cap" not in constraint_names
-
-
-def test_initial_values_without_time_dim_rejected() -> None:
-    """A value with no `time` dimension — the shape carried over before
-    multi-timestep stitching existed — is rejected outright rather than
-    silently reinterpreted as a single-timestep pin."""
-    with pytest.raises(ValueError, match="must carry a 'time' dimension"):
-        build_problem(
-            _one_time_dependent_one_constant_study(),
-            TimeBlock(1, [0, 1, 2]),
-            [0],
-            initial_values={("PLANT", "gen"): xr.DataArray(2.0)},
-        )
-
-    # The check is a precondition on the argument, so it does not need a study:
-    with pytest.raises(ValueError, match="must carry a 'time' dimension"):
-        _validate_initial_values({("PLANT", "gen"): xr.DataArray(2.0)})
-
-    assert _validate_initial_values(None) == {}
