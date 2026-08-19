@@ -305,6 +305,24 @@ tooling decides which block's version of a shared timestep is authoritative;
 `carry-over-length` only controls how much two consecutive blocks may
 *disagree* on that shared window.
 
+**What the carry-over pins.**  The mechanism is plain *variable fixing*: for
+block *N+1*, every time-dependent variable whose block-relative timestep falls
+in `[0, carry-over-length[` is fixed to the value block *N* computed for the
+**same absolute timestep**.  Two consequences are worth spelling out:
+
+- It is **not** an initial-condition mechanism.  Block *N+1*'s problem is not
+  given the value of the timestep *preceding* its window, so a `t-1` time-shift
+  operator at the block's first timestep still resolves against that block's own
+  border condition (cyclic by default) rather than reaching into block *N*.
+- It applies to **all** time-dependent variables of all models, not only
+  state-like ones such as a storage level.  Finer, per-model granularity can be
+  added later if a use case needs it.
+
+**Time-independent** variables (`structure.time = False`, e.g. an investment
+capacity) are never carried over — nothing links their values across blocks, so
+each block sizes them independently.  Sequential mode is therefore not suited to
+investment problems; use `frontal` or `benders-decomposition` for those.
+
 
 
 ### `parallel-subproblems`
