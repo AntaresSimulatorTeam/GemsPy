@@ -245,7 +245,12 @@ def test_extra_output_lower_bound_and_upper_bound() -> None:
     """
     lower_bound(x)/upper_bound(x) return the variable's current bounds post-solve.
     """
-    from gems_craft.expression.expression import LowerBoundNode, UpperBoundNode, literal
+    from gems_craft.expression.expression import (
+        LowerBoundNode,
+        UpperBoundNode,
+        literal,
+        var,
+    )
     from gems_craft.model.model import model
     from gems_craft.model.variable import float_variable
     from gems_craft.study import DataBase, Study, System, create_component
@@ -257,6 +262,9 @@ def test_extra_output_lower_bound_and_upper_bound() -> None:
         extra_outputs={
             "lb": LowerBoundNode("x"),
             "ub": UpperBoundNode("x"),
+        },
+        objective_contributions={
+            "null_objective": (literal(0) * var("x")).time_sum().expec()
         },
     )
 
@@ -285,7 +293,7 @@ def test_extra_output_bound_broadcasts_over_time() -> None:
     (not just t=0).
     """
     from gems_craft.expression import param
-    from gems_craft.expression.expression import UpperBoundNode, literal
+    from gems_craft.expression.expression import UpperBoundNode, literal, var
     from gems_craft.expression.indexing_structure import IndexingStructure
     from gems_craft.model.model import model
     from gems_craft.model.parameter import float_parameter
@@ -300,6 +308,9 @@ def test_extra_output_bound_broadcasts_over_time() -> None:
             float_variable("x", lower_bound=literal(0), upper_bound=param("cap"))
         ],
         extra_outputs={"x_ub": UpperBoundNode("x")},
+        objective_contributions={
+            "null_objective": (literal(0) * var("x")).time_sum().expec()
+        },
     )
 
     database = DataBase()
