@@ -21,7 +21,7 @@ Tests that integer_strategy is correctly reflected in the built linopy model.
 import pandas as pd
 import pytest
 
-from gems_craft.expression.expression import LowerBoundNode, literal, param
+from gems_craft.expression.expression import LowerBoundNode, literal, param, var
 from gems_craft.expression.indexing_structure import IndexingStructure
 from gems_craft.model.model import model
 from gems_craft.model.parameter import float_parameter
@@ -190,6 +190,9 @@ MIXED_MODEL_WITH_BOUND_OUTPUT = model(
     ],
     extra_outputs={
         "gen_lb": LowerBoundNode("generation"),
+    },
+    objective_contributions={
+        "null_objective": (literal(0) * var("generation")).time_sum().expec()
     },
 )
 
