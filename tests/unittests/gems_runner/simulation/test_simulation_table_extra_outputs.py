@@ -51,6 +51,10 @@ def test_extra_output_with_sum_connections() -> None:
                 definition=var("gen"),
             )
         ],
+        # linopy >= 0.9 refuses to solve a model with no objective.
+        objective_contributions={
+            "null_objective": (literal(0) * var("gen")).time_sum().expec()
+        },
     )
 
     # Node: slave port, extra output = sum of incoming flows (no binding constraint).
@@ -110,6 +114,10 @@ def test_extra_output_nonlinear() -> None:
         id="SIMPLE_NL",
         variables=[float_variable("a", lower_bound=literal(3), upper_bound=literal(3))],
         extra_outputs={"squared": var("a") * var("a")},
+        # linopy >= 0.9 refuses to solve a model with no objective.
+        objective_contributions={
+            "null_objective": (literal(0) * var("a")).time_sum().expec()
+        },
     )
 
     database = DataBase()
@@ -151,6 +159,10 @@ def test_extra_output_abs_round_on_variable() -> None:
         extra_outputs={
             "abs_shift": (var("a") - literal(5)).abs(),
             "rounded": var("a").round(),
+        },
+        # linopy >= 0.9 refuses to solve a model with no objective.
+        objective_contributions={
+            "null_objective": (literal(0) * var("a")).time_sum().expec()
         },
     )
 
@@ -194,6 +206,10 @@ def test_extra_output_min_on_variable() -> None:
         parameters=[float_parameter("cap")],
         variables=[float_variable("a", lower_bound=literal(5), upper_bound=literal(5))],
         extra_outputs={"capped": minimum(var("a"), param("cap"))},
+        # linopy >= 0.9 refuses to solve a model with no objective.
+        objective_contributions={
+            "null_objective": (literal(0) * var("a")).time_sum().expec()
+        },
     )
 
     database = DataBase()
@@ -329,6 +345,10 @@ def test_extra_output_comparison() -> None:
             "ge": ComparisonNode(var("a"), param("threshold"), Comparator.GREATER_THAN),
             # a (=5) <= threshold (=3) -> 0.0
             "le": ComparisonNode(var("a"), param("threshold"), Comparator.LESS_THAN),
+        },
+        # linopy >= 0.9 refuses to solve a model with no objective.
+        objective_contributions={
+            "null_objective": (literal(0) * var("a")).time_sum().expec()
         },
     )
 

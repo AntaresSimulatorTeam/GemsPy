@@ -19,8 +19,8 @@ from .parsing import (
     SolverOptionsConfig,
     TimeScopeConfig,
     load_optim_config,
-    validate_optim_config,
 )
+from .validation import validate_optim_config
 
 __all__ = [
     "ElementLocation",
