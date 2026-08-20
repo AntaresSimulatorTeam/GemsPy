@@ -417,7 +417,7 @@ Two heuristics are built in, each expecting a fixed set of
 
 | Heuristic | `inputs` elements | `outputs` elements |
 |---|---|---|
-| `fast` | `generation_power`, `cluster_max_generation`, `min_power_per_unit`, `max_power_per_unit`, `min_up_duration`, `min_down_duration` | `minimum_generation_power` |
+| `fast` | `generation_power`, `cluster_max_generation`, `min_power_per_unit`, `max_power_per_unit`, `min_up_duration`, `min_down_duration` | `minimum_generation_power`, `maximum_generation_power` |
 | `accurate` | `num_units_on_opt`, `num_units_max`, `min_up_duration`, `min_down_duration` | `minimum_num_units_on` |
 
 !!! note

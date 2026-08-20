@@ -146,12 +146,13 @@ def test_fast_heuristic() -> None:
     """
     Solve the same problem as before with the fast heuristic.
 
-    Unlike MILP/accurate, the fast model doesn't hold the cluster
-    committed through min_up_duration once the spike passes: it only
-    commits the 3 units for the 13th hour itself. As with every other
-    fast-heuristic test in this module, the reported objective only
-    reflects the proportional generation cost, not the fixed/startup
-    costs (``non_prop_cost``).
+    The fast heuristic derives maximum_generation_power from a sliding window of
+    size max(min_up_duration, min_down_duration) = max(3, 10) = 10 hours, so the 3
+    committed units stay available for the whole 10-hour window containing the
+    13th-hour spike (hours 11 to 20, 1-indexed), not just for min_up_duration. As
+    with every other fast-heuristic test in this module, the reported objective
+    only reflects the proportional generation cost, not the fixed/startup costs
+    (``non_prop_cost``).
 
     The optimal cost is then :
           50 x 2050 (prod step 13)
@@ -164,10 +165,17 @@ def test_fast_heuristic() -> None:
     assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
         0
     ] == pytest.approx(102500)
-    check_output(st, "G", "non_prop_cost", [153 if t == 12 else 0 for t in range(168)])
+    check_output(
+        st,
+        "G",
+        "non_prop_cost",
+        [153 if t == 10 else (3 if 11 <= t <= 19 else 0) for t in range(168)],
+    )
     check_output(
         st, "G", "generation_power", [2050 if t == 12 else 0 for t in range(168)]
     )
-    check_output(st, "G", "num_units_on", [3 if t == 12 else 0 for t in range(168)])
+    check_output(
+        st, "G", "num_units_on", [3 if 10 <= t <= 19 else 0 for t in range(168)]
+    )
     check_output(st, "N", "unsupplied_energy", [0.0] * 168)
     check_output(st, "N", "spilled_energy", [0.0] * 168)
