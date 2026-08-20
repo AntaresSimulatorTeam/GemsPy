@@ -131,6 +131,11 @@ def test_short_term_storage_base_with_yaml(
         time_blocks[0],
         list(range(scenarios)),
     )
+    # None of the models in this system defines an objective contribution, and
+    # linopy >= 0.9 refuses to solve a model with no objective: set a null one.
+    linopy_model = problem.linopy_model
+    first_var = linopy_model.variables[next(iter(linopy_model.variables))]
+    linopy_model.add_objective(0 * first_var)
     problem.solve(solver_name="highs")
     assert problem.termination_condition == "optimal"
 

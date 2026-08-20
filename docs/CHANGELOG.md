@@ -4,6 +4,10 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Changed
+- **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
+  to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
+
 ### Added
 - **Integer strategy and thermal heuristics** - components can now set
   `integer-strategy` (`exact` (default), `relaxed`, or `heuristic` +
@@ -20,6 +24,17 @@ All notable changes to GemsPy are documented here.
   heuristics" above), which previously had no way to be surfaced in results. Validated at
   model-build time; using them inside constraints, binding-constraints, objective
   contributions, or variable bounds raises a `ValueError`.
+
+### Fixed
+- **Standard library parsing now accepts hybrid port-type fields** -
+  `parse_yaml_library` (the standard, non-hybrid parser) no longer rejects
+  `area-connection` / `thermal-capacity-connection` on port-types, so a
+  library YAML file can be used as-is in both full GEMS and hybrid studies.
+  `AreaConnectionSchema` and `PortThermalCapacitySchema` moved from the
+  deleted `gems_craft_hybrid/model/` (`HybridLibrarySchema` /
+  `HybridPortTypeSchema`) directly onto `gems_craft`'s own `PortTypeSchema`;
+  the fields are parsed and validated but otherwise ignored outside hybrid
+  consumers.
 
 ## [0.1.3] - 2026-07-24
 

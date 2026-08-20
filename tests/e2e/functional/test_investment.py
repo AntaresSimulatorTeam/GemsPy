@@ -35,8 +35,8 @@ from gems_craft.optim_config.parsing import (
     ModelDecompositionConfig,
     ModelOptimConfig,
     OptimConfig,
-    validate_optim_config,
 )
+from gems_craft.optim_config.validation import validate_optim_config
 from gems_craft.study import (
     Component,
     ConstantData,

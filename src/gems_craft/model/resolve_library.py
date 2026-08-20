@@ -204,6 +204,8 @@ def _convert_port_type(port_type: PortTypeSchema) -> PortType:
     )
 
 
+# TODO: these _forbid_* checks are expression validation embedded in the
+# resolution pass — consider isolating them from the build logic below.
 def _forbid_nonlinear(expr: ExpressionNode, context: str) -> None:
     if not is_linear(expr):
         raise ValueError(f"Non-linear expression is not allowed in {context}.")

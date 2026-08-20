@@ -22,8 +22,8 @@ from gems_craft.optim_config.parsing import (
     ModelElementAccessType,
     ModelOptimConfig,
     OptimConfig,
-    validate_optim_config,
 )
+from gems_craft.optim_config.validation import validate_optim_config
 from gems_craft.study.parsing import HeuristicId
 from gems_craft.study.system import System, create_component
 

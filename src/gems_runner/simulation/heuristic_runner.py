@@ -27,8 +27,8 @@ from gems_craft.optim_config.parsing import (
     HeuristicElementConfig,
     ModelElementAccessType,
     OptimConfig,
-    get_heuristic_config_map,
 )
+from gems_craft.optim_config.validation import get_heuristic_config_map
 from gems_craft.study.parsing import HeuristicId, IntegerStrategyId
 from gems_runner.simulation.thermal_heuristic import (
     find_min_generation_fast,
