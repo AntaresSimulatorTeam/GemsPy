@@ -96,19 +96,18 @@ interoperate with [Antares Simulator](https://antares-simulator.org/).
 
 For the YAML fields in library and system files associated with the hybrid mode, see [this page](https://gems-energy.readthedocs.io/en/latest/interoperability/hybrid/hybrid-connections/) of the GEMS documentation website.
 
-Load and write hybrid libraries with `parse_yaml_hybrid_library` / `write_yaml_library`:
+Libraries are "cold" files: the same library YAML is often reused unchanged between a full GEMS study and a hybrid study of the same system. Hybrid-format libraries therefore load with the standard `parse_yaml_library` / `write_yaml_library` from `gems_craft` — the hybrid-only `area-connection` and `thermal-capacity-connection` port-type fields are recognized directly by `gems_craft`'s own schema (and simply ignored outside the hybrid workflow), so no separate hybrid library function is needed, and the same file works for either kind of study without a format change:
 
 ~~~ python
-from gems_craft.model.parsing import write_yaml_library
-from gems_craft_hybrid.model.parsing import parse_yaml_hybrid_library
+from gems_craft.model.parsing import parse_yaml_library, write_yaml_library
 
 with open("hybrid_lib.yml") as f:
-    library = parse_yaml_hybrid_library(f)
+    library = parse_yaml_library(f)
 write_yaml_library(library, Path("output/hybrid_lib.yml"))
 ~~~
 
 
-Load and write hybrid systems with `parse_yaml_hybrid_system` / `write_yaml_system`:
+System files, by contrast, are necessarily different between a full GEMS study and a hybrid study of the same setup — a hybrid system file describes area/thermal-capacity connections a full GEMS system wouldn't have. Since there's no cross-format file to keep compatible, parsing can afford to stay strict: hybrid systems still require the dedicated `gems_craft_hybrid` functions — load and write them with `parse_yaml_hybrid_system` / `write_yaml_system` — and `parse_yaml_system` (standard) rejects hybrid-only fields outright.
 
 ~~~ python
 from gems_craft.study.parsing import write_yaml_system
