@@ -8,6 +8,8 @@ All notable changes to GemsPy are documented here.
 
 - **Sequential mode carry-over length can now be controlled by the user through the parameter  `carry-over-length` (default: `block-overlap`) `block-overlap`**. This also fixes an incorrect stitching for `block-overlap >= 2`, where the previous hardcoded behaviour pinned block
   *N+1*'s first timestep to block *N*'s **last** timestep — a different absolute timestep. 
+- **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
+  to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
 
 ### Added
 
@@ -25,6 +27,17 @@ All notable changes to GemsPy are documented here.
   compute tighter variable bounds from the first solve. Each model declares
   what a heuristic reads/writes via `models[].heuristics` in
   `optim-config.yml`.
+
+### Fixed
+- **Standard library parsing now accepts hybrid port-type fields** -
+  `parse_yaml_library` (the standard, non-hybrid parser) no longer rejects
+  `area-connection` / `thermal-capacity-connection` on port-types, so a
+  library YAML file can be used as-is in both full GEMS and hybrid studies.
+  `AreaConnectionSchema` and `PortThermalCapacitySchema` moved from the
+  deleted `gems_craft_hybrid/model/` (`HybridLibrarySchema` /
+  `HybridPortTypeSchema`) directly onto `gems_craft`'s own `PortTypeSchema`;
+  the fields are parsed and validated but otherwise ignored outside hybrid
+  consumers.
 
 ## [0.1.3] - 2026-07-24
 
