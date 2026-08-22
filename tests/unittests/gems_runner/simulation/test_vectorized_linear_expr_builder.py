@@ -362,6 +362,78 @@ def test_comparison_equal_also_raises(builder: VectorizedLinearExprBuilder) -> N
 
 
 # ---------------------------------------------------------------------------
+# 8b. power() — linopy guard
+# ---------------------------------------------------------------------------
+
+
+def test_power_on_literals(builder: VectorizedLinearExprBuilder) -> None:
+    result = visit(literal(2.0) ** literal(3.0), builder)
+    assert isinstance(result, xr.DataArray)
+    assert float(result) == pytest.approx(8.0)
+
+
+def test_power_on_parameter_matches_manual_expansion(
+    builder: VectorizedLinearExprBuilder, param_da: xr.DataArray
+) -> None:
+    """p^3 must give exactly the coefficients of p*p*p."""
+    powered = visit(param("p") ** literal(3.0), builder)
+    expanded = visit(param("p") * param("p") * param("p"), builder)
+    assert isinstance(powered, xr.DataArray)
+    xr.testing.assert_allclose(powered, expanded)
+    np.testing.assert_allclose(powered.values, param_da.values**3)
+
+
+def test_power_with_parameter_exponent(
+    builder: VectorizedLinearExprBuilder, param_da: xr.DataArray
+) -> None:
+    result = visit(literal(2.0) ** param("p"), builder)
+    np.testing.assert_allclose(result.values, 2.0**param_da.values)
+
+
+def test_power_with_negative_and_fractional_exponent(
+    builder: VectorizedLinearExprBuilder, param_da: xr.DataArray
+) -> None:
+    negative = visit(param("p") ** literal(-1.0), builder)
+    np.testing.assert_allclose(negative.values, 1.0 / param_da.values)
+    fractional = visit(param("p") ** literal(0.5), builder)
+    np.testing.assert_allclose(fractional.values, param_da.values**0.5)
+
+
+def test_power_as_linear_coefficient(builder: VectorizedLinearExprBuilder) -> None:
+    """A parameter power used as a coefficient builds a linear expression."""
+    result = visit((param("p") ** literal(2.0)) * var("x"), builder)
+    assert isinstance(result, linopy.LinearExpression)
+
+
+def test_power_on_variable_base_raises(builder: VectorizedLinearExprBuilder) -> None:
+    with pytest.raises(NotImplementedError, match=r"\^"):
+        visit(var("x") ** literal(2.0), builder)
+
+
+def test_power_with_variable_exponent_raises(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    with pytest.raises(NotImplementedError, match="exponent"):
+        visit(literal(2.0) ** var("x"), builder)
+
+
+def test_power_of_variable_to_one_is_identity(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    """Exponents 0 and 1 pass the degree check, so the builder must handle them."""
+    result = visit(var("x") ** literal(1.0), builder)
+    assert isinstance(result, linopy.Variable)
+
+
+def test_power_of_variable_to_zero_is_one(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    result = visit(var("x") ** literal(0.0), builder)
+    assert isinstance(result, xr.DataArray)
+    assert float(result) == pytest.approx(1.0)
+
+
+# ---------------------------------------------------------------------------
 # 9. floor() / ceil() / abs() / round() — linopy guard
 # ---------------------------------------------------------------------------
 

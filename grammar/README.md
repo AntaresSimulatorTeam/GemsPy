@@ -4,11 +4,11 @@
 use for defining constraints, objective, etc.
 
 [ANTLR](https://www.antlr.org) needs to be used to generate the associated
-parser code, which must be written to [andromede.expression.parsing.antlr](/src/andromede/expression/parsing/antlr)
+parser code, which must be written to [gems_craft.expression.parsing.antlr](/src/gems_craft/expression/parsing/antlr)
 package. **No other files are expected to be present in that package**.
 
 To achieve this you may use the provided `generate-parser.sh` script after having installed
-antlr4-tools (`pip install -r requirements-dev.txt` in root directory).
+antlr4-tools (`uv sync --group dev` in root directory).
 
 You may also, for example, use the ANTLR4 PyCharm plugin.
 

@@ -55,3 +55,13 @@ def test_abs_round_printer() -> None:
 def test_dual_reduced_cost_printer() -> None:
     assert visit(DualNode("balance"), PrinterVisitor()) == "dual(balance)"
     assert visit(ReducedCostNode("p"), PrinterVisitor()) == "reduced_cost(p)"
+
+
+def test_power_printer() -> None:
+    p = param("p")
+    q = param("q")
+
+    assert visit(p**2, PrinterVisitor()) == "(p ^ 2.0)"
+    assert visit(p ** (q + 1), PrinterVisitor()) == "(p ^ (q + 1.0))"
+    assert visit(-(p**2), PrinterVisitor()) == "-((p ^ 2.0))"
+    assert visit(p**q**2, PrinterVisitor()) == "(p ^ (q ^ 2.0))"

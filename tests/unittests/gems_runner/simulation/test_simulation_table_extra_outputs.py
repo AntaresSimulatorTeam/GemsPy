@@ -188,6 +188,59 @@ def test_extra_output_abs_round_on_variable() -> None:
     assert rounded == pytest.approx(3.0)
 
 
+def test_extra_output_power_on_variable() -> None:
+    """
+    myVar^(2 + myParam) is allowed in extra outputs (post-solve evaluation),
+    even though a variable base is rejected as nonlinear inside a constraint.
+    Covers negative and fractional exponents too.
+    """
+    from gems_craft.expression import param, var
+    from gems_craft.expression.expression import literal
+    from gems_craft.model.model import model
+    from gems_craft.model.parameter import float_parameter
+    from gems_craft.model.variable import float_variable
+    from gems_craft.study import ConstantData, DataBase, Study, System, create_component
+    from gems_runner.simulation import TimeBlock, build_problem
+
+    SIMPLE_MODEL = model(
+        id="SIMPLE_POWER",
+        parameters=[float_parameter("p")],
+        variables=[float_variable("a", lower_bound=literal(4), upper_bound=literal(4))],
+        extra_outputs={
+            "powered": var("a") ** (literal(2) + param("p")),
+            "inverse": var("a") ** literal(-1),
+            "root": var("a") ** literal(0.5),
+        },
+        # linopy >= 0.9 refuses to solve a model with no objective.
+        objective_contributions={
+            "null_objective": (literal(0) * var("a")).time_sum().expec()
+        },
+    )
+
+    database = DataBase()
+    comp = create_component(model=SIMPLE_MODEL, id="comp_1")
+    database.add_data("comp_1", "p", ConstantData(1))
+
+    system = System("test_power_extra")
+    system.add_component(comp)
+
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), scenario_ids=list(range(1))
+    )
+    problem.solve(solver_name="highs")
+
+    df = SimulationTableBuilder().build(problem)
+
+    def value(output: str) -> float:
+        return (
+            df.component("comp_1").output(output).value(time_index=0, scenario_index=0)
+        )
+
+    assert value("powered") == pytest.approx(64.0)  # 4^(2+1)
+    assert value("inverse") == pytest.approx(0.25)
+    assert value("root") == pytest.approx(2.0)
+
+
 def test_extra_output_min_on_variable() -> None:
     """
     min(variable, parameter) is allowed in extra outputs and evaluated

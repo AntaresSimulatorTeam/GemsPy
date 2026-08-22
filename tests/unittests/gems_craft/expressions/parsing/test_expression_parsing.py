@@ -278,6 +278,86 @@ def test_parse_reduced_cost_unknown_variable_raises() -> None:
 
 
 @pytest.mark.parametrize(
+    "variables, parameters, expression_str, expected",
+    [
+        ({}, {"p"}, "p^2", param("p") ** 2),
+        ({}, {"p"}, "2^p", literal(2) ** param("p")),
+        ({}, {"p", "q"}, "p^(1+q)", param("p") ** (literal(1) + param("q"))),
+        ({"x"}, {}, "x[t-1]^2", var("x").shift(-literal(1)) ** 2),
+        ({"x"}, {}, "x^2", var("x") ** 2),
+    ],
+)
+def test_parsing_power(
+    variables: Set[str],
+    parameters: Set[str],
+    expression_str: str,
+    expected: ExpressionNode,
+) -> None:
+    identifiers = ModelIdentifiers(variables, parameters)
+    assert expressions_equal(parse_expression(expression_str, identifiers), expected)
+
+
+@pytest.mark.parametrize(
+    "expression_str, equivalent_str",
+    [
+        # '^' binds tighter than unary minus: standard mathematical convention,
+        # a deliberate deviation from Antares Simulator, where '-2^2' is 4.
+        ("-2^2", "-(2^2)"),
+        ("2^-3", "2^(-3)"),
+        # right-associative
+        ("2^3^2", "2^(3^2)"),
+        # '^' binds tighter than '*' and '/'
+        ("2*3^2", "2*(3^2)"),
+        ("2^3*2", "(2^3)*2"),
+        ("2^3/2", "(2^3)/2"),
+        # ... and than '+' and '-'
+        ("1+2^3", "1+(2^3)"),
+        # inside a time shift, the sign applies to the whole power operand,
+        # so the shift amount is -(2^2) = -4 and not (-2)^2 = 4
+        ("x[t-2^2]", "x[t-(2^2)]"),
+        # and '^' does not swallow a trailing '*' on its right:
+        # the shift amount is (-(2^2))*3 = -12 and not -(2^(2*3)) = -64
+        ("x[t-2^2*3]", "x[t-(2^2)*3]"),
+        ("x[t-2*3^2]", "x[t-2*(3^2)]"),
+    ],
+)
+def test_power_precedence(expression_str: str, equivalent_str: str) -> None:
+    """Each expression must parse exactly like its parenthesised equivalent."""
+    identifiers = ModelIdentifiers(variables={"x"}, parameters=set())
+    assert expressions_equal(
+        parse_expression(expression_str, identifiers),
+        parse_expression(equivalent_str, identifiers),
+    )
+
+
+@pytest.mark.parametrize(
+    "expression_str",
+    [
+        "p^2",
+        "2^p",
+        "-2^2",
+        "2^-3",
+        "2^3^2",
+        "2*3^2",
+        "2^3*2",
+        "p^(1+q)",
+        "(p^2)*(q^3)",
+        "-(p^2) + q^2",
+    ],
+)
+def test_power_print_reparse_round_trip(expression_str: str) -> None:
+    """Printing an AST containing '^' and re-parsing it must be a no-op.
+
+    Time-shifted expressions are out of scope here: PrinterVisitor emits them
+    as ``x.shift(...)``, which the grammar does not accept — a pre-existing
+    limitation unrelated to '^'.
+    """
+    identifiers = ModelIdentifiers(variables={"x"}, parameters={"p", "q"})
+    expr = parse_expression(expression_str, identifiers)
+    assert expressions_equal(parse_expression(print_expr(expr), identifiers), expr)
+
+
+@pytest.mark.parametrize(
     "expression_str",
     [
         "1**3",
@@ -285,6 +365,9 @@ def test_parse_reduced_cost_unknown_variable_raises() -> None:
         "x[t+1-t]",
         "x[2*t]",
         "x[t 4]",
+        # A signed exponent is not allowed inside a time shift: a fractional
+        # shift is meaningless. '2^-1' remains valid outside a shift.
+        "x[t+2^-1]",
     ],
 )
 def test_parse_cancellation_should_throw(expression_str: str) -> None:

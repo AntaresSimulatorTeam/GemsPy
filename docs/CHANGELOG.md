@@ -9,6 +9,23 @@ All notable changes to GemsPy are documented here.
   to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
 
 ### Added
+- **Power operator `^` in the expression language** - `^` is now accepted in
+  constraints, objective contributions, variable bounds, port-field definitions
+  and extra-outputs, matching Antares Simulator. It is right-associative and
+  binds tighter than unary minus and than `*` `/`. Its operands must be
+  literals or parameters everywhere except in `extra-outputs`, where a decision
+  variable may be raised to a power (evaluated post-solve), like the existing
+  `floor` / `ceil` / `abs` / `round` / `min` / `max`. The exponent must never
+  depend on a decision variable. The Python API gains `**` on `ExpressionNode`.
+  See [Expression syntax](user-guide/expressions.md).
+
+  **Divergence from Antares Simulator:** GemsPy parses `-2^2` as `-(2^2) = -4`,
+  the standard mathematical convention, whereas Antares Simulator currently
+  parses it as `(-2)^2 = 4`. The same model can therefore give different
+  results in the two interpreters until the Antares side is aligned. No
+  existing study is affected: `^` was previously a parse error, so no GEMS file
+  in circulation can contain it.
+
 - **Integer strategy and thermal heuristics** - components can now set
   `integer-strategy` (`exact` (default), `relaxed`, or `heuristic` +
   `heuristic-id`) to control how their model's integer/binary variables are

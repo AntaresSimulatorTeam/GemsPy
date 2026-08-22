@@ -36,6 +36,7 @@ from gems_craft.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
@@ -71,6 +72,9 @@ class ExpressionVisitor(ABC, Generic[T]):
 
     @abstractmethod
     def division(self, node: DivisionNode) -> T: ...
+
+    @abstractmethod
+    def power(self, node: PowerNode) -> T: ...
 
     @abstractmethod
     def comparison(self, node: ComparisonNode) -> T: ...
@@ -145,6 +149,8 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
         return visitor.multiplication(root)
     elif isinstance(root, DivisionNode):
         return visitor.division(root)
+    elif isinstance(root, PowerNode):
+        return visitor.power(root)
     elif isinstance(root, ComparisonNode):
         return visitor.comparison(root)
     elif isinstance(root, TimeShiftNode):
@@ -182,7 +188,7 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
 
 class SupportsOperations(Protocol[T]):
     """
-    Defines a type which implements math operations +, -, *, /
+    Defines a type which implements math operations +, -, *, /, **
     """
 
     @abstractmethod
@@ -205,6 +211,10 @@ class SupportsOperations(Protocol[T]):
     def __truediv__(self, other: T) -> T:
         pass
 
+    @abstractmethod
+    def __pow__(self, other: T) -> T:
+        pass
+
 
 T_op = TypeVar("T_op", bound=SupportsOperations)
 
@@ -212,7 +222,7 @@ T_op = TypeVar("T_op", bound=SupportsOperations)
 class ExpressionVisitorOperations(ExpressionVisitor[T_op], ABC):
     """
     Provides default implementations of math operations
-    based on (+, -, /, *) operations of type T.
+    based on (+, -, /, *, **) operations of type T.
     """
 
     def negation(self, node: NegationNode) -> T_op:
@@ -234,3 +244,8 @@ class ExpressionVisitorOperations(ExpressionVisitor[T_op], ABC):
         left_value = visit(node.left, self)
         right_value = visit(node.right, self)
         return left_value / right_value
+
+    def power(self, node: PowerNode) -> T_op:
+        left_value = visit(node.left, self)
+        right_value = visit(node.right, self)
+        return left_value**right_value

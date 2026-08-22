@@ -37,6 +37,8 @@ from gems_craft.expression.expression import DualNode, ReducedCostNode, maximum,
         var("x").round(),
         maximum(var("x"), param("p")),
         minimum(var("x"), param("p")),
+        var("x") ** 2,
+        param("p") ** (param("q") + 1),
     ],
 )
 def test_equals(expr: ExpressionNode) -> None:
@@ -73,6 +75,10 @@ def test_equals(expr: ExpressionNode) -> None:
         (maximum(var("x"), param("p")), maximum(var("y"), param("p"))),
         (minimum(var("x"), param("p")), minimum(var("x"), param("q"))),
         (maximum(var("x"), param("p")), minimum(var("x"), param("p"))),  # Max vs Min
+        # power
+        (var("x") ** 2, var("y") ** 2),
+        (var("x") ** 2, var("x") ** 3),
+        (var("x") ** 2, var("x") * var("x")),  # different node type
     ],
 )
 def test_not_equals(lhs: ExpressionNode, rhs: ExpressionNode) -> None:

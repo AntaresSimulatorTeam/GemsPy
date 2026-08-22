@@ -30,6 +30,7 @@ from gems_craft.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
@@ -230,6 +231,10 @@ class _ForbidBarePortFieldVisitor(ExpressionVisitor[None]):
         visit(node.right, self)
 
     def division(self, node: DivisionNode) -> None:
+        visit(node.left, self)
+        visit(node.right, self)
+
+    def power(self, node: PowerNode) -> None:
         visit(node.left, self)
         visit(node.right, self)
 

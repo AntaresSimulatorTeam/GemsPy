@@ -34,6 +34,7 @@ from .expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
@@ -92,6 +93,9 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return self._combine([node.left, node.right])
 
     def division(self, node: DivisionNode) -> IndexingStructure:
+        return self._combine([node.left, node.right])
+
+    def power(self, node: PowerNode) -> IndexingStructure:
         return self._combine([node.left, node.right])
 
     def comparison(self, node: ComparisonNode) -> IndexingStructure:

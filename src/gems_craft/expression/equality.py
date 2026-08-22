@@ -36,6 +36,7 @@ from gems_craft.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
@@ -75,6 +76,8 @@ class EqualityVisitor:
             right, MultiplicationNode
         ):
             return self.multiplication(left, right)
+        if isinstance(left, PowerNode) and isinstance(right, PowerNode):
+            return self.power(left, right)
         if isinstance(left, ComparisonNode) and isinstance(right, ComparisonNode):
             return self.comparison(left, right)
         if isinstance(left, VariableNode) and isinstance(right, VariableNode):
@@ -143,6 +146,9 @@ class EqualityVisitor:
         return self._visit_operands(left, right)
 
     def division(self, left: DivisionNode, right: DivisionNode) -> bool:
+        return self._visit_operands(left, right)
+
+    def power(self, left: PowerNode, right: PowerNode) -> bool:
         return self._visit_operands(left, right)
 
     def comparison(self, left: ComparisonNode, right: ComparisonNode) -> bool:

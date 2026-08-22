@@ -39,10 +39,15 @@ from .expression import (
     MultiplicationNode,
     NegationNode,
     ParameterNode,
+    PowerNode,
     ScenarioOperatorNode,
     VariableNode,
 )
 from .visitor import ExpressionVisitor, T, visit
+
+
+def _is_non_negative_integer(value: float) -> bool:
+    return value >= 0 and float(value).is_integer()
 
 
 class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
@@ -69,6 +74,25 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         if right_degree != 0:
             raise ValueError("Degree computation not implemented for divisions.")
         return visit(node.left, self)
+
+    def power(self, node: PowerNode) -> int | float:
+        # Mirrors the Antares Simulator rule: the exponent must not depend on
+        # variables, and a variable base only stays polynomial for a
+        # non-negative integer exponent.
+        if visit(node.right, self) != 0:
+            raise ValueError(
+                "Exponent of a power expression must not depend on variables."
+            )
+        base_degree = visit(node.left, self)
+        if base_degree == 0:
+            return 0
+        if isinstance(node.right, LiteralNode) and _is_non_negative_integer(
+            node.right.value
+        ):
+            exponent = int(node.right.value)
+            # inf * 0 is nan, whereas anything to the power 0 is the constant 1.
+            return 0 if exponent == 0 else base_degree * exponent
+        return math.inf
 
     def comparison(self, node: ComparisonNode) -> int | float:
         return max(visit(node.left, self), visit(node.right, self))

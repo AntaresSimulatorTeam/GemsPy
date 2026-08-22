@@ -20,6 +20,7 @@ fullexpr: expr EOF;
 expr
     : atom                                     # unsignedAtom
     | portFieldExpr                            # portField
+    | <assoc=right> expr '^' expr              # power
     | '-' expr                                 # negation
     | '(' expr ')'                             # expression
     | expr op=('/' | '*') expr                 # muldiv
@@ -60,13 +61,28 @@ shift: TIME shift_expr?;
 shift_expr
     : shift_expr op=('*' | '/') right_expr     # shiftMuldiv
     | shift_expr op=('+' | '-') right_expr     # shiftAddsub
-    | op=('+' | '-') atom                      # signedAtom
-    | op=('+' | '-') '(' expr ')'              # signedExpression
+    | op=('+' | '-') pow_expr                  # signedOperand
     ;
 
 right_expr
     : right_expr op=('/' | '*') right_expr     # rightMuldiv
-    | '(' expr ')'                             # rightExpression
+    | pow_expr                                 # rightPow
+    ;
+
+// Operand of '^' inside a time shift, chained right-associatively.
+// Deliberately NOT "right_expr" on the right of '^': being a separate rule,
+// it would be entered at precedence 0 and greedily swallow '*' and '/',
+// so "t - 2^2*3" would mean "2^(2*3)" instead of "(2^2)*3".
+// The exponent is unsigned here, so "t + 2^-1" is a parse error: a fractional
+// time shift is meaningless, and negative exponents remain available in the
+// general "expr" rule.
+pow_expr
+    : pow_atom '^' pow_expr                    # rightPower
+    | pow_atom                                 # rightPowAtom
+    ;
+
+pow_atom
+    : '(' expr ')'                             # rightExpression
     | atom                                     # rightAtom
     ;
 

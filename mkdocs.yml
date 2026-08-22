@@ -6,6 +6,7 @@ nav:
   - 'User guide: GEMS language and data structure': 'user-guide.md'
   - 'User guide: GemsPy interpreter package':
     - 'Reading input files': 'user-guide/inputs.md'
+    - 'Expression syntax': 'user-guide/expressions.md'
     - 'Building systems with the Python API': 'user-guide/building.md'
     - 'Optimization: building and solving problems': 'user-guide/optimisation.md'
     - 'Retrieving outputs': 'user-guide/outputs.md'

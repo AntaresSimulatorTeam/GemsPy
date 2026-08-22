@@ -36,6 +36,7 @@ from gems_craft.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
@@ -148,6 +149,10 @@ class _PortFieldExpressionChecker(ExpressionVisitor[None]):
 
     def port_field(self, node: PortFieldNode) -> None:
         raise ValueError("Port definition cannot reference another port field.")
+
+    def power(self, node: PowerNode) -> None:
+        visit(node.left, self)
+        visit(node.right, self)
 
     def floor(self, node: FloorNode) -> None:
         visit(node.operand, self)
