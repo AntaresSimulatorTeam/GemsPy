@@ -23,6 +23,7 @@ from gems_craft.expression import (
     var,
     visit,
 )
+from gems_craft.expression.degree import is_constant, is_linear
 from gems_craft.expression.expression import (
     AbsNode,
     CeilNode,
@@ -122,8 +123,8 @@ def test_power_degree() -> None:
     assert visit(FloorNode(x) ** 0, ExpressionDegreeVisitor()) == 0
 
 
-def test_variable_exponent_raises() -> None:
-    with pytest.raises(
-        ValueError, match="Exponent of a power expression must not depend on variables"
-    ):
-        visit(param("p") ** var("x"), ExpressionDegreeVisitor())
+def test_variable_exponent_degree() -> None:
+    """A variable exponent is not polynomial, but must not break is_linear()."""
+    assert visit(param("p") ** var("x"), ExpressionDegreeVisitor()) == math.inf
+    assert not is_linear(param("p") ** var("x"))
+    assert not is_constant(param("p") ** var("x"))

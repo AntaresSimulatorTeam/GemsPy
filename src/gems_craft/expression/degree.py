@@ -76,13 +76,10 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         return visit(node.left, self)
 
     def power(self, node: PowerNode) -> int | float:
-        # Mirrors the Antares Simulator rule: the exponent must not depend on
-        # variables, and a variable base only stays polynomial for a
-        # non-negative integer exponent.
+        # A variable exponent is never polynomial, and a variable base only
+        # stays polynomial for a non-negative integer exponent.
         if visit(node.right, self) != 0:
-            raise ValueError(
-                "Exponent of a power expression must not depend on variables."
-            )
+            return math.inf
         base_degree = visit(node.left, self)
         if base_degree == 0:
             return 0

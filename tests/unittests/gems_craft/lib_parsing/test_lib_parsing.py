@@ -333,9 +333,7 @@ library:
           expression: p^x = 0
 """)
     input_lib = parse_yaml_library(lib_yaml)
-    with pytest.raises(
-        ValueError, match="Exponent of a power expression must not depend on variables"
-    ):
+    with pytest.raises(ValueError, match="Non-linear expression is not allowed"):
         resolve_library([input_lib])
 
 
