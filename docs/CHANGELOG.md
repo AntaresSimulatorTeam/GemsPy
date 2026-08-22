@@ -13,8 +13,7 @@ All notable changes to GemsPy are documented here.
   tighter than unary minus and than `*` `/`, so `-2^2` is `-(2^2)`. Operands
   must be literals or parameters, except in `extra-outputs` where a variable may
   be raised to a power; the exponent must never depend on a variable. The Python
-  API gains `**` on `ExpressionNode`. See
-  [Expression syntax](user-guide/expressions.md).
+  API gains `**` on `ExpressionNode`.
 
 - **Integer strategy and thermal heuristics** - components can now set
   `integer-strategy` (`exact` (default), `relaxed`, or `heuristic` +
