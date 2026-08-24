@@ -35,7 +35,7 @@ heuristic configs — both shared across every case and mode).
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, cast
+from typing import Any, Dict, List, Optional, Union, cast
 
 import pandas as pd
 import pytest
@@ -106,6 +106,19 @@ def with_integer_strategy(
     return new_system
 
 
+def with_parameter_value(
+    system: SystemSchema, component_id: str, parameter_id: str, value: Union[float, str]
+) -> SystemSchema:
+    """Return a deep copy of *system* with one component's parameter value overridden."""
+    new_system = system.model_copy(deep=True)
+    for comp in new_system.components:
+        if comp.id == component_id:
+            for param in comp.parameters:
+                if param.id == parameter_id:
+                    param.value = value
+    return new_system
+
+
 # ---------------------------------------------------------------------------
 # Case registry
 # ---------------------------------------------------------------------------
@@ -148,11 +161,19 @@ def _shared_library() -> LibrarySchema:
         return parse_yaml_library(f)
 
 
-def build_thermal_study(case_id: str, mode: str) -> Study:
+def build_thermal_study(
+    case_id: str,
+    mode: str,
+    parameter_overrides: Optional[Dict[str, Dict[str, Union[float, str]]]] = None,
+) -> Study:
     """Build a Study in memory for (case_id, mode) in {milp, lp, accurate, fast}.
 
     No disk writes: every variant is derived from schemas parsed once from the
     case's committed base directory and the shared library file.
+
+    ``parameter_overrides`` optionally maps component id -> {parameter id: value},
+    applied on top of the base study's parameters (e.g. to zero out a thermal
+    cluster's P_min without committing a dedicated study directory).
     """
     spec = CASES[case_id]
     system = _base_system(spec.base_dir)
@@ -160,6 +181,11 @@ def build_thermal_study(case_id: str, mode: str) -> Study:
 
     if mode != "milp":
         system = with_integer_strategy(system, spec.thermal_components, mode)
+
+    if parameter_overrides:
+        for component_id, params in parameter_overrides.items():
+            for parameter_id, value in params.items():
+                system = with_parameter_value(system, component_id, parameter_id, value)
 
     resolved_system = resolve_system(system, lib_dict)
 

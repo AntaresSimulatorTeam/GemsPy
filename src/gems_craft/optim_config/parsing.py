@@ -93,7 +93,7 @@ _HEURISTIC_SCHEMA: Dict[HeuristicId, Dict[str, Set[str]]] = {
             "min_up_duration",
             "min_down_duration",
         },
-        "outputs": {"minimum_generation_power"},
+        "outputs": {"minimum_generation_power", "maximum_generation_power"},
     },
 }
 

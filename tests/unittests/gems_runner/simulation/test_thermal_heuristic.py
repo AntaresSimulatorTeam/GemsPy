@@ -36,8 +36,24 @@ def test_find_min_generation_fast_scalar_matches_constant_list() -> None:
 
 
 def test_find_min_generation_fast_scalar_clamps_output() -> None:
-    result = find_min_generation_fast(_GENERATION_POWER, 40.0, 50.0, 50.0, 2, 2)
-    assert all(v <= 40.0 for v in result)
+    minimum, maximum = find_min_generation_fast(
+        _GENERATION_POWER, 40.0, 50.0, 50.0, 2, 2
+    )
+    assert all(v <= 40.0 for v in minimum)
+    assert all(v <= 40.0 for v in maximum)
+
+
+def test_find_min_generation_fast_no_pmin_keeps_units_committed() -> None:
+    """With min_power_per_unit = 0, the minimum output is all zeros, but the maximum
+    output must still reflect units kept committed by the min_up/min_down window logic
+    (no early-return short-circuit)."""
+    generation_power = [0.0] * 5 + [100.0] + [0.0] * 5
+    minimum, maximum = find_min_generation_fast(
+        generation_power, 200.0, 0.0, 50.0, 3, 3
+    )
+    assert minimum == [0.0] * len(generation_power)
+    assert maximum[5] == pytest.approx(100.0)
+    assert any(v > 0.0 for t, v in enumerate(maximum) if t != 5)
 
 
 # ---------------------------------------------------------------------------

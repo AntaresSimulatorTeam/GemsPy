@@ -67,3 +67,6 @@ models:
           - heuristic-element: minimum_generation_power
             id: generation_power
             type: variable-lower-bound
+          - heuristic-element: maximum_generation_power
+            id: generation_power
+            type: variable-upper-bound

@@ -56,6 +56,7 @@ _HEURISTIC_ELEMENT_TIME_DEPENDENCE: Dict[str, Optional[bool]] = {
     "generation_power": True,
     "minimum_num_units_on": True,
     "minimum_generation_power": True,
+    "maximum_generation_power": True,
     "num_units_max": None,
     "cluster_max_generation": None,
 }
