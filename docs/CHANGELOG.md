@@ -9,6 +9,9 @@ All notable changes to GemsPy are documented here.
   *N+1*'s first timestep to block *N*'s **last** timestep — a different absolute timestep. 
 - **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
   to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
+- **Breaking** - parsing a library that declares a `taxonomy` raises `ValueError`
+  if no taxonomy is supplied, or if its id differs from the declared one.
+- **Breaking** - `TaxonomyData` renamed to `TaxonomySchema`; no alias kept.
 
 ### Added
 - **Integer strategy and thermal heuristics** - components can now set
@@ -26,6 +29,10 @@ All notable changes to GemsPy are documented here.
   heuristics" above), which previously had no way to be surfaced in results. Validated at
   model-build time; using them inside constraints, binding-constraints, objective
   contributions, or variable bounds raises a `ValueError`.
+
+- **Taxonomy conformance checked at parse time** - `parse_yaml_library` takes an
+  optional `taxonomy` and checks every library declaring a `taxonomy` field.
+  `load_study` reads it from the optional `input/taxonomy.yml`.
 
 ### Fixed
 - **Standard library parsing now accepts hybrid port-type fields** -

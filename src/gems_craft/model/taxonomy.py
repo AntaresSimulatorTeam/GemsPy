@@ -12,13 +12,16 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 import yaml
 from pydantic import Field
 
-from gems_craft.model.parsing import LibrarySchema, ModelSchema
 from gems_craft.utils import ModifiedBaseModel
+
+if TYPE_CHECKING:
+    # Annotations only — parsing.py imports this module, so this would be circular.
+    from gems_craft.model.parsing import LibrarySchema, ModelSchema
 
 
 class TaxonomyItem(ModifiedBaseModel):
@@ -38,7 +41,7 @@ class TaxonomyCategory(ModifiedBaseModel):
     properties: List[TaxonomyItem] = Field(default_factory=list)
 
 
-class TaxonomyData(ModifiedBaseModel):
+class TaxonomySchema(ModifiedBaseModel):
     id: str
     description: str = ""
     categories: List[TaxonomyCategory] = Field(default_factory=list)
@@ -56,7 +59,7 @@ def load_taxonomy(taxonomy_file: Path) -> Taxonomy:
         raw = yaml.safe_load(f)
     if "taxonomy" not in raw:
         raise ValueError(f"Missing 'taxonomy' key at root of {taxonomy_file}")
-    data = TaxonomyData.model_validate(raw["taxonomy"])
+    data = TaxonomySchema.model_validate(raw["taxonomy"])
     return Taxonomy(
         id=data.id, description=data.description, categories=data.categories
     )
@@ -76,7 +79,9 @@ def _missing(
     )
 
 
-def check_library_against_taxonomy(library: LibrarySchema, taxonomy: Taxonomy) -> None:
+def check_library_against_taxonomy(
+    library: "LibrarySchema", taxonomy: Taxonomy
+) -> None:
     """
     Validates that every model declaring a taxonomy_category:
       1. References a category that exists in the taxonomy.

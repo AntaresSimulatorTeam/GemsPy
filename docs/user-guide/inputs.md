@@ -14,6 +14,7 @@ my_study/
 ├── input/
 │   ├── system.yml
 │   ├── optim-config.yml
+│   ├── taxonomy.yml                      ← optional
 │   ├── model-libraries/
 │   │   └── *.yml
 │   └── data-series/

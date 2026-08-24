@@ -17,6 +17,7 @@ from typing import List, Optional
 from pydantic import ConfigDict, Field, ValidationError
 from yaml import safe_dump, safe_load
 
+from gems_craft.model.taxonomy import Taxonomy, check_library_against_taxonomy
 from gems_craft.utils import ModifiedBaseModel
 
 
@@ -123,12 +124,31 @@ class LibrarySchema(ModifiedBaseModel):
     version: Optional[str] = None
 
 
-def parse_yaml_library(input: typing.TextIO) -> LibrarySchema:
+def _check_declared_taxonomy(
+    library: LibrarySchema, taxonomy: Optional[Taxonomy]
+) -> None:
+    """Check a library against the taxonomy it declares conformance to."""
+    declared = f"Library '{library.id}' declares taxonomy '{library.taxonomy}'"
+    if taxonomy is None:
+        raise ValueError(
+            f"{declared} but no taxonomy was provided to check it against."
+        )
+    if library.taxonomy != taxonomy.id:
+        raise ValueError(f"{declared} but was checked against '{taxonomy.id}'.")
+    check_library_against_taxonomy(library, taxonomy)
+
+
+def parse_yaml_library(
+    input: typing.TextIO, taxonomy: Optional[Taxonomy] = None
+) -> LibrarySchema:
     tree = safe_load(input)
     try:
-        return LibrarySchema.model_validate(tree["library"])
+        library = LibrarySchema.model_validate(tree["library"])
     except ValidationError as e:
         raise ValueError(f"An error occurred during parsing: {e}")
+    if library.taxonomy is not None:
+        _check_declared_taxonomy(library, taxonomy)
+    return library
 
 
 def write_yaml_library(library: LibrarySchema, path: Path) -> None:
