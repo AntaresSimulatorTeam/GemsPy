@@ -100,9 +100,9 @@ from gems_craft.study import (
 from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import (
     build_data_base,
-    consistency_check,
     resolve_system,
 )
+from gems_craft.study.validation import consistency_check
 from gems_runner.simulation import TimeBlock, build_problem
 from tests.e2e.functional.libs.standard import (
     BALANCE_PORT_TYPE,

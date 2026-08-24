@@ -15,14 +15,15 @@ from gems_craft.model.model import Model
 from gems_craft.model.parsing import parse_yaml_library
 from gems_craft.model.resolve_library import resolve_library
 from gems_craft.model.taxonomy import load_taxonomy
+from gems_craft.model.validation import validate_libraries_against_taxonomy
 from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import (
     build_data_base,
-    consistency_check,
     resolve_system,
 )
 from gems_craft.study.scenario_builder import ScenarioBuilder
 from gems_craft.study.study import Study
+from gems_craft.study.validation import consistency_check
 
 
 def load_study(study_dir: Path) -> Study:
@@ -50,7 +51,8 @@ def load_study(study_dir: Path) -> Study:
     input_libraries = []
     for lib_file in lib_folder.glob("*.yml"):
         with lib_file.open() as lib:
-            input_libraries.append(parse_yaml_library(lib, taxonomy=taxonomy))
+            input_libraries.append(parse_yaml_library(lib))
+    validate_libraries_against_taxonomy(input_libraries, taxonomy)
 
     with system_file.open() as c:
         input_study = parse_yaml_system(c)

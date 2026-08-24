@@ -18,7 +18,8 @@ from gems_craft.study.parsing import (
     load_input_system,
     parse_yaml_system,
 )
-from gems_craft.study.resolve_components import consistency_check, resolve_system
+from gems_craft.study.resolve_components import resolve_system
+from gems_craft.study.validation import consistency_check
 
 COMPO_FILE = Path(__file__).parent / "systems/system.yml"
 

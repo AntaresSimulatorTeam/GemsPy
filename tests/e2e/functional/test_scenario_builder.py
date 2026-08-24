@@ -21,10 +21,10 @@ from gems_craft.study.data import DataBase
 from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import (
     build_data_base,
-    consistency_check,
     resolve_system,
 )
 from gems_craft.study.scenario_builder import ScenarioBuilder
+from gems_craft.study.validation import consistency_check
 from gems_runner.simulation import build_problem
 from gems_runner.simulation.time_block import TimeBlock
 

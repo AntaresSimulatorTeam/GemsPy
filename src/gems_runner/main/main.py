@@ -16,7 +16,6 @@ from typing import Dict, List, Optional
 from gems_craft.model.library import Library
 from gems_craft.model.parsing import parse_yaml_library
 from gems_craft.model.resolve_library import resolve_library
-from gems_craft.model.taxonomy import Taxonomy
 from gems_craft.optim_config.parsing import OptimConfig
 from gems_craft.study import Study
 from gems_craft.study.data import DataBase
@@ -27,14 +26,12 @@ from gems_runner.simulation import DecomposedProblems, build_couplings, dump_cou
 from gems_runner.study.runner import run_study
 
 
-def input_libs(
-    yaml_lib_paths: List[Path], taxonomy: Optional[Taxonomy] = None
-) -> Dict[str, Library]:
+def input_libs(yaml_lib_paths: List[Path]) -> Dict[str, Library]:
     yaml_libraries = []
     yaml_library_ids = set()
     for path in yaml_lib_paths:
         with path.open("r") as file:
-            yaml_lib = parse_yaml_library(file, taxonomy=taxonomy)
+            yaml_lib = parse_yaml_library(file)
             if yaml_lib.id in yaml_library_ids:
                 raise ValueError(f"The identifier '{yaml_lib.id}' is defined twice")
             yaml_libraries.append(yaml_lib)

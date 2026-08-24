@@ -54,8 +54,8 @@ class Study:
         }
 
     # TODO: this is a second, disjoint consistency check alongside
-    # resolve_components.consistency_check() — consider consolidating both
-    # into one validation module for System/Study.
+    # study/validation.py's consistency_check() — consider consolidating both
+    # into that validation module.
     def check_consistency(self) -> None:
         """Validate that the database supplies data for every parameter of every
         component defined in the system.
