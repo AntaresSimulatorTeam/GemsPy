@@ -4,11 +4,7 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
-### Changed
-- **Sequential mode carry-over length can now be controlled by the user through the parameter  `carry-over-length` (default: `block-overlap`). This also fixes an incorrect stitching for `block-overlap >= 2`, where the previous hardcoded behaviour pinned block
-  *N+1*'s first timestep to block *N*'s **last** timestep — a different absolute timestep. 
-- **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
-  to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
+## [0.2.0] - 2026-08-24
 
 ### Added
 - **Integer strategy and thermal heuristics** - components can now set
@@ -27,7 +23,38 @@ All notable changes to GemsPy are documented here.
   model-build time; using them inside constraints, binding-constraints, objective
   contributions, or variable bounds raises a `ValueError`.
 
+### Changed
+- **Sequential mode carry-over length is now user-controlled** through the new
+  `resolution.carry-over-length` parameter (default: `block-overlap`), which
+  sets how many of the shared leading timesteps of block *N+1* are pinned to
+  block *N*'s already-solved values. `0` is legal and explicit (blocks overlap
+  for lag-constraint history, but nothing is pinned); validation requires
+  `0 <= carry-over-length <= block-overlap` and `0 <= block-overlap <
+  block-length`. Both `block-overlap` and `carry-over-length` are rejected
+  outside `sequential-subproblems` mode. This also fixes an incorrect stitching
+  for `block-overlap >= 2`, where the previous hardcoded behaviour pinned block
+  *N+1*'s first timestep to block *N*'s **last** timestep — a different
+  absolute timestep.
+- **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
+  to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
+- **`validate_optim_config` moved to `gems_craft.optim_config.validation`** -
+  optim-config reading (`parsing.py`) and cross-validation (`validation.py`)
+  are now separate modules. The package-level import
+  (`from gems_craft.optim_config import validate_optim_config`) is unchanged;
+  only direct imports from `gems_craft.optim_config.parsing` need updating.
+
+### Removed
+- The unused `models-design/` folder (drawio diagrams), no longer referenced
+  anywhere in the codebase or the docs.
+
 ### Fixed
+- **`fast` thermal heuristic with no minimum power** - `find_min_generation_fast`
+  no longer short-circuits to all-zero output when `min_power_per_unit` is ~0.
+  It now always computes `num_units_on` and returns both
+  `minimum_generation_power` and `maximum_generation_power`, so unit-commitment
+  information is kept and committed units stay available for production. The
+  `fast` heuristic's declared outputs gain `maximum_generation_power`
+  accordingly.
 - **Standard library parsing now accepts hybrid port-type fields** -
   `parse_yaml_library` (the standard, non-hybrid parser) no longer rejects
   `area-connection` / `thermal-capacity-connection` on port-types, so a
@@ -37,6 +64,8 @@ All notable changes to GemsPy are documented here.
   `HybridPortTypeSchema`) directly onto `gems_craft`'s own `PortTypeSchema`;
   the fields are parsed and validated but otherwise ignored outside hybrid
   consumers.
+
+---
 
 ## [0.1.3] - 2026-07-24
 
