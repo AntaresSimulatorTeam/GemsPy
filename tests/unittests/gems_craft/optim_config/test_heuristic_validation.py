@@ -106,6 +106,11 @@ def _fast_heuristic_config(
                 id="generation_power",
                 type=ModelElementAccessType.VARIABLE_LOWER_BOUND,
             ),
+            HeuristicElementConfig(
+                heuristic_element="maximum_generation_power",
+                id="generation_power",
+                type=ModelElementAccessType.VARIABLE_UPPER_BOUND,
+            ),
         ],
     )
 

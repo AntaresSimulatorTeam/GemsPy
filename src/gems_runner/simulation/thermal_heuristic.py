@@ -12,7 +12,7 @@
 
 import math
 import warnings
-from typing import List, Union
+from typing import List, Tuple, Union
 
 import linopy
 import numpy as np
@@ -78,7 +78,7 @@ def find_min_generation_fast(
     max_power_per_unit: float,
     min_up_duration: float,
     min_down_duration: float,
-) -> List[float]:
+) -> Tuple[List[float], List[float]]:
     """
     Fast heuristic: derives the minimum generation power from the optimised production
     timeseries. Timesteps are grouped into windows of size max(min_up_duration, min_down_duration)
@@ -105,8 +105,11 @@ def find_min_generation_fast(
 
     Returns
     -------
-    List[float]
-        Minimum generation power per timestep (MW), clamped by cluster_max_generation.
+    Tuple[List[float], List[float]]
+        Minimum and maximum generation power per timestep (MW), both clamped by
+        cluster_max_generation. If min_power_per_unit is ~0, the minimum list is all
+        zeros, but the maximum list still reflects the units kept committed by the
+        min_up/min_down window logic.
     """
     min_up_duration = _round_to_int_duration(min_up_duration, "min_up_duration")
     min_down_duration = _round_to_int_duration(min_down_duration, "min_down_duration")
@@ -115,9 +118,6 @@ def find_min_generation_fast(
 
     if isinstance(cluster_max_generation, (int, float)):
         cluster_max_generation = [float(cluster_max_generation)] * num_timesteps
-
-    if abs(min_power_per_unit) < TOL:
-        return [0.0] * num_timesteps
 
     assert max_power_per_unit > TOL
 
@@ -151,10 +151,16 @@ def find_min_generation_fast(
         num_units_on=num_units_on,
     )
 
-    return [
-        min(n * min_power_per_unit, cluster_max_generation[t])
-        for t, n in enumerate(num_units_on)
-    ]
+    return (
+        [
+            min(n * min_power_per_unit, cluster_max_generation[t])
+            for t, n in enumerate(num_units_on)
+        ],
+        [
+            min(n * max_power_per_unit, cluster_max_generation[t])
+            for t, n in enumerate(num_units_on)
+        ],
+    )
 
 
 def find_num_units_accurate(

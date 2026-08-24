@@ -39,9 +39,17 @@ if TYPE_CHECKING:
     from gems_craft.study.study import Study
     from gems_runner.simulation.optimization import OptimizationProblem
 
-_HEURISTIC_FUNCTIONS: Dict[HeuristicId, Callable[..., List]] = {
+_HEURISTIC_FUNCTIONS: Dict[HeuristicId, Callable[..., Any]] = {
     HeuristicId.FAST: find_min_generation_fast,
     HeuristicId.ACCURATE: find_num_units_accurate,
+}
+
+# Canonical order of the heuristic_element names in each function's return value.
+# Needed because HeuristicConfig.outputs is ordered by the user's YAML declaration, which
+# must not be assumed to match the function's return order.
+_HEURISTIC_OUTPUT_ORDER: Dict[HeuristicId, List[str]] = {
+    HeuristicId.FAST: ["minimum_generation_power", "maximum_generation_power"],
+    HeuristicId.ACCURATE: ["minimum_num_units_on"],
 }
 
 
@@ -194,15 +202,23 @@ def apply_thermal_heuristics(
             }
             if "solver_name" in fn_params:
                 kwargs["solver_name"] = solver_name
-            heuristic_result: List = heuristic_fn(**kwargs)  # type: ignore[call-overload]
+            heuristic_result = heuristic_fn(**kwargs)  # type: ignore[call-overload]
 
-            result_da = xr.DataArray(
-                heuristic_result,
-                dims=["time"],
-                coords={"time": list(range(len(heuristic_result)))},
+            output_order = _HEURISTIC_OUTPUT_ORDER[heuristic_config.id]
+            result_values = (
+                heuristic_result
+                if isinstance(heuristic_result, tuple)
+                else [heuristic_result]
             )
+            results_by_element = dict(zip(output_order, result_values))
 
             for output in heuristic_config.outputs:
+                result_list = results_by_element[output.heuristic_element]
+                result_da = xr.DataArray(
+                    result_list,
+                    dims=["time"],
+                    coords={"time": list(range(len(result_list)))},
+                )
                 linopy_var = _get_component_linopy_var(
                     problem, model_id, output.id, component.id
                 )

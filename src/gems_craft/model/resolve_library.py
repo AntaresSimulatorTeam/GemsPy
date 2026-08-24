@@ -23,6 +23,7 @@ from gems_craft.expression.expression import (
     DualNode,
     FloorNode,
     LiteralNode,
+    LowerBoundNode,
     MaxNode,
     MinNode,
     MultiplicationNode,
@@ -36,6 +37,7 @@ from gems_craft.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UpperBoundNode,
     VariableNode,
 )
 from gems_craft.expression.indexing_structure import IndexingStructure
@@ -291,6 +293,12 @@ class _ForbidBarePortFieldVisitor(ExpressionVisitor[None]):
         pass
 
     def reduced_cost(self, node: ReducedCostNode) -> None:
+        pass
+
+    def lower_bound(self, node: LowerBoundNode) -> None:
+        pass
+
+    def upper_bound(self, node: UpperBoundNode) -> None:
         pass
 
 

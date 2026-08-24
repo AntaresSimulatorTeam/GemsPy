@@ -29,6 +29,7 @@ from gems_craft.expression.expression import (
     ExpressionNode,
     FloorNode,
     LiteralNode,
+    LowerBoundNode,
     MaxNode,
     MinNode,
     MultiplicationNode,
@@ -42,6 +43,7 @@ from gems_craft.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UpperBoundNode,
     VariableNode,
 )
 
@@ -126,6 +128,12 @@ class ExpressionVisitor(ABC, Generic[T]):
     @abstractmethod
     def reduced_cost(self, node: ReducedCostNode) -> T: ...
 
+    @abstractmethod
+    def lower_bound(self, node: LowerBoundNode) -> T: ...
+
+    @abstractmethod
+    def upper_bound(self, node: UpperBoundNode) -> T: ...
+
 
 def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
     """
@@ -177,6 +185,10 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
         return visitor.dual(root)
     elif isinstance(root, ReducedCostNode):
         return visitor.reduced_cost(root)
+    elif isinstance(root, LowerBoundNode):
+        return visitor.lower_bound(root)
+    elif isinstance(root, UpperBoundNode):
+        return visitor.upper_bound(root)
     raise ValueError(f"Unknown expression node type {root.__class__}")
 
 

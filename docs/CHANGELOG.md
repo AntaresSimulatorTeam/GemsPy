@@ -4,12 +4,19 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Taxonomy conformance checked at parse time** - `parse_yaml_library` takes an
+  optional `taxonomy` and checks every library declaring a `taxonomy` field.
+  `load_study` reads it from the optional `input/taxonomy.yml`.
+
 ### Changed
-- **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
-  to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
 - **Breaking** - parsing a library that declares a `taxonomy` raises `ValueError`
   if no taxonomy is supplied, or if its id differs from the declared one.
 - **Breaking** - `TaxonomyData` renamed to `TaxonomySchema`; no alias kept.
+
+---
+
+## [0.2.0] - 2026-08-24
 
 ### Added
 - **Integer strategy and thermal heuristics** - components can now set
@@ -20,10 +27,22 @@ All notable changes to GemsPy are documented here.
   compute tighter variable bounds from the first solve. Each model declares
   what a heuristic reads/writes via `models[].heuristics` in
   `optim-config.yml`.
+- **`lower_bound(variable_name)`** and **`upper_bound(variable_name)`** operators in the
+  expression language, usable in `extra-outputs` and port-field-definitions. Both take a bare
+  variable identifier and return its *current* lower/upper bound post-solve — in particular
+  reflecting mutations made by thermal heuristics (see "Integer strategy and thermal
+  heuristics" above).
 
-- **Taxonomy conformance checked at parse time** - `parse_yaml_library` takes an
-  optional `taxonomy` and checks every library declaring a `taxonomy` field.
-  `load_study` reads it from the optional `input/taxonomy.yml`.
+### Changed
+- **Sequential mode carry-over length is now user-controlled** through the new
+  `resolution.carry-over-length` parameter (default: `block-overlap`), which
+  sets how many of the shared leading timesteps of block *N+1* are pinned to
+  block *N*'s already-solved values. This also fixes an incorrect stitching
+  for `block-overlap >= 2`, where the previous hardcoded behaviour pinned block
+  *N+1*'s first timestep to block *N*'s **last** timestep — a different
+  absolute timestep.
+- **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
+  to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
 
 ### Fixed
 - **Standard library parsing now accepts hybrid port-type fields** -
@@ -35,6 +54,8 @@ All notable changes to GemsPy are documented here.
   `HybridPortTypeSchema`) directly onto `gems_craft`'s own `PortTypeSchema`;
   the fields are parsed and validated but otherwise ignored outside hybrid
   consumers.
+
+---
 
 ## [0.1.3] - 2026-07-24
 

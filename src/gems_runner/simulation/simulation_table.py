@@ -279,6 +279,8 @@ class SimulationTableBuilder:
 
         constraint_dual_arrays = self._collect_constraint_duals(problem)
         var_reduced_cost_arrays = self._collect_reduced_costs(problem)
+        var_lower_bound_arrays = self._collect_lower_bounds(problem)
+        var_upper_bound_arrays = self._collect_upper_bounds(problem)
 
         for mk, components in problem.study.model_components.items():
             model = problem.study.models[mk]
@@ -295,6 +297,8 @@ class SimulationTableBuilder:
                     var_solution_arrays=var_solution_arrays,
                     constraint_dual_arrays=constraint_dual_arrays,
                     var_reduced_cost_arrays=var_reduced_cost_arrays,
+                    var_lower_bound_arrays=var_lower_bound_arrays,
+                    var_upper_bound_arrays=var_upper_bound_arrays,
                     port_arrays={},
                     block_length=problem.block_length,
                 ),
@@ -307,6 +311,8 @@ class SimulationTableBuilder:
                     var_solution_arrays=var_solution_arrays,
                     constraint_dual_arrays=constraint_dual_arrays,
                     var_reduced_cost_arrays=var_reduced_cost_arrays,
+                    var_lower_bound_arrays=var_lower_bound_arrays,
+                    var_upper_bound_arrays=var_upper_bound_arrays,
                     port_arrays=port_arrays,
                     block_length=problem.block_length,
                 )
@@ -410,6 +416,30 @@ class SimulationTableBuilder:
             return result
         except Exception:
             return {}
+
+    @staticmethod
+    def _collect_lower_bounds(
+        problem: OptimizationProblem,
+    ) -> Dict[Tuple[str, str], xr.DataArray]:
+        """Return current variable lower bounds keyed by (model_key, var_name)."""
+        result: Dict[Tuple[str, str], xr.DataArray] = {}
+        for mk, vname in problem._linopy_vars:
+            lb = problem.get_variable_lower_bound(mk, vname)
+            if lb is not None:
+                result[(mk, vname)] = lb
+        return result
+
+    @staticmethod
+    def _collect_upper_bounds(
+        problem: OptimizationProblem,
+    ) -> Dict[Tuple[str, str], xr.DataArray]:
+        """Return current variable upper bounds keyed by (model_key, var_name)."""
+        result: Dict[Tuple[str, str], xr.DataArray] = {}
+        for mk, vname in problem._linopy_vars:
+            ub = problem.get_variable_upper_bound(mk, vname)
+            if ub is not None:
+                result[(mk, vname)] = ub
+        return result
 
     # -------------------------------------------------------------------------
     # Objective value

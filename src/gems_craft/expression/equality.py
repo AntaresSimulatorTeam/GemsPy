@@ -32,6 +32,7 @@ from gems_craft.expression.expression import (
     CeilNode,
     DualNode,
     FloorNode,
+    LowerBoundNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
@@ -42,6 +43,7 @@ from gems_craft.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UpperBoundNode,
 )
 
 
@@ -115,6 +117,10 @@ class EqualityVisitor:
             return self.dual(left, right)
         if isinstance(left, ReducedCostNode) and isinstance(right, ReducedCostNode):
             return self.reduced_cost(left, right)
+        if isinstance(left, LowerBoundNode) and isinstance(right, LowerBoundNode):
+            return self.lower_bound(left, right)
+        if isinstance(left, UpperBoundNode) and isinstance(right, UpperBoundNode):
+            return self.upper_bound(left, right)
         raise NotImplementedError(f"Equality not implemented for {left.__class__}")
 
     def literal(self, left: LiteralNode, right: LiteralNode) -> bool:
@@ -215,6 +221,12 @@ class EqualityVisitor:
         return left.constraint_id == right.constraint_id
 
     def reduced_cost(self, left: ReducedCostNode, right: ReducedCostNode) -> bool:
+        return left.variable_id == right.variable_id
+
+    def lower_bound(self, left: LowerBoundNode, right: LowerBoundNode) -> bool:
+        return left.variable_id == right.variable_id
+
+    def upper_bound(self, left: UpperBoundNode, right: UpperBoundNode) -> bool:
         return left.variable_id == right.variable_id
 
 
