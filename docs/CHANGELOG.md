@@ -43,10 +43,6 @@ All notable changes to GemsPy are documented here.
   (`from gems_craft.optim_config import validate_optim_config`) is unchanged;
   only direct imports from `gems_craft.optim_config.parsing` need updating.
 
-### Removed
-- The unused `models-design/` folder (drawio diagrams), no longer referenced
-  anywhere in the codebase or the docs.
-
 ### Fixed
 - **`fast` thermal heuristic with no minimum power** - `find_min_generation_fast`
   no longer short-circuits to all-zero output when `min_power_per_unit` is ~0.
