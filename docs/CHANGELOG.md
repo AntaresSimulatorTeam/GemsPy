@@ -5,7 +5,7 @@ All notable changes to GemsPy are documented here.
 ## [Unreleased]
 
 ### Changed
-- **Sequential mode carry-over length can now be controlled by the user through the parameter  `carry-over-length` (default: `block-overlap`). This also fixes an incorrect stitching for `block-overlap >= 2`, where the previous hardcoded behaviour pinned block
+- Sequential mode carry-over length can now be controlled by the user through the parameter  `carry-over-length` (default: `block-overlap`). This also fixes an incorrect stitching for `block-overlap >= 2`, where the previous hardcoded behaviour pinned block
   *N+1*'s first timestep to block *N*'s **last** timestep — a different absolute timestep. 
 - **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
   to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
