@@ -1503,8 +1503,8 @@ class ExprParser(Parser):
     RULE_shift = 5
     RULE_shift_expr = 6
     RULE_right_expr = 7
-    RULE_pow_expr = 8
-    RULE_pow_atom = 9
+    RULE_shift_operand = 8
+    RULE_shift_primary = 9
 
     ruleNames = [
         "portFieldExpr",
@@ -1515,8 +1515,8 @@ class ExprParser(Parser):
         "shift",
         "shift_expr",
         "right_expr",
-        "pow_expr",
-        "pow_atom",
+        "shift_operand",
+        "shift_primary",
     ]
 
     EOF = Token.EOF
@@ -2509,8 +2509,8 @@ class ExprParser(Parser):
             self.op = None  # Token
             self.copyFrom(ctx)
 
-        def pow_expr(self):
-            return self.getTypedRuleContext(ExprParser.Pow_exprContext, 0)
+        def shift_operand(self):
+            return self.getTypedRuleContext(ExprParser.Shift_operandContext, 0)
 
         def accept(self, visitor: ParseTreeVisitor):
             if hasattr(visitor, "visitSignedOperand"):
@@ -2541,7 +2541,7 @@ class ExprParser(Parser):
                 self._errHandler.reportMatch(self)
                 self.consume()
             self.state = 122
-            self.pow_expr()
+            self.shift_operand()
             self._ctx.stop = self._input.LT(-1)
             self.state = 132
             self._errHandler.sync(self)
@@ -2639,7 +2639,7 @@ class ExprParser(Parser):
         def copyFrom(self, ctx: ParserRuleContext):
             super().copyFrom(ctx)
 
-    class RightPowContext(Right_exprContext):
+    class RightOperandContext(Right_exprContext):
 
         def __init__(
             self, parser, ctx: ParserRuleContext
@@ -2647,12 +2647,12 @@ class ExprParser(Parser):
             super().__init__(parser)
             self.copyFrom(ctx)
 
-        def pow_expr(self):
-            return self.getTypedRuleContext(ExprParser.Pow_exprContext, 0)
+        def shift_operand(self):
+            return self.getTypedRuleContext(ExprParser.Shift_operandContext, 0)
 
         def accept(self, visitor: ParseTreeVisitor):
-            if hasattr(visitor, "visitRightPow"):
-                return visitor.visitRightPow(self)
+            if hasattr(visitor, "visitRightOperand"):
+                return visitor.visitRightOperand(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -2687,12 +2687,12 @@ class ExprParser(Parser):
         self._la = 0  # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            localctx = ExprParser.RightPowContext(self, localctx)
+            localctx = ExprParser.RightOperandContext(self, localctx)
             self._ctx = localctx
             _prevctx = localctx
 
             self.state = 136
-            self.pow_expr()
+            self.shift_operand()
             self._ctx.stop = self._input.LT(-1)
             self.state = 143
             self._errHandler.sync(self)
@@ -2738,7 +2738,7 @@ class ExprParser(Parser):
             self.unrollRecursionContexts(_parentctx)
         return localctx
 
-    class Pow_exprContext(ParserRuleContext):
+    class Shift_operandContext(ParserRuleContext):
         __slots__ = "parser"
 
         def __init__(
@@ -2748,24 +2748,41 @@ class ExprParser(Parser):
             self.parser = parser
 
         def getRuleIndex(self):
-            return ExprParser.RULE_pow_expr
+            return ExprParser.RULE_shift_operand
 
         def copyFrom(self, ctx: ParserRuleContext):
             super().copyFrom(ctx)
 
-    class RightPowerContext(Pow_exprContext):
+    class RightPrimaryContext(Shift_operandContext):
 
         def __init__(
             self, parser, ctx: ParserRuleContext
-        ):  # actually a ExprParser.Pow_exprContext
+        ):  # actually a ExprParser.Shift_operandContext
             super().__init__(parser)
             self.copyFrom(ctx)
 
-        def pow_atom(self):
-            return self.getTypedRuleContext(ExprParser.Pow_atomContext, 0)
+        def shift_primary(self):
+            return self.getTypedRuleContext(ExprParser.Shift_primaryContext, 0)
 
-        def pow_expr(self):
-            return self.getTypedRuleContext(ExprParser.Pow_exprContext, 0)
+        def accept(self, visitor: ParseTreeVisitor):
+            if hasattr(visitor, "visitRightPrimary"):
+                return visitor.visitRightPrimary(self)
+            else:
+                return visitor.visitChildren(self)
+
+    class RightPowerContext(Shift_operandContext):
+
+        def __init__(
+            self, parser, ctx: ParserRuleContext
+        ):  # actually a ExprParser.Shift_operandContext
+            super().__init__(parser)
+            self.copyFrom(ctx)
+
+        def shift_primary(self):
+            return self.getTypedRuleContext(ExprParser.Shift_primaryContext, 0)
+
+        def shift_operand(self):
+            return self.getTypedRuleContext(ExprParser.Shift_operandContext, 0)
 
         def accept(self, visitor: ParseTreeVisitor):
             if hasattr(visitor, "visitRightPower"):
@@ -2773,27 +2790,10 @@ class ExprParser(Parser):
             else:
                 return visitor.visitChildren(self)
 
-    class RightPowAtomContext(Pow_exprContext):
+    def shift_operand(self):
 
-        def __init__(
-            self, parser, ctx: ParserRuleContext
-        ):  # actually a ExprParser.Pow_exprContext
-            super().__init__(parser)
-            self.copyFrom(ctx)
-
-        def pow_atom(self):
-            return self.getTypedRuleContext(ExprParser.Pow_atomContext, 0)
-
-        def accept(self, visitor: ParseTreeVisitor):
-            if hasattr(visitor, "visitRightPowAtom"):
-                return visitor.visitRightPowAtom(self)
-            else:
-                return visitor.visitChildren(self)
-
-    def pow_expr(self):
-
-        localctx = ExprParser.Pow_exprContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 16, self.RULE_pow_expr)
+        localctx = ExprParser.Shift_operandContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 16, self.RULE_shift_operand)
         try:
             self.state = 151
             self._errHandler.sync(self)
@@ -2802,18 +2802,18 @@ class ExprParser(Parser):
                 localctx = ExprParser.RightPowerContext(self, localctx)
                 self.enterOuterAlt(localctx, 1)
                 self.state = 146
-                self.pow_atom()
+                self.shift_primary()
                 self.state = 147
                 self.match(ExprParser.T__1)
                 self.state = 148
-                self.pow_expr()
+                self.shift_operand()
                 pass
 
             elif la_ == 2:
-                localctx = ExprParser.RightPowAtomContext(self, localctx)
+                localctx = ExprParser.RightPrimaryContext(self, localctx)
                 self.enterOuterAlt(localctx, 2)
                 self.state = 150
-                self.pow_atom()
+                self.shift_primary()
                 pass
 
         except RecognitionException as re:
@@ -2824,7 +2824,7 @@ class ExprParser(Parser):
             self.exitRule()
         return localctx
 
-    class Pow_atomContext(ParserRuleContext):
+    class Shift_primaryContext(ParserRuleContext):
         __slots__ = "parser"
 
         def __init__(
@@ -2834,16 +2834,16 @@ class ExprParser(Parser):
             self.parser = parser
 
         def getRuleIndex(self):
-            return ExprParser.RULE_pow_atom
+            return ExprParser.RULE_shift_primary
 
         def copyFrom(self, ctx: ParserRuleContext):
             super().copyFrom(ctx)
 
-    class RightExpressionContext(Pow_atomContext):
+    class RightExpressionContext(Shift_primaryContext):
 
         def __init__(
             self, parser, ctx: ParserRuleContext
-        ):  # actually a ExprParser.Pow_atomContext
+        ):  # actually a ExprParser.Shift_primaryContext
             super().__init__(parser)
             self.copyFrom(ctx)
 
@@ -2856,11 +2856,11 @@ class ExprParser(Parser):
             else:
                 return visitor.visitChildren(self)
 
-    class RightAtomContext(Pow_atomContext):
+    class RightAtomContext(Shift_primaryContext):
 
         def __init__(
             self, parser, ctx: ParserRuleContext
-        ):  # actually a ExprParser.Pow_atomContext
+        ):  # actually a ExprParser.Shift_primaryContext
             super().__init__(parser)
             self.copyFrom(ctx)
 
@@ -2873,10 +2873,10 @@ class ExprParser(Parser):
             else:
                 return visitor.visitChildren(self)
 
-    def pow_atom(self):
+    def shift_primary(self):
 
-        localctx = ExprParser.Pow_atomContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 18, self.RULE_pow_atom)
+        localctx = ExprParser.Shift_primaryContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 18, self.RULE_shift_primary)
         try:
             self.state = 158
             self._errHandler.sync(self)

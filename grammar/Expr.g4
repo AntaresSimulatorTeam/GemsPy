@@ -61,27 +61,35 @@ shift: TIME shift_expr?;
 shift_expr
     : shift_expr op=('*' | '/') right_expr     # shiftMuldiv
     | shift_expr op=('+' | '-') right_expr     # shiftAddsub
-    | op=('+' | '-') pow_expr                  # signedOperand
+    | op=('+' | '-') shift_operand             # signedOperand
     ;
 
 right_expr
     : right_expr op=('/' | '*') right_expr     # rightMuldiv
-    | pow_expr                                 # rightPow
+    | shift_operand                            # rightOperand
     ;
 
-// Operand of '^' inside a time shift, chained right-associatively.
-// Deliberately NOT "right_expr" on the right of '^': being a separate rule,
-// it would be entered at precedence 0 and greedily swallow '*' and '/',
-// so "t - 2^2*3" would mean "2^(2*3)" instead of "(2^2)*3".
+// The two highest precedence tiers of the shift sub-grammar. They are named
+// after their level, not after '^': every operand of a shift goes through
+// them, whether or not a power is involved.
+//
+// They must stay separate from "right_expr" for two reasons:
+//  - the leading sign of "shift_expr" needs a power-capable operand that does
+//    NOT also swallow '*' and '/', otherwise "t - 2*3" becomes ambiguous and
+//    reassociates to "-(2*3)" instead of "(-2)*3";
+//  - "right_expr" on the right of '^' would be entered at precedence 0 and
+//    greedily swallow '*' and '/', so "t - 2^2*3" would mean "2^(2*3)"
+//    instead of "(2^2)*3".
+//
 // The exponent is unsigned here, so "t + 2^-1" is a parse error: a fractional
 // time shift is meaningless, and negative exponents remain available in the
 // general "expr" rule.
-pow_expr
-    : pow_atom '^' pow_expr                    # rightPower
-    | pow_atom                                 # rightPowAtom
+shift_operand
+    : shift_primary '^' shift_operand          # rightPower
+    | shift_primary                            # rightPrimary
     ;
 
-pow_atom
+shift_primary
     : '(' expr ')'                             # rightExpression
     | atom                                     # rightAtom
     ;

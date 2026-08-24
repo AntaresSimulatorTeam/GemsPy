@@ -111,8 +111,8 @@ class ExprVisitor(ParseTreeVisitor):
     def visitSignedOperand(self, ctx: ExprParser.SignedOperandContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#rightPow.
-    def visitRightPow(self, ctx: ExprParser.RightPowContext):
+    # Visit a parse tree produced by ExprParser#rightOperand.
+    def visitRightOperand(self, ctx: ExprParser.RightOperandContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#rightMuldiv.
@@ -123,8 +123,8 @@ class ExprVisitor(ParseTreeVisitor):
     def visitRightPower(self, ctx: ExprParser.RightPowerContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#rightPowAtom.
-    def visitRightPowAtom(self, ctx: ExprParser.RightPowAtomContext):
+    # Visit a parse tree produced by ExprParser#rightPrimary.
+    def visitRightPrimary(self, ctx: ExprParser.RightPrimaryContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#rightExpression.

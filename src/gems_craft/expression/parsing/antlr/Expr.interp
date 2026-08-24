@@ -51,8 +51,8 @@ atom
 shift
 shift_expr
 right_expr
-pow_expr
-pow_atom
+shift_operand
+shift_primary
 
 
 atn:
