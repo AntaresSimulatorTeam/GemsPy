@@ -13,12 +13,6 @@ All notable changes to GemsPy are documented here.
 
 ### Added
 
-- **`carry-over-length` resolution setting** - optional int on the
-  `resolution` block (`ResolutionConfig.carry_over_length`), validated as
-  `0 <= carry-over-length <= block-overlap`. Omitted, it defaults to
-  `block-overlap` (the whole overlap zone is pinned); an explicit `0` is
-  legal and means blocks overlap for lag-constraint history but are not
-  stitched at all.
 - **Integer strategy and thermal heuristics** - components can now set
   `integer-strategy` (`exact` (default), `relaxed`, or `heuristic` +
   `heuristic-id`) to control how their model's integer/binary variables are
