@@ -48,6 +48,7 @@ from gems_craft.model.variable import Variable
 from gems_craft.study.parsing import IntegerStrategyId
 from gems_craft.study.study import Study
 from gems_craft.study.system import Component
+from gems_craft.study.validation import check_data_requirements
 from gems_runner.simulation.linearize import (
     VectorizedExpr,
     VectorizedLinearExprBuilder,
@@ -1071,7 +1072,7 @@ def build_problem(
         problem is built.  Entries whose variable is time-independent, or is
         absent from this block, are ignored.
     """
-    study.check_consistency()
+    check_data_requirements(study)
 
     oob_filter = OutOfBoundsFilter(optim_config) if optim_config is not None else None
     builder = _OptimizationProblemBuilder(
@@ -1145,7 +1146,7 @@ def build_decomposed_problems(
     """
     from gems_craft.optim_config.parsing import ElementLocation
 
-    study.check_consistency()
+    check_data_requirements(study)
 
     oob_filter = OutOfBoundsFilter(optim_config)
 

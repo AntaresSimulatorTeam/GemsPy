@@ -24,7 +24,7 @@ from gems_craft.study.resolve_components import (
     resolve_system,
 )
 from gems_craft.study.scenario_builder import ScenarioBuilder
-from gems_craft.study.validation import consistency_check
+from gems_craft.study.validation import check_component_models
 from gems_runner.simulation import build_problem
 from gems_runner.simulation.time_block import TimeBlock
 
@@ -58,7 +58,7 @@ def test_system_with_scenarization(
         yaml_comp = parse_yaml_system(file)
         components = resolve_system(yaml_comp, lib_dict)
 
-    consistency_check(components, lib_dict["basic"].models)
+    check_component_models(components, lib_dict["basic"].models)
 
     timeblock = TimeBlock(1, list(range(2)))
     problem = build_problem(Study(components, database), timeblock, list(range(3)))

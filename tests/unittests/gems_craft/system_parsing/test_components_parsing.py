@@ -19,7 +19,7 @@ from gems_craft.study.parsing import (
     parse_yaml_system,
 )
 from gems_craft.study.resolve_components import resolve_system
-from gems_craft.study.validation import consistency_check
+from gems_craft.study.validation import check_component_models
 
 COMPO_FILE = Path(__file__).parent / "systems/system.yml"
 
@@ -51,12 +51,12 @@ def test_parsing_components_ok(
     assert len(result.connections) == 2
 
 
-def test_consistency_check_ok(
+def test_check_component_models_ok(
     input_system: SystemSchema, input_library: LibrarySchema
 ) -> None:
     result_lib = resolve_library([input_library])
     result_system = resolve_system(input_system, result_lib)
-    consistency_check(result_system, result_lib["basic"].models)
+    check_component_models(result_system, result_lib["basic"].models)
 
 
 def test_load_input_system_ok(tmp_path: Path) -> None:
@@ -94,7 +94,7 @@ def test_load_input_system_missing_file_raises_error() -> None:
         load_input_system(missing)
 
 
-def test_consistency_check_ko(
+def test_check_component_models_ko(
     input_system: SystemSchema, input_library: LibrarySchema
 ) -> None:
     result_lib = resolve_library([input_library])
@@ -104,7 +104,7 @@ def test_consistency_check_ko(
         ValueError,
         match=r"Error: Component G has invalid model ID: basic.generator",
     ):
-        consistency_check(result_comp, result_lib["basic"].models)
+        check_component_models(result_comp, result_lib["basic"].models)
 
 
 # ---------------------------------------------------------------------------

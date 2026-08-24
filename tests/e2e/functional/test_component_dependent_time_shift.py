@@ -102,7 +102,7 @@ from gems_craft.study.resolve_components import (
     build_data_base,
     resolve_system,
 )
-from gems_craft.study.validation import consistency_check
+from gems_craft.study.validation import check_component_models
 from gems_runner.simulation import TimeBlock, build_problem
 from tests.e2e.functional.libs.standard import (
     BALANCE_PORT_TYPE,
@@ -413,7 +413,7 @@ def test_two_components_different_lags_yaml(
 
     lib_dict = resolve_library([input_library])
     system = resolve_system(input_system, lib_dict)
-    consistency_check(system, lib_dict["time_shift_test"].models)
+    check_component_models(system, lib_dict["time_shift_test"].models)
 
     database = build_data_base(input_system, timeseries_dir=_series_dir)
 

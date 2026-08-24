@@ -18,8 +18,13 @@ All notable changes to GemsPy are documented here.
 - **Breaking** - `check_library_against_taxonomy` moved from
   `gems_craft.model.taxonomy` to the new `gems_craft.model.validation`, and
   `consistency_check` from `gems_craft.study.resolve_components` to the new
-  `gems_craft.study.validation`. Reading and validating are now separate modules,
-  as in `optim_config/`. No behavior change; import paths only.
+  `gems_craft.study.validation`, where it is renamed
+  `check_component_models`. The `Study.check_consistency()` method moved to
+  that same module as the function `check_data_requirements(study)` — the two
+  checks are disjoint (component model ids vs. database coverage) and their
+  near-identical old names invited confusion. Reading and validating are now
+  separate modules, as in `optim_config/`. No behavior change; names and
+  import paths only.
 
 ---
 
