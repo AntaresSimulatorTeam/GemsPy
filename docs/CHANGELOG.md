@@ -44,13 +44,6 @@ All notable changes to GemsPy are documented here.
   only direct imports from `gems_craft.optim_config.parsing` need updating.
 
 ### Fixed
-- **`fast` thermal heuristic with no minimum power** - `find_min_generation_fast`
-  no longer short-circuits to all-zero output when `min_power_per_unit` is ~0.
-  It now always computes `num_units_on` and returns both
-  `minimum_generation_power` and `maximum_generation_power`, so unit-commitment
-  information is kept and committed units stay available for production. The
-  `fast` heuristic's declared outputs gain `maximum_generation_power`
-  accordingly.
 - **Standard library parsing now accepts hybrid port-type fields** -
   `parse_yaml_library` (the standard, non-hybrid parser) no longer rejects
   `area-connection` / `thermal-capacity-connection` on port-types, so a
