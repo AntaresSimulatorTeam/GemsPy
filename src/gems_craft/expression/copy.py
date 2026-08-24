@@ -23,6 +23,7 @@ from .expression import (
     ExpressionNode,
     FloorNode,
     LiteralNode,
+    LowerBoundNode,
     MaxNode,
     MinNode,
     ParameterNode,
@@ -34,6 +35,7 @@ from .expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UpperBoundNode,
     VariableNode,
 )
 from .visitor import ExpressionVisitorOperations, visit
@@ -110,6 +112,12 @@ class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
 
     def reduced_cost(self, node: ReducedCostNode) -> ExpressionNode:
         return ReducedCostNode(node.variable_id)
+
+    def lower_bound(self, node: LowerBoundNode) -> ExpressionNode:
+        return LowerBoundNode(node.variable_id)
+
+    def upper_bound(self, node: UpperBoundNode) -> ExpressionNode:
+        return UpperBoundNode(node.variable_id)
 
 
 def copy_expression(expression: ExpressionNode) -> ExpressionNode:

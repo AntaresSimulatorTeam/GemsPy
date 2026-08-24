@@ -17,6 +17,13 @@ All notable changes to GemsPy are documented here.
   compute tighter variable bounds from the first solve. Each model declares
   what a heuristic reads/writes via `models[].heuristics` in
   `optim-config.yml`.
+- **`lower_bound(variable_name)`** and **`upper_bound(variable_name)`** operators in the
+  expression language, usable in `extra-outputs` and port-field-definitions. Both take a bare
+  variable identifier and return its *current* lower/upper bound post-solve — in particular
+  reflecting mutations made by thermal heuristics (see "Integer strategy and thermal
+  heuristics" above), which previously had no way to be surfaced in results. Validated at
+  model-build time; using them inside constraints, binding-constraints, objective
+  contributions, or variable bounds raises a `ValueError`.
 
 ### Fixed
 - **Standard library parsing now accepts hybrid port-type fields** -

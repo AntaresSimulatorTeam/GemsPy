@@ -17,7 +17,9 @@ from gems_craft.expression import ExpressionNode, literal, param, print_expr, va
 from gems_craft.expression.equality import expressions_equal
 from gems_craft.expression.expression import (
     DualNode,
+    LowerBoundNode,
     ReducedCostNode,
+    UpperBoundNode,
     maximum,
     minimum,
     port_field,
@@ -251,6 +253,8 @@ def test_parsing_visitor(
     [
         (set(), set(), {"balance"}, "dual(balance)", DualNode("balance")),
         ({"p"}, set(), set(), "reduced_cost(p)", ReducedCostNode("p")),
+        ({"p"}, set(), set(), "lower_bound(p)", LowerBoundNode("p")),
+        ({"p"}, set(), set(), "upper_bound(p)", UpperBoundNode("p")),
     ],
 )
 def test_parsing_dual_and_reduced_cost(
@@ -275,6 +279,18 @@ def test_parse_reduced_cost_unknown_variable_raises() -> None:
     identifiers = ModelIdentifiers({"x"}, set(), set())
     with pytest.raises(ParsingException, match="not a variable"):
         parse_expression("reduced_cost(p)", identifiers)
+
+
+def test_parse_lower_bound_unknown_variable_raises() -> None:
+    identifiers = ModelIdentifiers({"x"}, set(), set())
+    with pytest.raises(ParsingException, match="not a variable"):
+        parse_expression("lower_bound(p)", identifiers)
+
+
+def test_parse_upper_bound_unknown_variable_raises() -> None:
+    identifiers = ModelIdentifiers({"x"}, set(), set())
+    with pytest.raises(ParsingException, match="not a variable"):
+        parse_expression("upper_bound(p)", identifiers)
 
 
 @pytest.mark.parametrize(

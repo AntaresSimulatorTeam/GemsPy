@@ -12,7 +12,12 @@
 
 
 from gems_craft.expression import param, var
-from gems_craft.expression.expression import DualNode, ReducedCostNode
+from gems_craft.expression.expression import (
+    DualNode,
+    LowerBoundNode,
+    ReducedCostNode,
+    UpperBoundNode,
+)
 from gems_craft.expression.indexing import IndexingStructureProvider, compute_indexation
 from gems_craft.expression.indexing_structure import IndexingStructure
 
@@ -120,5 +125,15 @@ def test_dual_reduced_cost_indexing() -> None:
         True, True
     )
     assert compute_indexation(ReducedCostNode("p"), provider) == IndexingStructure(
+        True, True
+    )
+
+
+def test_lower_upper_bound_indexing() -> None:
+    provider = StructureProvider()
+    assert compute_indexation(LowerBoundNode("x"), provider) == IndexingStructure(
+        True, True
+    )
+    assert compute_indexation(UpperBoundNode("x"), provider) == IndexingStructure(
         True, True
     )

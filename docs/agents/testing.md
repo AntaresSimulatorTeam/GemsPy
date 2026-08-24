@@ -23,7 +23,7 @@ nature (they build a study with `gems_craft` and solve it with `gems_runner` in 
 | Unit — gems_craft / system | `tests/unittests/gems_craft/system/` | Model, network, and port object behaviour |
 | Unit — gems_craft / system parsing | `tests/unittests/gems_craft/system_parsing/` | System YAML parsing |
 | Unit — gems_craft_hybrid | `tests/unittests/gems_craft_hybrid/` | Hybrid GEMS/Antares Simulator schema parsing |
-| Unit — gems_runner / expression | `tests/unittests/gems_runner/expression/` | Solver-output expression evaluation (`dual()`, `reduced_cost()`, `variable()`) |
+| Unit — gems_runner / expression | `tests/unittests/gems_runner/expression/` | Solver-output expression evaluation (`dual()`, `reduced_cost()`, `lower_bound()`, `upper_bound()`, `variable()`) |
 | Unit — gems_runner / simulation | `tests/unittests/gems_runner/simulation/` | Full problem build + solve on small networks |
 | End-to-end — functional | `tests/e2e/functional/` | Cross-cutting tests: library/system combinations, stochastic, investment, scenario builder |
 | End-to-end — models | `tests/e2e/models/` | Model-level tests (andromede-v1 models, operator tests, proof-of-concept models) |

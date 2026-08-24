@@ -433,18 +433,22 @@ class OptimizationProblem:
         lv = self._linopy_vars.get((model_id, var_name))
         return lv.labels if lv is not None else None
 
-    def get_variable_solution(
-        self, model_id: str, var_name: str
+    def _reassemble_variable_attr(
+        self, model_id: str, var_name: str, attr: str
     ) -> Optional[xr.DataArray]:
-        """Return solved values for *var_name* across all its components.
+        """Reassemble a per-instance ``linopy.Variable`` attribute (``solution``,
+        ``lower``, ``upper``) for *var_name* across all its components.
 
-        Unlike ``linopy_model.solution[<name>]``, this is correct even when the
-        variable was split across relaxed/exact strategy groups: the merged
-        ``_linopy_vars`` copy keeps the ``.name`` of only one of the two really
-        -registered group Variables, so indexing the solver's solution Dataset
-        by that name silently drops the other group's components. This instead
-        reads ``.solution`` directly off the real per-component Variables
-        (``_linopy_vars_by_component``) and reassembles them.
+        Unlike reading the attribute off ``self._linopy_vars[(model_id, var_name)]``,
+        this is correct even when the variable was split across relaxed/exact
+        strategy groups: that merged, detached ``_MergedGroupVariable`` copy
+        keeps the ``.name`` of only one of the two really-registered group
+        Variables (so indexing the solver's solution Dataset by that name
+        silently drops the other group's components), and it is rebuilt once at
+        problem-build time so it never reflects later bound mutations (e.g. from
+        heuristics). This instead reads the attribute directly off the real
+        per-component Variables (``_linopy_vars_by_component``) and reassembles
+        them.
         """
         by_name: Dict[str, linopy.Variable] = {}
         for (m, vn, _c), variable in self._linopy_vars_by_component.items():
@@ -456,10 +460,45 @@ class OptimizationProblem:
         if not group_vars:
             return None
         if len(group_vars) == 1:
-            return group_vars[0].solution
+            return cast(xr.DataArray, getattr(group_vars[0], attr))
         return cast(
-            xr.DataArray, xr.concat([v.solution for v in group_vars], dim="component")
+            xr.DataArray,
+            xr.concat([getattr(v, attr) for v in group_vars], dim="component"),
         )
+
+    def get_variable_solution(
+        self, model_id: str, var_name: str
+    ) -> Optional[xr.DataArray]:
+        """Return solved values for *var_name* across all its components.
+
+        See :meth:`_reassemble_variable_attr` for why this must bypass the
+        merged ``_linopy_vars`` copy.
+        """
+        return self._reassemble_variable_attr(model_id, var_name, "solution")
+
+    def get_variable_lower_bound(
+        self, model_id: str, var_name: str
+    ) -> Optional[xr.DataArray]:
+        """Return the current lower bound for *var_name* across all its components.
+
+        Reflects any bound mutation applied after problem construction (e.g. by
+        thermal heuristics via :meth:`get_component_variable`). See
+        :meth:`_reassemble_variable_attr` for why this must bypass the merged
+        ``_linopy_vars`` copy.
+        """
+        return self._reassemble_variable_attr(model_id, var_name, "lower")
+
+    def get_variable_upper_bound(
+        self, model_id: str, var_name: str
+    ) -> Optional[xr.DataArray]:
+        """Return the current upper bound for *var_name* across all its components.
+
+        Reflects any bound mutation applied after problem construction (e.g. by
+        thermal heuristics via :meth:`get_component_variable`). See
+        :meth:`_reassemble_variable_attr` for why this must bypass the merged
+        ``_linopy_vars`` copy.
+        """
+        return self._reassemble_variable_attr(model_id, var_name, "upper")
 
 
 # ---------------------------------------------------------------------------

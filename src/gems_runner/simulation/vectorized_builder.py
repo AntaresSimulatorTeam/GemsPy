@@ -51,6 +51,7 @@ from gems_craft.expression.expression import (
     ExpressionNode,
     FloorNode,
     LiteralNode,
+    LowerBoundNode,
     MaxNode,
     MinNode,
     MultiplicationNode,
@@ -64,6 +65,7 @@ from gems_craft.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UpperBoundNode,
     VariableNode,
 )
 from gems_craft.expression.visitor import (
@@ -406,6 +408,18 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
             f"not in {type(self).__name__}."
         )
 
+    def lower_bound(self, node: LowerBoundNode) -> VectorizedExpr:
+        raise NotImplementedError(
+            f"lower_bound() is only available in the extra-output builder, "
+            f"not in {type(self).__name__}."
+        )
+
+    def upper_bound(self, node: UpperBoundNode) -> VectorizedExpr:
+        raise NotImplementedError(
+            f"upper_bound() is only available in the extra-output builder, "
+            f"not in {type(self).__name__}."
+        )
+
     # ------------------------------------------------------------------ #
     # Private helpers                                                       #
     # ------------------------------------------------------------------ #
@@ -571,6 +585,12 @@ class _ShiftAmountEvaluator(ExpressionVisitorOperations[xr.DataArray]):
         raise NotImplementedError
 
     def reduced_cost(self, node: ReducedCostNode) -> xr.DataArray:
+        raise NotImplementedError
+
+    def lower_bound(self, node: LowerBoundNode) -> xr.DataArray:
+        raise NotImplementedError
+
+    def upper_bound(self, node: UpperBoundNode) -> xr.DataArray:
         raise NotImplementedError
 
 
@@ -740,4 +760,10 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return None
 
     def reduced_cost(self, node: ReducedCostNode) -> Optional[xr.DataArray]:
+        return None
+
+    def lower_bound(self, node: LowerBoundNode) -> Optional[xr.DataArray]:
+        return None
+
+    def upper_bound(self, node: UpperBoundNode) -> Optional[xr.DataArray]:
         return None

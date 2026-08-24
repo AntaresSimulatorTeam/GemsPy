@@ -27,7 +27,12 @@ from gems_craft.expression import (
     visit,
 )
 from gems_craft.expression.equality import expressions_equal
-from gems_craft.expression.expression import DualNode, ReducedCostNode
+from gems_craft.expression.expression import (
+    DualNode,
+    LowerBoundNode,
+    ReducedCostNode,
+    UpperBoundNode,
+)
 from gems_runner.expression import EvaluationContext, EvaluationVisitor, ValueProvider
 
 
@@ -110,3 +115,11 @@ def test_dual_reduced_cost_evaluation_raises() -> None:
         visit(DualNode("balance"), EvaluationVisitor(ctx))
     with pytest.raises(NotImplementedError, match="reduced_cost"):
         visit(ReducedCostNode("p"), EvaluationVisitor(ctx))
+
+
+def test_lower_upper_bound_evaluation_raises() -> None:
+    ctx = EvaluationContext()
+    with pytest.raises(NotImplementedError, match="lower_bound"):
+        visit(LowerBoundNode("x"), EvaluationVisitor(ctx))
+    with pytest.raises(NotImplementedError, match="upper_bound"):
+        visit(UpperBoundNode("x"), EvaluationVisitor(ctx))
