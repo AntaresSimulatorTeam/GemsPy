@@ -149,10 +149,14 @@ class ResolutionMode(str, Enum):
     BENDERS_DECOMPOSITION = "benders-decomposition"
 
 
+_SEQUENTIAL_ONLY_FIELDS = ("block_overlap", "carry_over_length")
+
+
 class ResolutionConfig(ModifiedBaseModel):
     mode: ResolutionMode = ResolutionMode.FRONTAL
     block_length: Optional[int] = None
     block_overlap: int = 0
+    carry_over_length: Optional[int] = None
 
     @model_validator(mode="after")
     def _block_length_required_for_windowed_modes(self) -> "ResolutionConfig":
@@ -163,6 +167,66 @@ class ResolutionConfig(ModifiedBaseModel):
         if self.mode in windowed and self.block_length is None:
             raise ValueError(f"'block_length' is required for mode '{self.mode.value}'")
         return self
+
+    @model_validator(mode="after")
+    def _reject_sequential_only_fields(self) -> "ResolutionConfig":
+        """'block-overlap' and 'carry-over-length' steer the stitching of
+        consecutive blocks, which only exists in sequential mode.  Reject them
+        elsewhere instead of dropping them silently.  The check is on the keys
+        the user actually wrote (``model_fields_set``), so an explicit
+        'block-overlap: 0' is rejected too."""
+        if self.mode == ResolutionMode.SEQUENTIAL_SUBPROBLEMS:
+            return self
+        declared = [
+            name for name in _SEQUENTIAL_ONLY_FIELDS if name in self.model_fields_set
+        ]
+        if declared:
+            keys = ", ".join(f"'{name.replace('_', '-')}'" for name in declared)
+            plural = len(declared) > 1
+            raise ValueError(
+                f"{keys} only appl{'y' if plural else 'ies'} to mode "
+                f"'{ResolutionMode.SEQUENTIAL_SUBPROBLEMS.value}', but mode is "
+                f"'{self.mode.value}'; remove {'them' if plural else 'it'} "
+                f"or switch mode"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_block_overlap(self) -> "ResolutionConfig":
+        if self.block_overlap < 0:
+            raise ValueError(f"'block-overlap' must be >= 0, got {self.block_overlap}")
+        if self.block_length is not None and self.block_overlap >= self.block_length:
+            raise ValueError(
+                f"'block-overlap' ({self.block_overlap}) must be < 'block-length' "
+                f"({self.block_length})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_carry_over_length(self) -> "ResolutionConfig":
+        if self.carry_over_length is not None:
+            if self.carry_over_length < 0:
+                raise ValueError(
+                    f"'carry-over-length' must be >= 0, got {self.carry_over_length}"
+                )
+            if self.carry_over_length > self.block_overlap:
+                raise ValueError(
+                    f"'carry-over-length' ({self.carry_over_length}) must be <= "
+                    f"'block-overlap' ({self.block_overlap})"
+                )
+        return self
+
+    @property
+    def effective_carry_over_length(self) -> int:
+        """Resolved carry-over length: explicit value if set, else full pin of
+        the overlap zone (``block_overlap``). ``0`` is a legal explicit value,
+        distinct from "unset", meaning blocks overlap for lag-constraint
+        history but are not stitched at all."""
+        return (
+            self.carry_over_length
+            if self.carry_over_length is not None
+            else self.block_overlap
+        )
 
 
 class TimeScopeConfig(ModifiedBaseModel):

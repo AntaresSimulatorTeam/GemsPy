@@ -41,7 +41,8 @@ solver-options:
 resolution:
   mode: sequential-subproblems   # see section below
   block-length: 168               # one week (in timesteps)
-  block-overlap: 0
+  block-overlap: 24               # consecutive blocks share one day
+  carry-over-length: 24           # optional; omitted → defaults to block-overlap
 
 # Per-model configuration (optional)
 models:
@@ -220,7 +221,8 @@ optimisation subproblems.
 |---|---|---|---|
 | `mode` | str | `"frontal"` | Resolution strategy (see below) |
 | `block-length` | int | — | Timesteps per window; required for windowed modes |
-| `block-overlap` | int | `0` | Extra overlap timesteps between consecutive blocks |
+| `block-overlap` | int | `0` | Sequential mode only (rejected in other modes): shared timesteps between consecutive blocks; must satisfy `0 <= block-overlap < block-length` |
+| `carry-over-length` | int | `block-overlap` | Sequential mode only (rejected in other modes): how many of the shared timesteps are pinned to the previous block's values; must satisfy `0 <= carry-over-length <= block-overlap` |
 
 ### `frontal` (default)
 
@@ -236,17 +238,91 @@ Produces globally optimal results.
 
 ### `sequential-subproblems`
 
-The horizon is split into non-overlapping (or slightly overlapping) windows of
-`block-length` timesteps.  Blocks are solved **one after the other**; the state
-of inter-block dynamics (e.g. storage level) is carried over from one block to
-the next.
+The horizon is split into windows of `block-length` timesteps, each starting
+`block-length - block-overlap` timesteps after the previous one.  Blocks are
+solved **one after the other**; the state of inter-block dynamics (e.g. storage
+level) is carried over from one block to the next by pinning the leading
+timesteps of each block to the values the previous block already computed.
 
 ~~~ yaml
 resolution:
   mode: sequential-subproblems
-  block-length: 168   # one week
-  block-overlap: 0
+  block-length: 168       # one week
+  block-overlap: 24       # one day shared between consecutive blocks
+  carry-over-length: 24   # optional; omitted → defaults to block-overlap (full pin)
+                          # 0 is legal and explicit: overlap solved twice, no stitching
 ~~~
+
+Three parameters shape the stitching between consecutive blocks.  Illustrative
+example with `block-length: 10`, `block-overlap: 4`, `carry-over-length: 3`
+(a partial pin, so all three parameters are visible at once):
+
+~~~ text
+abs t     0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15
+Block N   0   1   2   3   4   5   6   7   8   9
+          └──────────────────────────────────────┘
+                     block-length = 10
+
+Block N+1                         0   1   2   3   4   5   6   7   8   9
+                                  └──────────────────────────────────────┘
+                                             block-length = 10
+
+                                  |------------|  overlap = 4  (t=6..9: solved by BOTH blocks)
+                                  |========|  carry-over = 3  (t=6..8: PINNED to block N's value)
+                                              ^  t=9: still shared, but free in N+1 (re-optimized)
+~~~
+
+Reading it:
+
+- **`block-length`** — width of each block's own window (10 for both here).
+- **`block-overlap`** — how far block *N+1*'s start reaches back into block
+  *N*'s window (4 → t=6..9 exist in both solves).  The overlap gives block
+  *N+1* real historical values for lag-dependent constraints (e.g. a storage
+  balance using `soc[t-1]`, or min up/down durations spanning several hours).
+- **`carry-over-length`** — how many of those *shared* leading timesteps of
+  block *N+1* get hard-pinned (`var[t] == value from block N`) to block *N*'s
+  already-solved values, counted from the earliest shared timestep (t=6), not
+  from t=9.  Here `carry-over-length: 3 < overlap: 4`, so t=6,7,8 are frozen
+  but t=9 is left free — an MPC-style partial pin where the optimizer may
+  revise the tail of the overlap with more lookback context.
+
+Defaults and special values:
+
+- **Omitted** `carry-over-length` resolves to `block-overlap`: the whole
+  overlap zone is pinned.  This is the right default when the overlap exists
+  to provide history for lag-dependent constraints without re-litigating
+  decisions the previous block already made.
+- **Explicit `carry-over-length: 0`** is legal and distinct from omitting the
+  field: blocks overlap for lag-constraint history, but no timestep is pinned
+  — block *N+1* re-solves the whole overlap window independently.
+- Validation requires `0 <= carry-over-length <= block-overlap` (and
+  `0 <= block-overlap < block-length`), with no special case at
+  `block-overlap: 0`.
+
+Overlapping timesteps appear once per block in the simulation table, tagged
+with the `block` column — nothing is lost or silently merged.  Downstream
+tooling decides which block's version of a shared timestep is authoritative;
+`carry-over-length` only controls how much two consecutive blocks may
+*disagree* on that shared window.
+
+**What the carry-over pins.**  The mechanism is plain *variable fixing*: for
+block *N+1*, every time-dependent variable whose block-relative timestep falls
+in `[0, carry-over-length[` is fixed to the value block *N* computed for the
+**same absolute timestep**.  Two consequences are worth spelling out:
+
+- It is **not** an initial-condition mechanism.  Block *N+1*'s problem is not
+  given the value of the timestep *preceding* its window, so a `t-1` time-shift
+  operator at the block's first timestep still resolves against that block's own
+  border condition (cyclic by default) rather than reaching into block *N*.
+- It applies to **all** time-dependent variables of all models, not only
+  state-like ones such as a storage level.  Finer, per-model granularity can be
+  added later if a use case needs it.
+
+**Time-independent** variables (`structure.time = False`, e.g. an investment
+capacity) are never carried over — nothing links their values across blocks, so
+each block sizes them independently.  Sequential mode is therefore not suited to
+investment problems; use `frontal` or `benders-decomposition` for those.
+
 
 
 ### `parallel-subproblems`
