@@ -19,29 +19,18 @@ All notable changes to GemsPy are documented here.
   expression language, usable in `extra-outputs` and port-field-definitions. Both take a bare
   variable identifier and return its *current* lower/upper bound post-solve — in particular
   reflecting mutations made by thermal heuristics (see "Integer strategy and thermal
-  heuristics" above), which previously had no way to be surfaced in results. Validated at
-  model-build time; using them inside constraints, binding-constraints, objective
-  contributions, or variable bounds raises a `ValueError`.
+  heuristics" above).
 
 ### Changed
 - **Sequential mode carry-over length is now user-controlled** through the new
   `resolution.carry-over-length` parameter (default: `block-overlap`), which
   sets how many of the shared leading timesteps of block *N+1* are pinned to
-  block *N*'s already-solved values. `0` is legal and explicit (blocks overlap
-  for lag-constraint history, but nothing is pinned); validation requires
-  `0 <= carry-over-length <= block-overlap` and `0 <= block-overlap <
-  block-length`. Both `block-overlap` and `carry-over-length` are rejected
-  outside `sequential-subproblems` mode. This also fixes an incorrect stitching
+  block *N*'s already-solved values. This also fixes an incorrect stitching
   for `block-overlap >= 2`, where the previous hardcoded behaviour pinned block
   *N+1*'s first timestep to block *N*'s **last** timestep — a different
   absolute timestep.
 - **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
   to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
-- **`validate_optim_config` moved to `gems_craft.optim_config.validation`** -
-  optim-config reading (`parsing.py`) and cross-validation (`validation.py`)
-  are now separate modules. The package-level import
-  (`from gems_craft.optim_config import validate_optim_config`) is unchanged;
-  only direct imports from `gems_craft.optim_config.parsing` need updating.
 
 ### Fixed
 - **Standard library parsing now accepts hybrid port-type fields** -
