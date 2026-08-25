@@ -4,6 +4,30 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Taxonomy conformance checked when a study is loaded** - `load_study` reads
+  the optional `input/taxonomy.yml` and calls
+  `validate_libraries_against_taxonomy` on every library declaring a `taxonomy`
+  field. `parse_yaml_library` is unchanged and performs no validation.
+
+### Changed
+- **Breaking** - loading a study whose library declares a `taxonomy` raises
+  `ValueError` if no taxonomy is supplied, or if its id differs from the declared
+  one.
+- **Breaking** - `TaxonomyData` renamed to `TaxonomySchema`; no alias kept.
+- **Breaking** - `check_library_against_taxonomy` moved from
+  `gems_craft.model.taxonomy` to the new `gems_craft.model.validation`, and
+  `consistency_check` from `gems_craft.study.resolve_components` to the new
+  `gems_craft.study.validation`, where it is renamed
+  `check_component_models`. The `Study.check_consistency()` method moved to
+  that same module as the function `check_data_requirements(study)` — the two
+  checks are disjoint (component model ids vs. database coverage) and their
+  near-identical old names invited confusion. Reading and validating are now
+  separate modules, as in `optim_config/`. No behavior change; names and
+  import paths only.
+
+---
+
 ## [0.2.0] - 2026-08-24
 
 ### Added

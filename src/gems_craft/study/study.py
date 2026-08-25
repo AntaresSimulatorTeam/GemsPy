@@ -28,10 +28,9 @@ class Study:
     DataBase (parameter values for those components).
 
     These two objects are always used together to build an optimisation
-    problem.  ``Study`` gathers them into a single, coherent unit and
-    provides the cross-validation logic that was previously spread between
-    ``DataBase.requirements_consistency`` and the callers of
-    ``build_problem``.
+    problem.  ``Study`` gathers them into a single, coherent unit; the
+    cross-validation of the pair lives in ``study/validation.py``
+    (``check_data_requirements``).
     """
 
     system: System
@@ -52,29 +51,3 @@ class Study:
         return {
             mk: components[0].model for mk, components in self.model_components.items()
         }
-
-    # TODO: this is a second, disjoint consistency check alongside
-    # resolve_components.consistency_check() — consider consolidating both
-    # into one validation module for System/Study.
-    def check_consistency(self) -> None:
-        """Validate that the database supplies data for every parameter of every
-        component defined in the system.
-
-        Raises
-        ------
-        ValueError
-            If a required data entry is missing or its time/scenario structure
-            does not match what the model parameter expects.
-        """
-        for component in self.system.components:
-            for param in component.model.parameters.values():
-                data_structure = self.database.get_data(component.id, param.name)
-
-                if not data_structure.check_requirement(
-                    component.model.parameters[param.name].structure.time,
-                    component.model.parameters[param.name].structure.scenario,
-                ):
-                    raise ValueError(
-                        f"Data inconsistency for component: {component.id}, "
-                        f"parameter: {param.name}. Requirement not met."
-                    )

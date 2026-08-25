@@ -18,7 +18,7 @@ The first category of input files mentioned above comprises libraries of models.
 library:
   id: basic
   description: Basic library
-  taxonomy: basic_taxonomy_of_models  # optional: id of the taxonomy this library conforms to
+  taxonomy: basic_taxonomy_of_models  # optional: id of the taxonomy this library is checked against
   version: 1.0.0                # optional: free-form library version
 
   port-types:

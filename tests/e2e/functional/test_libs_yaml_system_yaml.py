@@ -47,11 +47,11 @@ from gems_craft.study.data import DataBase
 from gems_craft.study.parsing import SystemSchema, parse_yaml_system
 from gems_craft.study.resolve_components import (
     build_data_base,
-    consistency_check,
     resolve_system,
 )
 from gems_craft.study.study import Study
 from gems_craft.study.system import System
+from gems_craft.study.validation import check_component_models
 from gems_runner.simulation import TimeBlock, build_problem
 
 
@@ -60,7 +60,7 @@ def test_basic_balance_using_yaml(
 ) -> None:
     result_lib = resolve_library([input_library])
     system = resolve_system(input_system, result_lib)
-    consistency_check(system, result_lib["basic"].models)
+    check_component_models(system, result_lib["basic"].models)
 
     database = build_data_base(input_system, None)
 
@@ -87,7 +87,7 @@ def setup_test(
             input_system = parse_yaml_system(c)
         lib_dict = resolve_library([input_library])
         system = resolve_system(input_system, lib_dict)
-        consistency_check(system, lib_dict["basic"].models)
+        check_component_models(system, lib_dict["basic"].models)
 
         database = build_data_base(input_system, series_dir)
         return Study(system, database)
