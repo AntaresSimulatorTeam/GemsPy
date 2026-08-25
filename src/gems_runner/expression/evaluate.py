@@ -24,6 +24,7 @@ from gems_craft.expression.expression import (
     ExpressionNode,
     FloorNode,
     LiteralNode,
+    LowerBoundNode,
     MaxNode,
     MinNode,
     ParameterNode,
@@ -35,6 +36,7 @@ from gems_craft.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UpperBoundNode,
     VariableNode,
 )
 from gems_craft.expression.indexing import IndexingStructureProvider
@@ -138,6 +140,12 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
 
     def reduced_cost(self, node: ReducedCostNode) -> float:
         raise NotImplementedError("reduced_cost() is not statically evaluable.")
+
+    def lower_bound(self, node: LowerBoundNode) -> float:
+        raise NotImplementedError("lower_bound() is not statically evaluable.")
+
+    def upper_bound(self, node: UpperBoundNode) -> float:
+        raise NotImplementedError("upper_bound() is not statically evaluable.")
 
 
 def evaluate(expression: ExpressionNode, value_provider: ValueProvider) -> float:

@@ -12,10 +12,10 @@ from gems_craft.study.data import DataBase
 from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.resolve_components import (
     build_data_base,
-    consistency_check,
     resolve_system,
 )
 from gems_craft.study.system import System
+from gems_craft.study.validation import check_component_models
 from gems_runner.simulation import TimeBlock, build_problem
 
 
@@ -30,7 +30,7 @@ def setup_data(pypsa_dir: Path) -> Tuple[System, DataBase]:
         input_study = parse_yaml_system(c)
     lib_dict = resolve_library([input_library])
     system = resolve_system(input_study, lib_dict)
-    consistency_check(system, lib_dict["pypsa_models"].models)
+    check_component_models(system, lib_dict["pypsa_models"].models)
 
     database = build_data_base(input_study, series_dir)
     return system, database

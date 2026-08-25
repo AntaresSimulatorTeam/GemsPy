@@ -20,8 +20,11 @@ from gems_craft.model.taxonomy import (
     Taxonomy,
     TaxonomyCategory,
     TaxonomyItem,
-    check_library_against_taxonomy,
     load_taxonomy,
+)
+from gems_craft.model.validation import (
+    check_library_against_taxonomy,
+    validate_libraries_against_taxonomy,
 )
 
 
@@ -418,3 +421,81 @@ library:
         - id: technology
 """)
     check_library_against_taxonomy(lib, taxonomy)  # must not raise
+
+
+# --- validate_libraries_against_taxonomy ---
+
+_CONFORMING_LIB = """
+library:
+  id: mylib
+  taxonomy: test_taxonomy
+  port-types:
+    - id: flow
+      fields:
+        - id: flow
+  models:
+    - id: generator
+      taxonomy-category: production
+      ports:
+        - id: injection_port
+          type: flow
+"""
+
+_VIOLATING_LIB = """
+library:
+  id: mylib
+  taxonomy: test_taxonomy
+  models:
+    - id: generator
+      taxonomy-category: production
+"""
+
+# Same violating model, but the library itself does not opt in to a taxonomy.
+_LIB_WITHOUT_TAXONOMY = """
+library:
+  id: mylib
+  models:
+    - id: generator
+      taxonomy-category: production
+"""
+
+
+def test_library_declaring_taxonomy_is_checked() -> None:
+    taxonomy = _make_taxonomy(_make_category("production", ["injection_port"]))
+    lib = _parse_lib(_CONFORMING_LIB)
+    validate_libraries_against_taxonomy([lib], taxonomy)  # must not raise
+    assert lib.taxonomy == "test_taxonomy"
+
+
+def test_library_declaring_taxonomy_raises_on_violation() -> None:
+    taxonomy = _make_taxonomy(_make_category("production", ["injection_port"]))
+    with pytest.raises(ValueError, match="injection_port"):
+        validate_libraries_against_taxonomy([_parse_lib(_VIOLATING_LIB)], taxonomy)
+
+
+def test_library_declaring_taxonomy_without_argument_raises() -> None:
+    with pytest.raises(ValueError, match="no taxonomy was provided"):
+        validate_libraries_against_taxonomy([_parse_lib(_CONFORMING_LIB)], None)
+
+
+def test_library_with_mismatched_taxonomy_id_raises() -> None:
+    taxonomy = Taxonomy(
+        id="other_taxonomy",
+        categories=[_make_category("production", ["injection_port"])],
+    )
+    with pytest.raises(ValueError, match="other_taxonomy"):
+        validate_libraries_against_taxonomy([_parse_lib(_CONFORMING_LIB)], taxonomy)
+
+
+def test_library_without_declared_taxonomy_is_not_checked() -> None:
+    """A model may carry a taxonomy-category without the library opting in."""
+    taxonomy = _make_taxonomy(_make_category("production", ["injection_port"]))
+    lib = _parse_lib(_LIB_WITHOUT_TAXONOMY)
+    validate_libraries_against_taxonomy([lib], taxonomy)  # must not raise
+    assert lib.taxonomy is None
+
+
+def test_parsing_a_declaring_library_does_not_validate_it() -> None:
+    """Parsing is pure reading: conformance is the caller's business."""
+    lib = _parse_lib(_VIOLATING_LIB)  # must not raise
+    assert lib.taxonomy == "test_taxonomy"

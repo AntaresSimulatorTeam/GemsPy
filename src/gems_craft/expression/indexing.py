@@ -27,6 +27,7 @@ from .expression import (
     ExpressionNode,
     FloorNode,
     LiteralNode,
+    LowerBoundNode,
     MaxNode,
     MinNode,
     MultiplicationNode,
@@ -41,6 +42,7 @@ from .expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UpperBoundNode,
     VariableNode,
 )
 from .visitor import ExpressionVisitor, T, visit
@@ -158,6 +160,12 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return self.context.get_constraint_structure(node.constraint_id)
 
     def reduced_cost(self, node: ReducedCostNode) -> IndexingStructure:
+        return self.context.get_variable_structure(node.variable_id)
+
+    def lower_bound(self, node: LowerBoundNode) -> IndexingStructure:
+        return self.context.get_variable_structure(node.variable_id)
+
+    def upper_bound(self, node: UpperBoundNode) -> IndexingStructure:
         return self.context.get_variable_structure(node.variable_id)
 
 

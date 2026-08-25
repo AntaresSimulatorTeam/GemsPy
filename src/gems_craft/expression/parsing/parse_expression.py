@@ -21,9 +21,11 @@ from gems_craft.expression.expression import (
     Comparator,
     ComparisonNode,
     DualNode,
+    LowerBoundNode,
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    UpperBoundNode,
     maximum,
     minimum,
 )
@@ -200,6 +202,22 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             raise ValueError(f"'{vid}' is not a variable of the model.")
         return ReducedCostNode(vid)
 
+    def _visit_lower_bound(self, arg_exprs: list) -> ExpressionNode:
+        if len(arg_exprs) != 1:
+            raise ValueError("lower_bound() requires exactly 1 argument.")
+        vid = arg_exprs[0].getText()  # type: ignore
+        if vid not in self.identifiers.variables:
+            raise ValueError(f"'{vid}' is not a variable of the model.")
+        return LowerBoundNode(vid)
+
+    def _visit_upper_bound(self, arg_exprs: list) -> ExpressionNode:
+        if len(arg_exprs) != 1:
+            raise ValueError("upper_bound() requires exactly 1 argument.")
+        vid = arg_exprs[0].getText()  # type: ignore
+        if vid not in self.identifiers.variables:
+            raise ValueError(f"'{vid}' is not a variable of the model.")
+        return UpperBoundNode(vid)
+
     # Visit a parse tree produced by ExprParser#function.
     def visitFunction(self, ctx: ExprParser.FunctionContext) -> ExpressionNode:
         function_name: str = ctx.IDENTIFIER().getText()  # type: ignore
@@ -210,6 +228,10 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             return self._visit_dual(arg_exprs)
         if function_name == "reduced_cost":
             return self._visit_reduced_cost(arg_exprs)
+        if function_name == "lower_bound":
+            return self._visit_lower_bound(arg_exprs)
+        if function_name == "upper_bound":
+            return self._visit_upper_bound(arg_exprs)
 
         args: list[ExpressionNode] = (
             [expr.accept(self) for expr in arg_exprs]  # type: ignore

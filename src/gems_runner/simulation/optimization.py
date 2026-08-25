@@ -48,6 +48,7 @@ from gems_craft.model.variable import Variable
 from gems_craft.study.parsing import IntegerStrategyId
 from gems_craft.study.study import Study
 from gems_craft.study.system import Component
+from gems_craft.study.validation import check_data_requirements
 from gems_runner.simulation.linearize import (
     VectorizedExpr,
     VectorizedLinearExprBuilder,
@@ -433,18 +434,22 @@ class OptimizationProblem:
         lv = self._linopy_vars.get((model_id, var_name))
         return lv.labels if lv is not None else None
 
-    def get_variable_solution(
-        self, model_id: str, var_name: str
+    def _reassemble_variable_attr(
+        self, model_id: str, var_name: str, attr: str
     ) -> Optional[xr.DataArray]:
-        """Return solved values for *var_name* across all its components.
+        """Reassemble a per-instance ``linopy.Variable`` attribute (``solution``,
+        ``lower``, ``upper``) for *var_name* across all its components.
 
-        Unlike ``linopy_model.solution[<name>]``, this is correct even when the
-        variable was split across relaxed/exact strategy groups: the merged
-        ``_linopy_vars`` copy keeps the ``.name`` of only one of the two really
-        -registered group Variables, so indexing the solver's solution Dataset
-        by that name silently drops the other group's components. This instead
-        reads ``.solution`` directly off the real per-component Variables
-        (``_linopy_vars_by_component``) and reassembles them.
+        Unlike reading the attribute off ``self._linopy_vars[(model_id, var_name)]``,
+        this is correct even when the variable was split across relaxed/exact
+        strategy groups: that merged, detached ``_MergedGroupVariable`` copy
+        keeps the ``.name`` of only one of the two really-registered group
+        Variables (so indexing the solver's solution Dataset by that name
+        silently drops the other group's components), and it is rebuilt once at
+        problem-build time so it never reflects later bound mutations (e.g. from
+        heuristics). This instead reads the attribute directly off the real
+        per-component Variables (``_linopy_vars_by_component``) and reassembles
+        them.
         """
         by_name: Dict[str, linopy.Variable] = {}
         for (m, vn, _c), variable in self._linopy_vars_by_component.items():
@@ -456,10 +461,45 @@ class OptimizationProblem:
         if not group_vars:
             return None
         if len(group_vars) == 1:
-            return group_vars[0].solution
+            return cast(xr.DataArray, getattr(group_vars[0], attr))
         return cast(
-            xr.DataArray, xr.concat([v.solution for v in group_vars], dim="component")
+            xr.DataArray,
+            xr.concat([getattr(v, attr) for v in group_vars], dim="component"),
         )
+
+    def get_variable_solution(
+        self, model_id: str, var_name: str
+    ) -> Optional[xr.DataArray]:
+        """Return solved values for *var_name* across all its components.
+
+        See :meth:`_reassemble_variable_attr` for why this must bypass the
+        merged ``_linopy_vars`` copy.
+        """
+        return self._reassemble_variable_attr(model_id, var_name, "solution")
+
+    def get_variable_lower_bound(
+        self, model_id: str, var_name: str
+    ) -> Optional[xr.DataArray]:
+        """Return the current lower bound for *var_name* across all its components.
+
+        Reflects any bound mutation applied after problem construction (e.g. by
+        thermal heuristics via :meth:`get_component_variable`). See
+        :meth:`_reassemble_variable_attr` for why this must bypass the merged
+        ``_linopy_vars`` copy.
+        """
+        return self._reassemble_variable_attr(model_id, var_name, "lower")
+
+    def get_variable_upper_bound(
+        self, model_id: str, var_name: str
+    ) -> Optional[xr.DataArray]:
+        """Return the current upper bound for *var_name* across all its components.
+
+        Reflects any bound mutation applied after problem construction (e.g. by
+        thermal heuristics via :meth:`get_component_variable`). See
+        :meth:`_reassemble_variable_attr` for why this must bypass the merged
+        ``_linopy_vars`` copy.
+        """
+        return self._reassemble_variable_attr(model_id, var_name, "upper")
 
 
 # ---------------------------------------------------------------------------
@@ -467,13 +507,35 @@ class OptimizationProblem:
 # ---------------------------------------------------------------------------
 
 
+def _validate_initial_values(
+    initial_values: Optional[Dict[Tuple[str, str], xr.DataArray]],
+) -> Dict[Tuple[str, str], xr.DataArray]:
+    """Check the carry-over contract on *initial_values* and return them.
+
+    Every value must carry a ``time`` dimension indexed ``0 .. k-1`` so that it
+    aligns with the leading timesteps of the block being built.
+    """
+    values = initial_values or {}
+    for (mk, var_name), init_val in values.items():
+        if "time" not in init_val.dims:
+            raise ValueError(
+                f"initial_values[{mk!r}, {var_name!r}] must carry a 'time' "
+                f"dimension indexed 0..k-1; got dims {tuple(init_val.dims)}"
+            )
+    return values
+
+
 class _OptimizationProblemBuilder:
     """
-    Builds the linopy problem in 4 phases:
+    Builds the linopy problem in 5 phases:
       1. Build parameter DataArrays for all models.
       2. Create all linopy Variables (uses param arrays for bounds).
       3. Build port arrays via incidence matrices.
       4. Add constraints and objectives to the linopy model.
+      5. Add the carry-over constraints of *initial_values* (sequential mode):
+         each time-dependent variable is *fixed*, over the block's first ``k``
+         timesteps, to the value the previous block computed for the same
+         absolute timestep.  Time-independent variables are never pinned.
     """
 
     def __init__(
@@ -492,7 +554,7 @@ class _OptimizationProblemBuilder:
         self.scenario_ids = scenario_ids
         self._location_filter = location_filter
         self._oob_filter = oob_filter
-        self._initial_values = initial_values or {}
+        self._initial_values = _validate_initial_values(initial_values)
 
         self.block_length = len(block.timesteps)
         self.time_coord = list(range(self.block_length))
@@ -534,15 +596,24 @@ class _OptimizationProblemBuilder:
                 model, port_arrays_for_model, total_obj
             )
 
-        # Phase 5: carry-over constraints (sequential mode only)
+        # Phase 5: carry-over constraints (sequential mode only).
+        # Only time-dependent variables are pinned: time-independent ones
+        # (structure.time = False, e.g. an investment capacity) are deliberately
+        # left free in every block — see the user guide, `sequential-subproblems`.
         for (mk, var_name), init_val in self._initial_values.items():
             linopy_var = self.linopy_vars.get((mk, var_name))
-            if linopy_var is not None and "time" in linopy_var.dims:
-                safe = f"{mk}__{var_name}".replace("-", "_")
-                self.linopy_model.add_constraints(
-                    linopy_var.isel(time=0) == init_val,  # type: ignore[arg-type]
-                    name=f"carry_over__{safe}",
-                )
+            if linopy_var is None or "time" not in linopy_var.dims:
+                continue
+            # Pin the first len(init_val.time) timesteps, clamped to this
+            # block's horizon (a truncated final block can be shorter than the
+            # carried window).
+            pin_length = min(init_val.sizes["time"], self.block_length)
+            safe = f"{mk}__{var_name}".replace("-", "_")
+            self.linopy_model.add_constraints(
+                linopy_var.isel(time=slice(0, pin_length))
+                == init_val.isel(time=slice(0, pin_length)),  # type: ignore[arg-type]
+                name=f"carry_over__{safe}",
+            )
 
         # Extract constant objective contribution (linopy cannot hold pure constants).
         objective_constant = 0.0
@@ -992,11 +1063,16 @@ def build_problem(
     problem_name:
         Label for the linopy model.
     initial_values:
-        Optional carry-over values keyed by ``(model_id, var_name)``.  For
-        each entry a constraint ``var[time=0] == value`` is added, overriding
-        the cyclic border condition for the first timestep.
+        Optional carry-over values keyed by ``(model_id, var_name)``.  Each
+        value must be an ``xr.DataArray`` carrying a ``time`` dimension of
+        length ``k`` indexed ``0 .. k-1``; constraints
+        ``var[time=i] == value[i]`` are then added for the block's first ``k``
+        timesteps, overriding the cyclic border condition on that window.  A
+        value without a ``time`` dimension raises ``ValueError`` before the
+        problem is built.  Entries whose variable is time-independent, or is
+        absent from this block, are ignored.
     """
-    study.check_consistency()
+    check_data_requirements(study)
 
     oob_filter = OutOfBoundsFilter(optim_config) if optim_config is not None else None
     builder = _OptimizationProblemBuilder(
@@ -1070,7 +1146,7 @@ def build_decomposed_problems(
     """
     from gems_craft.optim_config.parsing import ElementLocation
 
-    study.check_consistency()
+    check_data_requirements(study)
 
     oob_filter = OutOfBoundsFilter(optim_config)
 

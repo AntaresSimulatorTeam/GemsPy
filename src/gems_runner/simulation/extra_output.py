@@ -35,7 +35,9 @@ from gems_craft.expression.expression import (
     Comparator,
     ComparisonNode,
     DualNode,
+    LowerBoundNode,
     ReducedCostNode,
+    UpperBoundNode,
     VariableNode,
 )
 from gems_craft.expression.visitor import visit
@@ -110,6 +112,14 @@ class VectorizedExtraOutputBuilder(VectorizedBuilderBase[xr.DataArray]):
     var_reduced_cost_arrays:
         Mapping from (model_id, var_name) to a DataArray of reduced cost values,
         with dims in {component, time, scenario} (or a subset).
+    var_lower_bound_arrays:
+        Mapping from (model_id, var_name) to a DataArray of the variable's
+        current lower bound, with dims in {component, time, scenario} (or a
+        subset).
+    var_upper_bound_arrays:
+        Mapping from (model_id, var_name) to a DataArray of the variable's
+        current upper bound, with dims in {component, time, scenario} (or a
+        subset).
     port_arrays:
         Pre-computed xr.DataArray for each PortFieldId of this model.
         Keyed by PortFieldId(port_name, field_name).
@@ -122,6 +132,12 @@ class VectorizedExtraOutputBuilder(VectorizedBuilderBase[xr.DataArray]):
         default_factory=dict
     )
     var_reduced_cost_arrays: Dict[Tuple[str, str], xr.DataArray] = field(
+        default_factory=dict
+    )
+    var_lower_bound_arrays: Dict[Tuple[str, str], xr.DataArray] = field(
+        default_factory=dict
+    )
+    var_upper_bound_arrays: Dict[Tuple[str, str], xr.DataArray] = field(
         default_factory=dict
     )
 
@@ -151,6 +167,24 @@ class VectorizedExtraOutputBuilder(VectorizedBuilderBase[xr.DataArray]):
                 f"{self.model_id!r}."
             )
         return self.var_reduced_cost_arrays[key]
+
+    def lower_bound(self, node: LowerBoundNode) -> xr.DataArray:
+        key = (self.model_id, node.variable_id)
+        if key not in self.var_lower_bound_arrays:
+            raise KeyError(
+                f"Lower bound of variable '{node.variable_id}' not found for model "
+                f"{self.model_id!r}."
+            )
+        return self.var_lower_bound_arrays[key]
+
+    def upper_bound(self, node: UpperBoundNode) -> xr.DataArray:
+        key = (self.model_id, node.variable_id)
+        if key not in self.var_upper_bound_arrays:
+            raise KeyError(
+                f"Upper bound of variable '{node.variable_id}' not found for model "
+                f"{self.model_id!r}."
+            )
+        return self.var_upper_bound_arrays[key]
 
     def comparison(self, node: ComparisonNode) -> xr.DataArray:
         """Evaluate a comparison post-solve as a float indicator DataArray.

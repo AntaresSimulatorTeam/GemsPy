@@ -21,7 +21,9 @@ from gems_craft.expression.equality import (
 )
 from gems_craft.expression.expression import (
     DualNode,
+    LowerBoundNode,
     ReducedCostNode,
+    UpperBoundNode,
     maximum,
     minimum,
     port_field,
@@ -371,6 +373,8 @@ _PFIELD_ID = PortFieldId("port1", "flow")
 _UNRESTRICTED_EXPRS = [
     pytest.param("dual(balance)", DualNode("balance"), id="dual"),
     pytest.param("reduced_cost(x)", ReducedCostNode("x"), id="reduced_cost"),
+    pytest.param("lower_bound(x)", LowerBoundNode("x"), id="lower_bound"),
+    pytest.param("upper_bound(x)", UpperBoundNode("x"), id="upper_bound"),
     pytest.param("max(x, y)", maximum(var("x"), var("y")), id="max"),
     pytest.param("min(x, y)", minimum(var("x"), var("y")), id="min"),
     pytest.param("abs(x)", var("x").abs(), id="abs"),
@@ -718,3 +722,25 @@ def test_sum_connections_on_non_own_port_accepted() -> None:
         )
     )
     resolve_library([input_lib])  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# Acceptance: lower_bound()/upper_bound() parse from YAML inside extra-outputs
+# ---------------------------------------------------------------------------
+
+
+def test_lower_upper_bound_in_extra_output_accepted() -> None:
+    """lower_bound(generation)/upper_bound(generation) are valid extra-output expressions."""
+    input_lib = parse_yaml_library(
+        io.StringIO(
+            _port_model_yaml(
+                extra_output_expr="lower_bound(generation) + upper_bound(generation)"
+            )
+        )
+    )
+    lib = resolve_library([input_lib])
+    eo = lib["test"].models["test.gen_model"].extra_outputs
+    assert eo is not None
+    assert expressions_equal(
+        eo["eo"], LowerBoundNode("generation") + UpperBoundNode("generation")
+    )

@@ -27,7 +27,12 @@ from gems_craft.expression import (
     visit,
 )
 from gems_craft.expression.equality import expressions_equal
-from gems_craft.expression.expression import DualNode, ReducedCostNode
+from gems_craft.expression.expression import (
+    DualNode,
+    LowerBoundNode,
+    ReducedCostNode,
+    UpperBoundNode,
+)
 from gems_craft.expression.parsing.parse_expression import (
     ModelIdentifiers,
     parse_expression,
@@ -145,3 +150,11 @@ def test_power_precedence_evaluation() -> None:
     # the shift amounts of "x[t-2^2]" and "x[t-2^2*3]"
     assert value("-2^2") == pytest.approx(-4.0)
     assert value("-2^2*3") == pytest.approx(-12.0)
+
+
+def test_lower_upper_bound_evaluation_raises() -> None:
+    ctx = EvaluationContext()
+    with pytest.raises(NotImplementedError, match="lower_bound"):
+        visit(LowerBoundNode("x"), EvaluationVisitor(ctx))
+    with pytest.raises(NotImplementedError, match="upper_bound"):
+        visit(UpperBoundNode("x"), EvaluationVisitor(ctx))

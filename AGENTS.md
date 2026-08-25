@@ -72,7 +72,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 **`gems_craft/model/`** — Immutable model templates.
 - `Model`: defines component behavior (parameters, variables, constraints, ports)
 - `Library`: a collection of models, loaded from YAML
-- `Taxonomy` (`taxonomy.py`): categories naming the items a model must expose. Models opt in via `taxonomy-category`; `check_library_against_taxonomy` enforces conformance.
+- `Taxonomy` (`taxonomy.py`): categories naming the items a model must expose. Models opt in via `taxonomy-category`. `taxonomy.py` holds the data and `load_taxonomy` only; conformance lives in `validation.py` (`check_library_against_taxonomy`, and `validate_libraries_against_taxonomy` for libraries declaring a `taxonomy`), which `load_study` calls after parsing — `parse_yaml_library` stays a pure reader. `load_study` reads the `Taxonomy` from the optional `input/taxonomy.yml`.
 - `PortTypeSchema` (`parsing.py`) also declares the hybrid-only `area-connection` (`AreaConnectionSchema`) and `thermal-capacity-connection` (`PortThermalCapacitySchema`) fields; `resolve_library.py`'s `_convert_port_type` parses and discards them for every library, hybrid or not.
 
 **`gems_craft/expression/`** — Mathematical expression language and AST (structural/static analysis only — no numeric evaluation).

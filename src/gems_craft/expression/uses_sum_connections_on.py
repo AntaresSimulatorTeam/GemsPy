@@ -21,6 +21,7 @@ from gems_craft.expression.expression import (
     ExpressionNode,
     FloorNode,
     LiteralNode,
+    LowerBoundNode,
     MaxNode,
     MinNode,
     MultiplicationNode,
@@ -35,6 +36,7 @@ from gems_craft.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UpperBoundNode,
     VariableNode,
 )
 
@@ -124,6 +126,12 @@ class UsesSumConnectionsOnVisitor(ExpressionVisitor[bool]):
         return False
 
     def reduced_cost(self, node: ReducedCostNode) -> bool:
+        return False
+
+    def lower_bound(self, node: LowerBoundNode) -> bool:
+        return False
+
+    def upper_bound(self, node: UpperBoundNode) -> bool:
         return False
 
 

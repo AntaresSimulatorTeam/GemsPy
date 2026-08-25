@@ -32,6 +32,7 @@ from gems_craft.expression.expression import (
     CeilNode,
     DualNode,
     FloorNode,
+    LowerBoundNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
@@ -43,6 +44,7 @@ from gems_craft.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UpperBoundNode,
 )
 from gems_craft.expression.visitor import visit
 
@@ -182,6 +184,12 @@ class _PortFieldExpressionChecker(ExpressionVisitor[None]):
 
     def reduced_cost(self, node: ReducedCostNode) -> None:
         pass  # reduced_cost() is permitted in port-field definitions
+
+    def lower_bound(self, node: LowerBoundNode) -> None:
+        pass  # lower_bound() is permitted in port-field definitions
+
+    def upper_bound(self, node: UpperBoundNode) -> None:
+        pass  # upper_bound() is permitted in port-field definitions
 
 
 def _validate_port_field_expression(definition: PortFieldDefinition) -> None:

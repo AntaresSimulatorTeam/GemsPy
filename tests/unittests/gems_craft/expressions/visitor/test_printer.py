@@ -11,7 +11,12 @@
 # This file is part of the Antares project.
 
 from gems_craft.expression import ExpressionNode, PrinterVisitor, param, var, visit
-from gems_craft.expression.expression import DualNode, ReducedCostNode
+from gems_craft.expression.expression import (
+    DualNode,
+    LowerBoundNode,
+    ReducedCostNode,
+    UpperBoundNode,
+)
 
 
 def test_comparison() -> None:
@@ -65,3 +70,8 @@ def test_power_printer() -> None:
     assert visit(p ** (q + 1), PrinterVisitor()) == "(p ^ (q + 1.0))"
     assert visit(-(p**2), PrinterVisitor()) == "-((p ^ 2.0))"
     assert visit(p**q**2, PrinterVisitor()) == "(p ^ (q ^ 2.0))"
+
+
+def test_lower_upper_bound_printer() -> None:
+    assert visit(LowerBoundNode("x"), PrinterVisitor()) == "lower_bound(x)"
+    assert visit(UpperBoundNode("x"), PrinterVisitor()) == "upper_bound(x)"

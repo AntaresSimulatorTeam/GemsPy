@@ -14,7 +14,14 @@ import pytest
 
 from gems_craft.expression import ExpressionNode, copy_expression, literal, param, var
 from gems_craft.expression.equality import expressions_equal
-from gems_craft.expression.expression import DualNode, ReducedCostNode, maximum, minimum
+from gems_craft.expression.expression import (
+    DualNode,
+    LowerBoundNode,
+    ReducedCostNode,
+    UpperBoundNode,
+    maximum,
+    minimum,
+)
 
 
 @pytest.mark.parametrize(
@@ -100,3 +107,11 @@ def test_dual_reduced_cost_equality() -> None:
     )
     assert not expressions_equal(ReducedCostNode("p"), ReducedCostNode("q"))
     assert not expressions_equal(DualNode("p"), ReducedCostNode("p"))
+
+
+def test_lower_upper_bound_equality() -> None:
+    assert expressions_equal(LowerBoundNode("x"), copy_expression(LowerBoundNode("x")))
+    assert not expressions_equal(LowerBoundNode("x"), LowerBoundNode("y"))
+    assert expressions_equal(UpperBoundNode("x"), copy_expression(UpperBoundNode("x")))
+    assert not expressions_equal(UpperBoundNode("x"), UpperBoundNode("y"))
+    assert not expressions_equal(LowerBoundNode("x"), UpperBoundNode("x"))

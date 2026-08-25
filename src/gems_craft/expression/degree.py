@@ -20,6 +20,7 @@ from gems_craft.expression.expression import (
     CeilNode,
     DualNode,
     FloorNode,
+    LowerBoundNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
@@ -29,6 +30,7 @@ from gems_craft.expression.expression import (
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
+    UpperBoundNode,
 )
 
 from .expression import (
@@ -151,6 +153,12 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         return math.inf
 
     def reduced_cost(self, node: ReducedCostNode) -> int | float:
+        return math.inf
+
+    def lower_bound(self, node: LowerBoundNode) -> int | float:
+        return math.inf
+
+    def upper_bound(self, node: UpperBoundNode) -> int | float:
         return math.inf
 
 

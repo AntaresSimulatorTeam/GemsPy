@@ -29,8 +29,10 @@ from gems_craft.expression.expression import (
     CeilNode,
     DualNode,
     FloorNode,
+    LowerBoundNode,
     ReducedCostNode,
     RoundNode,
+    UpperBoundNode,
 )
 
 
@@ -86,6 +88,11 @@ def test_max_min_degree() -> None:
 def test_dual_reduced_cost_degree() -> None:
     assert visit(DualNode("balance"), ExpressionDegreeVisitor()) == math.inf
     assert visit(ReducedCostNode("p"), ExpressionDegreeVisitor()) == math.inf
+
+
+def test_lower_upper_bound_degree() -> None:
+    assert visit(LowerBoundNode("x"), ExpressionDegreeVisitor()) == math.inf
+    assert visit(UpperBoundNode("x"), ExpressionDegreeVisitor()) == math.inf
 
 
 @pytest.mark.xfail(reason="Degree simplification not implemented")

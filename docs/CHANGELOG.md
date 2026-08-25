@@ -4,16 +4,38 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
-### Changed
-- **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
-  to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
-
 ### Added
 - **Power operator `^` in the expression language** - right-associative, binding
   tighter than unary minus and than `*` `/`, so `-2^2` is `-(2^2)`. Operands
   must be literals or parameters, except in `extra-outputs` where a variable may
   be raised to a power. The Python API gains `**` on `ExpressionNode`.
 
+- **Taxonomy conformance checked when a study is loaded** - `load_study` reads
+  the optional `input/taxonomy.yml` and calls
+  `validate_libraries_against_taxonomy` on every library declaring a `taxonomy`
+  field. `parse_yaml_library` is unchanged and performs no validation.
+
+### Changed
+- **Breaking** - loading a study whose library declares a `taxonomy` raises
+  `ValueError` if no taxonomy is supplied, or if its id differs from the declared
+  one.
+- **Breaking** - `TaxonomyData` renamed to `TaxonomySchema`; no alias kept.
+- **Breaking** - `check_library_against_taxonomy` moved from
+  `gems_craft.model.taxonomy` to the new `gems_craft.model.validation`, and
+  `consistency_check` from `gems_craft.study.resolve_components` to the new
+  `gems_craft.study.validation`, where it is renamed
+  `check_component_models`. The `Study.check_consistency()` method moved to
+  that same module as the function `check_data_requirements(study)` — the two
+  checks are disjoint (component model ids vs. database coverage) and their
+  near-identical old names invited confusion. Reading and validating are now
+  separate modules, as in `optim_config/`. No behavior change; names and
+  import paths only.
+
+---
+
+## [0.2.0] - 2026-08-24
+
+### Added
 - **Integer strategy and thermal heuristics** - components can now set
   `integer-strategy` (`exact` (default), `relaxed`, or `heuristic` +
   `heuristic-id`) to control how their model's integer/binary variables are
@@ -22,6 +44,22 @@ All notable changes to GemsPy are documented here.
   compute tighter variable bounds from the first solve. Each model declares
   what a heuristic reads/writes via `models[].heuristics` in
   `optim-config.yml`.
+- **`lower_bound(variable_name)`** and **`upper_bound(variable_name)`** operators in the
+  expression language, usable in `extra-outputs` and port-field-definitions. Both take a bare
+  variable identifier and return its *current* lower/upper bound post-solve — in particular
+  reflecting mutations made by thermal heuristics (see "Integer strategy and thermal
+  heuristics" above).
+
+### Changed
+- **Sequential mode carry-over length is now user-controlled** through the new
+  `resolution.carry-over-length` parameter (default: `block-overlap`), which
+  sets how many of the shared leading timesteps of block *N+1* are pinned to
+  block *N*'s already-solved values. This also fixes an incorrect stitching
+  for `block-overlap >= 2`, where the previous hardcoded behaviour pinned block
+  *N+1*'s first timestep to block *N*'s **last** timestep — a different
+  absolute timestep.
+- **linopy upgraded to `>=0.9.0`** - the minimum supported Python version rises
+  to **3.11** accordingly (linopy 0.9 requires Python >= 3.11).
 
 ### Fixed
 - **Standard library parsing now accepts hybrid port-type fields** -
@@ -33,6 +71,8 @@ All notable changes to GemsPy are documented here.
   `HybridPortTypeSchema`) directly onto `gems_craft`'s own `PortTypeSchema`;
   the fields are parsed and validated but otherwise ignored outside hybrid
   consumers.
+
+---
 
 ## [0.1.3] - 2026-07-24
 
