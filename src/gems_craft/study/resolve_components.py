@@ -12,7 +12,6 @@
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
-from gems_craft.model import Model
 from gems_craft.model.library import Library
 from gems_craft.study import (
     Component,
@@ -130,23 +129,6 @@ def _get_component_by_id(
 ) -> Optional[Component]:
     components_dict = {component.id: component for component in all_components}
     return components_dict.get(component_id)
-
-
-# TODO: cross-validation logic mixed into a "resolve" (preprocessing) module —
-# move to a dedicated gems_craft/study/validation.py, mirroring optim_config/.
-def consistency_check(system: System, input_models: Dict[str, Model]) -> bool:
-    """
-    Checks if all components in the System have a valid model from the library.
-    Returns True if all components are consistent, raises ValueError otherwise.
-    """
-    # TODO: Update this consistency check to check if each component have a valid model from the lib it refers to (and not all libs)
-    model_ids_set = input_models.keys()
-    for component in system.all_components:
-        if component.model.id not in model_ids_set:
-            raise ValueError(
-                f"Error: Component {component.id} has invalid model ID: {component.model.id}"
-            )
-    return True
 
 
 def build_data_base(

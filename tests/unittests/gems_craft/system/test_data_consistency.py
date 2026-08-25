@@ -41,6 +41,7 @@ from gems_craft.study import (
     create_component,
 )
 from gems_craft.study.data import load_ts_from_file
+from gems_craft.study.validation import check_data_requirements
 from tests.unittests.gems_craft.system.libs.standard import (
     BALANCE_PORT_TYPE,
     CONSTANT,
@@ -152,7 +153,7 @@ def test_requirements_consistency_demand_model_fix_ok(
 
     # When
     # No ValueError should be raised
-    Study(mock_network, database).check_consistency()
+    check_data_requirements(Study(mock_network, database))
 
 
 def test_requirements_consistency_generator_model_ok(mock_network: System) -> None:
@@ -165,7 +166,7 @@ def test_requirements_consistency_generator_model_ok(mock_network: System) -> No
     database.add_data("D", "demand", ConstantData(30))
 
     # When
-    Study(mock_network, database).check_consistency()
+    check_data_requirements(Study(mock_network, database))
 
 
 def test_consistency_generation_time_free_for_constant_model_raises_exception(
@@ -184,7 +185,7 @@ def test_consistency_generation_time_free_for_constant_model_raises_exception(
 
     # When
     with pytest.raises(ValueError, match="Data inconsistency"):
-        Study(mock_network, database).check_consistency()
+        check_data_requirements(Study(mock_network, database))
 
 
 def test_requirements_consistency_demand_model_time_varying_ok(
@@ -200,7 +201,7 @@ def test_requirements_consistency_demand_model_time_varying_ok(
 
     # When
     # No ValueError should be raised
-    Study(mock_network, database).check_consistency()
+    check_data_requirements(Study(mock_network, database))
 
 
 def test_requirements_consistency_time_varying_parameter_with_correct_data_passes(
@@ -225,7 +226,7 @@ def test_requirements_consistency_time_varying_parameter_with_correct_data_passe
     system.connect(PortRef(gen, "balance_port"), PortRef(node, "balance_port"))
 
     # No ValueError should be raised
-    Study(system, database).check_consistency()
+    check_data_requirements(Study(system, database))
 
 
 @pytest.mark.parametrize(
@@ -270,7 +271,7 @@ def test_requirements_consistency_time_varying_parameter_with_scenario_varying_d
     # When
     # ValueError should be raised
     with pytest.raises(ValueError, match="Data inconsistency"):
-        Study(system, database).check_consistency()
+        check_data_requirements(Study(system, database))
 
 
 @pytest.mark.parametrize(
@@ -306,7 +307,7 @@ def test_requirements_consistency_scenario_varying_parameter_with_time_varying_d
 
     # ValueError should be raised
     with pytest.raises(ValueError, match="Data inconsistency"):
-        Study(system, database).check_consistency()
+        check_data_requirements(Study(system, database))
 
 
 def test_requirements_consistency_scenario_varying_parameter_with_correct_data_passes(
@@ -331,7 +332,7 @@ def test_requirements_consistency_scenario_varying_parameter_with_correct_data_p
     system.add_component(gen)
 
     # No ValueError should be raised
-    Study(system, database).check_consistency()
+    check_data_requirements(Study(system, database))
 
 
 def test_load_data_from_txt() -> None:
