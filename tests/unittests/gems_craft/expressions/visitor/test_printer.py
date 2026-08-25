@@ -62,6 +62,16 @@ def test_dual_reduced_cost_printer() -> None:
     assert visit(ReducedCostNode("p"), PrinterVisitor()) == "reduced_cost(p)"
 
 
+def test_power_printer() -> None:
+    p = param("p")
+    q = param("q")
+
+    assert visit(p**2, PrinterVisitor()) == "(p ^ 2.0)"
+    assert visit(p ** (q + 1), PrinterVisitor()) == "(p ^ (q + 1.0))"
+    assert visit(-(p**2), PrinterVisitor()) == "-((p ^ 2.0))"
+    assert visit(p**q**2, PrinterVisitor()) == "(p ^ (q ^ 2.0))"
+
+
 def test_lower_upper_bound_printer() -> None:
     assert visit(LowerBoundNode("x"), PrinterVisitor()) == "lower_bound(x)"
     assert visit(UpperBoundNode("x"), PrinterVisitor()) == "upper_bound(x)"

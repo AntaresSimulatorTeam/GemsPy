@@ -10,6 +10,7 @@ else:
 
 
 class ExprVisitor(ParseTreeVisitor):
+
     # Visit a parse tree produced by ExprParser#portFieldExpr.
     def visitPortFieldExpr(self, ctx: ExprParser.PortFieldExprContext):
         return self.visitChildren(ctx)
@@ -78,6 +79,10 @@ class ExprVisitor(ParseTreeVisitor):
     def visitFunction(self, ctx: ExprParser.FunctionContext):
         return self.visitChildren(ctx)
 
+    # Visit a parse tree produced by ExprParser#power.
+    def visitPower(self, ctx: ExprParser.PowerContext):
+        return self.visitChildren(ctx)
+
     # Visit a parse tree produced by ExprParser#argList.
     def visitArgList(self, ctx: ExprParser.ArgListContext):
         return self.visitChildren(ctx)
@@ -94,14 +99,6 @@ class ExprVisitor(ParseTreeVisitor):
     def visitShift(self, ctx: ExprParser.ShiftContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#signedAtom.
-    def visitSignedAtom(self, ctx: ExprParser.SignedAtomContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by ExprParser#signedExpression.
-    def visitSignedExpression(self, ctx: ExprParser.SignedExpressionContext):
-        return self.visitChildren(ctx)
-
     # Visit a parse tree produced by ExprParser#shiftMuldiv.
     def visitShiftMuldiv(self, ctx: ExprParser.ShiftMuldivContext):
         return self.visitChildren(ctx)
@@ -110,12 +107,28 @@ class ExprVisitor(ParseTreeVisitor):
     def visitShiftAddsub(self, ctx: ExprParser.ShiftAddsubContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#rightExpression.
-    def visitRightExpression(self, ctx: ExprParser.RightExpressionContext):
+    # Visit a parse tree produced by ExprParser#signedOperand.
+    def visitSignedOperand(self, ctx: ExprParser.SignedOperandContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#rightOperand.
+    def visitRightOperand(self, ctx: ExprParser.RightOperandContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#rightMuldiv.
     def visitRightMuldiv(self, ctx: ExprParser.RightMuldivContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#rightPower.
+    def visitRightPower(self, ctx: ExprParser.RightPowerContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#rightPrimary.
+    def visitRightPrimary(self, ctx: ExprParser.RightPrimaryContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#rightExpression.
+    def visitRightExpression(self, ctx: ExprParser.RightExpressionContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#rightAtom.

@@ -25,6 +25,7 @@ from gems_craft.expression.equality import expressions_equal
 from gems_craft.expression.expression import (
     AllTimeSumNode,
     MultiplicationNode,
+    PowerNode,
     TimeEvalNode,
     TimeShiftNode,
 )
@@ -44,3 +45,16 @@ def test_copy_ast() -> None:
     )
     copy = copy_expression(ast)
     assert expressions_equal(ast, copy)
+
+
+def test_copy_power_ast() -> None:
+    ast = MultiplicationNode(
+        PowerNode(VariableNode("x"), LiteralNode(2)),
+        PowerNode(
+            ParameterNode("p"), AdditionNode([LiteralNode(1), ParameterNode("q")])
+        ),
+    )
+    copy = copy_expression(ast)
+    assert expressions_equal(ast, copy)
+    assert isinstance(copy, MultiplicationNode)
+    assert isinstance(copy.left, PowerNode)

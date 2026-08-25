@@ -27,6 +27,7 @@ from .expression import (
     MultiplicationNode,
     NegationNode,
     ParameterNode,
+    PowerNode,
     RoundNode,
     VariableNode,
     literal,

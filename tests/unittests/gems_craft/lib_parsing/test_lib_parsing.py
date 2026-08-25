@@ -275,6 +275,70 @@ library:
         resolve_library([input_lib])
 
 
+def test_power_of_variable_in_constraint_is_rejected() -> None:
+    lib_yaml = io.StringIO("""
+library:
+  id: basic
+  port-types: []
+  models:
+    - id: bad-model
+      variables:
+        - id: x
+          variable-type: continuous
+      parameters: []
+      ports: []
+      constraints:
+        - id: bad
+          expression: x^2 = 0
+""")
+    input_lib = parse_yaml_library(lib_yaml)
+    with pytest.raises(ValueError, match="Non-linear expression is not allowed"):
+        resolve_library([input_lib])
+
+
+def test_power_of_parameter_in_constraint_is_accepted() -> None:
+    lib_yaml = io.StringIO("""
+library:
+  id: basic
+  port-types: []
+  models:
+    - id: good-model
+      variables:
+        - id: x
+          variable-type: continuous
+      parameters:
+        - id: p
+      ports: []
+      constraints:
+        - id: good
+          expression: p^2 * x <= 2^p
+""")
+    input_lib = parse_yaml_library(lib_yaml)
+    resolve_library([input_lib])
+
+
+def test_variable_exponent_in_constraint_is_rejected() -> None:
+    lib_yaml = io.StringIO("""
+library:
+  id: basic
+  port-types: []
+  models:
+    - id: bad-model
+      variables:
+        - id: x
+          variable-type: continuous
+      parameters:
+        - id: p
+      ports: []
+      constraints:
+        - id: bad
+          expression: p^x = 0
+""")
+    input_lib = parse_yaml_library(lib_yaml)
+    with pytest.raises(ValueError, match="Non-linear expression is not allowed"):
+        resolve_library([input_lib])
+
+
 def test_reduced_cost_in_objective_is_rejected() -> None:
     lib_yaml = io.StringIO("""
 library:

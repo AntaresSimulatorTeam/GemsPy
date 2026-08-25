@@ -5,6 +5,11 @@ All notable changes to GemsPy are documented here.
 ## [Unreleased]
 
 ### Added
+- **Power operator `^` in the expression language** - right-associative, binding
+  tighter than unary minus and than `*` `/`, so `-2^2` is `-(2^2)`. Operands
+  must be literals or parameters, except in `extra-outputs` where a variable may
+  be raised to a power. The Python API gains `**` on `ExpressionNode`.
+
 - **Taxonomy conformance checked when a study is loaded** - `load_study` reads
   the optional `input/taxonomy.yml` and calls
   `validate_libraries_against_taxonomy` on every library declaring a `taxonomy`

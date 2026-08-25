@@ -101,6 +101,12 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             return left - right
         raise ValueError(f"Invalid operator {op}")
 
+    # Visit a parse tree produced by ExprParser#power.
+    def visitPower(self, ctx: ExprParser.PowerContext) -> ExpressionNode:
+        base = ctx.expr(0).accept(self)  # type: ignore
+        exponent = ctx.expr(1).accept(self)  # type: ignore
+        return base**exponent
+
     # Visit a parse tree produced by ExprParser#negation.
     def visitNegation(self, ctx: ExprParser.NegationContext) -> ExpressionNode:
         return -ctx.expr().accept(self)  # type: ignore
@@ -271,21 +277,16 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             return left / right
         raise ValueError(f"Invalid operator {op}")
 
-    # Visit a parse tree produced by ExprParser#signedExpression.
-    def visitSignedExpression(
-        self, ctx: ExprParser.SignedExpressionContext
+    # Visit a parse tree produced by ExprParser#signedOperand.
+    def visitSignedOperand(
+        self, ctx: ExprParser.SignedOperandContext
     ) -> ExpressionNode:
+        # The sign applies to a whole shift operand, not just to an atom, so
+        # that "t - 2^2" means "t - (2^2)" and not "t + ((-2)^2)".
+        operand = ctx.shift_operand().accept(self)  # type: ignore
         if ctx.op.text == "-":  # type: ignore
-            return -ctx.expr().accept(self)  # type: ignore
-        else:
-            return ctx.expr().accept(self)  # type: ignore
-
-    # Visit a parse tree produced by ExprParser#signedAtom.
-    def visitSignedAtom(self, ctx: ExprParser.SignedAtomContext) -> ExpressionNode:
-        if ctx.op.text == "-":  # type: ignore
-            return -ctx.atom().accept(self)  # type: ignore
-        else:
-            return ctx.atom().accept(self)  # type: ignore
+            return -operand
+        return operand
 
     # Visit a parse tree produced by ExprParser#rightExpression.
     def visitRightExpression(
@@ -307,6 +308,20 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     # Visit a parse tree produced by ExprParser#rightAtom.
     def visitRightAtom(self, ctx: ExprParser.RightAtomContext) -> ExpressionNode:
         return ctx.atom().accept(self)  # type: ignore
+
+    # Visit a parse tree produced by ExprParser#rightOperand.
+    def visitRightOperand(self, ctx: ExprParser.RightOperandContext) -> ExpressionNode:
+        return ctx.shift_operand().accept(self)  # type: ignore
+
+    # Visit a parse tree produced by ExprParser#rightPower.
+    def visitRightPower(self, ctx: ExprParser.RightPowerContext) -> ExpressionNode:
+        base = ctx.shift_primary().accept(self)  # type: ignore
+        exponent = ctx.shift_operand().accept(self)  # type: ignore
+        return base**exponent
+
+    # Visit a parse tree produced by ExprParser#rightPrimary.
+    def visitRightPrimary(self, ctx: ExprParser.RightPrimaryContext) -> ExpressionNode:
+        return ctx.shift_primary().accept(self)  # type: ignore
 
 
 _UNARY_FUNCTIONS = {
