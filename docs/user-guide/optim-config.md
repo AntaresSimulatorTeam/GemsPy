@@ -90,9 +90,8 @@ The total number of timesteps solved is `last-time-step − first-time-step + 1`
 Selects which Monte-Carlo scenarios to simulate.  Indices are **0-based**,
 consistent with the `modeler-scenariobuilder.dat` file convention.
 
-The base scenario set is defined by exactly one of two mutually exclusive
-keys: `include` (inline) or `playlist-file` (from a JSON file).  `exclude`
-is optional and applies to **either** form.
+The base scenario set is defined inline with `include`. `exclude` is optional
+and removes scenarios from the included set.
 
 ### Inline form (`include` / `exclude`)
 
@@ -139,63 +138,17 @@ scenario-scope:
 - Overlapping entries in `include` are deduplicated automatically.
 - Excludes that do not appear in the base set produce a warning and have no effect.
 - Output is always sorted in ascending order.
-- `exclude` cannot be used without `include` or `playlist-file`.
+- `exclude` cannot be used without `include`.
 
 **Default behaviour** (no `scenario-scope` key at all, or an empty block):
 runs scenario 0 only.
 
----
-
-### Playlist-file form (`playlist-file`)
-
-Point to a JSON file containing a flat array of 0-based integer scenario
-indices.  Useful when the list of scenarios is generated programmatically or
-is too large to embed in YAML.
-
-| Key | Type | Description |
-|---|---|---|
-| `playlist-file` | path | Path to a JSON playlist (relative to `optim-config.yml`) |
-
-~~~ yaml
-scenario-scope:
-  playlist-file: mc_playlist.json   # resolved relative to optim-config.yml
-~~~
-
-The referenced file must contain a flat JSON array of non-negative integers:
-
-~~~ json
-[0, 2, 4, 6, 8, 10, 12]
-~~~
-
-`exclude` can be combined with `playlist-file` to subtract specific scenarios
-at run time without modifying the file:
-
-~~~ yaml
-scenario-scope:
-  playlist-file: mc_playlist.json
-  exclude:
-    - 4
-    - "8-10"
-~~~
-
-GemsPy reads and validates the playlist eagerly when `load_optim_config()` is
-called, so any I/O or format errors surface immediately at load time.
-
-**Rules:**
-
-- The file must be a flat JSON array of integers (no booleans, strings, or objects).
-- All indices must be ≥ 0.
-- Duplicates are silently removed; the result is sorted ascending.
-- `include` and `playlist-file` are mutually exclusive.
-
----
-
 ### ScenarioBuilder cross-validation
 
 If a [scenario builder](scenario-builder.md) file is present,
-`validate_optim_config()` checks that every scenario index in the playlist is
-defined for every scenario group.  Out-of-bounds indices raise a `ValueError`
-listing the affected groups.
+`validate_optim_config()` checks that every selected scenario index is defined
+for every scenario group. Out-of-bounds indices raise a `ValueError` listing
+the affected groups.
 
 ---
 
@@ -533,12 +486,6 @@ config = OptimConfig(
         mode=ResolutionMode.SEQUENTIAL_SUBPROBLEMS,
         block_length=168,
     ),
-)
-
-# Build programmatically — playlist-file form
-config_pf = OptimConfig(
-    time_scope=TimeScopeConfig(first_time_step=0, last_time_step=8759),
-    scenario_scope=ScenarioScopeConfig(playlist_file=Path("mc_playlist.json")),
 )
 
 # Pass to SimulationSession

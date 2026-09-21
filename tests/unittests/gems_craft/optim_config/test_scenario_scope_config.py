@@ -10,9 +10,7 @@
 #
 # This file is part of the Antares project.
 
-import json
 import warnings
-from pathlib import Path
 
 import pytest
 
@@ -90,47 +88,9 @@ def test_exclude_orphan_raises_warning() -> None:
 
 def test_exclude_without_any_base_raises() -> None:
     with pytest.raises(
-        ValueError, match="'exclude' requires 'include' or 'playlist-file'"
+        ValueError, match="'exclude' requires 'include'"
     ):
         ScenarioScopeConfig(exclude=[0])
-
-
-# ---------------------------------------------------------------------------
-# playlist-file + exclude
-# ---------------------------------------------------------------------------
-
-
-def test_playlist_file_with_exclude(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([0, 1, 2, 3, 4]))
-    cfg = ScenarioScopeConfig(playlist_file=playlist, exclude=[2, 4])
-    assert cfg.scenario_ids == [0, 1, 3]
-
-
-def test_playlist_file_with_exclude_range(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([0, 1, 2, 3, 4, 5, 6]))
-    cfg = ScenarioScopeConfig(playlist_file=playlist, exclude=["2-4"])
-    assert cfg.scenario_ids == [0, 1, 5, 6]
-
-
-def test_playlist_file_with_exclude_all_leaves_empty(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([0, 1, 2]))
-    cfg = ScenarioScopeConfig(playlist_file=playlist, exclude=["0-2"])
-    assert cfg.scenario_ids == []
-
-
-def test_playlist_file_with_exclude_orphan_warns(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([0, 1, 2]))
-    cfg = ScenarioScopeConfig(playlist_file=playlist, exclude=[5])
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        result = cfg.scenario_ids
-    assert result == [0, 1, 2]
-    assert len(caught) == 1
-    assert "5" in str(caught[0].message)
 
 
 # ---------------------------------------------------------------------------
@@ -159,110 +119,13 @@ def test_include_reversed_range_raises() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Mutual exclusion
-# ---------------------------------------------------------------------------
-
-
-def test_include_and_playlist_file_mutually_exclusive() -> None:
-    with pytest.raises(ValueError, match="mutually exclusive"):
-        ScenarioScopeConfig(include=[0], playlist_file=Path("some.json"))
-
-
-# ---------------------------------------------------------------------------
-# Default behaviour (no include, no playlist_file)
+# Default behaviour (no include)
 # ---------------------------------------------------------------------------
 
 
 def test_default_returns_single_scenario_zero() -> None:
     cfg = ScenarioScopeConfig()
     assert cfg.scenario_ids == [0]
-
-
-# ---------------------------------------------------------------------------
-# Playlist file form
-# ---------------------------------------------------------------------------
-
-
-def test_playlist_file_flat_integers(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([0, 2, 4]))
-    cfg = ScenarioScopeConfig(playlist_file=playlist)
-    assert cfg.scenario_ids == [0, 2, 4]
-
-
-def test_playlist_file_deduplicates_and_sorts(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([4, 0, 2, 0, 4]))
-    cfg = ScenarioScopeConfig(playlist_file=playlist)
-    assert cfg.scenario_ids == [0, 2, 4]
-
-
-def test_playlist_file_single_scenario(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([1]))
-    cfg = ScenarioScopeConfig(playlist_file=playlist)
-    assert cfg.scenario_ids == [1]
-
-
-def test_playlist_file_zero_scenario(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([0]))
-    cfg = ScenarioScopeConfig(playlist_file=playlist)
-    assert cfg.scenario_ids == [0]
-
-
-def test_playlist_file_large_list(tmp_path: Path) -> None:
-    indices = list(range(1000))
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps(indices))
-    cfg = ScenarioScopeConfig(playlist_file=playlist)
-    assert cfg.scenario_ids == list(range(1000))
-
-
-def test_playlist_file_non_list_raises(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps({"scenarios": [0, 1]}))
-    cfg = ScenarioScopeConfig(playlist_file=playlist)
-    with pytest.raises(ValueError, match="flat JSON array of integers"):
-        cfg.scenario_ids
-
-
-def test_playlist_file_contains_string_raises(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([0, "1", 2]))
-    cfg = ScenarioScopeConfig(playlist_file=playlist)
-    with pytest.raises(ValueError, match="flat JSON array of integers"):
-        cfg.scenario_ids
-
-
-def test_playlist_file_negative_index_raises(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([-1, 0, 1]))
-    cfg = ScenarioScopeConfig(playlist_file=playlist)
-    with pytest.raises(ValueError, match=">= 0"):
-        cfg.scenario_ids
-
-
-def test_playlist_file_not_found_raises(tmp_path: Path) -> None:
-    cfg = ScenarioScopeConfig(playlist_file=tmp_path / "missing.json")
-    with pytest.raises(ValueError, match="not found"):
-        cfg.scenario_ids
-
-
-def test_playlist_file_malformed_json_raises(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text("not valid json {{")
-    cfg = ScenarioScopeConfig(playlist_file=playlist)
-    with pytest.raises(ValueError, match="Invalid JSON"):
-        cfg.scenario_ids
-
-
-def test_playlist_file_boolean_values_rejected(tmp_path: Path) -> None:
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([True, 1, 2]))
-    cfg = ScenarioScopeConfig(playlist_file=playlist)
-    with pytest.raises(ValueError, match="flat JSON array of integers"):
-        cfg.scenario_ids
 
 
 # ---------------------------------------------------------------------------
@@ -284,22 +147,6 @@ def test_yaml_inline_include_exclude() -> None:
         {"scenario-scope": {"include": ["0-4"], "exclude": [2]}}
     )
     assert cfg.scenario_scope.scenario_ids == [0, 1, 3, 4]
-
-
-def test_yaml_playlist_file_relative_resolved_by_load_optim_config(
-    tmp_path: Path,
-) -> None:
-    from gems_craft.optim_config.parsing import load_optim_config
-
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([0, 1, 2]))
-
-    config_file = tmp_path / "optim-config.yml"
-    config_file.write_text("scenario-scope:\n  playlist-file: playlist.json\n")
-
-    cfg = load_optim_config(config_file)
-    assert cfg is not None
-    assert cfg.scenario_scope.scenario_ids == [0, 1, 2]
 
 
 def test_yaml_nb_scenarios_rejected() -> None:
@@ -361,23 +208,6 @@ def test_scenario_ids_cached_inline() -> None:
     assert first is second
 
 
-def test_scenario_ids_cached_playlist_file_via_load_optim_config(
-    tmp_path: Path,
-) -> None:
-    from gems_craft.optim_config.parsing import load_optim_config
-
-    playlist = tmp_path / "playlist.json"
-    playlist.write_text(json.dumps([0, 1, 2]))
-    config_file = tmp_path / "optim-config.yml"
-    config_file.write_text("scenario-scope:\n  playlist-file: playlist.json\n")
-
-    cfg = load_optim_config(config_file)
-    assert cfg is not None
-    playlist.unlink()  # delete the file — ids already cached at load time
-    assert cfg.scenario_scope.scenario_ids == [0, 1, 2]
-    assert cfg.scenario_scope.scenario_ids is cfg.scenario_scope.scenario_ids
-
-
 # ---------------------------------------------------------------------------
 # validate_optim_config — ScenarioBuilder cross-check
 # ---------------------------------------------------------------------------
@@ -402,7 +232,7 @@ def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
         validate_optim_config(config, system, sb)
 
 
-def test_validate_optim_config_scenario_builder_accepts_valid_playlist() -> None:
+def test_validate_optim_config_scenario_builder_accepts_valid_scenario_ids() -> None:
     import numpy as np
 
     from gems_craft.optim_config.parsing import OptimConfig
