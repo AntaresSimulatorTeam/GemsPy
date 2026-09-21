@@ -10,7 +10,6 @@
 #
 # This file is part of the Antares project.
 
-import json
 import re
 import warnings
 from enum import Enum
@@ -300,34 +299,23 @@ def _expand_entries(entries: List[Union[int, str]]) -> Set[int]:
 class ScenarioScopeConfig(ModifiedBaseModel):
     """Declares which Monte-Carlo scenarios to simulate.
 
-    Two mutually exclusive ways to define the base scenario set:
-
-    - **Inline** (``include``): a list of 0-based integers, string-integers,
-      and/or ``"a-b"`` range strings.
-    - **File** (``playlist_file``): path to a flat JSON array of 0-based
-      integers, resolved relative to ``optim-config.yml`` by
-      ``load_optim_config()``.
-
-    ``exclude`` is optional and compatible with *both* forms.  It subtracts a
-    set of scenarios from the base set using the same entry format.  Entries
-    in ``exclude`` that are not in the base set are silently ignored (a
+    ``include`` is a list of 0-based integers, string-integers, and/or
+    ``"a-b"`` range strings. ``exclude`` is optional and subtracts a set of
+    scenarios from the included set using the same entry format. Entries in
+    ``exclude`` that are not in the included set are silently ignored (a
     ``UserWarning`` is emitted).
 
-    ``include`` and ``playlist_file`` are mutually exclusive.
-    ``exclude`` without any base set raises ``ValueError``.
+    ``exclude`` without ``include`` raises ``ValueError``.
 
     All indices are 0-based, consistent with
     ``modeler-scenariobuilder.dat``.
 
-    The resolved list is computed lazily on first access to
-    ``scenario_ids`` and cached for the lifetime of the object.
-    ``load_optim_config()`` triggers eager resolution so that file I/O
-    errors surface at load time.
+    The resolved list is computed lazily on first access to ``scenario_ids``
+    and cached for the lifetime of the object.
     """
 
     include: Optional[List[Union[int, str]]] = None
     exclude: Optional[List[Union[int, str]]] = None
-    playlist_file: Optional[Path] = None
 
     _scenario_ids: Optional[List[int]] = PrivateAttr(default=None)
 
@@ -345,11 +333,8 @@ class ScenarioScopeConfig(ModifiedBaseModel):
     @model_validator(mode="after")
     def _check_constraints(self) -> "ScenarioScopeConfig":
         has_inline = self.include is not None
-        has_file = self.playlist_file is not None
-        if has_inline and has_file:
-            raise ValueError("'include' and 'playlist-file' are mutually exclusive")
-        if self.exclude is not None and not has_inline and not has_file:
-            raise ValueError("'exclude' requires 'include' or 'playlist-file'")
+        if self.exclude is not None and not has_inline:
+            raise ValueError("'exclude' requires 'include'")
         return self
 
     @property
@@ -359,9 +344,7 @@ class ScenarioScopeConfig(ModifiedBaseModel):
         return self._scenario_ids
 
     def _compute_scenario_ids(self) -> List[int]:
-        if self.playlist_file is not None:
-            included = self._load_playlist()
-        elif self.include is not None:
+        if self.include is not None:
             included = _expand_entries(self.include)
         else:
             return [0]
@@ -380,28 +363,6 @@ class ScenarioScopeConfig(ModifiedBaseModel):
 
         return sorted(included)
 
-    def _load_playlist(self) -> Set[int]:
-        try:
-            with self.playlist_file.open() as f:  # type: ignore[union-attr]
-                data = json.load(f)
-        except FileNotFoundError:
-            raise ValueError(f"Playlist file not found: '{self.playlist_file}'")
-        except json.JSONDecodeError as exc:
-            raise ValueError(
-                f"Invalid JSON in playlist file '{self.playlist_file}': {exc}"
-            ) from exc
-        if not isinstance(data, list) or not all(
-            isinstance(x, int) and not isinstance(x, bool) for x in data
-        ):
-            raise ValueError(
-                f"'{self.playlist_file}' must contain a flat JSON array of integers"
-            )
-        if any(x < 0 for x in data):
-            raise ValueError(
-                f"'{self.playlist_file}': all scenario indices must be >= 0"
-            )
-        return set(data)
-
 
 class OptimConfig(ModifiedBaseModel):
     time_scope: TimeScopeConfig = Field(default_factory=TimeScopeConfig)
@@ -412,17 +373,9 @@ class OptimConfig(ModifiedBaseModel):
 
 
 def load_optim_config(config_path: Path) -> Optional[OptimConfig]:
-    """Load and fully resolve an ``optim-config.yml`` file.
+    """Load an ``optim-config.yml`` file.
 
     Returns ``None`` if the file does not exist.
-    Raises ``ValueError`` on any parsing, validation, or playlist I/O failure.
-
-    Beyond plain YAML parsing, this function:
-
-    - Resolves a relative ``playlist-file`` path against the directory that
-      contains the config file.
-    - Eagerly populates ``scenario_ids`` so that playlist file errors surface
-      immediately rather than at first use.
     """
     if not config_path.exists():
         return None
@@ -432,11 +385,4 @@ def load_optim_config(config_path: Path) -> Optional[OptimConfig]:
     except ValidationError as e:
         raise ValueError(f"Invalid {config_path.stem}: {e}")
 
-    pf = config.scenario_scope.playlist_file
-    if pf is not None and not pf.is_absolute():
-        config.scenario_scope.playlist_file = config_path.parent / pf
-
-    # Resolve and cache scenario_ids eagerly so that the playlist file is read
-    # exactly once and any I/O or format errors surface at load time.
-    _ = config.scenario_scope.scenario_ids
     return config
