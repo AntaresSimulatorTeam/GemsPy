@@ -87,9 +87,7 @@ def test_exclude_orphan_raises_warning() -> None:
 
 
 def test_exclude_without_any_base_raises() -> None:
-    with pytest.raises(
-        ValueError, match="'exclude' requires 'include'"
-    ):
+    with pytest.raises(ValueError, match="'exclude' requires 'include'"):
         ScenarioScopeConfig(exclude=[0])
 
 
