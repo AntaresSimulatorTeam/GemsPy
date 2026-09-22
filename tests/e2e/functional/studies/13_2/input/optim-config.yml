@@ -13,6 +13,9 @@ time-scope:
   first-time-step: 0
   last-time-step: 0
 
+resolution:
+  mode: benders-decomposition
+
 solver-options:
   name: highs
   logs: true

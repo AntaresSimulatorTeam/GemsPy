@@ -50,20 +50,24 @@ def _master_coupling_row(
     )
 
 
-def _subproblem_coupling_row(
+def _subproblem_coupling_rows(
     decomposed: "DecomposedProblems",
     model_id: str,
     var_id: str,
     comp_id: str,
-) -> Optional[CouplingRow]:
-    labels = decomposed.subproblem.get_variable_labels(model_id, var_id)
-    if labels is None:
-        return None
-    return CouplingRow(
-        problem_id=decomposed.subproblem.name,
-        component_id=comp_id,
-        variable_int_id=int(labels.sel(component=comp_id).item()),
-    )
+) -> List[CouplingRow]:
+    rows: List[CouplingRow] = []
+    for subproblem in decomposed.subproblems:
+        labels = subproblem.get_variable_labels(model_id, var_id)
+        if labels is not None:
+            rows.append(
+                CouplingRow(
+                    problem_id=subproblem.name,
+                    component_id=comp_id,
+                    variable_int_id=int(labels.sel(component=comp_id).item()),
+                )
+            )
+    return rows
 
 
 def _coupling_rows_for_variable(
@@ -71,14 +75,17 @@ def _coupling_rows_for_variable(
     model_id: str,
     var_id: str,
 ) -> List[CouplingRow]:
+    study = (
+        decomposed.master.study
+        if decomposed.master is not None
+        else decomposed.subproblems[0].study
+    )
     rows: List[CouplingRow] = []
-    for comp in decomposed.subproblem.study.model_components.get(model_id, []):
-        for row in (
-            _master_coupling_row(decomposed, model_id, var_id, comp.id),
-            _subproblem_coupling_row(decomposed, model_id, var_id, comp.id),
-        ):
-            if row is not None:
-                rows.append(row)
+    for comp in study.model_components.get(model_id, []):
+        master_row = _master_coupling_row(decomposed, model_id, var_id, comp.id)
+        if master_row is not None:
+            rows.append(master_row)
+        rows.extend(_subproblem_coupling_rows(decomposed, model_id, var_id, comp.id))
     return rows
 
 

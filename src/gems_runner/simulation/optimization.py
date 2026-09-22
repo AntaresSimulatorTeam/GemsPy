@@ -1097,56 +1097,85 @@ class DecomposedProblems:
 
     Attributes
     ----------
-    subproblem:
-        OptimizationProblem containing all elements whose location is
-        ``subproblems`` or ``master-and-subproblems``.
+    subproblems:
+        One OptimizationProblem per ``(scenario, block)`` pair, each
+        containing every element whose declared location is ``subproblems``
+        (the default) or ``master-and-subproblems``, ordered scenario-major,
+        block-minor. A single-element list (one scenario, one block) is the
+        non-decomposed-time-horizon case.
     master:
         OptimizationProblem containing all elements whose location is
         ``master`` or ``master-and-subproblems``.  ``None`` when the
         optim-config declares no master-side elements.
     """
 
-    subproblem: OptimizationProblem
+    subproblems: List[OptimizationProblem]
     master: Optional[OptimizationProblem]
 
 
 def build_decomposed_problems(
     study: Study,
-    block: TimeBlock,
+    blocks: List[TimeBlock],
     scenario_ids: List[int],
     optim_config: "OptimConfig",
     *,
-    subproblem_name: str = "subproblem",
+    master_block: Optional[TimeBlock] = None,
     master_name: str = "master",
+    subproblem_name_fn: Optional[Callable[[int, TimeBlock], str]] = None,
 ) -> DecomposedProblems:
-    """Build master and subproblem OptimizationProblems according to *optim_config*.
+    """Build a master and one subproblem per ``(scenario_id, block)`` pair.
 
-    The subproblem is always built; it contains every element whose declared
-    location is ``subproblems`` (the default) or ``master-and-subproblems``.
+    One subproblem is built for every ``(scenario_id, block)`` combination in
+    ``scenario_ids`` x ``blocks``; each contains every element whose declared
+    location is ``subproblems`` (the default) or ``master-and-subproblems``,
+    built with a single scenario (no carry-over — blocks are treated as
+    independent). ``blocks`` is normally produced by
+    :func:`~gems_runner.simulation.time_block.compute_blocks`.
 
     The master is built only when at least one element in *optim_config* has
-    location ``master`` or ``master-and-subproblems``.
+    location ``master`` or ``master-and-subproblems``. It is always built over
+    the full time horizon and every scenario in *scenario_ids* — never split
+    per block, since master elements are time-independent (see
+    ``validate_optim_config``). *master_block* defaults to a block spanning
+    the union of *blocks*' timesteps when not given explicitly.
 
     Per-constraint out-of-bounds-processing rules (cyclic vs. drop) defined
     in the ``out-of-bounds-processing`` section of optim-config are applied
-    to both the subproblem and the master.  Constraints not listed default to
-    cyclic wrap-around.
+    to both the master and every subproblem. Constraints not listed default
+    to cyclic wrap-around.
 
     Parameters
     ----------
     study:
         Container holding both the System and the DataBase.
         Same semantics as :func:`build_problem`.
-    block, scenario_ids:
-        Same semantics as :func:`build_problem`.
+    blocks, scenario_ids:
+        The blocks and MC scenario indices to build subproblems for; the
+        cartesian product of the two determines the subproblem count.
     optim_config:
         Parsed ``OptimConfig`` from an ``optim-config.yml`` file.
-    subproblem_name, master_name:
-        Labels used for the underlying linopy models.
+    master_block:
+        Time block the master is built over; defaults to the union of
+        *blocks*' timesteps.
+    master_name:
+        Label used for the master's underlying linopy model.
+    subproblem_name_fn:
+        Maps ``(scenario_id, block)`` to a subproblem name; defaults to
+        ``f"subproblem_y{scenario_id}_w{block.id}"``.
     """
     from gems_craft.optim_config.parsing import ElementLocation
 
     check_data_requirements(study)
+
+    combos = [(sid, block) for sid in scenario_ids for block in blocks]
+    if subproblem_name_fn is None:
+        subproblem_name_fn = (
+            lambda sid, block: f"subproblem_y{sid}_w{block.id}"
+        )  # noqa: E731
+
+    if master_block is None:
+        all_timesteps = sorted({t for b in blocks for t in b.timesteps})
+        master_block = TimeBlock(0, all_timesteps)
 
     oob_filter = OutOfBoundsFilter(optim_config)
 
@@ -1159,29 +1188,30 @@ def build_decomposed_problems(
         ElementLocation.MASTER_AND_SUBPROBLEMS,
     }
 
-    oob_filter = OutOfBoundsFilter(optim_config)
-
-    subproblem = _OptimizationProblemBuilder(
-        name=subproblem_name,
-        study=study,
-        block=block,
-        scenario_ids=scenario_ids,
-        location_filter=DecompositionFilter(optim_config, sub_locs),
-        oob_filter=oob_filter,
-    ).build()
-
     master: Optional[OptimizationProblem] = None
     if _has_any_master_element(optim_config):
         master = _OptimizationProblemBuilder(
             name=master_name,
             study=study,
-            block=block,
+            block=master_block,
             scenario_ids=scenario_ids,
             location_filter=DecompositionFilter(optim_config, master_locs),
             oob_filter=oob_filter,
         ).build()
 
-    return DecomposedProblems(subproblem=subproblem, master=master)
+    subproblems = [
+        _OptimizationProblemBuilder(
+            name=subproblem_name_fn(sid, block),
+            study=study,
+            block=block,
+            scenario_ids=[sid],
+            location_filter=DecompositionFilter(optim_config, sub_locs),
+            oob_filter=oob_filter,
+        ).build()
+        for sid, block in combos
+    ]
+
+    return DecomposedProblems(subproblems=subproblems, master=master)
 
 
 def _has_any_master_element(config: "OptimConfig") -> bool:

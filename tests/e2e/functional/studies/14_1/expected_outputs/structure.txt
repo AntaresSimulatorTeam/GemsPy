@@ -1,0 +1,5 @@
+                  master                  continuous_generator_candidate        0
+        subproblem_y0_w0                  continuous_generator_candidate        4
+        subproblem_y0_w1                  continuous_generator_candidate        4
+        subproblem_y1_w0                  continuous_generator_candidate        4
+        subproblem_y1_w1                  continuous_generator_candidate        4

@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 
+from .benders_export import export_benders_problem
 from .couplings import CouplingRow, build_couplings, dump_couplings
 from .optimization import (
     DecomposedProblems,
@@ -21,4 +22,4 @@ from .optimization import (
 )
 from .runner import BendersRunner
 from .simulation_table import SimulationColumns, SimulationTableBuilder
-from .time_block import TimeBlock
+from .time_block import TimeBlock, compute_blocks
