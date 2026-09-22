@@ -102,15 +102,14 @@ def test_out_of_bounds_processing(study_id: str, expected_objective: float) -> N
     time_block = TimeBlock(1, [0, 1, 2])
     scenarios = [0]
 
-    decomposed = build_decomposed_problems(study, time_block, scenarios, optim_config)
-    decomposed.subproblem.solve(solver_name="highs")
+    decomposed = build_decomposed_problems(study, [time_block], scenarios, optim_config)
+    subproblem = decomposed.subproblems[0]
+    subproblem.solve(solver_name="highs")
 
     passed = False
     try:
-        assert decomposed.subproblem.termination_condition == "optimal"
-        assert decomposed.subproblem.objective_value == pytest.approx(
-            expected_objective
-        )
+        assert subproblem.termination_condition == "optimal"
+        assert subproblem.objective_value == pytest.approx(expected_objective)
         passed = True
     finally:
         if not passed:
@@ -119,18 +118,14 @@ def test_out_of_bounds_processing(study_id: str, expected_objective: float) -> N
             study_path = STUDIES_DIR / study_id
             output_dir = study_path / "output"
             output_dir.mkdir(parents=True, exist_ok=True)
-            decomposed.subproblem.export_lp(
-                output_dir / f"{study_path.stem}_{timestamp}.lp"
-            )
-            decomposed.subproblem.export_lp(
-                output_dir / f"{study_path.stem}_{timestamp}.mps"
-            )
+            subproblem.export_lp(output_dir / f"{study_path.stem}_{timestamp}.lp")
+            subproblem.export_lp(output_dir / f"{study_path.stem}_{timestamp}.mps")
             builder = SimulationTableBuilder(simulation_id=study_path.stem)
-            st = builder.build(decomposed.subproblem)
+            st = builder.build(subproblem)
             st.write_csv(
                 output_dir=output_dir,
                 simulation_id=f"{study_path.stem}_{timestamp}",
-                optim_nb=decomposed.subproblem.block.id,
+                optim_nb=subproblem.block.id,
             )
 
 
@@ -171,8 +166,8 @@ def test_constraint_instantiation(study_id: str) -> None:
     config_path = STUDIES_DIR / study_id / "input" / "optim-config.yml"
     optim_config = load_optim_config(config_path)
     time_block = TimeBlock(1, [0, 1, 2])
-    decomposed = build_decomposed_problems(study, time_block, [0], optim_config)
-    linopy_model = decomposed.subproblem.linopy_model
+    decomposed = build_decomposed_problems(study, [time_block], [0], optim_config)
+    linopy_model = decomposed.subproblems[0].linopy_model
 
     expected = _EXPECTED_CONSTRAINT_COUNTS[study_id]
     for constraint_name, expected_count in expected.items():

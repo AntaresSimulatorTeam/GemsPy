@@ -220,7 +220,7 @@ optimisation subproblems.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `mode` | str | `"frontal"` | Resolution strategy (see below) |
-| `block-length` | int | — | Timesteps per window; required for windowed modes |
+| `block-length` | int | — | Timesteps per window; required for `sequential-subproblems`/`parallel-subproblems`, optional for `benders-decomposition` (full-horizon-per-scenario subproblems if omitted) |
 | `block-overlap` | int | `0` | Sequential mode only (rejected in other modes): shared timesteps between consecutive blocks; must satisfy `0 <= block-overlap < block-length` |
 | `carry-over-length` | int | `block-overlap` | Sequential mode only (rejected in other modes): how many of the shared timesteps are pinned to the previous block's values; must satisfy `0 <= carry-over-length <= block-overlap` |
 
@@ -340,13 +340,28 @@ resolution:
 
 ### `benders-decomposition`
 
-A Benders decomposition is applied via AntaresXpansion.  Investment decisions
-are placed in a master problem; operational subproblems are solved per scenario.
+A Benders decomposition is applied via AntaresXpansion. Investment decisions
+are placed in a single master problem, solved once over the full horizon and
+every scenario. Operational subproblems are solved independently for every
+`(scenario, block)` pair: one subproblem per Monte Carlo year per
+`block-length`-timestep window, exactly as `parallel-subproblems`' "independent
+windows" — no carry-over between blocks, since Benders subproblems must be
+solvable independently of one another. If `block-length` is omitted, each
+scenario becomes a single subproblem spanning the full horizon.
 
 ~~~ yaml
 resolution:
   mode: benders-decomposition
+  block-length: 168       # optional; splits each scenario into per-week subproblems
 ~~~
+
+`block-overlap` and `carry-over-length` are rejected at config-load time in
+this mode, for the same reason they're absent from `parallel-subproblems`:
+Benders subproblems carry no state across blocks.
+
+Master and subproblem `.mps` files, the coupling `structure.txt`, and the
+AntaresXpansion `options.json` are all generated automatically before the
+external `benders` binary is invoked.
 
 ---
 

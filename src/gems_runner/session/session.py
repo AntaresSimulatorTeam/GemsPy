@@ -33,7 +33,7 @@ from gems_runner.simulation.simulation_table import (
     SimulationTableBuilder,
     merge_simulation_tables,
 )
-from gems_runner.simulation.time_block import TimeBlock
+from gems_runner.simulation.time_block import TimeBlock, compute_blocks
 
 
 class SimulationSession:
@@ -128,30 +128,14 @@ class SimulationSession:
 
     def _run_parallel(self) -> SimulationTable:
         cfg = self.optim_config.resolution
-        block_length: int = cfg.block_length  # type: ignore[assignment]
+        blocks = compute_blocks(
+            self.optim_config.time_scope.first_time_step,
+            self.optim_config.time_scope.last_time_step,
+            cfg.block_length,
+        )
 
         tables: List[SimulationTable] = []
         for scenario_id in self.scenario_ids:
-            starts = range(
-                self.optim_config.time_scope.first_time_step,
-                self.optim_config.time_scope.last_time_step + 1,
-                block_length,
-            )
-            blocks = [
-                TimeBlock(
-                    i,
-                    list(
-                        range(
-                            t,
-                            min(
-                                t + block_length,
-                                self.optim_config.time_scope.last_time_step + 1,
-                            ),
-                        )
-                    ),
-                )
-                for i, t in enumerate(starts)
-            ]
             for block in blocks:
                 _, table = self._run_block(block, scenario_ids=[scenario_id])
                 tables.append(table)
@@ -161,35 +145,35 @@ class SimulationSession:
     def _run_benders(self) -> SimulationTable:
         import pandas as pd
 
-        from gems_runner.simulation import (
-            BendersRunner,
-            build_couplings,
-            build_decomposed_problems,
-            dump_couplings,
-        )
+        from gems_runner.simulation import BendersRunner, build_decomposed_problems
+        from gems_runner.simulation.benders_export import export_benders_problem
 
-        block = TimeBlock(
-            1,
-            list(
-                range(
-                    self.optim_config.time_scope.first_time_step,
-                    self.optim_config.time_scope.last_time_step + 1,
-                )
-            ),
-        )
+        cfg = self.optim_config.resolution
+        first = self.optim_config.time_scope.first_time_step
+        last = self.optim_config.time_scope.last_time_step
+
+        master_block = TimeBlock(0, list(range(first, last + 1)))
+        week_blocks = compute_blocks(first, last, cfg.block_length)
+
         decomposed = build_decomposed_problems(
-            self.study, block, self.scenario_ids, self.optim_config
+            self.study,
+            week_blocks,
+            self.scenario_ids,
+            self.optim_config,
+            master_block=master_block,
         )
 
-        if decomposed.master is not None and self.output_dir is not None:
-            dump_couplings(
-                build_couplings(decomposed, self.optim_config), self.output_dir
-            )
-            BendersRunner(emplacement=self.output_dir).run()
-        else:
+        if decomposed.master is None or self.output_dir is None:
             raise RuntimeError(
                 "Benders decomposition requires a master problem and an output directory for coupling files."
             )
+        export_benders_problem(
+            decomposed,
+            self.optim_config,
+            self.output_dir,
+            n_scenarios=len(self.scenario_ids),
+        )
+        BendersRunner(emplacement=self.output_dir).run()
         return SimulationTable(pd.DataFrame())
 
     # ------------------------------------------------------------------

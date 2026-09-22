@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RTE (https://www.rte-france.com)
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
 #
 # See AUTHORS.txt
 #
@@ -11,10 +11,11 @@
 # This file is part of the Antares project.
 time-scope:
   first-time-step: 0
-  last-time-step: 0
+  last-time-step: 3
 
 resolution:
   mode: benders-decomposition
+  block-length: 2
 
 solver-options:
   name: highs
@@ -24,9 +25,10 @@ solver-options:
 scenario-scope:
   include:
     - 0
+    - 1
 
 models:
-  - id: lib_example_13_1.generator_with_continuous_invest
+  - id: lib_example_14_1.generator_with_continuous_invest
     model-decomposition:
       variables:
         - id: p_max
