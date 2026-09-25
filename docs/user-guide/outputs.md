@@ -79,7 +79,22 @@ value_s0_t1 = sub[(sub["scenario_index"] == 0) & (sub["block_time_index"] == 1)]
 
 ~~~ python
 results.to_csv(Path("output/"))       # writes one CSV per component
-results.to_parquet(Path("output/"))   # writes Parquet files
+results.to_parquet(Path("output/"))   # writes a zstd-compressed Parquet file
 results.to_netcdf(Path("output/"))    # writes a NetCDF file
 ds = results.to_dataset()             # returns an xarray Dataset
 ~~~
+
+Parquet files are written with zstd compression (level 3) and row groups of
+64,000 rows, the same settings as GEMS-ViewsBuilder.
+
+### Choosing the output format from the CLI
+
+`gemspy` writes the simulation table as CSV by default. Use `--output-format`
+to write Parquet instead:
+
+~~~ bash
+gemspy --study path/to/study_dir --output-format parquet
+~~~
+
+The equivalent Python call is
+`run_study(Path("path/to/study_dir"), output_format="parquet")`.
