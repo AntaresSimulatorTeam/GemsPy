@@ -173,3 +173,39 @@ def test_scalar_output_has_none_time_and_scenario_indices() -> None:
     assert pd.isna(rows.iloc[0][SimulationColumns.BLOCK_TIME_INDEX.value])
     assert pd.isna(rows.iloc[0][SimulationColumns.SCENARIO_INDEX.value])
     assert rows.iloc[0][SimulationColumns.VALUE.value] == 99.0
+
+
+def _make_scenario_independent_problem() -> "FakeProblem":
+    """A var with no scenario dim: [component=1, time=2]."""
+    da = xr.DataArray(
+        np.array([[10.0, 20.0]]),
+        dims=["component", "time"],
+        coords={"component": ["compA"], "time": [0, 1]},
+    )
+    return _make_problem_with_da(da)
+
+
+def test_single_scenario_problem_tags_all_rows_with_its_scenario() -> None:
+    """A problem solved for one MC scenario (sequential/parallel modes) owns all
+    its rows: scenario-independent outputs and the objective value get its id."""
+    st = SimulationTableBuilder().build(
+        _make_scenario_independent_problem(), scenario_ids_remap=[3]  # type: ignore[arg-type]
+    )
+    scenario_col = st.data[SimulationColumns.SCENARIO_INDEX.value]
+    outputs = st.data[SimulationColumns.OUTPUT.value]
+
+    assert list(scenario_col[outputs == "p"]) == [3, 3]
+    assert list(scenario_col[outputs == "objective-value"]) == [3]
+
+
+def test_multi_scenario_problem_keeps_shared_rows_without_scenario() -> None:
+    """In a problem covering several MC scenarios (frontal mode), scenario-
+    independent outputs and the objective value are shared: no scenario index."""
+    st = SimulationTableBuilder().build(
+        _make_scenario_independent_problem(), scenario_ids_remap=[0, 1]  # type: ignore[arg-type]
+    )
+    shared_outputs = st.data[SimulationColumns.OUTPUT.value].isin(
+        ["p", "objective-value"]
+    )
+
+    assert st.data[shared_outputs][SimulationColumns.SCENARIO_INDEX.value].isna().all()

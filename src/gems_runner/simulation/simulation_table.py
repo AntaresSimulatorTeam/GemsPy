@@ -226,7 +226,16 @@ class SimulationTableBuilder:
         )
         dfs.append(self._collect_objective_value(problem, block))
 
-        return SimulationTable(pd.concat(dfs, ignore_index=True), table_id=table_id)
+        df = pd.concat(dfs, ignore_index=True)
+        if scenario_ids_remap is not None and len(scenario_ids_remap) == 1:
+            # The problem was solved for a single MC scenario (always the case in
+            # sequential/parallel modes), so every row belongs to it, including
+            # scenario-independent outputs and the objective value. A missing
+            # scenario index would wrongly mean "shared by all scenarios".
+            scenario_col = SimulationColumns.SCENARIO_INDEX.value
+            df[scenario_col] = df[scenario_col].fillna(scenario_ids_remap[0])
+
+        return SimulationTable(df, table_id=table_id)
 
     # -------------------------------------------------------------------------
     # Solver outputs
