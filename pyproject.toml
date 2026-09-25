@@ -40,6 +40,7 @@ dependencies = [
     "highspy>=1.14",
     "pandas>=2.2",
     "attrs>=26.0",
+    "pyarrow>=15.0",
 ]
 classifiers = [
    #    Classifiers here: https://pypi.org/classifiers/
@@ -71,7 +72,6 @@ where = ["src"]
 
 [dependency-groups]
 dev = [
-    "pyarrow",
     "pytest>=9.0.3",
     "mypy>=1.7",
     "black>=24.0",
