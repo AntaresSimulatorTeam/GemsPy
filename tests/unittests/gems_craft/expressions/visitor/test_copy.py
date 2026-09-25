@@ -25,6 +25,8 @@ from gems_craft.expression.equality import expressions_equal
 from gems_craft.expression.expression import (
     AllTimeSumNode,
     MultiplicationNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
 )
@@ -44,3 +46,17 @@ def test_copy_ast() -> None:
     )
     copy = copy_expression(ast)
     assert expressions_equal(ast, copy)
+
+
+def test_copy_set_index_sum_over() -> None:
+    bare = SetIndexNode(VariableNode("x"), "fuel")
+    assert expressions_equal(bare, copy_expression(bare))
+
+    positioned = SetIndexNode(VariableNode("x"), "fuel", position=LiteralNode(2))
+    assert expressions_equal(positioned, copy_expression(positioned))
+
+    shifted = SetIndexNode(VariableNode("x"), "fuel", relative_shift=LiteralNode(1))
+    assert expressions_equal(shifted, copy_expression(shifted))
+
+    aggregated = SumOverNode(VariableNode("x"), "fuel")
+    assert expressions_equal(aggregated, copy_expression(aggregated))

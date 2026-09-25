@@ -27,6 +27,8 @@ from gems_craft.expression.expression import (
     PortFieldNode,
     ReducedCostNode,
     RoundNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -91,6 +93,12 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         return visit(node.operand, self)
 
     def all_time_sum(self, node: AllTimeSumNode) -> int | float:
+        return visit(node.operand, self)
+
+    def set_index(self, node: SetIndexNode) -> int | float:
+        return visit(node.operand, self)
+
+    def sum_over(self, node: SumOverNode) -> int | float:
         return visit(node.operand, self)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> int | float:

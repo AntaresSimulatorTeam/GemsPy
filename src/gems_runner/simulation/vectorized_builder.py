@@ -62,6 +62,8 @@ from gems_craft.expression.expression import (
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -315,6 +317,22 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         return operand * self.block_length  # type: ignore[operator,return-value]
 
     # ------------------------------------------------------------------ #
+    # Custom-set operators (not yet supported — see custom sets & indexing #
+    # design; implementing these requires threading a per-set dim through  #
+    # param_arrays/port_arrays first)                                      #
+    # ------------------------------------------------------------------ #
+
+    def set_index(self, node: SetIndexNode) -> VectorizedExpr:
+        raise NotImplementedError(
+            "Custom-set indexing is not yet supported by the vectorized builder."
+        )
+
+    def sum_over(self, node: SumOverNode) -> VectorizedExpr:
+        raise NotImplementedError(
+            "sum_over() is not yet supported by the vectorized builder."
+        )
+
+    # ------------------------------------------------------------------ #
     # Scenario operators                                                    #
     # ------------------------------------------------------------------ #
 
@@ -548,6 +566,12 @@ class _ShiftAmountEvaluator(ExpressionVisitorOperations[xr.DataArray]):
     def all_time_sum(self, node: AllTimeSumNode) -> xr.DataArray:
         raise NotImplementedError
 
+    def set_index(self, node: SetIndexNode) -> xr.DataArray:
+        raise NotImplementedError
+
+    def sum_over(self, node: SumOverNode) -> xr.DataArray:
+        raise NotImplementedError
+
     def scenario_operator(self, node: ScenarioOperatorNode) -> xr.DataArray:
         raise NotImplementedError
 
@@ -727,6 +751,12 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         )
 
     def all_time_sum(self, node: AllTimeSumNode) -> Optional[xr.DataArray]:
+        return visit(node.operand, self)
+
+    def set_index(self, node: SetIndexNode) -> Optional[xr.DataArray]:
+        return visit(node.operand, self)
+
+    def sum_over(self, node: SumOverNode) -> Optional[xr.DataArray]:
         return visit(node.operand, self)
 
     def time_eval(self, node: TimeEvalNode) -> Optional[xr.DataArray]:

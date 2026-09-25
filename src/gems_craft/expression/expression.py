@@ -118,6 +118,24 @@ class ExpressionNode:
     def eval(self, time: AnyExpression) -> "ExpressionNode":
         return TimeEvalNode(self, _wrap_in_node(time))
 
+    def set_index(
+        self,
+        set_id: str,
+        position: Optional[AnyExpression] = None,
+        relative_shift: Optional[AnyExpression] = None,
+    ) -> "ExpressionNode":
+        return SetIndexNode(
+            self,
+            set_id,
+            position=_wrap_in_node(position) if position is not None else None,
+            relative_shift=(
+                _wrap_in_node(relative_shift) if relative_shift is not None else None
+            ),
+        )
+
+    def sum_over(self, set_id: str) -> "ExpressionNode":
+        return SumOverNode(self, set_id)
+
     def floor(self) -> "ExpressionNode":
         return FloorNode(self)
 
@@ -327,6 +345,39 @@ class AllTimeSumNode(UnaryOperatorNode):
     """
 
     pass
+
+
+@dataclass(frozen=True, eq=False)
+class SetIndexNode(UnaryOperatorNode):
+    """
+    References one element of a custom index set (local or global) that the
+    operand is indexed by (see ``IndexingStructure.sets``).
+
+    Exactly one of ``position`` and ``relative_shift`` may be set:
+      - bare form ``X[fuel]``      -> position=None, relative_shift=None (current element)
+      - keyword form ``X[fuel=2]`` -> position=<expr> (explicit position)
+      - shift form ``X[fuel+1]``   -> relative_shift=<expr> (relative to current element)
+
+    Note: the field is named ``relative_shift`` rather than ``shift`` to avoid
+    shadowing the inherited ``ExpressionNode.shift()`` method.
+    """
+
+    set_id: str
+    position: Optional[ExpressionNode] = None
+    relative_shift: Optional[ExpressionNode] = None
+
+    def __post_init__(self) -> None:
+        if self.position is not None and self.relative_shift is not None:
+            raise ValueError(
+                "SetIndexNode cannot have both an explicit position and a relative shift."
+            )
+
+
+@dataclass(frozen=True, eq=False)
+class SumOverNode(UnaryOperatorNode):
+    """``sum_over(<set_id>, <expr>)``: aggregates the operand over every element of set_id."""
+
+    set_id: str
 
 
 @dataclass(frozen=True, eq=False)
