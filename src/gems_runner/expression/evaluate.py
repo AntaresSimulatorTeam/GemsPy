@@ -33,6 +33,8 @@ from gems_craft.expression.expression import (
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -104,6 +106,12 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
         raise NotImplementedError()
 
     def all_time_sum(self, node: AllTimeSumNode) -> float:
+        raise NotImplementedError()
+
+    def set_index(self, node: SetIndexNode) -> float:
+        raise NotImplementedError()
+
+    def sum_over(self, node: SumOverNode) -> float:
         raise NotImplementedError()
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> float:

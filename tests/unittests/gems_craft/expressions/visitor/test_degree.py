@@ -94,6 +94,16 @@ def test_lower_upper_bound_degree() -> None:
     assert visit(UpperBoundNode("x"), ExpressionDegreeVisitor()) == math.inf
 
 
+def test_set_index_sum_over_degree() -> None:
+    x = var("x")
+    p = param("p")
+
+    assert visit(x.set_index("fuel"), ExpressionDegreeVisitor()) == 1
+    assert visit(p.set_index("fuel", position=2), ExpressionDegreeVisitor()) == 0
+    assert visit(x.sum_over("fuel"), ExpressionDegreeVisitor()) == 1
+    assert visit(p.sum_over("fuel"), ExpressionDegreeVisitor()) == 0
+
+
 @pytest.mark.xfail(reason="Degree simplification not implemented")
 def test_degree_computation_should_take_into_account_simplifications() -> None:
     x = var("x")

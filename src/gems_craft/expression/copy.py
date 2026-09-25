@@ -32,6 +32,8 @@ from .expression import (
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -79,6 +81,21 @@ class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
 
     def all_time_sum(self, node: AllTimeSumNode) -> ExpressionNode:
         return AllTimeSumNode(visit(node.operand, self))
+
+    def set_index(self, node: SetIndexNode) -> ExpressionNode:
+        return SetIndexNode(
+            visit(node.operand, self),
+            node.set_id,
+            position=visit(node.position, self) if node.position is not None else None,
+            relative_shift=(
+                visit(node.relative_shift, self)
+                if node.relative_shift is not None
+                else None
+            ),
+        )
+
+    def sum_over(self, node: SumOverNode) -> ExpressionNode:
+        return SumOverNode(visit(node.operand, self), node.set_id)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> ExpressionNode:
         return ScenarioOperatorNode(visit(node.operand, self), node.name)

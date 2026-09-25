@@ -34,6 +34,8 @@ from gems_craft.expression.expression import (
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -255,6 +257,12 @@ class _ForbidBarePortFieldVisitor(ExpressionVisitor[None]):
         visit(node.operand, self)
 
     def all_time_sum(self, node: AllTimeSumNode) -> None:
+        visit(node.operand, self)
+
+    def set_index(self, node: SetIndexNode) -> None:
+        visit(node.operand, self)
+
+    def sum_over(self, node: SumOverNode) -> None:
         visit(node.operand, self)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> None:
