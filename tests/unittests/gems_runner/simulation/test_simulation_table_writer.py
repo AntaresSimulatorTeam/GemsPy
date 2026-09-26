@@ -149,3 +149,22 @@ def test_split_empty_table_writes_nothing(tmp_path: Path) -> None:
 def test_unsupported_output_format_raises() -> None:
     with pytest.raises(ValueError, match="Unsupported output format"):
         SimulationTableWriter("xlsx")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("output_format", ["csv", "parquet"])
+@pytest.mark.parametrize(
+    "empty_df",
+    [pd.DataFrame(), pd.DataFrame(columns=[col.value for col in SimulationColumns])],
+    ids=["no-columns", "columns-no-rows"],
+)
+def test_write_scenario_of_empty_table_writes_empty_file_with_columns(
+    tmp_path: Path, output_format: str, empty_df: pd.DataFrame
+) -> None:
+    writer = SimulationTableWriter(output_format)  # type: ignore[arg-type]
+    path = writer.write_scenario(SimulationTable(empty_df, "run"), tmp_path, 0)
+
+    reloaded = (
+        pd.read_parquet(path) if output_format == "parquet" else pd.read_csv(path)
+    )
+    assert list(reloaded.columns) == [col.value for col in SimulationColumns]
+    assert reloaded.empty
