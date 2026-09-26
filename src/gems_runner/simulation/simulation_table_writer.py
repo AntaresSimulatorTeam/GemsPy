@@ -11,10 +11,11 @@
 # This file is part of the Antares project.
 
 from pathlib import Path
-from typing import List, Literal, cast
+from typing import List, Literal, Optional, cast
 
 import pandas as pd
 import pyarrow as pa
+import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
 
 from gems_runner.simulation.simulation_table import SimulationColumns, SimulationTable
@@ -30,7 +31,7 @@ PARQUET_ROW_GROUP_SIZE = 64_000
 # e.g. scenario-independent variables and the objective value of a frontal run.
 COMMON_SCENARIO_SUFFIX = "scenario-common"
 
-# Column types of the per-scenario Parquet files. Fixed rather than inferred so
+# Column types of the simulation table files. Fixed rather than inferred so
 # that every file has the same schema, even when a column only holds empty
 # values in some file (e.g. component in the common file), and the files can be
 # read together (e.g. by GEMS-ViewsBuilder).
@@ -81,13 +82,16 @@ class SimulationTableWriter:
         return paths
 
     def write_scenario(
-        self, table: SimulationTable, output_dir: Path, scenario_id: int
+        self, table: SimulationTable, output_dir: Path, scenario_id: Optional[int]
     ) -> Path:
-        """Write the table of a single scenario, as solved in sequential and
-        parallel modes, to its ``scenario-<N>`` file."""
-        return self._write_part(
-            table.data, output_dir, table.table_id, f"scenario-{scenario_id}"
+        """Write the table of a single scenario to its ``scenario-<N>`` file, or,
+        for *scenario_id* None, the rows shared by all scenarios to the
+        ``scenario-common`` file. Safe to call concurrently for different
+        scenarios."""
+        suffix = (
+            COMMON_SCENARIO_SUFFIX if scenario_id is None else f"scenario-{scenario_id}"
         )
+        return self._write_part(table.data, output_dir, table.table_id, suffix)
 
     def _write_part(
         self, df: pd.DataFrame, output_dir: Path, table_id: str, suffix: str
@@ -95,16 +99,21 @@ class SimulationTableWriter:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         path = output_dir / f"simulation_table_{table_id}_{suffix}.{self.output_format}"
+        # Both formats are written with pyarrow, which releases the GIL, so that
+        # files can be written concurrently from several threads.
+        # Pandas metadata is dropped so that the file only depends on the data
+        # and the fixed schema, not on how the DataFrame was built.
+        arrow_table = pa.Table.from_pandas(
+            df, schema=SIMULATION_TABLE_SCHEMA, preserve_index=False
+        ).replace_schema_metadata(None)
         if self.output_format == "parquet":
             pq.write_table(  # type: ignore[no-untyped-call]
-                pa.Table.from_pandas(
-                    df, schema=SIMULATION_TABLE_SCHEMA, preserve_index=False
-                ),
+                arrow_table,
                 path,
                 compression=PARQUET_COMPRESSION,
                 compression_level=PARQUET_COMPRESSION_LEVEL,
                 row_group_size=PARQUET_ROW_GROUP_SIZE,
             )
         else:
-            df.to_csv(path, index=False)
+            pacsv.write_csv(arrow_table, path)
         return path

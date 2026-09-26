@@ -18,13 +18,16 @@ the 13_1 investment study extended to 4 time steps and 2 MC scenarios.
   shared investment (p_max) and the objective value.
 - sequential / parallel subproblems: each scenario is solved separately and
   written as soon as it is solved; every row belongs to a scenario, so no
-  common file is written. The files must match splitting the full table.
+  common file is written.
+- In every mode the files must be byte-identical to splitting the full table;
+  in frontal mode each scenario's rows are built on demand after the solve.
 """
 
 import shutil
 import textwrap
+import threading
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import pytest
@@ -128,42 +131,79 @@ def test_separate_scenario_modes_write_no_common_file(
         assert "p_max" in df["output"].values
 
 
-@pytest.mark.parametrize("mode", ["sequential", "parallel"])
+def _stream(
+    study_dir: Path, output_workers: Optional[int] = None
+) -> Tuple[SimulationTable, Dict[Optional[int], SimulationTable]]:
+    """Run with on_scenario_done and collect the handed-over tables."""
+    optim_config = load_optim_config(study_dir / "input" / "optim-config.yml")
+    assert optim_config is not None
+    streamed: Dict[Optional[int], SimulationTable] = {}
+    lock = threading.Lock()
+
+    def collect(scenario_id: Optional[int], table: SimulationTable) -> None:
+        with lock:
+            assert scenario_id not in streamed, "scenario handed over twice"
+            streamed[scenario_id] = table
+
+    returned = SimulationSession(
+        load_study(study_dir),
+        optim_config,
+        run_id="run",
+        on_scenario_done=collect,
+        output_workers=output_workers,
+    ).run()
+    return returned, streamed
+
+
+@pytest.mark.parametrize("output_format", ["csv", "parquet"])
+@pytest.mark.parametrize("mode", ["frontal", "sequential", "parallel"])
 def test_streamed_files_match_splitting_the_full_table(
-    tmp_path: Path, mode: str
+    tmp_path: Path, mode: str, output_format: str
 ) -> None:
-    """Writing each scenario as soon as it is solved gives the same files as
-    solving everything first and splitting the full table."""
+    """Handing results over one scenario at a time gives byte-identical files
+    to solving everything first and splitting the full table."""
     study_dir = _make_study(tmp_path, mode)
     optim_config = load_optim_config(study_dir / "input" / "optim-config.yml")
     assert optim_config is not None
-    writer = SimulationTableWriter("parquet")
+    writer = SimulationTableWriter(output_format)  # type: ignore[arg-type]
 
     full_table = SimulationSession(
         load_study(study_dir), optim_config, run_id="run"
     ).run()
-    split_paths = writer.write(full_table, tmp_path / "split")
+    split_paths = sorted(writer.write(full_table, tmp_path / "split"))
 
-    streamed: Dict[int, SimulationTable] = {}
-    session = SimulationSession(
-        load_study(study_dir),
-        optim_config,
-        run_id="run",
-        on_scenario_done=lambda scenario_id, table: streamed.update(
-            {scenario_id: table}
-        ),
-    )
-    assert session.run().data.empty  # nothing kept once handed to the callback
-    streamed_paths = [
+    returned, streamed = _stream(study_dir)
+    assert returned.data.empty  # nothing kept once handed to the callback
+    streamed_paths = sorted(
         writer.write_scenario(table, tmp_path / "streamed", scenario_id)
         for scenario_id, table in streamed.items()
-    ]
+    )
 
     assert [p.name for p in split_paths] == [p.name for p in streamed_paths]
     for split_path, streamed_path in zip(split_paths, streamed_paths):
-        pd.testing.assert_frame_equal(
-            pd.read_parquet(split_path), pd.read_parquet(streamed_path)
-        )
+        assert split_path.read_bytes() == streamed_path.read_bytes(), split_path.name
+
+
+def test_frontal_hands_over_common_rows_once_and_each_scenario_once(
+    tmp_path: Path,
+) -> None:
+    _, streamed = _stream(_make_study(tmp_path, "frontal"))
+
+    assert sorted(streamed, key=lambda s: -1 if s is None else s) == [None, 0, 1]
+    assert sorted(streamed[None].data["output"]) == ["objective-value", "p_max"]
+    for scenario_id in (0, 1):
+        scenario_col = streamed[scenario_id].data["scenario_index"]
+        assert (scenario_col == scenario_id).all()
+
+
+def test_frontal_result_does_not_depend_on_output_workers(tmp_path: Path) -> None:
+    study_dir = _make_study(tmp_path, "frontal")
+    _, one_worker = _stream(study_dir, output_workers=1)
+    _, many_workers = _stream(study_dir, output_workers=8)
+
+    assert one_worker.keys() == many_workers.keys()
+    for scenario_id, table in one_worker.items():
+        pd.testing.assert_frame_equal(table.data, many_workers[scenario_id].data)
 
 
 def test_split_files_can_be_read_together_like_views_builder(tmp_path: Path) -> None:
