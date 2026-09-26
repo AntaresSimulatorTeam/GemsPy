@@ -78,23 +78,58 @@ value_s0_t1 = sub[(sub["scenario_index"] == 0) & (sub["block_time_index"] == 1)]
 ## Exporting results
 
 ~~~ python
-results.to_csv(Path("output/"))       # writes one CSV per component
-results.to_parquet(Path("output/"))   # writes a zstd-compressed Parquet file
+from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
+
+SimulationTableWriter("parquet").write(results, Path("output/"))  # one file per scenario
 results.to_netcdf(Path("output/"))    # writes a NetCDF file
 ds = results.to_dataset()             # returns an xarray Dataset
 ~~~
 
-Parquet files are written with zstd compression (level 3) and row groups of
-64,000 rows, the same settings as GEMS-ViewsBuilder.
+`SimulationTableWriter` writes CSV or Parquet, one file per MC scenario (see
+below). Parquet files are written with zstd compression (level 3) and row
+groups of 64,000 rows, the same settings as GEMS-ViewsBuilder.
 
-### Choosing the output format from the CLI
+### Output files of `gemspy`
 
-`gemspy` writes the simulation table as CSV by default. Use `--output-format`
-to write Parquet instead:
+`gemspy` (and `run_study`) writes the simulation table as **one file per MC
+scenario**, as CSV by default or as Parquet with `--output-format parquet`:
 
 ~~~ bash
 gemspy --study path/to/study_dir --output-format parquet
 ~~~
+
+~~~
+output/<run_id>/
+├── simulation_table_<run_id>_scenario-0.parquet
+├── simulation_table_<run_id>_scenario-1.parquet
+├── ...
+└── simulation_table_<run_id>_scenario-common.parquet
+~~~
+
+Rows shared by all scenarios, i.e. with an empty `scenario_index`, go to the
+`scenario-common` file. This only happens in `frontal` mode with several
+scenarios, for scenario-independent variables (e.g. an investment) and the
+objective value. In `sequential-subproblems` and `parallel-subproblems` modes
+each scenario is solved separately, so every row belongs to a scenario and no
+common file is written.
+
+Every row is written exactly once, so reading all files together gives back
+the full table, e.g. `simulation_table_*_scenario-*.parquet` as GEMS-ViewsBuilder
+input. All Parquet files share the same column types.
+
+In `sequential-subproblems` and `parallel-subproblems` modes each scenario's
+file is written as soon as that scenario is solved, so only one scenario's
+results are held in memory at a time. In `frontal` mode all scenarios come out
+of a single solve; after it, each scenario's rows are built directly from the
+solution and written in parallel threads, without first building a table
+holding all scenarios.
+
+Both formats are written with pyarrow. In CSV files the header and text values
+are quoted and index columns are integers, e.g.
+`0,"my_node","spillage",0,0,3,0,`.
+
+In `benders-decomposition` mode no simulation table is written: the solve is
+done by Antares Xpansion.
 
 The equivalent Python call is
 `run_study(Path("path/to/study_dir"), output_format="parquet")`.

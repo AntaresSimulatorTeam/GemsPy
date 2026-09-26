@@ -1,16 +1,11 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
 import xarray as xr
-
-# Parquet write settings, aligned with GEMS-ViewsBuilder (gems_views_builder/common.py)
-PARQUET_COMPRESSION: Literal["zstd"] = "zstd"
-PARQUET_COMPRESSION_LEVEL = 3
-PARQUET_ROW_GROUP_SIZE = 64_000
 
 
 class OutputView:
@@ -122,27 +117,6 @@ class SimulationTable:
         mask = self._df[SimulationColumns.COMPONENT.value] == component_id
         return ComponentView(self._df[mask])
 
-    def to_csv(self, output_dir: Path) -> Path:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        path = output_dir / f"simulation_table_{self.table_id}.csv"
-        self._df.to_csv(path, index=False)
-        return path
-
-    def to_parquet(self, output_dir: Path) -> Path:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        path = output_dir / f"simulation_table_{self.table_id}.parquet"
-        self._df.to_parquet(
-            path,
-            engine="pyarrow",
-            index=False,
-            compression=PARQUET_COMPRESSION,
-            compression_level=PARQUET_COMPRESSION_LEVEL,
-            row_group_size=PARQUET_ROW_GROUP_SIZE,
-        )
-        return path
-
     def to_netcdf(self, output_dir: Path) -> Path:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -217,32 +191,71 @@ class SimulationTableBuilder:
             # block ids that are not 1-based.
             absolute_time_offset = problem.block.timesteps[0]
 
-        dfs: list[pd.DataFrame] = []
-        dfs += self._collect_vars_outputs(
-            problem, block, absolute_time_offset, scenario_ids_remap
-        )
-        dfs += self._collect_extra_outputs(
-            problem, block, absolute_time_offset, scenario_ids_remap
-        )
+        dfs = [
+            self._da_to_df(
+                da,
+                name,
+                block,
+                absolute_time_offset,
+                basis_status=None,
+                scenario_ids_remap=scenario_ids_remap,
+            )
+            for name, da in self._collect_output_arrays(problem)
+        ]
         dfs.append(self._collect_objective_value(problem, block))
 
-        return SimulationTable(pd.concat(dfs, ignore_index=True), table_id=table_id)
+        df = pd.concat(dfs, ignore_index=True)
+        if scenario_ids_remap is not None and len(scenario_ids_remap) == 1:
+            # The problem was solved for a single MC scenario (always the case in
+            # sequential/parallel modes), so every row belongs to it, including
+            # scenario-independent outputs and the objective value. A missing
+            # scenario index would wrongly mean "shared by all scenarios".
+            scenario_col = SimulationColumns.SCENARIO_INDEX.value
+            df[scenario_col] = df[scenario_col].fillna(scenario_ids_remap[0])
+
+        return SimulationTable(df, table_id=table_id)
+
+    def build_per_scenario(
+        self,
+        problem: OptimizationProblem,
+        scenario_ids_remap: List[int],
+        table_id: str = "",
+    ) -> "ScenarioTables":
+        """Compute the output arrays of *problem* once and return a
+        ScenarioTables that builds each scenario's rows on demand, so that no
+        table holding all scenarios is built. Row order within each scenario is
+        the same as in ``build()``."""
+        return ScenarioTables(
+            builder=self,
+            arrays=self._collect_output_arrays(problem),
+            objective=self._collect_objective_value(problem, problem.block.id),
+            block=problem.block.id,
+            abs_offset=problem.block.timesteps[0],
+            scenario_ids=scenario_ids_remap,
+            table_id=table_id,
+        )
 
     # -------------------------------------------------------------------------
     # Solver outputs
     # -------------------------------------------------------------------------
 
-    def _collect_vars_outputs(
-        self,
-        problem: OptimizationProblem,
-        block: int,
-        abs_offset: int,
-        scenario_ids_remap: Optional[List[int]] = None,
-    ) -> list[pd.DataFrame]:
-        dfs: list[pd.DataFrame] = []
+    def _collect_output_arrays(
+        self, problem: OptimizationProblem
+    ) -> List[Tuple[str, xr.DataArray]]:
+        """Return (output name, solution array) for every variable and extra
+        output, in table row order. Arrays keep their component, time and
+        scenario dimensions; they are turned into rows by ``_da_to_df``."""
+        return self._collect_var_arrays(problem) + self._collect_extra_output_arrays(
+            problem
+        )
+
+    def _collect_var_arrays(
+        self, problem: OptimizationProblem
+    ) -> List[Tuple[str, xr.DataArray]]:
+        arrays: List[Tuple[str, xr.DataArray]] = []
         solution = problem.linopy_model.solution
         if solution is None:
-            return dfs
+            return arrays
 
         for (mk, var_name), lv in problem._linopy_vars.items():
             sol_da = problem.get_variable_solution(mk, var_name)
@@ -250,33 +263,18 @@ class SimulationTableBuilder:
                 continue
 
             own_components = list(lv.coords["component"].values)
-            sol_da = sol_da.sel(component=own_components)
+            arrays.append((var_name, sol_da.sel(component=own_components)))
 
-            dfs.append(
-                self._da_to_df(
-                    sol_da,
-                    var_name,
-                    block,
-                    abs_offset,
-                    basis_status=None,
-                    scenario_ids_remap=scenario_ids_remap,
-                )
-            )
-
-        return dfs
+        return arrays
 
     # -------------------------------------------------------------------------
     # Extra outputs
     # -------------------------------------------------------------------------
 
-    def _collect_extra_outputs(
-        self,
-        problem: OptimizationProblem,
-        block: int,
-        abs_offset: int,
-        scenario_ids_remap: Optional[List[int]] = None,
-    ) -> list[pd.DataFrame]:
-        dfs: list[pd.DataFrame] = []
+    def _collect_extra_output_arrays(
+        self, problem: OptimizationProblem
+    ) -> List[Tuple[str, xr.DataArray]]:
+        arrays: List[Tuple[str, xr.DataArray]] = []
 
         var_solution_arrays: Dict[Tuple[str, str], xr.DataArray] = {}
         if problem.linopy_model.solution is not None:
@@ -337,21 +335,12 @@ class SimulationTableBuilder:
                     ]
                     result_da = result_da.sel(component=present)
 
-                dfs.append(
-                    self._da_to_df(
-                        result_da,
-                        out_id,
-                        block,
-                        abs_offset,
-                        basis_status=None,
-                        scenario_ids_remap=scenario_ids_remap,
-                    )
-                )
+                arrays.append((out_id, result_da))
 
-        return dfs
+        return arrays
 
     # -------------------------------------------------------------------------
-    # Dual / reduced-cost arrays (helpers for _collect_extra_outputs)
+    # Dual / reduced-cost arrays (helpers for _collect_extra_output_arrays)
     # -------------------------------------------------------------------------
 
     @staticmethod
@@ -530,6 +519,84 @@ class SimulationTableBuilder:
                 SimulationColumns.VALUE.value: da.values.ravel().astype(float),
                 SimulationColumns.BASIS_STATUS.value: basis_status,
             }
+        )
+
+
+class ScenarioTables:
+    """Per-scenario simulation tables of one solved problem, built on demand.
+
+    Obtain via ``SimulationTableBuilder.build_per_scenario``. ``common()`` gives
+    the rows shared by all scenarios (outputs without a scenario dimension and
+    the objective value) and ``scenario(s)`` the rows of scenario *s*; each call
+    only builds the rows it returns. For a problem with a single scenario every
+    row belongs to it, so ``common()`` is None, as in ``build()``.
+    Calls are independent and may run concurrently.
+    """
+
+    def __init__(
+        self,
+        builder: SimulationTableBuilder,
+        arrays: List[Tuple[str, xr.DataArray]],
+        objective: pd.DataFrame,
+        block: int,
+        abs_offset: int,
+        scenario_ids: List[int],
+        table_id: str,
+    ) -> None:
+        self._builder = builder
+        self._arrays = arrays
+        self._objective = objective
+        self._block = block
+        self._abs_offset = abs_offset
+        self.scenario_ids = list(scenario_ids)
+        self._table_id = table_id
+
+    def common(self) -> Optional[SimulationTable]:
+        """Rows shared by all scenarios, or None if there are none."""
+        if len(self.scenario_ids) == 1:
+            return None
+        dfs = [
+            self._to_df(da, name, scenario_ids_remap=None)
+            for name, da in self._arrays
+            if "scenario" not in da.dims
+        ]
+        dfs.append(self._objective)
+        return SimulationTable(pd.concat(dfs, ignore_index=True), self._table_id)
+
+    def scenario(self, scenario_id: int) -> Optional[SimulationTable]:
+        """Rows of *scenario_id*, or None if the problem has none for it."""
+        if len(self.scenario_ids) == 1:
+            dfs = [
+                self._to_df(da, name, self.scenario_ids) for name, da in self._arrays
+            ]
+            df = pd.concat([*dfs, self._objective], ignore_index=True)
+            scenario_col = SimulationColumns.SCENARIO_INDEX.value
+            df[scenario_col] = df[scenario_col].fillna(scenario_id)
+            return SimulationTable(df, self._table_id)
+
+        position = self.scenario_ids.index(scenario_id)
+        dfs = [
+            self._to_df(da.isel(scenario=[position]), name, [scenario_id])
+            for name, da in self._arrays
+            if "scenario" in da.dims
+        ]
+        if not dfs:
+            return None
+        return SimulationTable(pd.concat(dfs, ignore_index=True), self._table_id)
+
+    def _to_df(
+        self,
+        da: xr.DataArray,
+        name: str,
+        scenario_ids_remap: Optional[List[int]],
+    ) -> pd.DataFrame:
+        return self._builder._da_to_df(
+            da,
+            name,
+            self._block,
+            self._abs_offset,
+            basis_status=None,
+            scenario_ids_remap=scenario_ids_remap,
         )
 
 

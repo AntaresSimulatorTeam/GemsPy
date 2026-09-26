@@ -9,6 +9,21 @@ All notable changes to GemsPy are documented here.
   the optional `input/taxonomy.yml` and calls
   `validate_libraries_against_taxonomy` on every library declaring a `taxonomy`
   field. `parse_yaml_library` is unchanged and performs no validation.
+- **One simulation table file per MC scenario** - `gemspy` / `run_study` write
+  `simulation_table_<run_id>_scenario-<N>.<csv|parquet>` per scenario, plus
+  `simulation_table_<run_id>_scenario-common.<ext>` for rows shared by all
+  scenarios (frontal mode). Every row is written exactly once and all files
+  share one fixed schema, so they can be read together (e.g. by
+  GEMS-ViewsBuilder). No table holding all scenarios is built: sequential and
+  parallel subproblem modes write each scenario as soon as it is solved;
+  frontal mode builds each scenario's rows from the solution after the single
+  solve and writes them in parallel threads.
+- **`SimulationTableWriter`** - new in `gems_runner.simulation.simulation_table_writer`;
+  writes a `SimulationTable` as CSV or Parquet (zstd), one file per scenario.
+- **`SimulationSession(on_scenario_done=..., output_workers=...)`** - hands
+  results over one scenario at a time (scenario id `None` for the shared rows)
+  instead of returning one table; `SimulationTableBuilder.build_per_scenario`
+  builds per-scenario tables on demand.
 
 ### Changed
 - **Breaking** - loading a study whose library declares a `taxonomy` raises
@@ -25,6 +40,22 @@ All notable changes to GemsPy are documented here.
   near-identical old names invited confusion. Reading and validating are now
   separate modules, as in `optim_config/`. No behavior change; names and
   import paths only.
+- **Breaking** - a run no longer writes a single `simulation_table_<run_id>`
+  file; read `simulation_table_<run_id>_scenario-*.<ext>` instead.
+- **Breaking** - `SimulationTable.to_csv()` and `to_parquet()` removed; use
+  `SimulationTableWriter(format).write(table, output_dir)`.
+- **Breaking** - CSV files are written with pyarrow: the header and text
+  values are quoted and index columns are integers (`3` instead of `3.0`).
+- **Breaking** - Parquet files no longer embed pandas metadata; integer
+  columns with empty values are read back as floats by pandas.
+- Benders decomposition mode no longer writes an empty simulation table file.
+
+### Fixed
+- **Scenario index of scenario-independent outputs** - in sequential and
+  parallel subproblem modes, scenario-independent outputs (e.g. an investment
+  variable) and the objective value had an empty `scenario_index`, so values
+  from different scenarios could not be told apart. A problem solved for a
+  single scenario now tags every row with that scenario.
 
 ---
 

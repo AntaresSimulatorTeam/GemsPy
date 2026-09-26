@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 import xarray as xr
 from simulation_table_fakes import (
     FakeLinopyModel,
@@ -20,6 +19,7 @@ from gems_runner.simulation.simulation_table import (
     SimulationColumns,
     SimulationTableBuilder,
 )
+from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
 
 
 def test_simulation_table_builder_manual(tmp_path: Path) -> None:
@@ -88,24 +88,15 @@ def test_simulation_table_builder_manual(tmp_path: Path) -> None:
         check_dtype=False,
     )
 
-    csv_path = df.to_csv(tmp_path)
-
-    assert csv_path.exists(), "CSV file was not created"
-
-    with csv_path.open("r") as f:
-        first_line = f.readline().strip()
-
-    expected_header = ",".join(col.value for col in SimulationColumns)
-    assert first_line == expected_header, "CSV header does not match expected columns"
-
-    csv_path.unlink()
-
-    pytest.importorskip("pyarrow")
-    parquet_path = df.to_parquet(tmp_path)
-    assert parquet_path.exists(), "Parquet file was not created"
-    loaded = pd.read_parquet(parquet_path)
-    assert list(loaded.columns) == [col.value for col in SimulationColumns]
-    parquet_path.unlink()
+    expected_columns = [col.value for col in SimulationColumns]
+    for output_format in ("csv", "parquet"):
+        paths = SimulationTableWriter(output_format).write(df, tmp_path / output_format)  # type: ignore[arg-type]
+        assert paths, f"No {output_format} file was written"
+        for path in paths:
+            loaded = (
+                pd.read_csv(path) if output_format == "csv" else pd.read_parquet(path)
+            )
+            assert list(loaded.columns) == expected_columns
 
 
 def _make_problem_with_da(da: xr.DataArray, var_name: str = "p") -> "FakeProblem":
@@ -173,3 +164,39 @@ def test_scalar_output_has_none_time_and_scenario_indices() -> None:
     assert pd.isna(rows.iloc[0][SimulationColumns.BLOCK_TIME_INDEX.value])
     assert pd.isna(rows.iloc[0][SimulationColumns.SCENARIO_INDEX.value])
     assert rows.iloc[0][SimulationColumns.VALUE.value] == 99.0
+
+
+def _make_scenario_independent_problem() -> "FakeProblem":
+    """A var with no scenario dim: [component=1, time=2]."""
+    da = xr.DataArray(
+        np.array([[10.0, 20.0]]),
+        dims=["component", "time"],
+        coords={"component": ["compA"], "time": [0, 1]},
+    )
+    return _make_problem_with_da(da)
+
+
+def test_single_scenario_problem_tags_all_rows_with_its_scenario() -> None:
+    """A problem solved for one MC scenario (sequential/parallel modes) owns all
+    its rows: scenario-independent outputs and the objective value get its id."""
+    st = SimulationTableBuilder().build(
+        _make_scenario_independent_problem(), scenario_ids_remap=[3]  # type: ignore[arg-type]
+    )
+    scenario_col = st.data[SimulationColumns.SCENARIO_INDEX.value]
+    outputs = st.data[SimulationColumns.OUTPUT.value]
+
+    assert list(scenario_col[outputs == "p"]) == [3, 3]
+    assert list(scenario_col[outputs == "objective-value"]) == [3]
+
+
+def test_multi_scenario_problem_keeps_shared_rows_without_scenario() -> None:
+    """In a problem covering several MC scenarios (frontal mode), scenario-
+    independent outputs and the objective value are shared: no scenario index."""
+    st = SimulationTableBuilder().build(
+        _make_scenario_independent_problem(), scenario_ids_remap=[0, 1]  # type: ignore[arg-type]
+    )
+    shared_outputs = st.data[SimulationColumns.OUTPUT.value].isin(
+        ["p", "objective-value"]
+    )
+
+    assert st.data[shared_outputs][SimulationColumns.SCENARIO_INDEX.value].isna().all()

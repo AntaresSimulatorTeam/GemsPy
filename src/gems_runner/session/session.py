@@ -10,10 +10,12 @@
 #
 # This file is part of the Antares project.
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 from uuid import uuid4
 
+import pandas as pd
 import xarray as xr
 
 from gems_craft.optim_config.parsing import (
@@ -35,6 +37,10 @@ from gems_runner.simulation.simulation_table import (
 )
 from gems_runner.simulation.time_block import TimeBlock
 
+# Called with (scenario_id, table) once a scenario's rows are available;
+# scenario_id is None for the rows shared by all scenarios (frontal mode).
+ScenarioCallback = Callable[[Optional[int], SimulationTable], None]
+
 
 class SimulationSession:
     def __init__(
@@ -43,11 +49,28 @@ class SimulationSession:
         optim_config: OptimConfig,
         run_id: Optional[str] = None,
         output_dir: Optional[Path] = None,
+        on_scenario_done: Optional[ScenarioCallback] = None,
+        output_workers: Optional[int] = None,
     ) -> None:
+        """
+        Args:
+            on_scenario_done: Optional callback receiving the results one
+                scenario at a time instead of as one table: ``run()`` then
+                returns an empty table. In sequential and parallel subproblem
+                modes it is called as soon as a scenario is solved. In frontal
+                mode it is called concurrently (up to *output_workers* threads)
+                once the single solve is done, with each scenario's rows built
+                on demand, plus once with ``None`` for the rows shared by all
+                scenarios; no table holding all scenarios is built.
+            output_workers: Maximum number of threads handing frontal results
+                over to *on_scenario_done* (default: ThreadPoolExecutor's).
+        """
         self.study = study
         self.optim_config = optim_config
         self.run_id = run_id or str(uuid4())
         self.output_dir = output_dir
+        self.on_scenario_done = on_scenario_done
+        self.output_workers = output_workers
         self._apply_heuristics = should_apply_heuristics(study)
 
     @property
@@ -84,8 +107,12 @@ class SimulationSession:
                 )
             ),
         )
-        _, table = self._run_block(block, scenario_ids=self.scenario_ids)
-        return table
+        if self.on_scenario_done is None:
+            _, table = self._run_block(block, scenario_ids=self.scenario_ids)
+            return table
+        problem = self._solve_block(block, scenario_ids=self.scenario_ids)
+        self._hand_over_per_scenario(problem, self.scenario_ids, self.on_scenario_done)
+        return self._reduce([])
 
     def _run_sequential(self) -> SimulationTable:
         cfg = self.optim_config.resolution
@@ -95,6 +122,7 @@ class SimulationSession:
 
         tables: List[SimulationTable] = []
         for scenario_id in self.scenario_ids:
+            scenario_tables: List[SimulationTable] = []
             t_start = self.optim_config.time_scope.first_time_step
             block_id = 0
             carry_over: Dict[Tuple[str, str], xr.DataArray] = {}
@@ -111,7 +139,7 @@ class SimulationSession:
                     scenario_ids=[scenario_id],
                     initial_values=carry_over or None,
                 )
-                tables.append(table)
+                scenario_tables.append(table)
                 # Block N and block N+1 share `block_overlap` absolute
                 # timesteps: block N's local indices `block_length - overlap
                 # ...` are block N+1's local indices `0 ...`.
@@ -123,6 +151,7 @@ class SimulationSession:
                     length=carry_over_length,
                 )
                 block_id += 1
+            self._finish_scenario(scenario_id, scenario_tables, tables)
 
         return self._reduce(tables)
 
@@ -132,6 +161,7 @@ class SimulationSession:
 
         tables: List[SimulationTable] = []
         for scenario_id in self.scenario_ids:
+            scenario_tables: List[SimulationTable] = []
             starts = range(
                 self.optim_config.time_scope.first_time_step,
                 self.optim_config.time_scope.last_time_step + 1,
@@ -154,13 +184,12 @@ class SimulationSession:
             ]
             for block in blocks:
                 _, table = self._run_block(block, scenario_ids=[scenario_id])
-                tables.append(table)
+                scenario_tables.append(table)
+            self._finish_scenario(scenario_id, scenario_tables, tables)
 
         return self._reduce(tables)
 
     def _run_benders(self) -> SimulationTable:
-        import pandas as pd
-
         from gems_runner.simulation import (
             BendersRunner,
             build_couplings,
@@ -209,6 +238,19 @@ class SimulationSession:
         scenario_ids_remap equals scenario_ids because the list of MC scenario IDs
         IS the mapping from internal 0-based position to actual MC identifier.
         """
+        problem = self._solve_block(block, scenario_ids, initial_values)
+        table = SimulationTableBuilder().build(
+            problem, scenario_ids_remap=scenario_ids, table_id=self.run_id
+        )
+        return problem, table
+
+    def _solve_block(
+        self,
+        block: TimeBlock,
+        scenario_ids: List[int],
+        initial_values: Optional[Dict[Tuple[str, str], xr.DataArray]] = None,
+    ) -> OptimizationProblem:
+        """Build and solve one block (plus the heuristic re-solve, if any)."""
         problem = build_problem(
             self.study,
             block,
@@ -227,10 +269,30 @@ class SimulationSession:
             apply_thermal_heuristics(problem, self.optim_config, scenario_ids)
             problem.solve(solver_name=solver_name, **solver_kwargs)
             self._check_solved(problem)
-        table = SimulationTableBuilder().build(
+        return problem
+
+    def _hand_over_per_scenario(
+        self,
+        problem: OptimizationProblem,
+        scenario_ids: List[int],
+        callback: ScenarioCallback,
+    ) -> None:
+        """Build each scenario's rows of a solved multi-scenario problem on
+        demand and pass them to *callback*, concurrently: at most
+        ``output_workers`` scenarios are held in memory at a time."""
+        tables = SimulationTableBuilder().build_per_scenario(
             problem, scenario_ids_remap=scenario_ids, table_id=self.run_id
         )
-        return problem, table
+
+        def hand_over(scenario_id: Optional[int]) -> None:
+            table = (
+                tables.common() if scenario_id is None else tables.scenario(scenario_id)
+            )
+            if table is not None:
+                callback(scenario_id, table)
+
+        with ThreadPoolExecutor(max_workers=self.output_workers) as pool:
+            list(pool.map(hand_over, [None, *scenario_ids]))
 
     @staticmethod
     def _check_solved(problem: OptimizationProblem) -> None:
@@ -240,8 +302,23 @@ class SimulationSession:
                 f"(termination_condition={problem.termination_condition!r})."
             )
 
+    def _finish_scenario(
+        self,
+        scenario_id: int,
+        scenario_tables: List[SimulationTable],
+        tables: List[SimulationTable],
+    ) -> None:
+        """Hand one scenario's tables to ``on_scenario_done``, or keep them in
+        *tables* for the final merge when no callback is set."""
+        if self.on_scenario_done is None:
+            tables.extend(scenario_tables)
+        elif scenario_tables:
+            self.on_scenario_done(scenario_id, self._reduce(scenario_tables))
+
     def _reduce(self, tables: List[SimulationTable]) -> SimulationTable:
         """REDUCE: merge SimulationTables from one scenario's blocks into one."""
+        if not tables:
+            return SimulationTable(pd.DataFrame(), table_id=self.run_id)
         return merge_simulation_tables(tables, table_id=self.run_id)
 
     @staticmethod
