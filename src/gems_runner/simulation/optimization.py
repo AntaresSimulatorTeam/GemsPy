@@ -379,6 +379,23 @@ class OptimizationProblem:
     # All others fall back to file-based LP/MPS exchange.
     _DIRECT_API_SOLVERS = {"highs", "gurobi"}
 
+    # Native option switching each solver's console output on or off. linopy
+    # has no generic logging switch: options are forwarded to the solver as is.
+    _LOG_OUTPUT_OPTIONS: Dict[str, Tuple[str, Callable[[bool], object]]] = {
+        "highs": ("output_flag", bool),
+        "gurobi": ("OutputFlag", int),
+        "xpress": ("outputlog", int),
+    }
+
+    @classmethod
+    def log_output_options(cls, solver_name: str, logs: bool) -> Dict[str, object]:
+        """Return the solver option enabling (*logs* True) or silencing solver
+        output, or no option for a solver without a known output switch."""
+        if solver_name not in cls._LOG_OUTPUT_OPTIONS:
+            return {}
+        option, convert = cls._LOG_OUTPUT_OPTIONS[solver_name]
+        return {option: convert(logs)}
+
     def solve(self, solver_name: str = "highs", **kwargs: object) -> None:
         """Solve the problem using the specified solver."""
         # Use io_api="direct" to bypass LP file writing and avoid LP name parsing
