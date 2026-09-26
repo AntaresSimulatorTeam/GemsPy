@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 import xarray as xr
 from simulation_table_fakes import (
     FakeLinopyModel,
@@ -20,6 +19,7 @@ from gems_runner.simulation.simulation_table import (
     SimulationColumns,
     SimulationTableBuilder,
 )
+from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
 
 
 def test_simulation_table_builder_manual(tmp_path: Path) -> None:
@@ -88,24 +88,15 @@ def test_simulation_table_builder_manual(tmp_path: Path) -> None:
         check_dtype=False,
     )
 
-    csv_path = df.to_csv(tmp_path)
-
-    assert csv_path.exists(), "CSV file was not created"
-
-    with csv_path.open("r") as f:
-        first_line = f.readline().strip()
-
-    expected_header = ",".join(col.value for col in SimulationColumns)
-    assert first_line == expected_header, "CSV header does not match expected columns"
-
-    csv_path.unlink()
-
-    pytest.importorskip("pyarrow")
-    parquet_path = df.to_parquet(tmp_path)
-    assert parquet_path.exists(), "Parquet file was not created"
-    loaded = pd.read_parquet(parquet_path)
-    assert list(loaded.columns) == [col.value for col in SimulationColumns]
-    parquet_path.unlink()
+    expected_columns = [col.value for col in SimulationColumns]
+    for output_format in ("csv", "parquet"):
+        paths = SimulationTableWriter(output_format).write(df, tmp_path / output_format)  # type: ignore[arg-type]
+        assert paths, f"No {output_format} file was written"
+        for path in paths:
+            loaded = (
+                pd.read_csv(path) if output_format == "csv" else pd.read_parquet(path)
+            )
+            assert list(loaded.columns) == expected_columns
 
 
 def _make_problem_with_da(da: xr.DataArray, var_name: str = "p") -> "FakeProblem":

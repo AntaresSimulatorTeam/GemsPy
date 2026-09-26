@@ -104,7 +104,8 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `VectorizedLinearExprBuilder` (`linearize.py`): `ExpressionVisitor` subclass that converts an expression AST into a `VectorizedExpr`
 - `VectorizedBuilderBase` (`vectorized_builder.py`): shared base for all vectorized visitors (used by both `linearize.py` and `extra_output.py`)
 - `TimeBlock` (`time_block.py`): defines the temporal window for one solve
-- `SimulationTableBuilder` / `SimulationTableWriter` (`simulation_table.py`): result extraction as a flat pandas `DataFrame`
+- `SimulationTableBuilder` (`simulation_table.py`): result extraction as a flat pandas `DataFrame`
+- `SimulationTableWriter` (`simulation_table_writer.py`): writes a `SimulationTable` as CSV or Parquet, one file per scenario (streamed per scenario via `SimulationSession(on_scenario_done=...)` in sequential/parallel modes)
 - `apply_thermal_heuristics` (`heuristic_runner.py`): injects heuristic-derived bounds into a solved problem
 - `find_min_generation_fast` / `find_num_units_accurate` (`thermal_heuristic.py`): the `fast`/`accurate` heuristic functions
 

@@ -11,9 +11,10 @@
 # This file is part of the Antares project.
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 from uuid import uuid4
 
+import pandas as pd
 import xarray as xr
 
 from gems_craft.optim_config.parsing import (
@@ -35,6 +36,9 @@ from gems_runner.simulation.simulation_table import (
 )
 from gems_runner.simulation.time_block import TimeBlock
 
+# Called with (scenario_id, table) once all blocks of one scenario are solved.
+ScenarioCallback = Callable[[int, SimulationTable], None]
+
 
 class SimulationSession:
     def __init__(
@@ -43,11 +47,21 @@ class SimulationSession:
         optim_config: OptimConfig,
         run_id: Optional[str] = None,
         output_dir: Optional[Path] = None,
+        on_scenario_done: Optional[ScenarioCallback] = None,
     ) -> None:
+        """
+        Args:
+            on_scenario_done: Optional callback for modes that solve each
+                scenario separately (sequential and parallel subproblems). It
+                receives each scenario's table as soon as that scenario is
+                solved, and the table is not kept: ``run()`` then returns an
+                empty table, so only one scenario is held in memory at a time.
+        """
         self.study = study
         self.optim_config = optim_config
         self.run_id = run_id or str(uuid4())
         self.output_dir = output_dir
+        self.on_scenario_done = on_scenario_done
         self._apply_heuristics = should_apply_heuristics(study)
 
     @property
@@ -95,6 +109,7 @@ class SimulationSession:
 
         tables: List[SimulationTable] = []
         for scenario_id in self.scenario_ids:
+            scenario_tables: List[SimulationTable] = []
             t_start = self.optim_config.time_scope.first_time_step
             block_id = 0
             carry_over: Dict[Tuple[str, str], xr.DataArray] = {}
@@ -111,7 +126,7 @@ class SimulationSession:
                     scenario_ids=[scenario_id],
                     initial_values=carry_over or None,
                 )
-                tables.append(table)
+                scenario_tables.append(table)
                 # Block N and block N+1 share `block_overlap` absolute
                 # timesteps: block N's local indices `block_length - overlap
                 # ...` are block N+1's local indices `0 ...`.
@@ -123,6 +138,7 @@ class SimulationSession:
                     length=carry_over_length,
                 )
                 block_id += 1
+            self._finish_scenario(scenario_id, scenario_tables, tables)
 
         return self._reduce(tables)
 
@@ -132,6 +148,7 @@ class SimulationSession:
 
         tables: List[SimulationTable] = []
         for scenario_id in self.scenario_ids:
+            scenario_tables: List[SimulationTable] = []
             starts = range(
                 self.optim_config.time_scope.first_time_step,
                 self.optim_config.time_scope.last_time_step + 1,
@@ -154,13 +171,12 @@ class SimulationSession:
             ]
             for block in blocks:
                 _, table = self._run_block(block, scenario_ids=[scenario_id])
-                tables.append(table)
+                scenario_tables.append(table)
+            self._finish_scenario(scenario_id, scenario_tables, tables)
 
         return self._reduce(tables)
 
     def _run_benders(self) -> SimulationTable:
-        import pandas as pd
-
         from gems_runner.simulation import (
             BendersRunner,
             build_couplings,
@@ -240,8 +256,23 @@ class SimulationSession:
                 f"(termination_condition={problem.termination_condition!r})."
             )
 
+    def _finish_scenario(
+        self,
+        scenario_id: int,
+        scenario_tables: List[SimulationTable],
+        tables: List[SimulationTable],
+    ) -> None:
+        """Hand one scenario's tables to ``on_scenario_done``, or keep them in
+        *tables* for the final merge when no callback is set."""
+        if self.on_scenario_done is None:
+            tables.extend(scenario_tables)
+        elif scenario_tables:
+            self.on_scenario_done(scenario_id, self._reduce(scenario_tables))
+
     def _reduce(self, tables: List[SimulationTable]) -> SimulationTable:
         """REDUCE: merge SimulationTables from one scenario's blocks into one."""
+        if not tables:
+            return SimulationTable(pd.DataFrame(), table_id=self.run_id)
         return merge_simulation_tables(tables, table_id=self.run_id)
 
     @staticmethod

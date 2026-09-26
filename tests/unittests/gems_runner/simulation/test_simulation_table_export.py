@@ -1,7 +1,7 @@
 # Copyright (c) 2024, RTE (https://www.rte-france.com)
 # SPDX-License-Identifier: MPL-2.0
 
-"""Tests for SimulationTable.to_dataset(), write_parquet(), and write_netcdf()."""
+"""Tests for SimulationTable.to_dataset() and to_netcdf()."""
 
 from pathlib import Path
 
@@ -112,42 +112,6 @@ def test_to_dataset_includes_objective_value_scalar() -> None:
     assert "objective-value" in ds.data_vars
     assert ds["objective-value"].shape == ()  # scalar (no dims)
     assert float(ds["objective-value"]) == pytest.approx(99.0)
-
-
-# ---------------------------------------------------------------------------
-# Tests: write_parquet()
-# ---------------------------------------------------------------------------
-
-
-def test_write_parquet_creates_file(tmp_path: Path) -> None:
-    pytest.importorskip("pyarrow")
-    st = SimulationTableBuilder().build(_make_problem(), table_id="test")  # type: ignore[arg-type]
-    path = st.to_parquet(tmp_path)
-    assert path.exists()
-    assert path.suffix == ".parquet"
-
-
-def test_write_parquet_content_matches_original(tmp_path: Path) -> None:
-    pytest.importorskip("pyarrow")
-    st = SimulationTableBuilder().build(_make_problem(), table_id="test")  # type: ignore[arg-type]
-    path = st.to_parquet(tmp_path)
-
-    loaded = pd.read_parquet(path)
-    pd.testing.assert_frame_equal(
-        to_object_dtype(loaded.reset_index(drop=True)),
-        to_object_dtype(st.data.reset_index(drop=True)),
-        check_dtype=False,
-    )
-
-
-def test_write_parquet_uses_zstd_compression(tmp_path: Path) -> None:
-    pq = pytest.importorskip("pyarrow.parquet")
-    st = SimulationTableBuilder().build(_make_problem(), table_id="test")  # type: ignore[arg-type]
-    path = st.to_parquet(tmp_path)
-
-    metadata = pq.ParquetFile(path).metadata
-    for column_index in range(metadata.num_columns):
-        assert metadata.row_group(0).column(column_index).compression == "ZSTD"
 
 
 # ---------------------------------------------------------------------------

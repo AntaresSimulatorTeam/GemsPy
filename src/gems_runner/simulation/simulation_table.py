@@ -1,16 +1,11 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
 import xarray as xr
-
-# Parquet write settings, aligned with GEMS-ViewsBuilder (gems_views_builder/common.py)
-PARQUET_COMPRESSION: Literal["zstd"] = "zstd"
-PARQUET_COMPRESSION_LEVEL = 3
-PARQUET_ROW_GROUP_SIZE = 64_000
 
 
 class OutputView:
@@ -121,27 +116,6 @@ class SimulationTable:
         """Return a ComponentView filtered to the given component ID."""
         mask = self._df[SimulationColumns.COMPONENT.value] == component_id
         return ComponentView(self._df[mask])
-
-    def to_csv(self, output_dir: Path) -> Path:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        path = output_dir / f"simulation_table_{self.table_id}.csv"
-        self._df.to_csv(path, index=False)
-        return path
-
-    def to_parquet(self, output_dir: Path) -> Path:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        path = output_dir / f"simulation_table_{self.table_id}.parquet"
-        self._df.to_parquet(
-            path,
-            engine="pyarrow",
-            index=False,
-            compression=PARQUET_COMPRESSION,
-            compression_level=PARQUET_COMPRESSION_LEVEL,
-            row_group_size=PARQUET_ROW_GROUP_SIZE,
-        )
-        return path
 
     def to_netcdf(self, output_dir: Path) -> Path:
         output_dir = Path(output_dir)
