@@ -14,7 +14,7 @@ import argparse
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
+from typing import List, Literal, Optional, TextIO, Type, TypeVar, Union, overload
 
 from pydantic import Field, ValidationError, model_validator
 from yaml import safe_dump, safe_load
@@ -126,6 +126,7 @@ def write_yaml_system(system: SystemSchema, path: Path) -> None:
 class ParsedArguments:
     study_dir: Path
     optim_config_path: Optional[Path] = None
+    output_format: Literal["csv", "parquet"] = "csv"
 
 
 def parse_cli() -> ParsedArguments:
@@ -143,9 +144,17 @@ def parse_cli() -> ParsedArguments:
         dest="optim_config",
         help="optional custom path to optim-config.yml (defaults to study_dir/input/optim-config.yml)",
     )
+    parser.add_argument(
+        "--output-format",
+        choices=["csv", "parquet"],
+        default="csv",
+        dest="output_format",
+        help="format of the simulation table file (default: csv)",
+    )
 
     args = parser.parse_args()
     return ParsedArguments(
         study_dir=args.study,
         optim_config_path=args.optim_config,
+        output_format=args.output_format,
     )

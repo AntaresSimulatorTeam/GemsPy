@@ -67,6 +67,7 @@ def main_cli() -> None:
     run_study(
         study_dir=parsed_args.study_dir,
         optim_config_path=parsed_args.optim_config_path,
+        output_format=parsed_args.output_format,
     )
 
 
