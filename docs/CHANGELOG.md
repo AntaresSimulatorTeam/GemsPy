@@ -47,8 +47,8 @@ All notable changes to GemsPy are documented here.
 - **Breaking** - CSV files are written with pyarrow: index columns are
   integers (`3` instead of `3.0`) and whole numbers are written without `.0`
   (`42` instead of `42.0`).
-- **Breaking** - Parquet files no longer embed pandas metadata; integer
-  columns with empty values are read back as floats by pandas.
+- Parquet files no longer embed pandas metadata. The stored data is
+  unchanged; files now depend only on the data and the fixed schema.
 - Benders decomposition mode no longer writes an empty simulation table file.
 
 ### Fixed
