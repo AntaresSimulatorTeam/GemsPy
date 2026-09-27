@@ -21,4 +21,5 @@ from .optimization import (
 )
 from .runner import BendersRunner
 from .simulation_table import SimulationColumns, SimulationTableBuilder
+from .simulation_table_writer import SimulationTableWriter
 from .time_block import TimeBlock

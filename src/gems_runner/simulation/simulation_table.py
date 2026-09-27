@@ -226,7 +226,6 @@ class SimulationTableBuilder:
         table holding all scenarios is built. Row order within each scenario is
         the same as in ``build()``."""
         return ScenarioTables(
-            builder=self,
             arrays=self._collect_output_arrays(problem),
             objective=self._collect_objective_value(problem, problem.block.id),
             block=problem.block.id,
@@ -535,7 +534,6 @@ class ScenarioTables:
 
     def __init__(
         self,
-        builder: SimulationTableBuilder,
         arrays: List[Tuple[str, xr.DataArray]],
         objective: pd.DataFrame,
         block: int,
@@ -543,7 +541,6 @@ class ScenarioTables:
         scenario_ids: List[int],
         table_id: str,
     ) -> None:
-        self._builder = builder
         self._arrays = arrays
         self._objective = objective
         self._block = block
@@ -590,7 +587,7 @@ class ScenarioTables:
         name: str,
         scenario_ids_remap: Optional[List[int]],
     ) -> pd.DataFrame:
-        return self._builder._da_to_df(
+        return SimulationTableBuilder._da_to_df(
             da,
             name,
             self._block,

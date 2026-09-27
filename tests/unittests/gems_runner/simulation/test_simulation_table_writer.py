@@ -237,3 +237,9 @@ def test_parquet_format(tmp_path: Path) -> None:
             "basis_status": None,
         },
     ]
+
+
+def test_writer_is_exported_from_package() -> None:
+    import gems_runner.simulation as simulation
+
+    assert simulation.SimulationTableWriter is SimulationTableWriter
