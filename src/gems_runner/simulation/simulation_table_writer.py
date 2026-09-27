@@ -73,12 +73,12 @@ class SimulationTableWriter:
         for scenario, part in table.data.groupby(
             SimulationColumns.SCENARIO_INDEX.value, dropna=False, sort=True
         ):
-            suffix = (
-                COMMON_SCENARIO_SUFFIX
-                if pd.isna(scenario)
-                else f"scenario-{int(cast(float, scenario))}"
+            scenario_id = None if pd.isna(scenario) else int(cast(float, scenario))
+            paths.append(
+                self.write_scenario(
+                    SimulationTable(part, table.table_id), output_dir, scenario_id
+                )
             )
-            paths.append(self._write_part(part, output_dir, table.table_id, suffix))
         return paths
 
     def write_scenario(

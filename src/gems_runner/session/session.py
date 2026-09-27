@@ -309,7 +309,8 @@ class SimulationSession:
             self.on_scenario_done(scenario_id, self._reduce(scenario_tables))
 
     def _reduce(self, tables: List[SimulationTable]) -> SimulationTable:
-        """REDUCE: merge SimulationTables from one scenario's blocks into one."""
+        """REDUCE: merge SimulationTables into one (an empty table for an
+        empty list)."""
         if not tables:
             return SimulationTable(pd.DataFrame(), table_id=self.run_id)
         return merge_simulation_tables(tables, table_id=self.run_id)
