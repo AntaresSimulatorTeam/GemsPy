@@ -51,8 +51,8 @@ def run_study(
 
     # Results are handed over one scenario at a time and written immediately:
     # in sequential/parallel modes as each scenario is solved, in frontal mode
-    # concurrently after the single solve. No table holding all scenarios is
-    # built. Benders mode writes no simulation table.
+    # one after another after the single solve. No table holding all scenarios
+    # is built. Benders mode writes no simulation table.
     session = SimulationSession(
         study=study,
         optim_config=optim_config,

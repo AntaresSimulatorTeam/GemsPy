@@ -25,7 +25,6 @@ the 13_1 investment study extended to 4 time steps and 2 MC scenarios.
 
 import shutil
 import textwrap
-import threading
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -132,25 +131,22 @@ def test_separate_scenario_modes_write_no_common_file(
 
 
 def _stream(
-    study_dir: Path, output_workers: Optional[int] = None
+    study_dir: Path,
 ) -> Tuple[SimulationTable, Dict[Optional[int], SimulationTable]]:
     """Run with on_scenario_done and collect the handed-over tables."""
     optim_config = load_optim_config(study_dir / "input" / "optim-config.yml")
     assert optim_config is not None
     streamed: Dict[Optional[int], SimulationTable] = {}
-    lock = threading.Lock()
 
     def collect(scenario_id: Optional[int], table: SimulationTable) -> None:
-        with lock:
-            assert scenario_id not in streamed, "scenario handed over twice"
-            streamed[scenario_id] = table
+        assert scenario_id not in streamed, "scenario handed over twice"
+        streamed[scenario_id] = table
 
     returned = SimulationSession(
         load_study(study_dir),
         optim_config,
         run_id="run",
         on_scenario_done=collect,
-        output_workers=output_workers,
     ).run()
     return returned, streamed
 
@@ -194,16 +190,6 @@ def test_frontal_hands_over_common_rows_once_and_each_scenario_once(
     for scenario_id in (0, 1):
         scenario_col = streamed[scenario_id].data["scenario_index"]
         assert (scenario_col == scenario_id).all()
-
-
-def test_frontal_result_does_not_depend_on_output_workers(tmp_path: Path) -> None:
-    study_dir = _make_study(tmp_path, "frontal")
-    _, one_worker = _stream(study_dir, output_workers=1)
-    _, many_workers = _stream(study_dir, output_workers=8)
-
-    assert one_worker.keys() == many_workers.keys()
-    for scenario_id, table in one_worker.items():
-        pd.testing.assert_frame_equal(table.data, many_workers[scenario_id].data)
 
 
 def test_split_files_can_be_read_together_like_views_builder(tmp_path: Path) -> None:

@@ -86,8 +86,7 @@ class SimulationTableWriter:
     ) -> Path:
         """Write the table of a single scenario to its ``scenario-<N>`` file, or,
         for *scenario_id* None, the rows shared by all scenarios to the
-        ``scenario-common`` file. Safe to call concurrently for different
-        scenarios."""
+        ``scenario-common`` file."""
         suffix = (
             COMMON_SCENARIO_SUFFIX if scenario_id is None else f"scenario-{scenario_id}"
         )
@@ -99,8 +98,8 @@ class SimulationTableWriter:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         path = output_dir / f"simulation_table_{table_id}_{suffix}.{self.output_format}"
-        # Both formats are written with pyarrow, which releases the GIL, so that
-        # files can be written concurrently from several threads.
+        # Both formats are written with pyarrow and the fixed schema, so that CSV
+        # and Parquet files have the same column types.
         # Pandas metadata is dropped so that the file only depends on the data
         # and the fixed schema, not on how the DataFrame was built.
         # An empty table may have no columns at all (e.g. SimulationTable(

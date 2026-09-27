@@ -10,7 +10,6 @@
 #
 # This file is part of the Antares project.
 
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 from uuid import uuid4
@@ -50,7 +49,6 @@ class SimulationSession:
         run_id: Optional[str] = None,
         output_dir: Optional[Path] = None,
         on_scenario_done: Optional[ScenarioCallback] = None,
-        output_workers: Optional[int] = None,
     ) -> None:
         """
         Args:
@@ -58,19 +56,16 @@ class SimulationSession:
                 scenario at a time instead of as one table: ``run()`` then
                 returns an empty table. In sequential and parallel subproblem
                 modes it is called as soon as a scenario is solved. In frontal
-                mode it is called concurrently (up to *output_workers* threads)
-                once the single solve is done, with each scenario's rows built
-                on demand, plus once with ``None`` for the rows shared by all
-                scenarios; no table holding all scenarios is built.
-            output_workers: Maximum number of threads handing frontal results
-                over to *on_scenario_done* (default: ThreadPoolExecutor's).
+                mode it is called once the single solve is done, first with
+                ``None`` for the rows shared by all scenarios, then for each
+                scenario, whose rows are built on demand; no table holding all
+                scenarios is built.
         """
         self.study = study
         self.optim_config = optim_config
         self.run_id = run_id or str(uuid4())
         self.output_dir = output_dir
         self.on_scenario_done = on_scenario_done
-        self.output_workers = output_workers
         self._apply_heuristics = should_apply_heuristics(study)
 
     @property
@@ -277,22 +272,20 @@ class SimulationSession:
         scenario_ids: List[int],
         callback: ScenarioCallback,
     ) -> None:
-        """Build each scenario's rows of a solved multi-scenario problem on
-        demand and pass them to *callback*, concurrently: at most
-        ``output_workers`` scenarios are held in memory at a time."""
+        """Build the rows of a solved multi-scenario problem one scenario at a
+        time and pass them to *callback*, so that only one scenario's table is
+        held in memory at a time."""
         tables = SimulationTableBuilder().build_per_scenario(
             problem, scenario_ids_remap=scenario_ids, table_id=self.run_id
         )
 
-        def hand_over(scenario_id: Optional[int]) -> None:
-            table = (
-                tables.common() if scenario_id is None else tables.scenario(scenario_id)
-            )
+        common = tables.common()
+        if common is not None:
+            callback(None, common)
+        for scenario_id in scenario_ids:
+            table = tables.scenario(scenario_id)
             if table is not None:
                 callback(scenario_id, table)
-
-        with ThreadPoolExecutor(max_workers=self.output_workers) as pool:
-            list(pool.map(hand_over, [None, *scenario_ids]))
 
     @staticmethod
     def _check_solved(problem: OptimizationProblem) -> None:

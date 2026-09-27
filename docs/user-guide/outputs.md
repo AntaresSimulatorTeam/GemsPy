@@ -121,8 +121,9 @@ In `sequential-subproblems` and `parallel-subproblems` modes each scenario's
 file is written as soon as that scenario is solved, so only one scenario's
 results are held in memory at a time. In `frontal` mode all scenarios come out
 of a single solve; after it, each scenario's rows are built directly from the
-solution and written in parallel threads, without first building a table
-holding all scenarios.
+solution and written one scenario at a time, without first building a table
+holding all scenarios, so only one scenario's table is held in memory at a
+time.
 
 Both formats are written with pyarrow. In CSV files the header and text values
 are quoted and index columns are integers, e.g.

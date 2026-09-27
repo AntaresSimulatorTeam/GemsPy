@@ -17,10 +17,10 @@ All notable changes to GemsPy are documented here.
   GEMS-ViewsBuilder). No table holding all scenarios is built: sequential and
   parallel subproblem modes write each scenario as soon as it is solved;
   frontal mode builds each scenario's rows from the solution after the single
-  solve and writes them in parallel threads.
+  solve and writes them one scenario at a time.
 - **`SimulationTableWriter`** - new in `gems_runner.simulation.simulation_table_writer`;
   writes a `SimulationTable` as CSV or Parquet (zstd), one file per scenario.
-- **`SimulationSession(on_scenario_done=..., output_workers=...)`** - hands
+- **`SimulationSession(on_scenario_done=...)`** - hands
   results over one scenario at a time (scenario id `None` for the shared rows)
   instead of returning one table; `SimulationTableBuilder.build_per_scenario`
   builds per-scenario tables on demand.
