@@ -6,7 +6,6 @@
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 import xarray as xr
 from simulation_table_fakes import (
@@ -15,7 +14,6 @@ from simulation_table_fakes import (
     FakeModel,
     FakeProblem,
     FakeStudy,
-    to_object_dtype,
 )
 
 from gems_runner.simulation.simulation_table import (
