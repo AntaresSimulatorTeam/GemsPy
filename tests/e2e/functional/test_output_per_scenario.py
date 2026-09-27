@@ -60,6 +60,7 @@ _RESOLUTIONS = {
         resolution:
           mode: sequential-subproblems
           block-length: 2
+          block-overlap: 1
         """),
     "parallel": textwrap.dedent("""\
         resolution:
@@ -204,3 +205,50 @@ def test_split_files_can_be_read_together_like_views_builder(tmp_path: Path) -> 
     assert objective.height == 1
     assert objective["absolute_time_index"].is_null().all()
     assert objective["scenario_index"].is_null().all()
+
+
+def test_sequential_overlap_keeps_one_row_per_block(tmp_path: Path) -> None:
+    """With block-overlap, a time step solved in two blocks appears once per
+    block in its scenario file."""
+    paths = _run_study_to_parquet(tmp_path, "sequential")
+
+    df = pd.read_parquet(paths[0])
+    generation = df[
+        (df["output"] == "generation")
+        & (df["component"] == "already_installed_generator")
+    ]
+    blocks_per_time_step = generation.groupby("absolute_time_index")["block"].apply(
+        sorted
+    )
+    assert blocks_per_time_step.to_dict() == {0: [0], 1: [0, 1], 2: [1, 2], 3: [2]}
+
+
+def test_frontal_non_consecutive_scenario_ids(tmp_path: Path) -> None:
+    """Scenario ids are mapped to their position in the solution arrays: with
+    include [0, 2], the second position is scenario 2."""
+    study_dir = _make_study(tmp_path, "frontal")
+    (study_dir / "input" / "data-series" / "load_ts.tsv").write_text(
+        "300\t500\t700\n350\t450\t650\n400\t550\t720\n250\t480\t690\n"
+    )
+    config_path = study_dir / "input" / "optim-config.yml"
+    config_path.write_text(_CONFIG_HEADER.replace("    - 1\n", "    - 2\n"))
+    optim_config = load_optim_config(config_path)
+    assert optim_config is not None
+    assert optim_config.scenario_scope.scenario_ids == [0, 2]
+    writer = SimulationTableWriter("parquet")
+
+    full_table = SimulationSession(
+        load_study(study_dir), optim_config, run_id="run"
+    ).run()
+    split_paths = sorted(writer.write(full_table, tmp_path / "split"))
+    _, streamed = _stream(study_dir)
+    streamed_paths = sorted(
+        writer.write_scenario(table, tmp_path / "streamed", scenario_id)
+        for scenario_id, table in streamed.items()
+    )
+
+    assert _suffixes(streamed_paths) == ["scenario-0", "scenario-2", "scenario-common"]
+    for split_path, streamed_path in zip(split_paths, streamed_paths):
+        assert split_path.read_bytes() == streamed_path.read_bytes(), split_path.name
+    scenario_2 = pd.read_parquet(streamed_paths[1])
+    assert (scenario_2["scenario_index"] == 2).all()

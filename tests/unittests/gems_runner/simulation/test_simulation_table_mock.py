@@ -17,6 +17,7 @@ from simulation_table_fakes import (
 
 from gems_runner.simulation.simulation_table import (
     SimulationColumns,
+    SimulationTable,
     SimulationTableBuilder,
 )
 from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
@@ -200,3 +201,72 @@ def test_multi_scenario_problem_keeps_shared_rows_without_scenario() -> None:
     )
 
     assert st.data[shared_outputs][SimulationColumns.SCENARIO_INDEX.value].isna().all()
+
+
+def _make_scenario_dependent_problem() -> "FakeProblem":
+    """A var with a scenario dim: [component=1, time=2, scenario=2]."""
+    da = xr.DataArray(
+        np.array([[[1.0, 2.0], [3.0, 4.0]]]),
+        dims=["component", "time", "scenario"],
+        coords={"component": ["compA"], "time": [0, 1], "scenario": [0, 1]},
+    )
+    return _make_problem_with_da(da)
+
+
+def _outputs_and_scenarios(table: SimulationTable) -> list:
+    df = table.data
+    return sorted(
+        zip(
+            df[SimulationColumns.OUTPUT.value],
+            df[SimulationColumns.SCENARIO_INDEX.value].map(
+                lambda s: None if pd.isna(s) else int(s)
+            ),
+        ),
+        key=str,
+    )
+
+
+def test_per_scenario_tables_split_scenario_rows_from_shared_rows() -> None:
+    tables = SimulationTableBuilder().build_per_scenario(
+        _make_scenario_dependent_problem(), scenario_ids_remap=[5, 7]  # type: ignore[arg-type]
+    )
+
+    common = tables.common()
+    scenario_7 = tables.scenario(7)
+    assert common is not None and scenario_7 is not None
+    assert _outputs_and_scenarios(common) == [("objective-value", None)]
+    assert _outputs_and_scenarios(scenario_7) == [("p", 7), ("p", 7)]
+    assert list(scenario_7.data[SimulationColumns.VALUE.value]) == [2.0, 4.0]
+
+
+def test_per_scenario_tables_without_scenario_dependent_outputs() -> None:
+    """All outputs are shared by the scenarios: everything goes to common() and
+    no scenario has rows of its own, so no scenario file must be written."""
+    tables = SimulationTableBuilder().build_per_scenario(
+        _make_scenario_independent_problem(), scenario_ids_remap=[0, 1]  # type: ignore[arg-type]
+    )
+
+    common = tables.common()
+    assert common is not None
+    assert _outputs_and_scenarios(common) == [
+        ("objective-value", None),
+        ("p", None),
+        ("p", None),
+    ]
+    assert tables.scenario(0) is None
+    assert tables.scenario(1) is None
+
+
+def test_per_scenario_tables_single_scenario_owns_all_rows() -> None:
+    tables = SimulationTableBuilder().build_per_scenario(
+        _make_scenario_independent_problem(), scenario_ids_remap=[3]  # type: ignore[arg-type]
+    )
+
+    assert tables.common() is None
+    scenario_3 = tables.scenario(3)
+    assert scenario_3 is not None
+    assert _outputs_and_scenarios(scenario_3) == [
+        ("objective-value", 3),
+        ("p", 3),
+        ("p", 3),
+    ]

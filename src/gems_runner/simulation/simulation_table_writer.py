@@ -114,5 +114,11 @@ class SimulationTableWriter:
                 row_group_size=PARQUET_ROW_GROUP_SIZE,
             )
         else:
-            pacsv.write_csv(arrow_table, path)
+            # No quotes, like pandas' CSV output; pyarrow raises instead of
+            # writing a broken row if a value contains a comma or a quote.
+            pacsv.write_csv(
+                arrow_table,
+                path,
+                pacsv.WriteOptions(quoting_style="none", quoting_header="none"),
+            )
         return path

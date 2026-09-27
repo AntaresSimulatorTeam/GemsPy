@@ -44,8 +44,9 @@ All notable changes to GemsPy are documented here.
   file; read `simulation_table_<run_id>_scenario-*.<ext>` instead.
 - **Breaking** - `SimulationTable.to_csv()` and `to_parquet()` removed; use
   `SimulationTableWriter(format).write(table, output_dir)`.
-- **Breaking** - CSV files are written with pyarrow: the header and text
-  values are quoted and index columns are integers (`3` instead of `3.0`).
+- **Breaking** - CSV files are written with pyarrow: index columns are
+  integers (`3` instead of `3.0`) and whole numbers are written without `.0`
+  (`42` instead of `42.0`).
 - **Breaking** - Parquet files no longer embed pandas metadata; integer
   columns with empty values are read back as floats by pandas.
 - Benders decomposition mode no longer writes an empty simulation table file.

@@ -125,9 +125,9 @@ solution and written one scenario at a time, without first building a table
 holding all scenarios, so only one scenario's table is held in memory at a
 time.
 
-Both formats are written with pyarrow. In CSV files the header and text values
-are quoted and index columns are integers, e.g.
-`0,"my_node","spillage",0,0,3,0,`.
+Both formats are written with pyarrow. CSV files have no quotes; index columns
+are integers and whole numbers are written without `.0`, e.g.
+`0,my_node,spillage,0,0,3,0,`.
 
 In `benders-decomposition` mode no simulation table is written: the solve is
 done by Antares Xpansion.

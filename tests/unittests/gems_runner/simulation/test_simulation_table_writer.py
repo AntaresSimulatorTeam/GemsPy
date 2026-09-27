@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 from simulation_table_fakes import to_object_dtype
@@ -149,3 +150,90 @@ def test_split_empty_table_writes_nothing(tmp_path: Path) -> None:
 def test_unsupported_output_format_raises() -> None:
     with pytest.raises(ValueError, match="Unsupported output format"):
         SimulationTableWriter("xlsx")  # type: ignore[arg-type]
+
+
+def test_csv_format(tmp_path: Path) -> None:
+    """CSV files are written by pyarrow without quotes: integer index columns,
+    empty cells for missing values, whole floats without '.0'."""
+    table = _table(
+        [
+            {
+                **_row("gen", "p", 1, 1.5),
+                "absolute_time_index": 3,
+                "block_time_index": 3,
+            },
+            _row(None, "objective-value", 1, 42.0),
+        ]
+    )
+    path = SimulationTableWriter("csv").write_scenario(table, tmp_path, 1)
+
+    assert path.read_text().splitlines() == [
+        "block,component,output,absolute_time_index,block_time_index,"
+        "scenario_index,value,basis_status",
+        "0,gen,p,3,3,1,1.5,",
+        "0,,objective-value,,,1,42,",
+    ]
+
+
+def test_csv_value_with_comma_raises_instead_of_writing_a_broken_row(
+    tmp_path: Path,
+) -> None:
+    table = _table([_row("gen,1", "p", 0, 1.0)])
+    with pytest.raises(pa.ArrowInvalid, match="structural characters"):
+        SimulationTableWriter("csv").write_scenario(table, tmp_path, 0)
+
+
+def test_parquet_format(tmp_path: Path) -> None:
+    """Parquet files use the fixed schema without pandas metadata, zstd
+    compression, 64,000-row groups, and store missing values as nulls."""
+    n_rows = 150_000
+    rows = pd.DataFrame(
+        {
+            SimulationColumns.BLOCK.value: 0,
+            SimulationColumns.COMPONENT.value: "gen",
+            SimulationColumns.OUTPUT.value: "p",
+            SimulationColumns.ABSOLUTE_TIME_INDEX.value: range(n_rows),
+            SimulationColumns.BLOCK_TIME_INDEX.value: range(n_rows),
+            SimulationColumns.SCENARIO_INDEX.value: 1,
+            SimulationColumns.VALUE.value: 1.5,
+            SimulationColumns.BASIS_STATUS.value: None,
+        }
+    )
+    objective = pd.DataFrame([_row(None, "objective-value", 1, 42.0)])
+    table = SimulationTable(pd.concat([rows, objective], ignore_index=True), "run")
+    path = SimulationTableWriter("parquet").write_scenario(table, tmp_path, 1)
+
+    parquet_file = pq.ParquetFile(path)
+    assert parquet_file.schema_arrow.equals(SIMULATION_TABLE_SCHEMA)
+    assert parquet_file.schema_arrow.metadata is None  # no pandas metadata
+    metadata = parquet_file.metadata
+    assert [metadata.row_group(i).num_rows for i in range(metadata.num_row_groups)] == [
+        64_000,
+        64_000,
+        22_001,
+    ]
+    for group in range(metadata.num_row_groups):
+        for column in range(metadata.num_columns):
+            assert metadata.row_group(group).column(column).compression == "ZSTD"
+    assert parquet_file.read().slice(n_rows - 1).to_pylist() == [
+        {
+            "block": 0,
+            "component": "gen",
+            "output": "p",
+            "absolute_time_index": n_rows - 1,
+            "block_time_index": n_rows - 1,
+            "scenario_index": 1,
+            "value": 1.5,
+            "basis_status": None,
+        },
+        {
+            "block": 0,
+            "component": None,
+            "output": "objective-value",
+            "absolute_time_index": None,
+            "block_time_index": None,
+            "scenario_index": 1,
+            "value": 42.0,
+            "basis_status": None,
+        },
+    ]
