@@ -102,16 +102,9 @@ class SimulationTableWriter:
         # and Parquet files have the same column types.
         # Pandas metadata is dropped so that the file only depends on the data
         # and the fixed schema, not on how the DataFrame was built.
-        # An empty table may have no columns at all (e.g. SimulationTable(
-        # pd.DataFrame())), which from_pandas cannot match against the schema:
-        # write an empty table with the fixed columns instead.
-        arrow_table = (
-            SIMULATION_TABLE_SCHEMA.empty_table()
-            if df.empty
-            else pa.Table.from_pandas(
-                df, schema=SIMULATION_TABLE_SCHEMA, preserve_index=False
-            ).replace_schema_metadata(None)
-        )
+        arrow_table = pa.Table.from_pandas(
+            df, schema=SIMULATION_TABLE_SCHEMA, preserve_index=False
+        ).replace_schema_metadata(None)
         if self.output_format == "parquet":
             pq.write_table(  # type: ignore[no-untyped-call]
                 arrow_table,
