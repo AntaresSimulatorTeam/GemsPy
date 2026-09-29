@@ -210,6 +210,11 @@ listing the affected groups.
 > **Note** — Xpress (≥ 9.8) and Gurobi (≥ 10.0) require their respective Python
 > packages and a valid licence.
 
+`logs` is translated into the solver's own output option: `output_flag` for
+HiGHS, `OutputFlag` for Gurobi and `outputlog` for Xpress. The same option set
+explicitly in `parameters` takes precedence. HiGHS always prints its one-line
+`Running HiGHS ...` banner when the solver starts, even with `logs: false`.
+
 ---
 
 ## `resolution`
