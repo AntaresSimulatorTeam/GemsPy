@@ -85,7 +85,7 @@ ds = results.to_dataset()             # returns an xarray Dataset
 ~~~
 
 Parquet files are written with zstd compression (level 3) and row groups of
-64,000 rows, the same settings as GEMS-ViewsBuilder.
+64,000 rows.
 
 ### Choosing the output format from the CLI
 

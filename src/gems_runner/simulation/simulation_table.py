@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-# Parquet write settings, aligned with GEMS-ViewsBuilder (gems_views_builder/common.py)
 PARQUET_COMPRESSION: Literal["zstd"] = "zstd"
 PARQUET_COMPRESSION_LEVEL = 3
 PARQUET_ROW_GROUP_SIZE = 64_000
