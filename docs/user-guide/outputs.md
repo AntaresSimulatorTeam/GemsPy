@@ -97,4 +97,5 @@ gemspy --study path/to/study_dir --output-format parquet
 ~~~
 
 The equivalent Python call is
-`run_study(Path("path/to/study_dir"), output_format="parquet")`.
+`run_study(Path("path/to/study_dir"), output_format=OutputFormat.PARQUET)`,
+with `OutputFormat` imported from `gems_craft.study.parsing`.
