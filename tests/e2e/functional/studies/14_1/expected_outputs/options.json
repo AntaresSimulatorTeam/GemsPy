@@ -1,0 +1,10 @@
+{
+     "MASTER_NAME": "master",
+     "STRUCTURE_FILE": "structure.txt",
+     "INPUTROOT": ".",
+     "SLAVE_WEIGHT": "CONSTANT",
+     "SLAVE_WEIGHT_VALUE": 2,
+     "SOLVER_NAME": "COIN",
+     "JSON_FILE": "expansion/out.json",
+     "LAST_ITERATION_JSON_FILE": "expansion/last_iteration.json"
+}

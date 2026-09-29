@@ -1,0 +1,63 @@
+# Copyright (c) 2026, RTE (https://www.rte-france.com)
+#
+# See AUTHORS.txt
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This file is part of the Antares project.
+
+# Study case 14_1 : per-(Monte Carlo year, week-block) Benders subproblem
+# generation. Same investment model as 13_1 (one continuous investment
+# candidate), but run over 2 scenarios x 2 week-blocks so that
+# build_decomposed_problems produces 4 independent subproblems sharing one
+# master, instead of 13_1/13_2's single-subproblem degenerate case.
+
+system:
+  id: case_14_1
+  components:
+    - id: my_node
+      model: lib_example_14_1.area
+      parameters:
+        - id: spillage_cost
+          time-dependent: false
+          scenario-dependent: false
+          value: 1
+        - id: ens_cost
+          time-dependent: false
+          scenario-dependent: false
+          value: 501
+
+    - id: load
+      model: lib_example_14_1.load
+      parameters:
+        - id: load
+          time-dependent: false
+          scenario-dependent: false
+          value: 400
+
+    - id: continuous_generator_candidate
+      model: lib_example_14_1.generator_with_continuous_invest
+      parameters:
+        - id: op_cost
+          scenario-dependent: false
+          time-dependent: false
+          value: 10
+        - id: invest_cost
+          scenario-dependent: false
+          time-dependent: false
+          value: 400
+
+  connections:
+    - component1: my_node
+      port1: balance_port
+      component2: load
+      port2: balance_port
+
+    - component1: my_node
+      port1: balance_port
+      component2: continuous_generator_candidate
+      port2: balance_port

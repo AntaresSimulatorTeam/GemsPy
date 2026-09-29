@@ -17,9 +17,9 @@ Each study directory contains:
   - input/system.yml           : network and component definitions
   - input/model-libraries/     : model library YAML files
   - input/optim-config.yml     : decomposition configuration
-  - expected_outputs/master.mps      : expected MPS for the master problem
-  - expected_outputs/subproblem.mps  : expected MPS for the subproblem
-  - expected_outputs/structure.txt   : expected Benders structure file
+  - expected_outputs/master.mps           : expected MPS for the master problem
+  - expected_outputs/subproblem_y0_w1.mps : expected MPS for the (single) subproblem
+  - expected_outputs/structure.txt        : expected Benders structure file
 
 The test builds the decomposed problems from the input files, writes MPS
 files via linopy's to_file(), generates structure.txt, and asserts that
@@ -70,13 +70,12 @@ def test_study_mps_matches_expected(study_id: str, tmp_path: Path) -> None:
     time_block = TimeBlock(1, [0])
     scenarios = 1
     decomposed = build_decomposed_problems(
-        Study(system, database), time_block, list(range(scenarios)), optim_config
+        Study(system, database), [time_block], list(range(scenarios)), optim_config
     )
 
     # --- Write MPS files ---
-    decomposed.subproblem.linopy_model.to_file(
-        tmp_path / f"{decomposed.subproblem.name}.mps"
-    )
+    for subproblem in decomposed.subproblems:
+        subproblem.linopy_model.to_file(tmp_path / f"{subproblem.name}.mps")
     if decomposed.master is not None:
         decomposed.master.linopy_model.to_file(
             tmp_path / f"{decomposed.master.name}.mps"
@@ -90,7 +89,8 @@ def test_study_mps_matches_expected(study_id: str, tmp_path: Path) -> None:
     )
 
     # --- Assert subproblem MPS matches expected ---
-    sub_name = decomposed.subproblem.name
+    assert len(decomposed.subproblems) == 1
+    sub_name = decomposed.subproblems[0].name
     generated_sub = (tmp_path / f"{sub_name}.mps").read_text()
     expected_sub = (expected_dir / f"{sub_name}.mps").read_text()
     assert generated_sub == expected_sub, (
