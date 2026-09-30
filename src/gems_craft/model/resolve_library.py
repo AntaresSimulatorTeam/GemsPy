@@ -115,11 +115,15 @@ def resolve_library(
                 port_types={},
                 models={},
                 taxonomy=cur_yaml_lib.taxonomy,
+                sets=set(),
             )
 
             # Add already parsed port types from dependencies in current lib
             _add_preloaded_port_types_to_current_lib(preloaded_port_types, current_lib)
             _add_resolved_dependent_port_types_to_current_lib(
+                output_lib_dict, treated_lib_ids, cur_yaml_lib, current_lib
+            )
+            _add_resolved_dependent_sets_to_current_lib(
                 output_lib_dict, treated_lib_ids, cur_yaml_lib, current_lib
             )
 
@@ -152,6 +156,17 @@ def _add_resolved_dependent_port_types_to_current_lib(
         current_lib.port_types.update(output_lib_dict[done_lib].port_types)
 
 
+def _add_resolved_dependent_sets_to_current_lib(
+    output_lib_dict: Dict[str, Library],
+    treated_lib_ids: Set[str],
+    cur_yaml_lib: LibrarySchema,
+    current_lib: Library,
+) -> None:
+    done_dependencies = set(cur_yaml_lib.dependencies) & treated_lib_ids
+    for done_lib in done_dependencies:
+        current_lib.sets.update(output_lib_dict[done_lib].sets)
+
+
 def _update_treated_libs_and_import_stack(
     treated_lib_ids: Set[str], import_stack: List[str]
 ) -> None:
@@ -170,13 +185,20 @@ def _resolve_lib(
         )
     current_lib.port_types.update(port_types_dict)
 
+    own_sets = {s.id for s in cur_yaml_lib.sets}
+    if current_lib.sets & own_sets:
+        raise Exception(
+            f"Set(s): {current_lib.sets & own_sets} is(are) defined twice."
+        )
+    current_lib.sets.update(own_sets)
+
     cur_yaml_lib_model_ids = [model.id for model in cur_yaml_lib.models]
     for id in cur_yaml_lib_model_ids:
         if cur_yaml_lib_model_ids.count(id) > 1:
             raise Exception(f"Model {id} is defined twice")
 
     models = [
-        _resolve_model(m, current_lib.port_types, current_lib.id)
+        _resolve_model(m, current_lib.port_types, current_lib.id, current_lib.sets)
         for m in cur_yaml_lib.models
     ]
 
@@ -328,13 +350,25 @@ def _forbid_sum_connections_on_own_port(
 
 
 def _resolve_model(
-    input_model: ModelSchema, port_types: Dict[str, PortType], library_id: str
+    input_model: ModelSchema,
+    port_types: Dict[str, PortType],
+    library_id: str,
+    visible_global_sets: Set[str],
 ) -> Model:
+    local_set_ids = {s.id for s in input_model.sets}
+    collision = local_set_ids & visible_global_sets
+    if collision:
+        raise ValueError(
+            f"Local set(s) {collision} in model '{input_model.id}' collide with "
+            f"global set(s) of the same name visible to this library."
+        )
+
     identifiers = ModelIdentifiers(
         variables={v.id for v in input_model.variables},
         parameters={p.id for p in input_model.parameters},
         constraints={c.id for c in input_model.binding_constraints}
         | {c.id for c in input_model.constraints},
+        sets=local_set_ids | visible_global_sets,
     )
 
     own_port_fields: Set[tuple] = {
@@ -384,7 +418,7 @@ def _resolve_model(
 
     return model(
         id=f"{library_id}.{input_model.id}",
-        parameters=[_to_parameter(p) for p in input_model.parameters],
+        parameters=[_to_parameter(p, identifiers) for p in input_model.parameters],
         variables=[_to_variable(v, identifiers) for v in input_model.variables],
         ports=[_resolve_model_port(p, port_types) for p in input_model.ports],
         port_fields_definitions=[
@@ -396,6 +430,7 @@ def _resolve_model(
         objective_contributions=objective_contributions,
         extra_outputs=extra_outputs,
         properties=[p.id for p in input_model.properties],
+        local_sets=local_set_ids,
     )
 
 
@@ -415,11 +450,19 @@ def _resolve_field_definition(
     )
 
 
-def _to_parameter(param: ParameterSchema) -> Parameter:
+def _to_parameter(param: ParameterSchema, identifiers: ModelIdentifiers) -> Parameter:
+    indexed_by = frozenset(param.indexed_by)
+    unknown = indexed_by - identifiers.sets
+    if unknown:
+        raise ValueError(
+            f"Parameter '{param.id}' is indexed by undeclared set(s): {unknown}"
+        )
     return Parameter(
         name=param.id,
         type=ValueType.CONTINUOUS,
-        structure=IndexingStructure(param.time_dependent, param.scenario_dependent),
+        structure=IndexingStructure(
+            param.time_dependent, param.scenario_dependent, indexed_by
+        ),
     )
 
 
@@ -432,6 +475,12 @@ def _to_expression_if_present(
 
 
 def _to_variable(var: VariableSchema, identifiers: ModelIdentifiers) -> Variable:
+    indexed_by = frozenset(var.indexed_by)
+    unknown = indexed_by - identifiers.sets
+    if unknown:
+        raise ValueError(
+            f"Variable '{var.id}' is indexed by undeclared set(s): {unknown}"
+        )
     return Variable(
         name=var.id,
         data_type={
@@ -439,7 +488,9 @@ def _to_variable(var: VariableSchema, identifiers: ModelIdentifiers) -> Variable
             "integer": ValueType.INTEGER,
             "binary": ValueType.BINARY,
         }[var.variable_type],
-        structure=IndexingStructure(var.time_dependent, var.scenario_dependent),
+        structure=IndexingStructure(
+            var.time_dependent, var.scenario_dependent, indexed_by
+        ),
         lower_bound=_to_expression_if_present(var.lower_bound, identifiers),
         upper_bound=_to_expression_if_present(var.upper_bound, identifiers),
     )

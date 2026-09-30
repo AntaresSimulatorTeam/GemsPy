@@ -75,21 +75,12 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return visit(node.operand, self)
 
     def _combine(self, operands: List[ExpressionNode]) -> IndexingStructure:
-        if not operands:
-            return IndexingStructure(False, False)
-        res = visit(operands[0], self)
-        if res.is_time_scenario_varying():
-            return res
-        for o in operands[1:]:
+        res = IndexingStructure(False, False)
+        for o in operands:
             res = res | visit(o, self)
-            if res.is_time_scenario_varying():
-                return res
         return res
 
     def addition(self, node: AdditionNode) -> IndexingStructure:
-        # performance note:
-        # here we don't need to visit all nodes, we can stop as soon as
-        # index is true/true
         return self._combine(node.operands)
 
     def multiplication(self, node: MultiplicationNode) -> IndexingStructure:
@@ -102,41 +93,42 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return self._combine([node.left, node.right])
 
     def variable(self, node: VariableNode) -> IndexingStructure:
-        time = self.context.get_variable_structure(node.name).time == True
-        scenario = self.context.get_variable_structure(node.name).scenario == True
-        return IndexingStructure(time, scenario)
+        return self.context.get_variable_structure(node.name)
 
     def parameter(self, node: ParameterNode) -> IndexingStructure:
-        time = self.context.get_parameter_structure(node.name).time == True
-        scenario = self.context.get_parameter_structure(node.name).scenario == True
-        return IndexingStructure(time, scenario)
+        return self.context.get_parameter_structure(node.name)
 
     def time_shift(self, node: TimeShiftNode) -> IndexingStructure:
         return visit(node.operand, self)
 
     def time_eval(self, node: TimeEvalNode) -> IndexingStructure:
-        return IndexingStructure(False, visit(node.operand, self).scenario)
+        inner = visit(node.operand, self)
+        return IndexingStructure(False, inner.scenario, inner.sets)
 
     def time_sum(self, node: TimeSumNode) -> IndexingStructure:
         return visit(node.operand, self)
 
     def all_time_sum(self, node: AllTimeSumNode) -> IndexingStructure:
-        return IndexingStructure(False, visit(node.operand, self).scenario)
+        inner = visit(node.operand, self)
+        return IndexingStructure(False, inner.scenario, inner.sets)
 
     def set_index(self, node: SetIndexNode) -> IndexingStructure:
-        # TODO(custom sets, phase 2): once IndexingStructure carries a `sets`
-        # dimension, indexing into `node.set_id` should remove it from the
-        # combined structure (mirroring how time_shift keeps time, but a
-        # concrete position/relative-shift resolves that one set dimension).
-        return visit(node.operand, self)
+        inner = visit(node.operand, self)
+        if node.position is not None:
+            # Explicit position resolves to a single element: collapses the
+            # dimension, mirroring how time_eval collapses time.
+            return IndexingStructure(inner.time, inner.scenario, inner.sets - {node.set_id})
+        # Bare (`X[fuel]`) or relative-shift (`X[fuel+1]`) forms still vary
+        # over the set, mirroring how time_shift keeps time.
+        return inner
 
     def sum_over(self, node: SumOverNode) -> IndexingStructure:
-        # TODO(custom sets, phase 2): should remove `node.set_id` from the
-        # combined structure's `sets`, mirroring all_time_sum's collapsing of time.
-        return visit(node.operand, self)
+        inner = visit(node.operand, self)
+        return IndexingStructure(inner.time, inner.scenario, inner.sets - {node.set_id})
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> IndexingStructure:
-        return IndexingStructure(visit(node.operand, self).time, False)
+        inner = visit(node.operand, self)
+        return IndexingStructure(inner.time, False, inner.sets)
 
     def port_field(self, node: PortFieldNode) -> IndexingStructure:
         raise ValueError(

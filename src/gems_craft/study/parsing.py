@@ -11,12 +11,13 @@
 # This file is part of the Antares project.
 
 import argparse
+import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
 
-from pydantic import Field, ValidationError, model_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 from yaml import safe_dump, safe_load
 
 from gems_craft.utils import ModifiedBaseModel
@@ -33,6 +34,7 @@ class ComponentParameterSchema(ModifiedBaseModel):
     id: str
     time_dependent: bool = False
     scenario_dependent: bool = False
+    indexed_by: List[str] = Field(default_factory=list)
     value: Union[float, str]
     scenario_group: Optional[str] = None
 
@@ -71,6 +73,28 @@ class IntegerStrategy(ModifiedBaseModel):
         return self
 
 
+class SetInstanceSchema(ModifiedBaseModel):
+    id: str
+    elements: Union[List[Union[str, int]], str]
+
+    @field_validator("elements", mode="after")
+    @classmethod
+    def _expand_range(
+        cls, v: Union[List[Union[str, int]], str]
+    ) -> Union[List[Union[str, int]], str]:
+        if isinstance(v, str):
+            m = re.fullmatch(r"(\d+)\.\.(\d+)", v.strip())
+            if not m:
+                raise ValueError(
+                    f"Invalid elements range {v!r}: expected 'a..b' (e.g. '0..9')"
+                )
+            a, b = int(m.group(1)), int(m.group(2))
+            if a > b:
+                raise ValueError(f"Range start must be <= end, got {v!r}")
+            return list(range(a, b + 1))
+        return v
+
+
 class ComponentSchema(ModifiedBaseModel):
     id: str
     model: str
@@ -78,6 +102,7 @@ class ComponentSchema(ModifiedBaseModel):
     parameters: Optional[List[ComponentParameterSchema]] = None
     properties: Optional[List[ComponentPropertySchema]] = None
     integer_strategy: IntegerStrategy = Field(default_factory=IntegerStrategy)
+    sets: Optional[List[SetInstanceSchema]] = None
 
 
 class SystemSchema(ModifiedBaseModel):
@@ -85,6 +110,7 @@ class SystemSchema(ModifiedBaseModel):
     model_libraries: Optional[str] = None  # Parsed but unused for now
     components: List[ComponentSchema] = Field(default_factory=list)
     connections: Optional[List[PortConnectionsSchema]] = None
+    sets: Optional[List[SetInstanceSchema]] = None
 
 
 _S = TypeVar("_S", bound=SystemSchema)
