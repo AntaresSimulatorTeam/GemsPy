@@ -264,10 +264,6 @@ class SimulationTableBuilder:
         self, problem: OptimizationProblem
     ) -> List[Tuple[str, xr.DataArray]]:
         arrays: List[Tuple[str, xr.DataArray]] = []
-        solution = problem.linopy_model.solution
-        if solution is None:
-            return arrays
-
         for (mk, var_name), lv in problem._linopy_vars.items():
             sol_da = problem.get_variable_solution(mk, var_name)
             if sol_da is None:
@@ -288,15 +284,14 @@ class SimulationTableBuilder:
         arrays: List[Tuple[str, xr.DataArray]] = []
 
         var_solution_arrays: Dict[Tuple[str, str], xr.DataArray] = {}
-        if problem.linopy_model.solution is not None:
-            for (mk, vname), lv in problem._linopy_vars.items():
-                sol_da = problem.get_variable_solution(mk, vname)
-                if sol_da is None:
-                    continue
-                if "component" in sol_da.dims:
-                    own_components = list(lv.coords["component"].values)
-                    sol_da = sol_da.sel(component=own_components)
-                var_solution_arrays[(mk, vname)] = sol_da
+        for (mk, vname), lv in problem._linopy_vars.items():
+            sol_da = problem.get_variable_solution(mk, vname)
+            if sol_da is None:
+                continue
+            if "component" in sol_da.dims:
+                own_components = list(lv.coords["component"].values)
+                sol_da = sol_da.sel(component=own_components)
+            var_solution_arrays[(mk, vname)] = sol_da
 
         constraint_dual_arrays = self._collect_constraint_duals(problem)
         var_reduced_cost_arrays = self._collect_reduced_costs(problem)
@@ -508,6 +503,10 @@ class SimulationTableBuilder:
         comp_vals: List[Any] = list(da.coords["component"].values)
         n_c, n_t, n_s = da.shape
 
+        # Format each component name once, then repeat it for its rows.
+        comp_names = np.array(
+            [str(c) if c is not None else None for c in comp_vals], dtype=object
+        )
         ci = np.repeat(np.arange(n_c), n_t * n_s)
         ti = np.tile(np.repeat(np.arange(n_t), n_s), n_c)
         raw_si = (
@@ -518,9 +517,7 @@ class SimulationTableBuilder:
         return pd.DataFrame(
             {
                 SimulationColumns.BLOCK.value: block,
-                SimulationColumns.COMPONENT.value: [
-                    str(c) if c is not None else None for c in np.array(comp_vals)[ci]
-                ],
+                SimulationColumns.COMPONENT.value: comp_names[ci],
                 SimulationColumns.OUTPUT.value: output_name,
                 SimulationColumns.ABSOLUTE_TIME_INDEX.value: (
                     (abs_offset + ti) if has_time else None

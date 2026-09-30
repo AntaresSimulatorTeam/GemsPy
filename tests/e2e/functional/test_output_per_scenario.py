@@ -33,6 +33,7 @@ import pytest
 
 from gems_craft.optim_config.parsing import load_optim_config
 from gems_craft.study.folder import load_study
+from gems_craft.study.parsing import OutputFormat
 from gems_runner.session.session import SimulationSession
 from gems_runner.simulation.simulation_table import (
     SimulationTable,
@@ -155,33 +156,38 @@ def _stream(
     return returned, streamed
 
 
-@pytest.mark.parametrize("output_format", ["csv", "parquet"])
 @pytest.mark.parametrize("mode", ["frontal", "sequential", "parallel"])
 def test_streamed_files_match_splitting_the_full_table(
-    tmp_path: Path, mode: str, output_format: str
+    tmp_path: Path, mode: str
 ) -> None:
     """Handing results over one scenario at a time gives byte-identical files
-    to solving everything first and splitting the full table."""
+    to solving everything first and splitting the full table, in both formats
+    (each study is solved once and written in both formats)."""
     study_dir = _make_study(tmp_path, mode)
     optim_config = load_optim_config(study_dir / "input" / "optim-config.yml")
     assert optim_config is not None
-    writer = SimulationTableWriter(output_format)  # type: ignore[arg-type]
 
     full_table = SimulationSession(
         load_study(study_dir), optim_config, run_id="run"
     ).run()
-    split_paths = sorted(writer.write(full_table, tmp_path / "split"))
-
     returned, streamed = _stream(study_dir)
     assert returned.data.empty  # nothing kept once handed to the callback
-    streamed_paths = sorted(
-        writer.write_scenario(table, tmp_path / "streamed", scenario_id)
-        for scenario_id, table in streamed.items()
-    )
 
-    assert [p.name for p in split_paths] == [p.name for p in streamed_paths]
-    for split_path, streamed_path in zip(split_paths, streamed_paths, strict=True):
-        assert split_path.read_bytes() == streamed_path.read_bytes(), split_path.name
+    for output_format in OutputFormat:
+        writer = SimulationTableWriter(output_format)
+        out_dir = tmp_path / output_format.value
+        split_paths = sorted(writer.write(full_table, out_dir / "split"))
+        streamed_paths = sorted(
+            writer.write_scenario(table, out_dir / "streamed", scenario_id)
+            for scenario_id, table in streamed.items()
+        )
+
+        assert split_paths, output_format
+        assert [p.name for p in split_paths] == [p.name for p in streamed_paths]
+        for split_path, streamed_path in zip(split_paths, streamed_paths, strict=True):
+            assert (
+                split_path.read_bytes() == streamed_path.read_bytes()
+            ), split_path.name
 
 
 def test_frontal_hands_over_common_rows_once_and_each_scenario_once(
