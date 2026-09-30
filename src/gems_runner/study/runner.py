@@ -4,6 +4,7 @@ from typing import Optional
 
 from gems_craft.optim_config.parsing import OptimConfig, load_optim_config
 from gems_craft.study.folder import load_study
+from gems_craft.study.parsing import OutputFormat
 from gems_runner.session.session import SimulationSession
 from gems_runner.simulation.simulation_table import SimulationTable
 from gems_runner.simulation.simulation_table_writer import (
@@ -15,7 +16,7 @@ from gems_runner.simulation.simulation_table_writer import (
 def run_study(
     study_dir: Path,
     optim_config_path: Optional[Path] = None,
-    output_format: OutputFormat = "csv",
+    output_format: OutputFormat = OutputFormat.CSV,
 ) -> None:
     """
     Runs a simulation study and exports results to CSV or Parquet, one
@@ -29,10 +30,9 @@ def run_study(
         study_dir: The path to the study directory.
         optim_config_path: Optional custom path to an optim-config YAML file.
             If not provided, defaults to ``study_dir/input/optim-config.yml``.
-        output_format: Format of the simulation table files, ``"csv"``
-            (default) or ``"parquet"`` (zstd-compressed). One file is written per
-            MC scenario, plus a ``scenario-common`` file when some rows are shared
-            by all scenarios (frontal mode).
+        output_format: Format of the simulation table file,
+            ``OutputFormat.CSV`` (default) or ``OutputFormat.PARQUET``
+            (zstd-compressed).
     """
     study = load_study(study_dir)
 

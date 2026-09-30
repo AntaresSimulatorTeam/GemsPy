@@ -85,9 +85,8 @@ results.to_netcdf(Path("output/"))    # writes a NetCDF file
 ds = results.to_dataset()             # returns an xarray Dataset
 ~~~
 
-`SimulationTableWriter` writes CSV or Parquet, one file per MC scenario (see
-below). Parquet files are written with zstd compression (level 3) and row
-groups of 64,000 rows, the same settings as GEMS-ViewsBuilder.
+Parquet files are written with zstd compression (level 3) and row groups of
+64,000 rows.
 
 ### Output files of `gemspy`
 
@@ -133,4 +132,5 @@ In `benders-decomposition` mode no simulation table is written: the solve is
 done by Antares Xpansion.
 
 The equivalent Python call is
-`run_study(Path("path/to/study_dir"), output_format="parquet")`.
+`run_study(Path("path/to/study_dir"), output_format=OutputFormat.PARQUET)`,
+with `OutputFormat` imported from `gems_craft.study.parsing`.

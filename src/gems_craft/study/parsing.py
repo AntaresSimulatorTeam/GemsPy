@@ -14,7 +14,7 @@ import argparse
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Literal, Optional, TextIO, Type, TypeVar, Union, overload
+from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
 
 from pydantic import Field, ValidationError, model_validator
 from yaml import safe_dump, safe_load
@@ -51,6 +51,11 @@ class IntegerStrategyId(str, Enum):
 class HeuristicId(str, Enum):
     FAST = "fast"
     ACCURATE = "accurate"
+
+
+class OutputFormat(str, Enum):
+    CSV = "csv"
+    PARQUET = "parquet"
 
 
 class IntegerStrategy(ModifiedBaseModel):
@@ -126,7 +131,7 @@ def write_yaml_system(system: SystemSchema, path: Path) -> None:
 class ParsedArguments:
     study_dir: Path
     optim_config_path: Optional[Path] = None
-    output_format: Literal["csv", "parquet"] = "csv"
+    output_format: OutputFormat = OutputFormat.CSV
 
 
 def parse_cli() -> ParsedArguments:
@@ -146,8 +151,8 @@ def parse_cli() -> ParsedArguments:
     )
     parser.add_argument(
         "--output-format",
-        choices=["csv", "parquet"],
-        default="csv",
+        choices=[output_format.value for output_format in OutputFormat],
+        default=OutputFormat.CSV.value,
         dest="output_format",
         help="format of the simulation table file (default: csv)",
     )
@@ -156,5 +161,5 @@ def parse_cli() -> ParsedArguments:
     return ParsedArguments(
         study_dir=args.study,
         optim_config_path=args.optim_config,
-        output_format=args.output_format,
+        output_format=OutputFormat(args.output_format),
     )
