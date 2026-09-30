@@ -529,7 +529,7 @@ requires-dist = [
     { name = "mkdocstrings-python", marker = "extra == 'doc'" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pandas", specifier = ">=2.2" },
-    { name = "pyarrow", specifier = ">=22.0" },
+    { name = "pyarrow", specifier = ">=15.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "xarray", specifier = ">=2025.3" },

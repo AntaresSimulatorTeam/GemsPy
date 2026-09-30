@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 from simulation_table_fakes import to_object_dtype
@@ -152,9 +151,9 @@ def test_unsupported_output_format_raises() -> None:
         SimulationTableWriter("xlsx")  # type: ignore[arg-type]
 
 
-def test_csv_format(tmp_path: Path) -> None:
-    """CSV files are written by pyarrow without quotes: integer index columns,
-    empty cells for missing values, whole floats without '.0'."""
+def test_csv_format_is_pandas_to_csv(tmp_path: Path) -> None:
+    """CSV files are written with pandas, as the single-file output of earlier
+    versions: the same text as ``DataFrame.to_csv(index=False)``."""
     table = _table(
         [
             {
@@ -167,20 +166,18 @@ def test_csv_format(tmp_path: Path) -> None:
     )
     path = SimulationTableWriter("csv").write_scenario(table, tmp_path, 1)
 
-    assert path.read_text().splitlines() == [
-        "block,component,output,absolute_time_index,block_time_index,"
-        "scenario_index,value,basis_status",
-        "0,gen,p,3,3,1,1.5,",
-        "0,,objective-value,,,1,42,",
-    ]
+    assert path.read_text() == table.data.to_csv(index=False)
+    assert path.read_text().splitlines()[2] == "0,,objective-value,,,1,42.0,"
 
 
-def test_csv_value_with_comma_raises_instead_of_writing_a_broken_row(
-    tmp_path: Path,
-) -> None:
-    table = _table([_row("gen,1", "p", 0, 1.0)])
-    with pytest.raises(pa.ArrowInvalid, match="structural characters"):
-        SimulationTableWriter("csv").write_scenario(table, tmp_path, 0)
+def test_csv_quotes_values_that_need_it(tmp_path: Path) -> None:
+    table = _table([_row("gen,1", 'p"q', 0, 1.0)])
+    path = SimulationTableWriter("csv").write_scenario(table, tmp_path, 0)
+
+    assert path.read_text().splitlines()[1] == '0,"gen,1","p""q",,,0,1.0,'
+    reloaded = pd.read_csv(path)
+    assert list(reloaded["component"]) == ["gen,1"]
+    assert list(reloaded["output"]) == ['p"q']
 
 
 def test_parquet_format(tmp_path: Path) -> None:

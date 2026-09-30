@@ -15,7 +15,6 @@ from typing import Dict, List, Literal, Optional, cast
 
 import pandas as pd
 import pyarrow as pa
-import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
 
 from gems_craft.study.parsing import OutputFormat
@@ -30,7 +29,7 @@ PARQUET_ROW_GROUP_SIZE = 64_000
 # e.g. scenario-independent variables and the objective value of a frontal run.
 COMMON_SCENARIO_SUFFIX = "scenario-common"
 
-# Column types of the simulation table files. Fixed rather than inferred so
+# Column types of the Parquet files. Fixed rather than inferred so
 # that every file has the same schema, even when a column only holds empty
 # values in some file (e.g. component in the common file), and the files can be
 # read together. Keyed by SimulationColumns so that a new column without a type
@@ -103,30 +102,23 @@ class SimulationTableWriter:
             output_dir
             / f"simulation_table_{table_id}_{suffix}.{self.output_format.value}"
         )
-        # Both formats are written with pyarrow and the fixed schema, so that CSV
-        # and Parquet files have the same column types.
-        # Pandas metadata is dropped so that the file only depends on the data
-        # and the fixed schema, not on how the DataFrame was built.
+        if self.output_format == OutputFormat.CSV:
+            # Same CSV format as the single-file output of earlier versions.
+            df.to_csv(path, index=False)
+            return path
+        # Parquet uses the fixed schema, so that every file has the same column
+        # types. Pandas metadata is dropped so that the file only depends on the
+        # data and the fixed schema, not on how the DataFrame was built.
         # nthreads=1: pyarrow's default converts large tables with a thread
         # pool, which is slower here (object columns hold the GIL).
         arrow_table = pa.Table.from_pandas(
             df, schema=SIMULATION_TABLE_SCHEMA, preserve_index=False, nthreads=1
         ).replace_schema_metadata(None)
-        if self.output_format == OutputFormat.PARQUET:
-            pq.write_table(  # type: ignore[no-untyped-call]
-                arrow_table,
-                path,
-                compression=PARQUET_COMPRESSION,
-                compression_level=PARQUET_COMPRESSION_LEVEL,
-                row_group_size=PARQUET_ROW_GROUP_SIZE,
-            )
-        else:
-            # No quotes (quoting_header needs pyarrow >= 22); pyarrow raises
-            # instead of writing a broken row if a value contains a comma, a
-            # quote or a line break (the rows written so far stay in the file).
-            pacsv.write_csv(
-                arrow_table,
-                path,
-                pacsv.WriteOptions(quoting_style="none", quoting_header="none"),
-            )
+        pq.write_table(  # type: ignore[no-untyped-call]
+            arrow_table,
+            path,
+            compression=PARQUET_COMPRESSION,
+            compression_level=PARQUET_COMPRESSION_LEVEL,
+            row_group_size=PARQUET_ROW_GROUP_SIZE,
+        )
         return path

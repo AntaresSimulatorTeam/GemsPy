@@ -126,12 +126,9 @@ solution and written one scenario at a time, without first building a table
 holding all scenarios, so only one scenario's table is held in memory at a
 time.
 
-Both formats are written with pyarrow. CSV files have no quotes and numbers use
-pyarrow's shortest form: whole numbers without `.0`, values of 1e10 or more in
-scientific notation (e.g. `1.640755e+11`), e.g. `0,my_node,spillage,0,0,3,0,`.
-Because values are never quoted, a component or output id containing a comma, a
-quote or a line break cannot be written to CSV (the export fails with an error
-and leaves a truncated file); use Parquet for such studies.
+CSV files are written with pandas, in the same format as the single-file
+output of earlier versions. Parquet files are written with pyarrow and a fixed
+schema.
 
 In `benders-decomposition` mode no simulation table is written: the solve is
 done by Antares Xpansion.
