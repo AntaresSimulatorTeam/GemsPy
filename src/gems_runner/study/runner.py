@@ -7,10 +7,7 @@ from gems_craft.study.folder import load_study
 from gems_craft.study.parsing import OutputFormat
 from gems_runner.session.session import SimulationSession
 from gems_runner.simulation.simulation_table import SimulationTable
-from gems_runner.simulation.simulation_table_writer import (
-    OutputFormat,
-    SimulationTableWriter,
-)
+from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
 
 
 def run_study(

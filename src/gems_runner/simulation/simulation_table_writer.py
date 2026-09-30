@@ -18,11 +18,10 @@ import pyarrow as pa
 import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
 
+from gems_craft.study.parsing import OutputFormat
 from gems_runner.simulation.simulation_table import SimulationColumns, SimulationTable
 
-OutputFormat = Literal["csv", "parquet"]
-
-# Parquet write settings, aligned with GEMS-ViewsBuilder (gems_views_builder/common.py)
+# Parquet write settings
 PARQUET_COMPRESSION: Literal["zstd"] = "zstd"
 PARQUET_COMPRESSION_LEVEL = 3
 PARQUET_ROW_GROUP_SIZE = 64_000
@@ -34,7 +33,7 @@ COMMON_SCENARIO_SUFFIX = "scenario-common"
 # Column types of the simulation table files. Fixed rather than inferred so
 # that every file has the same schema, even when a column only holds empty
 # values in some file (e.g. component in the common file), and the files can be
-# read together (e.g. by GEMS-ViewsBuilder).
+# read together.
 SIMULATION_TABLE_SCHEMA = pa.schema(
     [
         (SimulationColumns.BLOCK.value, pa.int64()),
@@ -59,10 +58,11 @@ class SimulationTableWriter:
     into the full table.
     """
 
-    def __init__(self, output_format: OutputFormat = "csv") -> None:
-        if output_format not in ("csv", "parquet"):
-            raise ValueError(f"Unsupported output format: {output_format!r}")
-        self.output_format = output_format
+    def __init__(self, output_format: OutputFormat = OutputFormat.CSV) -> None:
+        try:
+            self.output_format = OutputFormat(output_format)
+        except ValueError:
+            raise ValueError(f"Unsupported output format: {output_format!r}") from None
 
     def write(self, table: SimulationTable, output_dir: Path) -> List[Path]:
         """Write the full *table* into *output_dir*, split by scenario; return
@@ -97,7 +97,10 @@ class SimulationTableWriter:
     ) -> Path:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        path = output_dir / f"simulation_table_{table_id}_{suffix}.{self.output_format}"
+        path = (
+            output_dir
+            / f"simulation_table_{table_id}_{suffix}.{self.output_format.value}"
+        )
         # Both formats are written with pyarrow and the fixed schema, so that CSV
         # and Parquet files have the same column types.
         # Pandas metadata is dropped so that the file only depends on the data
@@ -105,7 +108,7 @@ class SimulationTableWriter:
         arrow_table = pa.Table.from_pandas(
             df, schema=SIMULATION_TABLE_SCHEMA, preserve_index=False
         ).replace_schema_metadata(None)
-        if self.output_format == "parquet":
+        if self.output_format == OutputFormat.PARQUET:
             pq.write_table(  # type: ignore[no-untyped-call]
                 arrow_table,
                 path,
