@@ -13,13 +13,18 @@ All notable changes to GemsPy are documented here.
   `simulation_table_<run_id>_scenario-<N>.<csv|parquet>` per scenario, plus
   `simulation_table_<run_id>_scenario-common.<ext>` for rows shared by all
   scenarios (frontal mode). Every row is written exactly once and all files
-  share one fixed schema, so they can be read together (e.g. by
-  GEMS-ViewsBuilder). No table holding all scenarios is built: sequential and
+  share one fixed schema, so they can be read together. No table holding all
+  scenarios is built: sequential and
   parallel subproblem modes write each scenario as soon as it is solved;
   frontal mode builds each scenario's rows from the solution after the single
   solve and writes them one scenario at a time.
-- **`SimulationTableWriter`** - new in `gems_runner.simulation.simulation_table_writer`;
-  writes a `SimulationTable` as CSV or Parquet (zstd), one file per scenario.
+- **Parquet output** - `gemspy --output-format csv|parquet` (default `csv`) and
+  `run_study(output_format=...)` choose the file format, given as the new
+  `OutputFormat` enum (`gems_craft.study.parsing`; also the new
+  `ParsedArguments.output_format` field).
+- **`SimulationTableWriter`** - new in `gems_runner.simulation.simulation_table_writer`
+  (also exported from `gems_runner.simulation`); writes a `SimulationTable` as
+  CSV or Parquet (zstd), one file per scenario.
 - **`SimulationSession(on_scenario_done=...)`** - hands
   results over one scenario at a time (scenario id `None` for the shared rows)
   instead of returning one table; `SimulationTableBuilder.build_per_scenario`
@@ -44,19 +49,34 @@ All notable changes to GemsPy are documented here.
   file; read `simulation_table_<run_id>_scenario-*.<ext>` instead.
 - **Breaking** - `SimulationTable.to_csv()` and `to_parquet()` removed; use
   `SimulationTableWriter(format).write(table, output_dir)`.
-- **Breaking** - CSV files are written with pyarrow: index columns are
-  integers (`3` instead of `3.0`) and whole numbers are written without `.0`
-  (`42` instead of `42.0`).
-- Parquet files no longer embed pandas metadata. The stored data is
-  unchanged; files now depend only on the data and the fixed schema.
+- **Breaking** - CSV files are written with pyarrow. Numbers in the `value`
+  column use pyarrow's shortest form: whole numbers without `.0` (`42` instead
+  of `42.0`), values of 1e10 or more in scientific notation (`1.640755e+11`
+  instead of `164075500000.0`), small values as `0.00001` / `2.5e-7` instead of
+  `1e-05` / `2.5e-07`; the parsed values are unchanged. Lines always end with
+  `\n`. Values are never quoted (pandas quoted them when needed), so a
+  component or output id containing a comma, a quote or a line break now makes
+  CSV export fail with `ArrowInvalid`, leaving a truncated file (use Parquet for
+  such studies).
+- Parquet files use a fixed schema (`output` and `basis_status` as `string`),
+  zstd compression (level 3) and 64,000-row groups, without pandas metadata;
+  the values are unchanged.
+- `pyarrow>=22.0` is now a runtime dependency (CSV and Parquet writing).
 - Benders decomposition mode no longer writes an empty simulation table file.
 
 ### Fixed
-- **Scenario index of scenario-independent outputs** - in sequential and
-  parallel subproblem modes, scenario-independent outputs (e.g. an investment
-  variable) and the objective value had an empty `scenario_index`, so values
-  from different scenarios could not be told apart. A problem solved for a
-  single scenario now tags every row with that scenario.
+- **Scenario index of scenario-independent outputs** - scenario-independent
+  outputs (e.g. an investment variable) and the objective value had an empty
+  `scenario_index` even when the problem was solved for a single scenario, so
+  in sequential and parallel subproblem modes values from different scenarios
+  could not be told apart. A problem solved for a single scenario now tags
+  every row with that scenario: every sequential/parallel run, and frontal runs
+  with one scenario (the default scenario scope).
+- **Empty scenario scope** - a scenario scope resolving to no scenario (e.g.
+  every included scenario excluded) is rejected when the optim-config is
+  validated, before solving. It crashed with an unclear error before
+  (`No objects to concatenate` in sequential/parallel modes, `cannot reshape
+  array of size 0` in frontal mode).
 
 ---
 

@@ -56,10 +56,13 @@ class SimulationSession:
                 scenario at a time instead of as one table: ``run()`` then
                 returns an empty table. In sequential and parallel subproblem
                 modes it is called as soon as a scenario is solved. In frontal
-                mode it is called once the single solve is done, first with
-                ``None`` for the rows shared by all scenarios, then for each
-                scenario, whose rows are built on demand; no table holding all
-                scenarios is built.
+                mode it is called once the single solve is done: first with
+                ``None`` for the rows shared by all scenarios (only when there
+                are several scenarios), then for each scenario that has
+                scenario-dependent rows, built on demand; no table holding all
+                scenarios is built. A scenario without rows of its own is not
+                handed over, and the callback is never called in Benders mode,
+                which produces no table.
         """
         self.study = study
         self.optim_config = optim_config
@@ -272,9 +275,9 @@ class SimulationSession:
         scenario_ids: List[int],
         callback: ScenarioCallback,
     ) -> None:
-        """Build the rows of a solved multi-scenario problem one scenario at a
-        time and pass them to *callback*, so that only one scenario's table is
-        held in memory at a time."""
+        """Build the rows of a solved problem one scenario at a time and pass
+        them to *callback*, so that only one scenario's table is held in memory
+        at a time."""
         tables = SimulationTableBuilder().build_per_scenario(
             problem, scenario_ids_remap=scenario_ids, table_id=self.run_id
         )

@@ -11,7 +11,7 @@
 # This file is part of the Antares project.
 
 from pathlib import Path
-from typing import List, Literal, Optional, cast
+from typing import Dict, List, Literal, Optional, cast
 
 import pandas as pd
 import pyarrow as pa
@@ -33,18 +33,20 @@ COMMON_SCENARIO_SUFFIX = "scenario-common"
 # Column types of the simulation table files. Fixed rather than inferred so
 # that every file has the same schema, even when a column only holds empty
 # values in some file (e.g. component in the common file), and the files can be
-# read together.
+# read together. Keyed by SimulationColumns so that a new column without a type
+# fails at import instead of being silently dropped by pa.Table.from_pandas.
+_COLUMN_TYPES: Dict[SimulationColumns, pa.DataType] = {
+    SimulationColumns.BLOCK: pa.int64(),
+    SimulationColumns.COMPONENT: pa.string(),
+    SimulationColumns.OUTPUT: pa.string(),
+    SimulationColumns.ABSOLUTE_TIME_INDEX: pa.int64(),
+    SimulationColumns.BLOCK_TIME_INDEX: pa.int64(),
+    SimulationColumns.SCENARIO_INDEX: pa.int64(),
+    SimulationColumns.VALUE: pa.float64(),
+    SimulationColumns.BASIS_STATUS: pa.string(),
+}
 SIMULATION_TABLE_SCHEMA = pa.schema(
-    [
-        (SimulationColumns.BLOCK.value, pa.int64()),
-        (SimulationColumns.COMPONENT.value, pa.string()),
-        (SimulationColumns.OUTPUT.value, pa.string()),
-        (SimulationColumns.ABSOLUTE_TIME_INDEX.value, pa.int64()),
-        (SimulationColumns.BLOCK_TIME_INDEX.value, pa.int64()),
-        (SimulationColumns.SCENARIO_INDEX.value, pa.int64()),
-        (SimulationColumns.VALUE.value, pa.float64()),
-        (SimulationColumns.BASIS_STATUS.value, pa.string()),
-    ]
+    [(column.value, _COLUMN_TYPES[column]) for column in SimulationColumns]
 )
 
 
@@ -105,8 +107,10 @@ class SimulationTableWriter:
         # and Parquet files have the same column types.
         # Pandas metadata is dropped so that the file only depends on the data
         # and the fixed schema, not on how the DataFrame was built.
+        # nthreads=1: pyarrow's default converts large tables with a thread
+        # pool, which is slower here (object columns hold the GIL).
         arrow_table = pa.Table.from_pandas(
-            df, schema=SIMULATION_TABLE_SCHEMA, preserve_index=False
+            df, schema=SIMULATION_TABLE_SCHEMA, preserve_index=False, nthreads=1
         ).replace_schema_metadata(None)
         if self.output_format == OutputFormat.PARQUET:
             pq.write_table(  # type: ignore[no-untyped-call]
@@ -117,8 +121,9 @@ class SimulationTableWriter:
                 row_group_size=PARQUET_ROW_GROUP_SIZE,
             )
         else:
-            # No quotes, like pandas' CSV output; pyarrow raises instead of
-            # writing a broken row if a value contains a comma or a quote.
+            # No quotes (quoting_header needs pyarrow >= 22); pyarrow raises
+            # instead of writing a broken row if a value contains a comma, a
+            # quote or a line break (the rows written so far stay in the file).
             pacsv.write_csv(
                 arrow_table,
                 path,

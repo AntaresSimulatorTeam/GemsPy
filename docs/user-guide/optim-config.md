@@ -140,6 +140,8 @@ scenario-scope:
 - Excludes that do not appear in the base set produce a warning and have no effect.
 - Output is always sorted in ascending order.
 - `exclude` cannot be used without `include` or `playlist-file`.
+- The resolved list must contain at least one scenario; otherwise the
+  optim-config is rejected (`ValueError`) before anything is solved.
 
 **Default behaviour** (no `scenario-scope` key at all, or an empty block):
 runs scenario 0 only.
@@ -187,6 +189,8 @@ called, so any I/O or format errors surface immediately at load time.
 - All indices must be ≥ 0.
 - Duplicates are silently removed; the result is sorted ascending.
 - `include` and `playlist-file` are mutually exclusive.
+- The resolved list must contain at least one scenario; otherwise the
+  optim-config is rejected (`ValueError`) before anything is solved.
 
 ---
 

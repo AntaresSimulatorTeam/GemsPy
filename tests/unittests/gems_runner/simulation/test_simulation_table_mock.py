@@ -20,7 +20,10 @@ from gems_runner.simulation.simulation_table import (
     SimulationTable,
     SimulationTableBuilder,
 )
-from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
+from gems_runner.simulation.simulation_table_writer import (
+    SIMULATION_TABLE_SCHEMA,
+    SimulationTableWriter,
+)
 
 
 def test_simulation_table_builder_manual(tmp_path: Path) -> None:
@@ -188,6 +191,7 @@ def test_single_scenario_problem_tags_all_rows_with_its_scenario() -> None:
 
     assert list(scenario_col[outputs == "p"]) == [3, 3]
     assert list(scenario_col[outputs == "objective-value"]) == [3]
+    assert scenario_col.dtype == "int64"
 
 
 def test_multi_scenario_problem_keeps_shared_rows_without_scenario() -> None:
@@ -270,3 +274,16 @@ def test_per_scenario_tables_single_scenario_owns_all_rows() -> None:
         ("p", 3),
         ("p", 3),
     ]
+
+
+def test_builder_columns_match_the_writer_schema() -> None:
+    """pa.Table.from_pandas silently drops columns that the schema does not
+    list: every column the builder produces must be in the writer schema."""
+    problem = _make_scenario_dependent_problem()
+    full = SimulationTableBuilder().build(problem, scenario_ids_remap=[0, 1])  # type: ignore[arg-type]
+    tables = SimulationTableBuilder().build_per_scenario(problem, scenario_ids_remap=[0, 1])  # type: ignore[arg-type]
+    common, scenario_0 = tables.common(), tables.scenario(0)
+    assert common is not None and scenario_0 is not None
+
+    for table in (full, common, scenario_0):
+        assert list(table.data.columns) == SIMULATION_TABLE_SCHEMA.names

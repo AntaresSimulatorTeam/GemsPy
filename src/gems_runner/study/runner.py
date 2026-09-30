@@ -27,7 +27,7 @@ def run_study(
         study_dir: The path to the study directory.
         optim_config_path: Optional custom path to an optim-config YAML file.
             If not provided, defaults to ``study_dir/input/optim-config.yml``.
-        output_format: Format of the simulation table file,
+        output_format: Format of the simulation table files,
             ``OutputFormat.CSV`` (default) or ``OutputFormat.PARQUET``
             (zstd-compressed).
     """

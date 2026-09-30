@@ -176,7 +176,11 @@ def _tag_single_scenario(df: pd.DataFrame, scenario_id: int) -> pd.DataFrame:
     scenarios".
     """
     scenario_col = SimulationColumns.SCENARIO_INDEX.value
-    df[scenario_col] = df[scenario_col].fillna(scenario_id)
+    column = df[scenario_col]
+    # where() + infer_objects() gives an int64 column on every pandas version:
+    # fillna() downcast with a FutureWarning on pandas 2.x, and no longer
+    # downcasts on pandas 3.
+    df[scenario_col] = column.where(column.notna(), scenario_id).infer_objects()
     return df
 
 
@@ -537,7 +541,6 @@ class ScenarioTables:
     the objective value) and ``scenario(s)`` the rows of scenario *s*; each call
     only builds the rows it returns. For a problem with a single scenario every
     row belongs to it, so ``common()`` is None, as in ``build()``.
-    Calls are independent and may run concurrently.
     """
 
     def __init__(

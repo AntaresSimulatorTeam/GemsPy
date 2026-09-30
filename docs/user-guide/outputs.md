@@ -78,9 +78,10 @@ value_s0_t1 = sub[(sub["scenario_index"] == 0) & (sub["block_time_index"] == 1)]
 ## Exporting results
 
 ~~~ python
-from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
+from gems_craft.study.parsing import OutputFormat
+from gems_runner.simulation import SimulationTableWriter
 
-SimulationTableWriter("parquet").write(results, Path("output/"))  # one file per scenario
+SimulationTableWriter(OutputFormat.PARQUET).write(results, Path("output/"))  # one file per scenario
 results.to_netcdf(Path("output/"))    # writes a NetCDF file
 ds = results.to_dataset()             # returns an xarray Dataset
 ~~~
@@ -113,8 +114,9 @@ each scenario is solved separately, so every row belongs to a scenario and no
 common file is written.
 
 Every row is written exactly once, so reading all files together gives back
-the full table, e.g. `simulation_table_*_scenario-*.parquet` as GEMS-ViewsBuilder
-input. All Parquet files share the same column types.
+every row of the full table (grouped by scenario), e.g. by reading
+`simulation_table_*_scenario-*.parquet`. All Parquet files share the same
+column types.
 
 In `sequential-subproblems` and `parallel-subproblems` modes each scenario's
 file is written as soon as that scenario is solved, so only one scenario's
@@ -124,9 +126,12 @@ solution and written one scenario at a time, without first building a table
 holding all scenarios, so only one scenario's table is held in memory at a
 time.
 
-Both formats are written with pyarrow. CSV files have no quotes; index columns
-are integers and whole numbers are written without `.0`, e.g.
-`0,my_node,spillage,0,0,3,0,`.
+Both formats are written with pyarrow. CSV files have no quotes and numbers use
+pyarrow's shortest form: whole numbers without `.0`, values of 1e10 or more in
+scientific notation (e.g. `1.640755e+11`), e.g. `0,my_node,spillage,0,0,3,0,`.
+Because values are never quoted, a component or output id containing a comma, a
+quote or a line break cannot be written to CSV (the export fails with an error
+and leaves a truncated file); use Parquet for such studies.
 
 In `benders-decomposition` mode no simulation table is written: the solve is
 done by Antares Xpansion.

@@ -40,7 +40,7 @@ dependencies = [
     "highspy>=1.14",
     "pandas>=2.2",
     "attrs>=26.0",
-    "pyarrow>=15.0",
+    "pyarrow>=22.0",
 ]
 classifiers = [
    #    Classifiers here: https://pypi.org/classifiers/
