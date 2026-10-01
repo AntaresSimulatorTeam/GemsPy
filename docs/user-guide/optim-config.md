@@ -189,8 +189,6 @@ called, so any I/O or format errors surface immediately at load time.
 - All indices must be ≥ 0.
 - Duplicates are silently removed; the result is sorted ascending.
 - `include` and `playlist-file` are mutually exclusive.
-- The resolved list must contain at least one scenario; otherwise the
-  optim-config is rejected (`ValueError`) before anything is solved.
 
 ---
 
