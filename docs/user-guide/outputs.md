@@ -113,19 +113,6 @@ objective value. In `sequential-subproblems` and `parallel-subproblems` modes
 each scenario is solved separately, so every row belongs to a scenario and no
 common file is written.
 
-Every row is written exactly once, so reading all files together gives back
-every row of the full table (grouped by scenario), e.g. by reading
-`simulation_table_*_scenario-*.parquet`. All Parquet files share the same
-column types.
-
-In `sequential-subproblems` and `parallel-subproblems` modes each scenario's
-file is written as soon as that scenario is solved, so only one scenario's
-results are held in memory at a time. In `frontal` mode all scenarios come out
-of a single solve; after it, each scenario's rows are built directly from the
-solution and written one scenario at a time, without first building a table
-holding all scenarios, so only one scenario's table is held in memory at a
-time.
-
 In `benders-decomposition` mode no simulation table is written: the solve is
 done by Antares Xpansion.
 
