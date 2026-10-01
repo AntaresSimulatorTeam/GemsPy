@@ -56,6 +56,12 @@ All notable changes to GemsPy are documented here.
 - Benders decomposition mode no longer writes an empty simulation table file.
 
 ### Fixed
+- **`solver-options.logs` now controls solver output** - it was passed to the
+  solver as an unknown `solver_logs` option (HiGHS printed
+  `getOptionIndex: Option "solver_logs" is unknown` on every solve) and had no
+  effect. It is now translated into the solver's own output option
+  (`output_flag` for HiGHS, `OutputFlag` for Gurobi, `outputlog` for Xpress);
+  with `logs: false` HiGHS only prints its startup banner.
 - **Scenario index of scenario-independent outputs** - scenario-independent
   outputs (e.g. an investment variable) and the objective value had an empty
   `scenario_index` even when the problem was solved for a single scenario, so
