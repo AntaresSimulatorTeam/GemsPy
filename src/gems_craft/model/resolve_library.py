@@ -236,10 +236,14 @@ def _forbid_nonlinear(expr: ExpressionNode, context: str) -> None:
 
 
 class _ForbidBarePortFieldVisitor(ExpressionVisitor[None]):
-    """Raises if a bare PortFieldNode appears outside of sum_connections."""
+    """
+    Raises if a bare PortFieldNode appears outside of sum_connections, and, when
+    `allow_sum_connections` is False, if sum_connections appears at all.
+    """
 
-    def __init__(self, context: str) -> None:
+    def __init__(self, context: str, allow_sum_connections: bool = True) -> None:
         self._context = context
+        self._allow_sum_connections = allow_sum_connections
 
     def literal(self, node: LiteralNode) -> None:
         pass
@@ -297,7 +301,9 @@ class _ForbidBarePortFieldVisitor(ExpressionVisitor[None]):
         )
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> None:
-        pass  # sum_connections wrapping a port field is valid; do not recurse
+        if not self._allow_sum_connections:
+            raise ValueError(f"sum_connections is not allowed in {self._context}.")
+        # sum_connections wrapping a port field is valid; do not recurse
 
     def floor(self, node: FloorNode) -> None:
         visit(node.operand, self)
@@ -332,8 +338,10 @@ class _ForbidBarePortFieldVisitor(ExpressionVisitor[None]):
         pass
 
 
-def _forbid_bare_port_field(expr: ExpressionNode, context: str) -> None:
-    visit(expr, _ForbidBarePortFieldVisitor(context))
+def _forbid_bare_port_field(
+    expr: ExpressionNode, context: str, allow_sum_connections: bool = True
+) -> None:
+    visit(expr, _ForbidBarePortFieldVisitor(context, allow_sum_connections))
 
 
 def _forbid_sum_connections_on_own_port(
@@ -395,7 +403,9 @@ def _resolve_model(
         }
         for oid, expr in objective_contributions.items():
             _forbid_nonlinear(expr, f"objective contribution '{oid}'")
-            _forbid_bare_port_field(expr, f"objective contribution '{oid}'")
+            _forbid_bare_port_field(
+                expr, f"objective contribution '{oid}'", allow_sum_connections=False
+            )
             _forbid_sum_connections_on_own_port(
                 expr, own_port_fields, f"objective contribution '{oid}'"
             )

@@ -11,6 +11,8 @@
 # This file is part of the Antares project.
 
 
+import pytest
+
 from gems_craft.expression import literal, param, var
 from gems_craft.expression.expression import (
     DualNode,
@@ -18,7 +20,13 @@ from gems_craft.expression.expression import (
     ReducedCostNode,
     UpperBoundNode,
 )
-from gems_craft.expression.indexing import IndexingStructureProvider, compute_indexation
+from gems_craft.expression.expression import port_field
+from gems_craft.expression.indexing import (
+    IndexingStructureProvider,
+    IndexingUsageError,
+    UnresolvedPortFieldError,
+    compute_indexation,
+)
 from gems_craft.expression.indexing_structure import IndexingStructure
 
 
@@ -221,3 +229,43 @@ def test_lower_upper_bound_indexing() -> None:
     assert compute_indexation(UpperBoundNode("x"), provider) == IndexingStructure(
         True, True
     )
+
+class _ConstantParamProvider(StructureProvider):
+    def get_parameter_structure(self, name: str) -> IndexingStructure:
+        return IndexingStructure(False, False)
+
+
+def test_time_shift_on_non_time_dependent_raises() -> None:
+    with pytest.raises(IndexingUsageError, match="not time-dependent"):
+        compute_indexation(param("p").shift(1), _ConstantParamProvider())
+
+
+def test_time_eval_on_non_time_dependent_raises() -> None:
+    with pytest.raises(IndexingUsageError, match="not time-dependent"):
+        compute_indexation(param("p").eval(1), _ConstantParamProvider())
+
+
+def test_unresolved_port_field_raises() -> None:
+    with pytest.raises(UnresolvedPortFieldError):
+        compute_indexation(
+            port_field("p", "f").sum_connections(), _ConstantParamProvider()
+        )
+
+
+def test_index_error_reported_alongside_unresolved_port_field() -> None:
+    """An invalid time shift is still reported when a sibling operand (before or
+    after it) holds an unresolved port field."""
+    provider = _ConstantParamProvider()
+    port = port_field("p", "f").sum_connections()
+    bad = param("p").shift(1)
+    with pytest.raises(IndexingUsageError):
+        compute_indexation(port + bad, provider)
+    with pytest.raises(IndexingUsageError):
+        compute_indexation(bad + port, provider)
+
+
+def test_time_shift_on_unresolved_port_field_is_deferred() -> None:
+    with pytest.raises(UnresolvedPortFieldError):
+        compute_indexation(
+            port_field("p", "f").sum_connections().shift(1), _ConstantParamProvider()
+        )

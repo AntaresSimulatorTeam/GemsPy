@@ -692,6 +692,20 @@ def test_sum_connections_on_own_port_in_extra_output_raises() -> None:
         resolve_library([input_lib])
 
 
+def test_sum_connections_in_objective_contribution_raises() -> None:
+    """sum_connections is rejected in objective contributions, even on a port field not defined here."""
+    yaml = _port_model_yaml().replace(
+        "      ports:",
+        "      objective-contributions:\n"
+        "        - id: obj\n"
+        "          expression: sum(generation + sum_connections(balance_port.flow))\n"
+        "      ports:",
+    )
+    input_lib = parse_yaml_library(io.StringIO(yaml))
+    with pytest.raises(ValueError, match="sum_connections is not allowed"):
+        resolve_library([input_lib])
+
+
 # ---------------------------------------------------------------------------
 # Rule 2: bare port.field cannot appear outside sum_connections
 # ---------------------------------------------------------------------------
