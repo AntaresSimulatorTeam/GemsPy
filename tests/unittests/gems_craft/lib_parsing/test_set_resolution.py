@@ -26,8 +26,7 @@ def _parse_lib(yaml_content: str):
 
 
 def test_local_set_colliding_with_global_set_raises() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: collision_lib
   sets:
@@ -38,15 +37,13 @@ library:
         - id: fuel
       parameters:
         - id: p
-"""
-    )
+""")
     with pytest.raises(ValueError, match="collide with"):
         resolve_library([lib])
 
 
 def test_local_set_not_colliding_with_unrelated_global_set_ok() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: ok_lib
   sets:
@@ -57,8 +54,7 @@ library:
         - id: segment
       parameters:
         - id: p
-"""
-    )
+""")
     resolve_library([lib])  # must not raise
 
 
@@ -66,18 +62,15 @@ library:
 
 
 def test_duplicate_global_set_across_dependency_raises() -> None:
-    lib_a = _parse_lib(
-        """
+    lib_a = _parse_lib("""
 library:
   id: libA
   sets:
     - id: fuel
   models:
     - id: m
-"""
-    )
-    lib_b = _parse_lib(
-        """
+""")
+    lib_b = _parse_lib("""
 library:
   id: libB
   dependencies: [libA]
@@ -85,8 +78,7 @@ library:
     - id: fuel
   models:
     - id: n
-"""
-    )
+""")
     with pytest.raises(Exception, match="defined twice"):
         resolve_library([lib_a, lib_b])
 
@@ -95,8 +87,7 @@ library:
 
 
 def test_indexed_by_undeclared_set_raises() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: undecl_lib
   models:
@@ -104,8 +95,7 @@ library:
       parameters:
         - id: p
           indexed-by: [fuel]
-"""
-    )
+""")
     with pytest.raises(ValueError, match="undeclared set"):
         resolve_library([lib])
 
@@ -114,8 +104,7 @@ library:
 
 
 def test_set_index_on_non_indexed_by_variable_raises() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: dim_lib
   sets:
@@ -129,15 +118,13 @@ library:
       constraints:
         - id: c
           expression: x[fuel] <= p
-"""
-    )
+""")
     with pytest.raises(ValueError, match="not indexed by 'fuel'"):
         resolve_library([lib])
 
 
 def test_set_index_on_indexed_by_variable_ok() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: dim_ok_lib
   sets:
@@ -152,8 +139,7 @@ library:
       constraints:
         - id: c
           expression: x[fuel] <= p
-"""
-    )
+""")
     resolve_library([lib])  # must not raise
 
 
@@ -161,8 +147,7 @@ library:
 
 
 def test_time_eval_on_non_time_dependent_parameter_raises() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: time_dim_lib
   models:
@@ -175,15 +160,13 @@ library:
       constraints:
         - id: c
           expression: p[5] <= x
-"""
-    )
+""")
     with pytest.raises(ValueError, match="not time-dependent"):
         resolve_library([lib])
 
 
 def test_time_eval_on_time_dependent_parameter_ok() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: time_dim_ok_lib
   models:
@@ -196,16 +179,14 @@ library:
       constraints:
         - id: c
           expression: p[5] <= x
-"""
-    )
+""")
     resolve_library([lib])  # must not raise
 
 
 def test_relative_time_shift_on_non_time_dependent_parameter_raises() -> None:
     """A relative shift (X[t+1]/X.shift(...)) on a non-time-dependent identifier
     is rejected the same way as the absolute/explicit-position form (X[5])."""
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: time_shift_lib
   models:
@@ -218,15 +199,13 @@ library:
       constraints:
         - id: c
           expression: p[t+1] <= x
-"""
-    )
+""")
     with pytest.raises(ValueError, match="not time-dependent"):
         resolve_library([lib])
 
 
 def test_relative_time_shift_on_time_dependent_parameter_ok() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: time_shift_ok_lib
   models:
@@ -239,8 +218,7 @@ library:
       constraints:
         - id: c
           expression: p[t+1] <= x
-"""
-    )
+""")
     resolve_library([lib])  # must not raise
 
 
@@ -248,8 +226,7 @@ library:
 
 
 def test_bound_indexed_by_set_variable_lacks_raises() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: bound_lib
   sets:
@@ -262,15 +239,13 @@ library:
       variables:
         - id: x
           upper-bound: cap[fuel]
-"""
-    )
+""")
     with pytest.raises(ValueError, match="not declared in 'x'"):
         resolve_library([lib])
 
 
 def test_bound_summed_over_set_variable_lacks_is_ok() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: bound_ok_lib
   sets:
@@ -283,14 +258,12 @@ library:
       variables:
         - id: x
           upper-bound: sum_over(fuel, cap[fuel])
-"""
-    )
+""")
     resolve_library([lib])  # must not raise
 
 
 def test_bound_indexed_by_set_variable_also_indexed_by_is_ok() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: bound_ok_lib
   sets:
@@ -304,8 +277,7 @@ library:
         - id: x
           indexed-by: [fuel]
           upper-bound: cap[fuel]
-"""
-    )
+""")
     resolve_library([lib])  # must not raise
 
 
@@ -313,8 +285,7 @@ library:
 
 
 def test_port_field_definition_indexed_by_local_set_raises() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: port_lib
   port-types:
@@ -335,15 +306,13 @@ library:
         - port: injection_port
           field: flow
           definition: gen[segment]
-"""
-    )
+""")
     with pytest.raises(ValueError, match="wrap it in sum_over"):
         resolve_library([lib])
 
 
 def test_port_field_definition_summed_over_local_set_ok() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: port_ok_lib
   port-types:
@@ -364,14 +333,12 @@ library:
         - port: injection_port
           field: flow
           definition: sum_over(segment, gen[segment])
-"""
-    )
+""")
     resolve_library([lib])  # must not raise
 
 
 def test_port_field_definition_indexed_by_global_set_ok() -> None:
-    lib = _parse_lib(
-        """
+    lib = _parse_lib("""
 library:
   id: port_global_lib
   sets:
@@ -392,6 +359,5 @@ library:
         - port: injection_port
           field: flow
           definition: gen[fuel]
-"""
-    )
+""")
     resolve_library([lib])  # global sets are exempt, must not raise

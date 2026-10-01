@@ -187,9 +187,7 @@ def _resolve_lib(
 
     own_sets = {s.id for s in cur_yaml_lib.sets}
     if current_lib.sets & own_sets:
-        raise Exception(
-            f"Set(s): {current_lib.sets & own_sets} is(are) defined twice."
-        )
+        raise Exception(f"Set(s): {current_lib.sets & own_sets} is(are) defined twice.")
     current_lib.sets.update(own_sets)
 
     cur_yaml_lib_model_ids = [model.id for model in cur_yaml_lib.models]

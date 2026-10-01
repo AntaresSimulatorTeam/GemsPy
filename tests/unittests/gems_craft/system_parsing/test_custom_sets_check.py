@@ -122,9 +122,7 @@ def test_unused_global_set_not_required_to_be_instantiated() -> None:
     """A library-declared global set that no model actually references via
     indexed_by doesn't need to be instantiated (mirrors how declaring a
     parameter time-dependent never forces the system to actually vary it)."""
-    lib = parse_yaml_library(
-        io.StringIO(
-            """
+    lib = parse_yaml_library(io.StringIO("""
 library:
   id: unused_set_lib
   sets:
@@ -133,15 +131,12 @@ library:
     - id: m
       parameters:
         - id: p
-"""
-        )
-    )
+"""))
     lib_dict = resolve_library([lib])
     model_dict = {}
     for library in lib_dict.values():
         model_dict |= library.models
-    system = _parse_system(
-        """
+    system = _parse_system("""
 system:
   components:
     - id: A
@@ -149,8 +144,7 @@ system:
       parameters:
         - id: p
           value: 1.0
-"""
-    )
+""")
     check_custom_sets(system, model_dict, lib_dict)  # must not raise
 
 

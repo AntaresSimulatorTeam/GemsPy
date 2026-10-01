@@ -151,7 +151,9 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         if node.position is not None:
             # Explicit position resolves to a single element: collapses the
             # dimension, mirroring how time_eval collapses time.
-            return IndexingStructure(inner.time, inner.scenario, inner.sets - {node.set_id})
+            return IndexingStructure(
+                inner.time, inner.scenario, inner.sets - {node.set_id}
+            )
         # Bare (`X[fuel]`) or relative-shift (`X[fuel+1]`) forms still vary
         # over the set, mirroring how time_shift keeps time.
         return inner

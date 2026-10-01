@@ -19,8 +19,8 @@ from gems_craft.expression.expression import (
     LowerBoundNode,
     ReducedCostNode,
     UpperBoundNode,
+    port_field,
 )
-from gems_craft.expression.expression import port_field
 from gems_craft.expression.indexing import (
     IndexingStructureProvider,
     IndexingUsageError,
@@ -229,6 +229,7 @@ def test_lower_upper_bound_indexing() -> None:
     assert compute_indexation(UpperBoundNode("x"), provider) == IndexingStructure(
         True, True
     )
+
 
 class _ConstantParamProvider(StructureProvider):
     def get_parameter_structure(self, name: str) -> IndexingStructure:

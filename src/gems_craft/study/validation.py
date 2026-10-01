@@ -96,7 +96,9 @@ def check_custom_sets(
         component_model = model_dict.get(component.model)
         if component_model is None:
             continue  # reported by check_component_models
-        used_local_sets = _sets_used_by_model(component_model) & component_model.local_sets
+        used_local_sets = (
+            _sets_used_by_model(component_model) & component_model.local_sets
+        )
         instantiated_local = {s.id: s for s in (component.sets or [])}
         missing_local = used_local_sets - instantiated_local.keys()
         if missing_local:
