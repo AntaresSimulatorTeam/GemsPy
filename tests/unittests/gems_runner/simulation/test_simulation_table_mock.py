@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 import xarray as xr
 from simulation_table_fakes import (
     FakeLinopyModel,
@@ -18,7 +17,12 @@ from simulation_table_fakes import (
 
 from gems_runner.simulation.simulation_table import (
     SimulationColumns,
+    SimulationTable,
     SimulationTableBuilder,
+)
+from gems_runner.simulation.simulation_table_writer import (
+    SIMULATION_TABLE_SCHEMA,
+    SimulationTableWriter,
 )
 
 
@@ -88,24 +92,15 @@ def test_simulation_table_builder_manual(tmp_path: Path) -> None:
         check_dtype=False,
     )
 
-    csv_path = df.to_csv(tmp_path)
-
-    assert csv_path.exists(), "CSV file was not created"
-
-    with csv_path.open("r") as f:
-        first_line = f.readline().strip()
-
-    expected_header = ",".join(col.value for col in SimulationColumns)
-    assert first_line == expected_header, "CSV header does not match expected columns"
-
-    csv_path.unlink()
-
-    pytest.importorskip("pyarrow")
-    parquet_path = df.to_parquet(tmp_path)
-    assert parquet_path.exists(), "Parquet file was not created"
-    loaded = pd.read_parquet(parquet_path)
-    assert list(loaded.columns) == [col.value for col in SimulationColumns]
-    parquet_path.unlink()
+    expected_columns = [col.value for col in SimulationColumns]
+    for output_format in ("csv", "parquet"):
+        paths = SimulationTableWriter(output_format).write(df, tmp_path / output_format)  # type: ignore[arg-type]
+        assert paths, f"No {output_format} file was written"
+        for path in paths:
+            loaded = (
+                pd.read_csv(path) if output_format == "csv" else pd.read_parquet(path)
+            )
+            assert list(loaded.columns) == expected_columns
 
 
 def _make_problem_with_da(da: xr.DataArray, var_name: str = "p") -> "FakeProblem":
@@ -173,3 +168,122 @@ def test_scalar_output_has_none_time_and_scenario_indices() -> None:
     assert pd.isna(rows.iloc[0][SimulationColumns.BLOCK_TIME_INDEX.value])
     assert pd.isna(rows.iloc[0][SimulationColumns.SCENARIO_INDEX.value])
     assert rows.iloc[0][SimulationColumns.VALUE.value] == 99.0
+
+
+def _make_scenario_independent_problem() -> "FakeProblem":
+    """A var with no scenario dim: [component=1, time=2]."""
+    da = xr.DataArray(
+        np.array([[10.0, 20.0]]),
+        dims=["component", "time"],
+        coords={"component": ["compA"], "time": [0, 1]},
+    )
+    return _make_problem_with_da(da)
+
+
+def test_single_scenario_problem_tags_all_rows_with_its_scenario() -> None:
+    """A problem solved for one MC scenario (sequential/parallel modes) owns all
+    its rows: scenario-independent outputs and the objective value get its id."""
+    st = SimulationTableBuilder().build(
+        _make_scenario_independent_problem(), scenario_ids_remap=[3]  # type: ignore[arg-type]
+    )
+    scenario_col = st.data[SimulationColumns.SCENARIO_INDEX.value]
+    outputs = st.data[SimulationColumns.OUTPUT.value]
+
+    assert list(scenario_col[outputs == "p"]) == [3, 3]
+    assert list(scenario_col[outputs == "objective-value"]) == [3]
+    assert scenario_col.dtype == "int64"
+
+
+def test_multi_scenario_problem_keeps_shared_rows_without_scenario() -> None:
+    """In a problem covering several MC scenarios (frontal mode), scenario-
+    independent outputs and the objective value are shared: no scenario index."""
+    st = SimulationTableBuilder().build(
+        _make_scenario_independent_problem(), scenario_ids_remap=[0, 1]  # type: ignore[arg-type]
+    )
+    shared_outputs = st.data[SimulationColumns.OUTPUT.value].isin(
+        ["p", "objective-value"]
+    )
+
+    assert st.data[shared_outputs][SimulationColumns.SCENARIO_INDEX.value].isna().all()
+
+
+def _make_scenario_dependent_problem() -> "FakeProblem":
+    """A var with a scenario dim: [component=1, time=2, scenario=2]."""
+    da = xr.DataArray(
+        np.array([[[1.0, 2.0], [3.0, 4.0]]]),
+        dims=["component", "time", "scenario"],
+        coords={"component": ["compA"], "time": [0, 1], "scenario": [0, 1]},
+    )
+    return _make_problem_with_da(da)
+
+
+def _outputs_and_scenarios(table: SimulationTable) -> list:
+    df = table.data
+    return sorted(
+        zip(
+            df[SimulationColumns.OUTPUT.value],
+            df[SimulationColumns.SCENARIO_INDEX.value].map(
+                lambda s: None if pd.isna(s) else int(s)
+            ),
+        ),
+        key=str,
+    )
+
+
+def test_per_scenario_tables_split_scenario_rows_from_shared_rows() -> None:
+    tables = SimulationTableBuilder().build_per_scenario(
+        _make_scenario_dependent_problem(), scenario_ids_remap=[5, 7]  # type: ignore[arg-type]
+    )
+
+    common = tables.common()
+    scenario_7 = tables.scenario(7)
+    assert common is not None and scenario_7 is not None
+    assert _outputs_and_scenarios(common) == [("objective-value", None)]
+    assert _outputs_and_scenarios(scenario_7) == [("p", 7), ("p", 7)]
+    assert list(scenario_7.data[SimulationColumns.VALUE.value]) == [2.0, 4.0]
+
+
+def test_per_scenario_tables_without_scenario_dependent_outputs() -> None:
+    """All outputs are shared by the scenarios: everything goes to common() and
+    no scenario has rows of its own, so no scenario file must be written."""
+    tables = SimulationTableBuilder().build_per_scenario(
+        _make_scenario_independent_problem(), scenario_ids_remap=[0, 1]  # type: ignore[arg-type]
+    )
+
+    common = tables.common()
+    assert common is not None
+    assert _outputs_and_scenarios(common) == [
+        ("objective-value", None),
+        ("p", None),
+        ("p", None),
+    ]
+    assert tables.scenario(0) is None
+    assert tables.scenario(1) is None
+
+
+def test_per_scenario_tables_single_scenario_owns_all_rows() -> None:
+    tables = SimulationTableBuilder().build_per_scenario(
+        _make_scenario_independent_problem(), scenario_ids_remap=[3]  # type: ignore[arg-type]
+    )
+
+    assert tables.common() is None
+    scenario_3 = tables.scenario(3)
+    assert scenario_3 is not None
+    assert _outputs_and_scenarios(scenario_3) == [
+        ("objective-value", 3),
+        ("p", 3),
+        ("p", 3),
+    ]
+
+
+def test_builder_columns_match_the_writer_schema() -> None:
+    """pa.Table.from_pandas silently drops columns that the schema does not
+    list: every column the builder produces must be in the writer schema."""
+    problem = _make_scenario_dependent_problem()
+    full = SimulationTableBuilder().build(problem, scenario_ids_remap=[0, 1])  # type: ignore[arg-type]
+    tables = SimulationTableBuilder().build_per_scenario(problem, scenario_ids_remap=[0, 1])  # type: ignore[arg-type]
+    common, scenario_0 = tables.common(), tables.scenario(0)
+    assert common is not None and scenario_0 is not None
+
+    for table in (full, common, scenario_0):
+        assert list(table.data.columns) == SIMULATION_TABLE_SCHEMA.names

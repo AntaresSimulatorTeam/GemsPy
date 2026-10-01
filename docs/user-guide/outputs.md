@@ -78,8 +78,10 @@ value_s0_t1 = sub[(sub["scenario_index"] == 0) & (sub["block_time_index"] == 1)]
 ## Exporting results
 
 ~~~ python
-results.to_csv(Path("output/"))       # writes one CSV per component
-results.to_parquet(Path("output/"))   # writes a zstd-compressed Parquet file
+from gems_craft.study.parsing import OutputFormat
+from gems_runner.simulation import SimulationTableWriter
+
+SimulationTableWriter(OutputFormat.PARQUET).write(results, Path("output/"))  # one file per scenario
 results.to_netcdf(Path("output/"))    # writes a NetCDF file
 ds = results.to_dataset()             # returns an xarray Dataset
 ~~~
@@ -87,14 +89,32 @@ ds = results.to_dataset()             # returns an xarray Dataset
 Parquet files are written with zstd compression (level 3) and row groups of
 64,000 rows.
 
-### Choosing the output format from the CLI
+### Output files of `gemspy`
 
-`gemspy` writes the simulation table as CSV by default. Use `--output-format`
-to write Parquet instead:
+`gemspy` (and `run_study`) writes the simulation table as **one file per MC
+scenario**, as CSV by default or as Parquet with `--output-format parquet`:
 
 ~~~ bash
 gemspy --study path/to/study_dir --output-format parquet
 ~~~
+
+~~~
+output/<run_id>/
+├── simulation_table_<run_id>_scenario-0.parquet
+├── simulation_table_<run_id>_scenario-1.parquet
+├── ...
+└── simulation_table_<run_id>_scenario-common.parquet
+~~~
+
+Rows shared by all scenarios, i.e. with an empty `scenario_index`, go to the
+`scenario-common` file. This only happens in `frontal` mode with several
+scenarios, for scenario-independent variables (e.g. an investment) and the
+objective value. In `sequential-subproblems` and `parallel-subproblems` modes
+each scenario is solved separately, so every row belongs to a scenario and no
+common file is written.
+
+In `benders-decomposition` mode no simulation table is written: the solve is
+done by Antares Xpansion.
 
 The equivalent Python call is
 `run_study(Path("path/to/study_dir"), output_format=OutputFormat.PARQUET)`,

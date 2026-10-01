@@ -6,6 +6,8 @@ from gems_craft.optim_config.parsing import OptimConfig, load_optim_config
 from gems_craft.study.folder import load_study
 from gems_craft.study.parsing import OutputFormat
 from gems_runner.session.session import SimulationSession
+from gems_runner.simulation.simulation_table import SimulationTable
+from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
 
 
 def run_study(
@@ -14,7 +16,8 @@ def run_study(
     output_format: OutputFormat = OutputFormat.CSV,
 ) -> None:
     """
-    Runs a simulation study and exports results to CSV or Parquet.
+    Runs a simulation study and exports results to CSV or Parquet, one
+    simulation table file per MC scenario.
 
     Run parameters (time scope, solver options, scenario scope) are read from
     ``study_dir/input/optim-config.yml``; defaults apply when the file is absent.
@@ -24,7 +27,7 @@ def run_study(
         study_dir: The path to the study directory.
         optim_config_path: Optional custom path to an optim-config YAML file.
             If not provided, defaults to ``study_dir/input/optim-config.yml``.
-        output_format: Format of the simulation table file,
+        output_format: Format of the simulation table files,
             ``OutputFormat.CSV`` (default) or ``OutputFormat.PARQUET``
             (zstd-compressed).
     """
@@ -37,16 +40,21 @@ def run_study(
 
     run_id = datetime.now().strftime("%Y%m%dT%H%M")
     output_dir = study_dir / "output" / run_id
+    # Created before solving so that an invalid output format fails fast.
+    writer = SimulationTableWriter(output_format)
+
+    def write_scenario(scenario_id: Optional[int], table: SimulationTable) -> None:
+        writer.write_scenario(table, output_dir, scenario_id)
+
+    # Results are handed over one scenario at a time and written immediately:
+    # in sequential/parallel modes as each scenario is solved, in frontal mode
+    # one after another after the single solve. No table holding all scenarios
+    # is built. Benders mode writes no simulation table.
     session = SimulationSession(
         study=study,
         optim_config=optim_config,
         run_id=run_id,
         output_dir=output_dir,
+        on_scenario_done=write_scenario,
     )
-    table = session.run()
-    if output_format == OutputFormat.PARQUET:
-        table.to_parquet(output_dir)
-    elif output_format == OutputFormat.CSV:
-        table.to_csv(output_dir)
-    else:
-        raise ValueError(f"Unsupported output format: {output_format!r}")
+    session.run()

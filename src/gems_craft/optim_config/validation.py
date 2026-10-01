@@ -330,6 +330,7 @@ def validate_optim_config(
       assigned to ``master`` or ``master-and-subproblems``.
     - Heuristic inputs/outputs reference existing model parameters/variables with the
       time-dependence the heuristic function expects.
+    - The scenario scope resolves to at least one scenario.
     - If ``scenario_builder`` is provided, every scenario index in
       ``config.scenario_scope.scenario_ids`` is defined for every scenario
       group in the builder.
@@ -339,6 +340,11 @@ def validate_optim_config(
     models_in_system = {c.model.id: c.model for c in system.all_components}
     errors: List[str] = []
 
+    if not config.scenario_scope.scenario_ids:
+        errors.append(
+            "scenario-scope resolves to an empty scenario list (included "
+            "scenarios minus excluded ones); nothing to simulate"
+        )
     if scenario_builder is not None:
         errors.extend(
             scenario_builder.validate_mc_scenarios(config.scenario_scope.scenario_ids)

@@ -16,7 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from gems_craft.optim_config.parsing import ScenarioScopeConfig
+from gems_craft.optim_config.parsing import OptimConfig, ScenarioScopeConfig
+from gems_craft.optim_config.validation import validate_optim_config
+from gems_craft.study.system import System
 
 # ---------------------------------------------------------------------------
 # Inline form — include only
@@ -417,3 +419,21 @@ def test_validate_optim_config_scenario_builder_accepts_valid_playlist() -> None
     system = System(id="test")
 
     validate_optim_config(config, system, sb)  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# validate_optim_config — empty scenario scope
+# ---------------------------------------------------------------------------
+
+
+def test_validate_optim_config_rejects_empty_scenario_scope() -> None:
+    config = OptimConfig(scenario_scope=ScenarioScopeConfig(include=[0], exclude=[0]))
+    with pytest.raises(ValueError, match="empty scenario list"):
+        validate_optim_config(config, System(id="test"))
+
+
+def test_validate_optim_config_accepts_non_empty_scenario_scope() -> None:
+    config = OptimConfig(
+        scenario_scope=ScenarioScopeConfig(include=[0, 1], exclude=[0])
+    )
+    validate_optim_config(config, System(id="test"))  # must not raise

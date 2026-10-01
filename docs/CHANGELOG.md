@@ -9,6 +9,26 @@ All notable changes to GemsPy are documented here.
   the optional `input/taxonomy.yml` and calls
   `validate_libraries_against_taxonomy` on every library declaring a `taxonomy`
   field. `parse_yaml_library` is unchanged and performs no validation.
+- **One simulation table file per MC scenario** - `gemspy` / `run_study` write
+  `simulation_table_<run_id>_scenario-<N>.<csv|parquet>` per scenario, plus
+  `simulation_table_<run_id>_scenario-common.<ext>` for rows shared by all
+  scenarios (frontal mode). Every row is written exactly once and all files
+  share one fixed schema, so they can be read together. No table holding all
+  scenarios is built: sequential and
+  parallel subproblem modes write each scenario as soon as it is solved;
+  frontal mode builds each scenario's rows from the solution after the single
+  solve and writes them one scenario at a time.
+- **Parquet output** - `gemspy --output-format csv|parquet` (default `csv`) and
+  `run_study(output_format=...)` choose the file format, given as the new
+  `OutputFormat` enum (`gems_craft.study.parsing`; also the new
+  `ParsedArguments.output_format` field).
+- **`SimulationTableWriter`** - new in `gems_runner.simulation.simulation_table_writer`
+  (also exported from `gems_runner.simulation`); writes a `SimulationTable` as
+  CSV or Parquet (zstd), one file per scenario.
+- **`SimulationSession(on_scenario_done=...)`** - hands
+  results over one scenario at a time (scenario id `None` for the shared rows)
+  instead of returning one table; `SimulationTableBuilder.build_per_scenario`
+  builds per-scenario tables on demand.
 
 ### Changed
 - **Breaking** - loading a study whose library declares a `taxonomy` raises
@@ -25,6 +45,15 @@ All notable changes to GemsPy are documented here.
   near-identical old names invited confusion. Reading and validating are now
   separate modules, as in `optim_config/`. No behavior change; names and
   import paths only.
+- **Breaking** - a run no longer writes a single `simulation_table_<run_id>`
+  file; read `simulation_table_<run_id>_scenario-*.<ext>` instead.
+- **Breaking** - `SimulationTable.to_csv()` and `to_parquet()` removed; use
+  `SimulationTableWriter(format).write(table, output_dir)`.
+- Parquet files use a fixed schema (`output` and `basis_status` as `string`),
+  zstd compression (level 3) and 64,000-row groups, without pandas metadata;
+  the values are unchanged.
+- `pyarrow>=15.0` is now a runtime dependency (Parquet writing).
+- Benders decomposition mode no longer writes an empty simulation table file.
 
 ### Fixed
 - **`solver-options.logs` now controls solver output** - it was passed to the
@@ -33,6 +62,18 @@ All notable changes to GemsPy are documented here.
   effect. It is now translated into the solver's own output option
   (`output_flag` for HiGHS, `OutputFlag` for Gurobi, `outputlog` for Xpress);
   with `logs: false` HiGHS only prints its startup banner.
+- **Scenario index of scenario-independent outputs** - scenario-independent
+  outputs (e.g. an investment variable) and the objective value had an empty
+  `scenario_index` even when the problem was solved for a single scenario, so
+  in sequential and parallel subproblem modes values from different scenarios
+  could not be told apart. A problem solved for a single scenario now tags
+  every row with that scenario: every sequential/parallel run, and frontal runs
+  with one scenario (the default scenario scope).
+- **Empty scenario scope** - a scenario scope resolving to no scenario (e.g.
+  every included scenario excluded) is rejected when the optim-config is
+  validated, before solving. It crashed with an unclear error before
+  (`No objects to concatenate` in sequential/parallel modes, `cannot reshape
+  array of size 0` in frontal mode).
 
 ---
 

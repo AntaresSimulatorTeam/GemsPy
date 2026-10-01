@@ -154,7 +154,7 @@ def parse_cli() -> ParsedArguments:
         choices=[output_format.value for output_format in OutputFormat],
         default=OutputFormat.CSV.value,
         dest="output_format",
-        help="format of the simulation table file (default: csv)",
+        help="format of the simulation table files (default: csv)",
     )
 
     args = parser.parse_args()
