@@ -68,6 +68,24 @@ database = build_data_base(input_system, Path(series_dir))
 `build_data_base()` reads all timeseries files referenced by the system
 (`.txt` or `.csv`) from `series_dir`.
 
+### Loading set-indexed data
+
+A parameter with `indexed-by` set(s) reads a tidy CSV (`<value>.csv`, with a
+header row) from `series_dir`, with one row per combination:
+
+~~~ csv
+time,fuel,value
+0,gas,45.0
+0,coal,30.0
+1,gas,47.0
+1,coal,30.0
+~~~
+
+Columns are matched by name, in any order. `value` is always required. `time`
+is required only if the parameter is `time-dependent`, and `scenario` only if it
+is `scenario-dependent`. There is one column per set listed in the component's
+own `indexed-by`; any other column is rejected. Set columns must hold exactly the elements instantiated in
+`system.yml`, and `time`/`scenario` values must be `0..n-1`.
 ### Assembling a Study
 
 Once you have `system` and `database`, wrap them in a `Study`:
