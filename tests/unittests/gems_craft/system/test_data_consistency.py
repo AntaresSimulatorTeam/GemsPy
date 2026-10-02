@@ -33,6 +33,7 @@ from gems_craft.study import (
     DataBase,
     PortRef,
     ScenarioSeriesData,
+    SetIndexedSeriesData,
     Study,
     System,
     TimeIndex,
@@ -343,3 +344,44 @@ def test_load_data_from_txt() -> None:
         [[100, 200], [50, 100]], index=[0, 1], columns=[0, 1]
     )
     assert gen_costs.equals(expected_timeseries)
+
+
+# --- set-indexed data -------------------------------------------------------
+
+
+def _fuel_series(time: bool = False) -> SetIndexedSeriesData:
+    return SetIndexedSeriesData(
+        values=np.ones((2, 2)) if time else np.ones(2),
+        dims=("time", "fuel") if time else ("fuel",),
+        coords={"fuel": ("gas", "coal")},
+    )
+
+
+def _fuel_study(
+    data: SetIndexedSeriesData,
+    structure: IndexingStructure = IndexingStructure(True, False, frozenset({"fuel"})),
+) -> Study:
+    fuel_model = model(
+        id="FUEL",
+        parameters=[float_parameter("price", structure)],
+        variables=[float_variable("x")],
+    )
+    system = System("test")
+    system.add_component(create_component(model=fuel_model, id="F"))
+    database = DataBase()
+    database.add_data("F", "price", data)
+    return Study(system, database)
+
+
+def test_set_indexed_data_matching_model_passes() -> None:
+    check_data_requirements(_fuel_study(_fuel_series(time=True)))
+
+
+def test_set_indexed_data_narrower_than_model_passes() -> None:
+    check_data_requirements(_fuel_study(_fuel_series(time=False)))
+
+
+def test_set_indexed_data_for_parameter_without_the_set_raises() -> None:
+    study = _fuel_study(_fuel_series(time=True), IndexingStructure(True, False))
+    with pytest.raises(ValueError, match="Requirement not met"):
+        check_data_requirements(study)
