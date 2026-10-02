@@ -19,16 +19,38 @@ defining parameters, variables, and equations.
 import itertools
 import warnings
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, FrozenSet, Iterable, List, Optional
 
 from gems_craft.expression import ExpressionNode
 from gems_craft.expression.degree import is_linear
-from gems_craft.expression.indexing import IndexingStructureProvider, compute_indexation
+from gems_craft.expression.indexing import (
+    IndexingStructureProvider,
+    IndexingUsageError,
+    UnresolvedPortFieldError,
+    compute_indexation,
+)
 from gems_craft.expression.indexing_structure import IndexingStructure
 from gems_craft.model.constraint import Constraint
 from gems_craft.model.parameter import Parameter
 from gems_craft.model.port import PortFieldDefinition, PortFieldId, PortType
 from gems_craft.model.variable import Variable
+
+
+def _safe_indexation(
+    expr: ExpressionNode, provider: IndexingStructureProvider, context: str
+) -> Optional[IndexingStructure]:
+    """
+    Computes the indexation of `expr`, which also validates time and set index
+    usage (errors name `context`). Returns None if `expr` still contains an
+    unresolved port field (sum_connections): the check is then deferred until
+    ports are resolved.
+    """
+    try:
+        return compute_indexation(expr, provider)
+    except IndexingUsageError as e:
+        raise ValueError(f"{e} (in {context})") from e
+    except UnresolvedPortFieldError:
+        return None
 
 
 # TODO: Introduce bool_variable ?
@@ -57,15 +79,13 @@ def _make_structure_provider(
 
         base = _BaseProvider()
         for cname, c in constraints.items():
-            try:
-                constraint_structures[cname] = compute_indexation(c.expression, base)
-            except ValueError:
-                # Constraints containing unresolved port fields (sum_connections)
-                # cannot be indexed before port resolution; fall back to the most
-                # general structure so callers can still proceed.
-                constraint_structures[cname] = IndexingStructure(
-                    time=True, scenario=True
-                )
+            structure = _safe_indexation(c.expression, base, f"constraint '{cname}'")
+            # Constraints containing unresolved port fields (sum_connections)
+            # cannot be indexed before port resolution; fall back to the most
+            # general structure so callers can still proceed.
+            constraint_structures[cname] = structure or IndexingStructure(
+                time=True, scenario=True
+            )
 
     class Provider(IndexingStructureProvider):
         def get_parameter_structure(self, name: str) -> IndexingStructure:
@@ -106,7 +126,13 @@ def _normalize_objective_contributions(
     provider = _make_structure_provider(parameters, variables)
     result: Dict[str, ExpressionNode] = {}
     for contrib_id, expr in contributions.items():
-        structure = compute_indexation(expr, provider)
+        structure = _safe_indexation(
+            expr, provider, f"objective contribution '{contrib_id}'"
+        )
+        if structure is None:
+            raise ValueError(
+                f"Objective contribution '{contrib_id}' contains an unresolved port field."
+            )
         if structure == IndexingStructure(time=False, scenario=True):
             warnings.warn(
                 f"Objective contribution '{contrib_id}' has a scenario dimension "
@@ -140,6 +166,71 @@ def _is_objective_contribution_valid(
         raise ValueError("Objective contribution should be a real-valued expression.")
     # TODO: We should also check that the number of instances is equal to 1, but this would require a linearization here, do not want to do that for now...
     return True
+
+
+def _check_bound_set_consistency(
+    bound_expr: ExpressionNode,
+    var: Variable,
+    provider: IndexingStructureProvider,
+    kind: str,
+) -> None:
+    structure = _safe_indexation(
+        bound_expr, provider, f"{kind.lower()} of variable '{var.name}'"
+    )
+    if structure is None:
+        return
+    stray = structure.sets - var.structure.sets
+    if stray:
+        raise ValueError(
+            f"{kind} of variable '{var.name}' is indexed by set(s) "
+            f"{sorted(stray)} not declared in '{var.name}''s own indexed_by."
+        )
+
+
+def _check_local_set_crosses_port(
+    definition: PortFieldDefinition,
+    local_sets: FrozenSet[str],
+    provider: IndexingStructureProvider,
+) -> None:
+    port_field = f"{definition.port_field.port_name}.{definition.port_field.field_name}"
+    structure = _safe_indexation(
+        definition.definition, provider, f"port field definition '{port_field}'"
+    )
+    if structure is None:
+        return
+    crossing = structure.sets & local_sets
+    if crossing:
+        raise ValueError(
+            f"Port field definition for '{port_field}' is still indexed by local "
+            f"set(s) {sorted(crossing)}; wrap it in sum_over(...) before it "
+            "can cross a port."
+        )
+
+
+def _check_model_set_indexing(model: "Model") -> None:
+    provider = _make_structure_provider(
+        model.parameters,
+        model.variables,
+        {**model.constraints, **model.binding_constraints},
+    )
+
+    for c in model.get_all_constraints():
+        _safe_indexation(c.expression, provider, f"constraint '{c.name}'")
+
+    for oid, expr in (model.objective_contributions or {}).items():
+        _safe_indexation(expr, provider, f"objective contribution '{oid}'")
+
+    for eo_id, eo_expr in (model.extra_outputs or {}).items():
+        _safe_indexation(eo_expr, provider, f"extra-output '{eo_id}'")
+
+    for var in model.variables.values():
+        if var.lower_bound is not None:
+            _check_bound_set_consistency(var.lower_bound, var, provider, "Lower bound")
+        if var.upper_bound is not None:
+            _check_bound_set_consistency(var.upper_bound, var, provider, "Upper bound")
+
+    for definition in model.port_fields_definitions.values():
+        _check_local_set_crosses_port(definition, model.local_sets, provider)
 
 
 @dataclass(frozen=True)
@@ -178,12 +269,15 @@ class Model:
     )
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None
     properties: List[str] = field(default_factory=list)
+    local_sets: FrozenSet[str] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
         # Validate each contribution if present
         if self.objective_contributions:
             for expr in self.objective_contributions.values():
                 _is_objective_contribution_valid(self, expr)
+
+        _check_model_set_indexing(self)
 
         for definition in self.port_fields_definitions.values():
             port_name = definition.port_field.port_name
@@ -221,6 +315,7 @@ def model(
     port_fields_definitions: Optional[Iterable[PortFieldDefinition]] = None,
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None,
     properties: Optional[Iterable[str]] = None,
+    local_sets: Optional[Iterable[str]] = None,
 ) -> Model:
     """
     Utility method to create Models from relaxed arguments
@@ -264,4 +359,5 @@ def model(
         ),
         extra_outputs=extra_outputs,
         properties=list(properties) if properties else [],
+        local_sets=frozenset(local_sets) if local_sets else frozenset(),
     )

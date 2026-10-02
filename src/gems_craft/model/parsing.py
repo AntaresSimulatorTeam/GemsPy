@@ -24,6 +24,7 @@ class ParameterSchema(ModifiedBaseModel):
     id: str
     time_dependent: bool = False
     scenario_dependent: bool = False
+    indexed_by: List[str] = Field(default_factory=list)
 
 
 class VariableSchema(ModifiedBaseModel):
@@ -33,6 +34,7 @@ class VariableSchema(ModifiedBaseModel):
     lower_bound: Optional[str] = None
     upper_bound: Optional[str] = None
     variable_type: str = "continuous"
+    indexed_by: List[str] = Field(default_factory=list)
 
     model_config = ConfigDict(
         **ModifiedBaseModel.model_config, coerce_numbers_to_str=True
@@ -83,6 +85,11 @@ class PropertySchema(ModifiedBaseModel):
     id: str
 
 
+class SetSchema(ModifiedBaseModel):
+    id: str
+    description: Optional[str] = None
+
+
 class ObjectiveContributionSchema(ModifiedBaseModel):
     id: str
     expression: str
@@ -97,6 +104,7 @@ class ExtraOutputSchema(ModifiedBaseModel):
 class ModelSchema(ModifiedBaseModel):
     id: str
     taxonomy_category: Optional[str] = None
+    sets: List[SetSchema] = Field(default_factory=list)
     parameters: List[ParameterSchema] = Field(default_factory=list)
     variables: List[VariableSchema] = Field(default_factory=list)
     ports: List[ModelPortSchema] = Field(default_factory=list)
@@ -117,6 +125,7 @@ class LibrarySchema(ModifiedBaseModel):
     id: str
     dependencies: List[str] = Field(default_factory=list)
     port_types: List[PortTypeSchema] = Field(default_factory=list)
+    sets: List[SetSchema] = Field(default_factory=list)
     models: List[ModelSchema] = Field(default_factory=list)
     description: Optional[str] = None
     taxonomy: Optional[str] = None

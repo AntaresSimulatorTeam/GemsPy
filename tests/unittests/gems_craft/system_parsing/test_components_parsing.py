@@ -374,3 +374,62 @@ system:
         "technology": "nuclear",
         "company": "rhonepower",
     }
+
+
+_SYSTEM_WITH_SETS = """\
+system:
+  sets:
+    - id: fuel
+      elements: [gas, coal]
+  components:
+    - id: A
+      model: basic.area
+      sets:
+        - id: segment
+          elements: 0..2
+      parameters:
+        - id: p
+          value: 1.0
+          indexed-by: [fuel]
+"""
+
+
+def test_parse_yaml_system_sets_and_indexed_by() -> None:
+    system = parse_yaml_system(io.StringIO(_SYSTEM_WITH_SETS))
+    assert system.sets is not None
+    assert system.sets[0].id == "fuel"
+    assert system.sets[0].elements == ["gas", "coal"]
+    component = system.components[0]
+    assert component.sets is not None
+    assert component.sets[0].id == "segment"
+    assert component.sets[0].elements == [0, 1, 2]
+    assert component.parameters[0].indexed_by == ["fuel"]
+
+
+def test_parse_yaml_system_sets_and_indexed_by_default_absent() -> None:
+    system = parse_yaml_system(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
+    assert system.sets is None
+    for component in system.components:
+        assert component.sets is None
+
+
+def test_set_instance_invalid_range_raises() -> None:
+    with pytest.raises(ValidationError, match="Invalid elements range"):
+        parse_yaml_system(io.StringIO("""\
+system:
+  sets:
+    - id: fuel
+      elements: not-a-range
+  components: []
+"""))
+
+
+def test_set_instance_reversed_range_raises() -> None:
+    with pytest.raises(ValidationError, match="Range start must be"):
+        parse_yaml_system(io.StringIO("""\
+system:
+  sets:
+    - id: fuel
+      elements: 5..2
+  components: []
+"""))
