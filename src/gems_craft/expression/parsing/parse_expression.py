@@ -10,7 +10,7 @@
 #
 # This file is part of the Antares project.
 from dataclasses import dataclass, field
-from typing import Set
+from typing import Callable, Dict, Optional, Set, Tuple
 
 from antlr4 import CommonTokenStream, InputStream
 from antlr4.error.ErrorStrategy import BailErrorStrategy
@@ -43,12 +43,16 @@ class ModelIdentifiers:
     variables: Set[str]
     parameters: Set[str]
     constraints: Set[str] = field(default_factory=set)
+    sets: Set[str] = field(default_factory=set)
 
     def is_variable(self, identifier: str) -> bool:
         return identifier in self.variables
 
     def is_parameter(self, identifier: str) -> bool:
         return identifier in self.parameters
+
+    def is_set(self, identifier: str) -> bool:
+        return identifier in self.sets
 
 
 @dataclass(frozen=True)
@@ -140,35 +144,122 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     def visitPortFieldSum(self, ctx: ExprParser.PortFieldSumContext) -> ExpressionNode:
         return PortFieldAggregatorNode(ctx.portFieldExpr().accept(self), "PortSum")  # type: ignore
 
-    # Visit a parse tree produced by ExprParser#timeShift.
-    def visitTimeIndex(self, ctx: ExprParser.TimeIndexContext) -> ExpressionNode:
-        expr = self._convert_identifier(ctx.IDENTIFIER().getText())  # type: ignore
+    # Visit a parse tree produced by ExprParser#bracketIndex.
+    def visitBracketIndex(self, ctx: ExprParser.BracketIndexContext) -> ExpressionNode:
+        base = self._convert_identifier(ctx.IDENTIFIER().getText())  # type: ignore
+        return self._apply_index_list(base, ctx.indexList())  # type: ignore
+
+    def visitBracketIndexExpr(
+        self, ctx: ExprParser.BracketIndexExprContext
+    ) -> ExpressionNode:
+        base = ctx.expr().accept(self)  # type: ignore
+        return self._apply_index_list(base, ctx.indexList())  # type: ignore
+
+    def visitSumOver(self, ctx: ExprParser.SumOverContext) -> ExpressionNode:
+        set_id: str = ctx.IDENTIFIER().getText()  # type: ignore
+        if not self.identifiers.is_set(set_id):
+            raise ValueError(
+                f"'{set_id}' is not a declared set; sum_over() requires a declared set id."
+            )
+        operand = ctx.expr().accept(self)  # type: ignore
+        return operand.sum_over(set_id)
+
+    def _apply_index_list(
+        self, base: ExpressionNode, index_list_ctx: "ExprParser.IndexListContext"
+    ) -> ExpressionNode:
+        """
+        Applies every term of an index list (custom sets and indexing
+        extension) to `base`. Term order in the *source syntax* must not
+        affect the resulting AST (`X[fuel=3, 2]` == `X[2, fuel=3]`), so terms
+        are first classified independently of one another, then applied in a
+        canonical order: the (at most one) implicit time term first, then set
+        terms sorted by set id.
+        """
+        time_applier: Optional[Callable[[ExpressionNode], ExpressionNode]] = None
+        set_appliers: Dict[str, Callable[[ExpressionNode], ExpressionNode]] = {}
+
+        for term_ctx in index_list_ctx.indexTerm():  # type: ignore
+            set_id, apply = term_ctx.accept(self)  # type: ignore
+            if set_id is None:
+                if time_applier is not None:
+                    raise ValueError(
+                        "An index list cannot contain more than one term denoting "
+                        "the (implicit) time dimension."
+                    )
+                time_applier = apply
+            else:
+                if set_id in set_appliers:
+                    raise ValueError(f"Set '{set_id}' is indexed more than once.")
+                set_appliers[set_id] = apply
+
+        result = base
+        if time_applier is not None:
+            result = time_applier(result)
+        for set_id in sorted(set_appliers):
+            result = set_appliers[set_id](result)
+        return result
+
+    # Visit a parse tree produced by ExprParser#namedOrTimeShiftTerm.
+    def visitNamedOrTimeShiftTerm(
+        self, ctx: ExprParser.NamedOrTimeShiftTermContext
+    ) -> Tuple[Optional[str], Callable[[ExpressionNode], ExpressionNode]]:
+        """Returns (set_id, apply) -- set_id is None for a time-denoting term."""
+        shift_ctx = ctx.shift()  # type: ignore
+        amount = shift_ctx.accept(self)  # type: ignore
+        is_zero = expressions_equal(amount, literal(0))
+
+        if shift_ctx.TIME() is not None:  # type: ignore
+            if is_zero:
+                return None, lambda expr: expr
+            return None, lambda expr: expr.shift(amount)
+
+        identifier: str = shift_ctx.IDENTIFIER().getText()  # type: ignore
+        if self.identifiers.is_set(identifier):
+            if is_zero:
+                return identifier, lambda expr: expr.set_index(identifier)
+            return identifier, lambda expr: expr.set_index(
+                identifier, relative_shift=amount
+            )
+
+        # Legacy fallback: an ordinary parameter/variable identifier used as an
+        # absolute time index, optionally offset -- preserves pre-existing
+        # `X[some_param]` / `X[some_param+1]` semantics unchanged, for any
+        # identifier that never resolves to a declared set.
+        base = self._convert_identifier(identifier)
+        eval_time = base if is_zero else base + amount
+        return None, lambda expr: expr.eval(eval_time)
+
+    # Visit a parse tree produced by ExprParser#keywordTerm.
+    def visitKeywordTerm(
+        self, ctx: ExprParser.KeywordTermContext
+    ) -> Tuple[Optional[str], Callable[[ExpressionNode], ExpressionNode]]:
+        """Returns (set_id, apply) -- set_id is None for a time-denoting term."""
+        identifier: str = "t" if ctx.TIME() is not None else ctx.IDENTIFIER().getText()  # type: ignore
+        comparator: str = ctx.COMPARISON().getText()  # type: ignore
+        if comparator != "=":
+            raise ValueError(
+                f"'{comparator}' is not valid in the keyword index form "
+                f"('{identifier}{comparator}...'); only '=' is."
+            )
+        position = ctx.expr().accept(self)  # type: ignore
+        if identifier == "t":
+            return None, lambda expr: expr.eval(position)
+        if self.identifiers.is_set(identifier):
+            return identifier, lambda expr: expr.set_index(
+                identifier, position=position
+            )
+        raise ValueError(
+            f"'{identifier}' is neither 't' nor a declared set; the keyword "
+            f"index form ('{identifier}=...') is only valid for those."
+        )
+
+    # Visit a parse tree produced by ExprParser#positionTerm.
+    def visitPositionTerm(
+        self, ctx: ExprParser.PositionTermContext
+    ) -> Tuple[Optional[str], Callable[[ExpressionNode], ExpressionNode]]:
+        """Returns (set_id, apply) -- set_id is None for a time-denoting term."""
         eval_time = ctx.expr().accept(self)  # type: ignore
-        return expr.eval(eval_time)
-
-    def visitTimeShift(self, ctx: ExprParser.TimeShiftContext) -> ExpressionNode:
-        shifted_expr = self._convert_identifier(ctx.IDENTIFIER().getText())  # type: ignore
-        time_shift = ctx.shift().accept(self)  # type: ignore
-        # specifics for x[t] ...
-        if expressions_equal(time_shift, literal(0)):
-            return shifted_expr
-        return shifted_expr.shift(time_shift)
-
-    def visitTimeShiftExpr(
-        self, ctx: ExprParser.TimeShiftExprContext
-    ) -> ExpressionNode:
-        shifted_expr = ctx.expr().accept(self)  # type: ignore
-        time_shift = ctx.shift().accept(self)  # type: ignore
-        if expressions_equal(time_shift, literal(0)):
-            return shifted_expr
-        return shifted_expr.shift(time_shift)
-
-    def visitTimeIndexExpr(
-        self, ctx: ExprParser.TimeIndexExprContext
-    ) -> ExpressionNode:
-        expr = ctx.expr(0).accept(self)  # type: ignore
-        eval_time = ctx.expr(1).accept(self)  # type: ignore
-        return expr.eval(eval_time)
+        return None, lambda expr: expr.eval(eval_time)
 
     def visitTimeSum(self, ctx: ExprParser.TimeSumContext) -> ExpressionNode:
         shifted_expr = ctx.expr().accept(self)  # type: ignore

@@ -65,3 +65,33 @@ def test_dual_reduced_cost_printer() -> None:
 def test_lower_upper_bound_printer() -> None:
     assert visit(LowerBoundNode("x"), PrinterVisitor()) == "lower_bound(x)"
     assert visit(UpperBoundNode("x"), PrinterVisitor()) == "upper_bound(x)"
+
+
+def test_set_index_sum_over_printer() -> None:
+    x = var("x")
+
+    assert visit(x.set_index("fuel"), PrinterVisitor()) == "(x[fuel])"
+    assert visit(x.set_index("fuel", position=2), PrinterVisitor()) == "(x[fuel=2.0])"
+    assert (
+        visit(x.set_index("fuel", relative_shift=1), PrinterVisitor())
+        == "(x[fuel+1.0])"
+    )
+    assert visit(x.sum_over("fuel"), PrinterVisitor()) == "sum_over(fuel, x)"
+
+
+def test_multiple_set_index_printer() -> None:
+    """Multi-set indexing is represented as nested single-set SetIndexNodes
+    in the AST, but the printer collapses a directly-nested chain into one
+    bracket: `x[fuel=1.0, segment=2.0]`."""
+    x = var("x")
+    expr = x.set_index("fuel", position=1).set_index("segment", position=2)
+
+    assert visit(expr, PrinterVisitor()) == "(x[fuel=1.0, segment=2.0])"
+
+    mixed = x.set_index("fuel").set_index("segment", relative_shift=1)
+    assert visit(mixed, PrinterVisitor()) == "(x[fuel, segment+1.0])"
+
+    # x[t+1, fuel]: the time term (a TimeShiftNode, not a SetIndexNode) prints
+    # its own bracket, so it must not be merged into the set's bracket
+    shifted_then_indexed = x.shift(1).set_index("fuel")
+    assert visit(shifted_then_indexed, PrinterVisitor()) == "((x[t+1.0])[fuel])"

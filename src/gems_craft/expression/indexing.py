@@ -38,6 +38,8 @@ from .expression import (
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -120,6 +122,18 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
 
     def all_time_sum(self, node: AllTimeSumNode) -> IndexingStructure:
         return IndexingStructure(False, visit(node.operand, self).scenario)
+
+    def set_index(self, node: SetIndexNode) -> IndexingStructure:
+        # TODO(custom sets, phase 2): once IndexingStructure carries a `sets`
+        # dimension, indexing into `node.set_id` should remove it from the
+        # combined structure (mirroring how time_shift keeps time, but a
+        # concrete position/relative-shift resolves that one set dimension).
+        return visit(node.operand, self)
+
+    def sum_over(self, node: SumOverNode) -> IndexingStructure:
+        # TODO(custom sets, phase 2): should remove `node.set_id` from the
+        # combined structure's `sets`, mirroring all_time_sum's collapsing of time.
+        return visit(node.operand, self)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> IndexingStructure:
         return IndexingStructure(visit(node.operand, self).time, False)
