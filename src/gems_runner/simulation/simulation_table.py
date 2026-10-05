@@ -301,6 +301,7 @@ class SimulationTableBuilder:
                     var_upper_bound_arrays=var_upper_bound_arrays,
                     port_arrays={},
                     block_length=problem.block_length,
+                    set_sizes=problem.set_sizes.get(mk_, {}),
                 ),
             )
 
@@ -315,6 +316,7 @@ class SimulationTableBuilder:
                     var_upper_bound_arrays=var_upper_bound_arrays,
                     port_arrays=port_arrays,
                     block_length=problem.block_length,
+                    set_sizes=problem.set_sizes.get(mk, {}),
                 )
                 result_da: xr.DataArray = cast(xr.DataArray, visit(expr_node, builder))
 

@@ -22,6 +22,7 @@ from gems_craft.model.parsing import (
     PortFieldDefinitionSchema,
     ConstraintSchema,
     ObjectiveContributionSchema,
+    SetSchema,
 )
 from gems_craft.model.resolve_library import resolve_library
 
@@ -63,26 +64,48 @@ load_model = ModelSchema(
 
 generator_model = ModelSchema(
     id="generator",
+    sets=[SetSchema(id="tier")],  # local set: instantiated by each component
     parameters=[
         ParameterSchema(id="p_min", time_dependent=True, scenario_dependent=True),
-        ParameterSchema(id="p_max", time_dependent=True, scenario_dependent=True),
-        ParameterSchema(id="generation_cost"),
+        ParameterSchema(
+            id="p_max", time_dependent=True, scenario_dependent=True, indexed_by=["fuel", "tier"]
+        ),
+        ParameterSchema(id="generation_cost", indexed_by=["fuel", "tier"]),
     ],
     variables=[
-        VariableSchema(id="generation", lower_bound="p_min", upper_bound="p_max"),
+        VariableSchema(
+            id="generation", lower_bound="p_min", upper_bound="p_max", indexed_by=["fuel", "tier"]
+        ),
         VariableSchema(id="num_units_on", lower_bound="0", variable_type="integer"),
     ],
     ports=[ModelPortSchema(id="balance_port", type="flow")],
     port_field_definitions=[
-        PortFieldDefinitionSchema(port="balance_port", field="flow", definition="generation"),
+        PortFieldDefinitionSchema(
+            port="balance_port",
+            field="flow",
+            definition="sum_over(fuel, sum_over(tier, generation))",
+        ),
     ],
     objective_contributions=[
-        ObjectiveContributionSchema(id="objective", expression="sum(generation_cost * generation)"),
+        ObjectiveContributionSchema(
+            id="objective",
+            expression="sum(sum_over(fuel, sum_over(tier, generation_cost * generation)))",
+        ),
     ],
 )
 
-library = LibrarySchema(id="simple_library", port_types=[flow], models=[bus_model, load_model, generator_model])
+library = LibrarySchema(
+    id="simple_library",
+    port_types=[flow],
+    sets=[SetSchema(id="fuel")],  # global set: instantiated once on the system
+    models=[bus_model, load_model, generator_model],
+)
 ~~~
+
+`generator` also shows custom sets: `p_max`, `generation_cost` and `generation`
+are indexed by the global set `fuel` and by the model's own local set `tier`.
+The port field sums `generation` over both sets, as a local set cannot cross a
+port.
 
 ## Defining a ComponentSchema
 
@@ -95,6 +118,7 @@ from gems_craft.study.parsing import (
     IntegerStrategy,
     IntegerStrategyId,
     HeuristicId,
+    SetInstanceSchema,
 )
 
 components = []
@@ -144,21 +168,27 @@ components.append(
         ),
         parameters=[
             ComponentParameterSchema(
-                id="marginal_cost",
+                id="generation_cost",
                 time_dependent=False,
                 scenario_dependent=False,
-                value=70  # €/MWh
+                indexed_by=["fuel", "tier"],
+                value="generation_cost",  # tidy CSV, see "Loading set-indexed data"
             ),
             ComponentParameterSchema(
-                id="pmax",
+                id="p_max",
                 time_dependent=False,
                 scenario_dependent=False,
-                value=700  # MWh
+                indexed_by=["fuel", "tier"],
+                value="p_max",  # tidy CSV, MWh
             ),
         ],
+        sets=[SetInstanceSchema(id="tier", elements=["low", "high"])],
     )
 )
 ~~~
+
+Components of one model may instantiate a local set (here `tier`) with
+different elements and sizes.
 
 A component may also set `integer_strategy` to relax or heuristically process
 its model's integer/binary variables — see
@@ -200,6 +230,7 @@ connections.append(
 from gems_craft.study.parsing import SystemSchema
 
 input_system = SystemSchema(
+    sets=[SetInstanceSchema(id="fuel", elements=["coal", "gas"])],
     components=components,
     connections=connections,
 )
