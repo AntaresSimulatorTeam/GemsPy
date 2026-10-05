@@ -18,6 +18,7 @@ from simulation_table_fakes import (
 
 from gems_runner.simulation.simulation_table import (
     SimulationColumns,
+    SimulationTable,
     SimulationTableBuilder,
 )
 
@@ -56,6 +57,8 @@ def test_simulation_table_builder_manual(tmp_path: Path) -> None:
             SimulationColumns.ABSOLUTE_TIME_INDEX: 0,
             SimulationColumns.BLOCK_TIME_INDEX: 0,
             SimulationColumns.SCENARIO_INDEX: 0,
+            SimulationColumns.SET_ID: None,
+            SimulationColumns.SET_INDEX: None,
             SimulationColumns.VALUE: 10.0,
             SimulationColumns.BASIS_STATUS: None,
         },
@@ -66,6 +69,8 @@ def test_simulation_table_builder_manual(tmp_path: Path) -> None:
             SimulationColumns.ABSOLUTE_TIME_INDEX: 1,
             SimulationColumns.BLOCK_TIME_INDEX: 1,
             SimulationColumns.SCENARIO_INDEX: 0,
+            SimulationColumns.SET_ID: None,
+            SimulationColumns.SET_INDEX: None,
             SimulationColumns.VALUE: 20.0,
             SimulationColumns.BASIS_STATUS: None,
         },
@@ -76,6 +81,8 @@ def test_simulation_table_builder_manual(tmp_path: Path) -> None:
             SimulationColumns.ABSOLUTE_TIME_INDEX: None,
             SimulationColumns.BLOCK_TIME_INDEX: None,
             SimulationColumns.SCENARIO_INDEX: None,
+            SimulationColumns.SET_ID: None,
+            SimulationColumns.SET_INDEX: None,
             SimulationColumns.VALUE: 42.0,
             SimulationColumns.BASIS_STATUS: None,
         },
@@ -173,3 +180,63 @@ def test_scalar_output_has_none_time_and_scenario_indices() -> None:
     assert pd.isna(rows.iloc[0][SimulationColumns.BLOCK_TIME_INDEX.value])
     assert pd.isna(rows.iloc[0][SimulationColumns.SCENARIO_INDEX.value])
     assert rows.iloc[0][SimulationColumns.VALUE.value] == 99.0
+
+
+def _set_lookup(elements):  # type: ignore
+    return lambda comp, set_id: elements[(comp, set_id)]
+
+
+def test_da_to_df_two_sets_ragged_drops_padding() -> None:
+    """Sets sorted by id, element names pipe-joined, padded positions dropped."""
+    da = xr.DataArray(
+        [[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], [[7.0, 8.0], [9.0, 10.0], [0.0, 0.0]]],
+        dims=["component", "seg", "fuel"],
+        coords={"component": ["a", "b"], "seg": [0, 1, 2], "fuel": [0, 1]},
+    )
+    elements = {
+        ("a", "seg"): (10, 20, 30),
+        ("b", "seg"): (10, 20),
+        ("a", "fuel"): ("coal", "gas"),
+        ("b", "fuel"): ("coal", "gas"),
+    }
+    df = SimulationTableBuilder._da_to_df(
+        da, "x", 1, 0, None, set_elements=_set_lookup(elements)
+    )
+    assert set(df[SimulationColumns.SET_ID.value]) == {"fuel|seg"}
+    by_comp = {
+        c: list(g[SimulationColumns.SET_INDEX.value])
+        for c, g in df.groupby(SimulationColumns.COMPONENT.value)
+    }
+    assert by_comp["a"] == [f"{f}|{g}" for f in ("coal", "gas") for g in (10, 20, 30)]
+    assert by_comp["b"] == [f"{f}|{g}" for f in ("coal", "gas") for g in (10, 20)]
+    b_values = df[df[SimulationColumns.COMPONENT.value] == "b"][
+        SimulationColumns.VALUE.value
+    ]
+    assert list(b_values) == [7.0, 9.0, 8.0, 10.0]
+
+
+def test_da_to_df_without_set_has_none_set_columns() -> None:
+    da = xr.DataArray([1.0], dims=["component"], coords={"component": ["a"]})
+    df = SimulationTableBuilder._da_to_df(da, "x", 1, 0, None)
+    assert df[SimulationColumns.SET_ID.value].isna().all()
+    assert df[SimulationColumns.SET_INDEX.value].isna().all()
+
+
+def test_to_dataset_set_indexed_output() -> None:
+    da = xr.DataArray(
+        np.arange(8.0).reshape(1, 2, 1, 4),
+        dims=["component", "time", "scenario", "fuel"],
+        coords={"component": ["a"], "time": [0, 1], "scenario": [0], "fuel": range(4)},
+    )
+    elements = {("a", "fuel"): ("coal", "gas", "oil", "bio")}
+    df = SimulationTableBuilder._da_to_df(
+        da, "gen", 1, 0, None, set_elements=_set_lookup(elements)
+    )
+    ds = SimulationTable(df).to_dataset()
+    assert ds["gen"].dims == (
+        "component",
+        "absolute_time_index",
+        "scenario_index",
+        "fuel",
+    )
+    assert ds["gen"].sel(fuel="oil", absolute_time_index=1).item() == 6.0

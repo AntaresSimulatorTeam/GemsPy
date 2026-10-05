@@ -1,11 +1,13 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
 import xarray as xr
+
+_BASE_DIMS = ("component", "time", "scenario")
 
 
 class OutputView:
@@ -20,7 +22,7 @@ class OutputView:
 
     @property
     def data(self) -> pd.DataFrame:
-        """Return the underlying Time × Scenario DataFrame."""
+        """Return the underlying Time × Scenario DataFrame (Time × (Scenario, set_index) if set-indexed)."""
         return self._df
 
     def value(
@@ -35,11 +37,15 @@ class OutputView:
         - ``value(scenario_index=s)`` → Series indexed by absolute_time_index
         - ``value(time_index=t)``     → Series indexed by scenario_index
         Called with both arguments returns a scalar ``float``.
+        For a set-indexed output the columns are a (scenario_index, set_index)
+        MultiIndex: the results are DataFrames/Series keyed by ``set_index`` instead.
         """
         if time_index is None and scenario_index is None:
             return self._df
         if time_index is not None and scenario_index is not None:
-            return float(cast(Any, self._df.loc[time_index, scenario_index]))
+            res = self._df.loc[time_index, scenario_index]
+            # Series over set_index for a set-indexed output
+            return res if isinstance(res, pd.Series) else float(cast(Any, res))
         if time_index is not None:
             return self._df.loc[time_index]  # Series over scenarios
         return self._df[scenario_index]  # Series over time
@@ -58,11 +64,17 @@ class ComponentView:
         self._df = df
 
     def output(self, output_id: str) -> OutputView:
-        """Return an OutputView for the given output name."""
+        """Return an OutputView for the given output name.
+
+        For a set-indexed output, the columns are a (scenario_index, set_index)
+        MultiIndex.
+        """
         col_output = SimulationColumns.OUTPUT.value
         col_time = SimulationColumns.ABSOLUTE_TIME_INDEX.value
         col_scenario = SimulationColumns.SCENARIO_INDEX.value
         col_value = SimulationColumns.VALUE.value
+
+        col_set = SimulationColumns.SET_INDEX.value
 
         filtered = self._df[self._df[col_output] == output_id].copy()
         # Dimension-independent outputs store None for the missing index.
@@ -70,14 +82,16 @@ class ComponentView:
         # API (value(time_index=t, scenario_index=s)) keeps working.
         filtered[col_time] = filtered[col_time].fillna(0)
         filtered[col_scenario] = filtered[col_scenario].fillna(0)
+        columns = (
+            [col_scenario, col_set] if filtered[col_set].notna().any() else col_scenario
+        )
         pivot = filtered.pivot_table(
             index=col_time,
-            columns=col_scenario,
+            columns=columns,
             values=col_value,
             aggfunc="first",
         )
         pivot.index.name = col_time
-        pivot.columns.name = col_scenario
         return OutputView(pivot)
 
 
@@ -142,7 +156,9 @@ class SimulationTable:
         """Return simulation results as an xr.Dataset.
 
         Each output variable becomes a DataArray with dimensions
-        (component, absolute_time_index, scenario_index).
+        (component, absolute_time_index, scenario_index). A set-indexed output
+        gets one more dimension named after its ``set_id`` (e.g. ``"fuel|seg"``),
+        labelled by ``set_index``.
         Scalar rows without component/time/scenario (e.g. objective-value)
         are stored as zero-dimensional variables.
         """
@@ -153,10 +169,21 @@ class SimulationTable:
         col_scen = SimulationColumns.SCENARIO_INDEX.value
         col_val = SimulationColumns.VALUE.value
 
+        col_set_id = SimulationColumns.SET_ID.value
+        col_set_idx = SimulationColumns.SET_INDEX.value
+
         main = df.dropna(subset=[col_comp, col_time, col_scen])
-        indexed = main.set_index([col_comp, col_time, col_scen, col_out])[col_val]
+        plain = main[main[col_set_id].isna()]
+        indexed = plain.set_index([col_comp, col_time, col_scen, col_out])[col_val]
         unstacked = indexed.unstack(col_out)
         ds = xr.Dataset.from_dataframe(unstacked)
+
+        for (out, set_id), grp in main[main[col_set_id].notna()].groupby(
+            [col_out, col_set_id]
+        ):
+            series = grp.set_index([col_comp, col_time, col_scen, col_set_idx])[col_val]
+            da = xr.DataArray.from_series(series).rename({col_set_idx: set_id})
+            ds = xr.merge([ds, da.to_dataset(name=out)])
 
         scalars = df[df[col_comp].isna() & df[col_time].isna()]
         for _, row in scalars.iterrows():
@@ -177,6 +204,8 @@ class SimulationColumns(str, Enum):
     ABSOLUTE_TIME_INDEX = "absolute_time_index"
     BLOCK_TIME_INDEX = "block_time_index"
     SCENARIO_INDEX = "scenario_index"
+    SET_ID = "set_id"
+    SET_INDEX = "set_index"
     VALUE = "value"
     BASIS_STATUS = "basis_status"
 
@@ -248,10 +277,27 @@ class SimulationTableBuilder:
                     abs_offset,
                     basis_status=None,
                     scenario_ids_remap=scenario_ids_remap,
+                    set_elements=self._set_elements_lookup(problem),
                 )
             )
 
         return dfs
+
+    @staticmethod
+    def _set_elements_lookup(
+        problem: OptimizationProblem,
+    ) -> Callable[[Optional[str], str], Sequence[Union[str, int]]]:
+        """(component id or None, set id) -> elements of that set for the component."""
+
+        def lookup(
+            component_id: Optional[str], set_id: str
+        ) -> Sequence[Union[str, int]]:
+            system = problem.study.system
+            if component_id is None:
+                return system.global_sets[set_id]
+            return system.set_elements(system.get_component(component_id), set_id)
+
+        return lookup
 
     # -------------------------------------------------------------------------
     # Extra outputs
@@ -335,6 +381,7 @@ class SimulationTableBuilder:
                         abs_offset,
                         basis_status=None,
                         scenario_ids_remap=scenario_ids_remap,
+                        set_elements=self._set_elements_lookup(problem),
                     )
                 )
 
@@ -459,6 +506,8 @@ class SimulationTableBuilder:
                     SimulationColumns.ABSOLUTE_TIME_INDEX.value: None,
                     SimulationColumns.BLOCK_TIME_INDEX.value: None,
                     SimulationColumns.SCENARIO_INDEX.value: None,
+                    SimulationColumns.SET_ID.value: None,
+                    SimulationColumns.SET_INDEX.value: None,
                     SimulationColumns.VALUE.value: problem.objective_value,
                     SimulationColumns.BASIS_STATUS.value: None,
                 }
@@ -477,15 +526,23 @@ class SimulationTableBuilder:
         abs_offset: int,
         basis_status: Optional[str],
         scenario_ids_remap: Optional[List[int]] = None,
+        set_elements: Optional[
+            Callable[[Optional[str], str], Sequence[Union[str, int]]]
+        ] = None,
     ) -> pd.DataFrame:
-        """Vectorize a [component?, time?, scenario?] DataArray into a DataFrame.
+        """Vectorize a [component?, time?, scenario?, *sets] DataArray into a DataFrame.
 
         Index columns (absolute_time_index, block_time_index, scenario_index) are
         set to None for dimensions that are absent from the original DataArray,
         signalling that the output is independent of that dimension.
+
+        Custom-set dimensions (sorted by id) are folded into pipe-joined ``set_id`` /
+        ``set_index`` columns (element names); rows at padded positions, beyond a
+        component's own set size, are dropped.
         """
         has_time = "time" in da.dims
         has_scenario = "scenario" in da.dims
+        set_dims = sorted(str(d) for d in da.dims if d not in _BASE_DIMS)
 
         if "component" not in da.dims:
             da = da.expand_dims(component=[None])
@@ -494,16 +551,32 @@ class SimulationTableBuilder:
         if not has_scenario:
             da = da.expand_dims(scenario=[0])
 
-        da = da.transpose("component", "time", "scenario")
+        da = da.transpose("component", "time", "scenario", *set_dims)
         comp_vals: List[Any] = list(da.coords["component"].values)
-        n_c, n_t, n_s = da.shape
+        n_s = da.shape[2]
 
-        ci = np.repeat(np.arange(n_c), n_t * n_s)
-        ti = np.tile(np.repeat(np.arange(n_t), n_s), n_c)
-        raw_si = (
-            scenario_ids_remap if scenario_ids_remap is not None else list(range(n_s))
+        idx = np.indices(da.shape).reshape(da.ndim, -1)
+        values = da.values.ravel().astype(float)
+        set_index: Optional[List[str]] = None
+        if set_dims:
+            if set_elements is None:
+                raise ValueError("set_elements is required for set-indexed outputs")
+            keep = np.ones(values.shape, dtype=bool)
+            labels = []
+            for k, set_id in enumerate(set_dims):
+                # names[component, position]; None marks padded positions
+                names = np.full((da.shape[0], da.shape[3 + k]), None, dtype=object)
+                for c, comp in enumerate(comp_vals):
+                    elems = set_elements(None if comp is None else str(comp), set_id)
+                    names[c, : len(elems)] = [str(e) for e in elems]
+                labels.append(names[idx[0], idx[3 + k]])
+                keep &= labels[-1] != None  # noqa: E711 (elementwise)
+            idx, values = idx[:, keep], values[keep]
+            set_index = ["|".join(row) for row in zip(*(lab[keep] for lab in labels))]
+        ci, ti, pos_s = idx[0], idx[1], idx[2]
+        raw_si = np.asarray(
+            scenario_ids_remap if scenario_ids_remap is not None else range(n_s)
         )
-        si = np.tile(raw_si, n_c * n_t)
 
         return pd.DataFrame(
             {
@@ -516,8 +589,12 @@ class SimulationTableBuilder:
                     (abs_offset + ti) if has_time else None
                 ),
                 SimulationColumns.BLOCK_TIME_INDEX.value: ti if has_time else None,
-                SimulationColumns.SCENARIO_INDEX.value: si if has_scenario else None,
-                SimulationColumns.VALUE.value: da.values.ravel().astype(float),
+                SimulationColumns.SCENARIO_INDEX.value: (
+                    raw_si[pos_s] if has_scenario else None
+                ),
+                SimulationColumns.SET_ID.value: "|".join(set_dims) or None,
+                SimulationColumns.SET_INDEX.value: set_index,
+                SimulationColumns.VALUE.value: values,
                 SimulationColumns.BASIS_STATUS.value: basis_status,
             }
         )
