@@ -51,16 +51,16 @@ def test_time_and_set_pivot() -> None:
     np.testing.assert_array_equal(data.values, [[1, 10], [2, 20]])
 
 
-def test_column_order_is_irrelevant() -> None:
-    reordered = _df("value,time,fuel\n1,0,gas\n2,1,gas\n10,0,coal\n20,1,coal\n")
-    a = dataframe_to_set_indexed_series(_df(TIME_FUEL_CSV), True, False, FUELS)
-    b = dataframe_to_set_indexed_series(reordered, True, False, FUELS)
-    np.testing.assert_array_equal(a.values, b.values)
-
-
-def test_row_order_is_irrelevant() -> None:
-    shuffled = _df("fuel,time,value\ncoal,1,20\ngas,0,1\ncoal,0,10\ngas,1,2\n")
-    data = dataframe_to_set_indexed_series(shuffled, True, False, FUELS)
+@pytest.mark.parametrize(
+    "csv",
+    [
+        "value,time,fuel\n1,0,gas\n2,1,gas\n10,0,coal\n20,1,coal\n",  # columns
+        "fuel,time,value\ncoal,1,20\ngas,0,1\ncoal,0,10\ngas,1,2\n",  # rows
+    ],
+    ids=["column order", "row order"],
+)
+def test_column_and_row_order_are_irrelevant(csv: str) -> None:
+    data = dataframe_to_set_indexed_series(_df(csv), True, False, FUELS)
     np.testing.assert_array_equal(data.values, [[1, 10], [2, 20]])
 
 
@@ -87,13 +87,6 @@ def test_all_dimensions() -> None:
     assert data.get_value([1], np.array([2]))[0, 0, 1] == 121
 
 
-def test_missing_required_column() -> None:  # (a)
-    with pytest.raises(ValueError, match="missing \\['time'\\]"):
-        dataframe_to_set_indexed_series(
-            _df("fuel,value\ngas,1\ncoal,2\n"), True, False, FUELS
-        )
-
-
 def test_overridden_out_dimension_broadcasts() -> None:  # (b)
     data = dataframe_to_set_indexed_series(
         _df("fuel,value\ngas,1\ncoal,2\n"), False, False, FUELS
@@ -104,11 +97,6 @@ def test_overridden_out_dimension_broadcasts() -> None:  # (b)
     assert data.get_value(None, None).shape == (2,)
 
 
-def test_overridden_out_column_present() -> None:  # (c)
-    with pytest.raises(ValueError, match="unexpected \\['time'\\]"):
-        dataframe_to_set_indexed_series(_df(TIME_FUEL_CSV), False, False, FUELS)
-
-
 def test_constant_values_behave_like_varying_data() -> None:  # (d)
     csv = "fuel,time,value\ngas,0,5\ngas,1,5\ncoal,0,5\ncoal,1,5\n"
     data = dataframe_to_set_indexed_series(_df(csv), True, False, FUELS)
@@ -117,21 +105,31 @@ def test_constant_values_behave_like_varying_data() -> None:  # (d)
 
 
 @pytest.mark.parametrize(
-    "csv, message",
+    "csv, message, time_dependent",
     [
-        (TIME_FUEL_CSV + "gas,1,3\n", "duplicate or missing"),
-        ("fuel,time,value\ngas,0,1\ngas,1,2\ncoal,0,10\n", "duplicate or missing"),
-        ("fuel,time,value\ngas,0,1\ncoal,0,2\noil,0,3\n", "do not match"),
-        ("fuel,time,value\ngas,0,1\ngas,2,1\ncoal,0,1\ncoal,2,1\n", "0..n-1"),
-        ("fuel,time,value\ngas,a,1\ncoal,0,1\n", "integers"),
-        ("fuel,time,value\ngas,0,x\ncoal,0,1\n", "numbers"),
-        ("fuel,time,value\ngas,0,\ncoal,0,1\n", "empty cells"),
-        ("fuel,time,value,extra\ngas,0,1,1\ncoal,0,1,1\n", "unexpected \\['extra'\\]"),
+        (TIME_FUEL_CSV + "gas,1,3\n", "duplicate or missing", True),
+        (
+            "fuel,time,value\ngas,0,1\ngas,1,2\ncoal,0,10\n",
+            "duplicate or missing",
+            True,
+        ),
+        ("fuel,time,value\ngas,0,1\ncoal,0,2\noil,0,3\n", "do not match", True),
+        ("fuel,time,value\ngas,0,1\ngas,2,1\ncoal,0,1\ncoal,2,1\n", "0..n-1", True),
+        ("fuel,time,value\ngas,a,1\ncoal,0,1\n", "integers", True),
+        ("fuel,time,value\ngas,0,x\ncoal,0,1\n", "numbers", True),
+        ("fuel,time,value\ngas,0,\ncoal,0,1\n", "empty cells", True),
+        (
+            "fuel,time,value,extra\ngas,0,1,1\ncoal,0,1,1\n",
+            "unexpected \\['extra'\\]",
+            True,
+        ),
+        ("fuel,value\ngas,1\ncoal,2\n", "missing \\['time'\\]", True),
+        (TIME_FUEL_CSV, "unexpected \\['time'\\]", False),
     ],
 )
-def test_invalid_series(csv: str, message: str) -> None:
+def test_invalid_series(csv: str, message: str, time_dependent: bool) -> None:
     with pytest.raises(ValueError, match=message):
-        dataframe_to_set_indexed_series(_df(csv), True, False, FUELS)
+        dataframe_to_set_indexed_series(_df(csv), time_dependent, False, FUELS)
 
 
 def test_check_requirement() -> None:

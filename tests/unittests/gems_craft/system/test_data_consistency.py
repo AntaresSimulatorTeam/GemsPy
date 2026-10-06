@@ -373,15 +373,21 @@ def _fuel_study(
     return Study(system, database)
 
 
-def test_set_indexed_data_matching_model_passes() -> None:
-    check_data_requirements(_fuel_study(_fuel_series(time=True)))
-
-
-def test_set_indexed_data_narrower_than_model_passes() -> None:
-    check_data_requirements(_fuel_study(_fuel_series(time=False)))
-
-
-def test_set_indexed_data_for_parameter_without_the_set_raises() -> None:
-    study = _fuel_study(_fuel_series(time=True), IndexingStructure(True, False))
-    with pytest.raises(ValueError, match="Requirement not met"):
+@pytest.mark.parametrize(
+    "time_series, structure, passes",
+    [
+        (True, IndexingStructure(True, False, frozenset({"fuel"})), True),  # matching
+        (False, IndexingStructure(True, False, frozenset({"fuel"})), True),  # narrower
+        (True, IndexingStructure(True, False), False),  # model lacks the set
+    ],
+    ids=["matching", "narrower than model", "parameter without the set"],
+)
+def test_set_indexed_data_requirements(
+    time_series: bool, structure: IndexingStructure, passes: bool
+) -> None:
+    study = _fuel_study(_fuel_series(time=time_series), structure)
+    if passes:
         check_data_requirements(study)
+    else:
+        with pytest.raises(ValueError, match="Requirement not met"):
+            check_data_requirements(study)
