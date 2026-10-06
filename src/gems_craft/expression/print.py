@@ -104,7 +104,15 @@ class PrinterVisitor(ExpressionVisitor[str]):
         return node.name
 
     def time_shift(self, node: TimeShiftNode) -> str:
-        return f"({visit(node.operand, self)}[t+{visit(node.time_shift, self)}])"
+        return f"({visit(node.operand, self)}[t{self._signed_offset(node.time_shift)}])"
+
+    def _signed_offset(self, offset: ExpressionNode) -> str:
+        """Prints a shift amount with its sign (`+1.0`, `-1.0`), never `+-`."""
+        if isinstance(offset, LiteralNode) and offset.value < 0:
+            return f"-{-offset.value}"
+        if isinstance(offset, NegationNode):
+            return f"-{visit(offset.operand, self)}"
+        return f"+{visit(offset, self)}"
 
     def time_eval(self, node: TimeEvalNode) -> str:
         return f"({visit(node.operand, self)}[t={visit(node.eval_time, self)}])"
@@ -131,7 +139,7 @@ class PrinterVisitor(ExpressionVisitor[str]):
         if node.position is not None:
             return f"{node.set_id}={visit(node.position, self)}"
         if node.relative_shift is not None:
-            return f"{node.set_id}+{visit(node.relative_shift, self)}"
+            return f"{node.set_id}{self._signed_offset(node.relative_shift)}"
         return node.set_id
 
     def sum_over(self, node: SumOverNode) -> str:
