@@ -634,18 +634,26 @@ class _OptimizationProblemBuilder:
 
         # Extract constant objective contribution (linopy cannot hold pure constants).
         objective_constant = 0.0
+        has_objective = False
         if total_obj is not None and not isinstance(
             total_obj, (xr.DataArray, int, float)
         ):
+            # Move any constant term out of the expression (linopy rejects it).
+            if isinstance(total_obj, linopy.LinearExpression):
+                objective_constant = float(total_obj.const.sum())
+                total_obj = total_obj - objective_constant
             self.linopy_model.add_objective(total_obj)  # type: ignore[arg-type]
+            has_objective = True
         elif total_obj is not None:
             if isinstance(total_obj, xr.DataArray):
                 objective_constant = float(total_obj.sum())
             else:
                 objective_constant = float(total_obj)
 
-        # linopy requires at least one variable to solve; add a fixed dummy if needed.
-        if len(self.linopy_model.variables) == 0:
+        # linopy requires an objective (hence a variable) to solve; add a fixed dummy if needed.
+        if not has_objective and (
+            total_obj is not None or len(self.linopy_model.variables) == 0
+        ):
             dummy = self.linopy_model.add_variables(
                 lower=xr.DataArray([0.0], dims=["__dummy_dim"]),
                 upper=xr.DataArray([0.0], dims=["__dummy_dim"]),
