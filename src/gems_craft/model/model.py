@@ -154,14 +154,16 @@ def _model_expressions(model: "Model") -> Iterator[Tuple[str, Any]]:
         yield f"definition of port field '{d.port_field}'", d
 
 
-def time_sum_bound_parameters(model: "Model") -> Iterator[Tuple[str, str, str]]:
+def time_sum_bound_parameters(
+    model: "Model",
+) -> Iterator[Tuple[str, ExpressionNode, str]]:
     """(parameter, bound, where) for each parameter used in a time sum bound of
-    the model, the bound being printed as in the expression."""
+    the model."""
     for where, holder in _model_expressions(model):
         for time_sum in _nodes(holder, TimeSumNode):
             for bound in (time_sum.from_time, time_sum.to_time):
                 for parameter in _nodes(bound, ParameterNode):
-                    yield parameter.name, print_expr(bound), where
+                    yield parameter.name, bound, where
 
 
 def _is_objective_contribution_valid(

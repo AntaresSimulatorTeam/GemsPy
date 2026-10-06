@@ -17,8 +17,10 @@ into its runtime objects) and from `study.py` (which only holds them together)
 — mirroring `optim_config/parsing.py` and `optim_config/validation.py`.
 """
 
-from typing import Dict
+from typing import Dict, List, Tuple
 
+from gems_craft.expression import ExpressionNode
+from gems_craft.expression.print import print_expr
 from gems_craft.model import Model
 from gems_craft.model.model import time_sum_bound_parameters
 from gems_craft.study.data import TimeScenarioSeriesData, TimeSeriesData
@@ -79,12 +81,20 @@ def check_time_sum_bounds(study: Study) -> None:
         If a component gives a time series to a parameter used in a time sum
         bound.
     """
+    # Components often share a model: list its bound parameters only once.
+    bounds_by_model: Dict[int, List[Tuple[str, ExpressionNode, str]]] = {}
     for component in study.system.components:
-        for parameter, bound, where in time_sum_bound_parameters(component.model):
+        model_key = id(component.model)
+        if model_key not in bounds_by_model:
+            bounds_by_model[model_key] = list(
+                time_sum_bound_parameters(component.model)
+            )
+        for parameter, bound, where in bounds_by_model[model_key]:
             data = study.database.get_data(component.id, parameter)
             if isinstance(data, (TimeSeriesData, TimeScenarioSeriesData)):
                 raise ValueError(
                     f"Component '{component.id}' (model '{component.model.id}'): "
                     f"a time sum bound must be fixed in time, but parameter "
-                    f"'{parameter}' of '{bound}' in {where} is a time series."
+                    f"'{parameter}' of '{print_expr(bound)}' in {where} is a "
+                    "time series."
                 )
