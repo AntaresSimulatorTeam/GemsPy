@@ -12,7 +12,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -344,6 +344,29 @@ def dataframe_to_set_indexed_series(
     values = np.empty(tuple(shape))
     values[tuple(codes)] = value
     return SetIndexedSeriesData(values=values, dims=tuple(key_cols), coords=coords)
+
+
+def _flatten_nested(node: Any, set_ids: List[str]) -> List[Dict[str, str]]:
+    if not set_ids:
+        return [{"value": str(node)}]
+    if not isinstance(node, dict):
+        raise ValueError(f"Inline values need a mapping over set '{set_ids[0]}'.")
+    return [
+        {set_ids[0]: str(k), **row}
+        for k, sub in node.items()
+        for row in _flatten_nested(sub, set_ids[1:])
+    ]
+
+
+def nested_dict_to_set_indexed_series(
+    value: Dict[Union[str, int], Any],
+    set_elements: Dict[str, List[Union[str, int]]],
+) -> SetIndexedSeriesData:
+    """Inline set-only values, nested per set in order, as a tidy series."""
+    df = pd.DataFrame(
+        _flatten_nested(value, list(set_elements)), columns=[*set_elements, "value"]
+    )
+    return dataframe_to_set_indexed_series(df, False, False, set_elements)
 
 
 @dataclass(frozen=True)

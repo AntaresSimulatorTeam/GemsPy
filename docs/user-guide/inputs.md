@@ -88,6 +88,24 @@ own `indexed-by`; any other column is rejected. Set columns must hold exactly th
 elements instantiated in `system.yml`, and `time`/`scenario` values must be
 `0..n-1`. Empty or non-numeric `value` cells are rejected.
 
+A parameter that depends on sets only (neither `time-dependent` nor
+`scenario-dependent`) may instead give its values inline in `system.yml`, as a
+mapping from element to value, nested in the order of `indexed-by` when there are
+several sets:
+
+~~~ yaml
+parameters:
+  - id: cost
+    indexed-by: [fuel]
+    value: {gas: 45, coal: 30}
+  - id: capacity
+    indexed-by: [fuel, segment]
+    value: {gas: {1: 3, 2: 4}, coal: {1: 5, 2: 6}}
+~~~
+
+The keys at each level must be exactly the elements instantiated for that set,
+and the leaves must be numbers.
+
 ### Assembling a Study
 
 Once you have `system` and `database`, wrap them in a `Study`:

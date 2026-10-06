@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
+from typing import Any, Dict, List, Optional, TextIO, Type, TypeVar, Union, overload
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 from yaml import safe_dump, safe_load
@@ -35,7 +35,8 @@ class ComponentParameterSchema(ModifiedBaseModel):
     time_dependent: bool = False
     scenario_dependent: bool = False
     indexed_by: List[str] = Field(default_factory=list)
-    value: Union[float, str]
+    # float: constant; str: series name; dict: inline set-indexed values (nested per set)
+    value: Union[float, str, Dict[Union[str, int], Any]]
     scenario_group: Optional[str] = None
 
 
