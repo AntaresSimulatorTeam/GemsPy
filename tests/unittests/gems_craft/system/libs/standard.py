@@ -208,8 +208,7 @@ THERMAL_CLUSTER_MODEL_HD = model(
         float_parameter("d_min_up", CONSTANT),
         float_parameter("d_min_down", CONSTANT),
         float_parameter("cost", CONSTANT),
-        int_parameter("nb_units_max", CONSTANT),
-        int_parameter("nb_failures", TIME_AND_SCENARIO_FREE),
+        int_parameter("nb_units_max", ANTICIPATIVE_TIME_VARYING),
     ],
     variables=[
         float_variable(
@@ -280,8 +279,7 @@ THERMAL_CLUSTER_MODEL_DHD = model(
         float_parameter("d_min_up", CONSTANT),
         float_parameter("d_min_down", CONSTANT),
         float_parameter("cost", CONSTANT),
-        int_parameter("nb_units_max", CONSTANT),
-        int_parameter("nb_failures", TIME_AND_SCENARIO_FREE),
+        int_parameter("nb_units_max", NON_ANTICIPATIVE_TIME_VARYING),
     ],
     variables=[
         float_variable(

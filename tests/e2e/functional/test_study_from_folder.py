@@ -71,3 +71,45 @@ def test_load_study_raises_on_taxonomy_id_mismatch(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="other_taxonomy"):
         load_study(study_dir)
+
+
+_LIB_WITH_GLOBAL_SET = """\
+library:
+  id: lib
+  sets:
+    - id: fuel
+  models:
+    - id: m
+      parameters:
+        - id: p
+          indexed-by: [fuel]
+"""
+
+
+def _minimal_study_with_set(tmp_path: Path, system_yaml: str) -> Path:
+    study_dir = tmp_path / "custom_sets_study"
+    (study_dir / "input" / "model-libraries").mkdir(parents=True)
+    (study_dir / "input" / "data-series").mkdir(parents=True)
+    (study_dir / "input" / "model-libraries" / "lib.yml").write_text(
+        _LIB_WITH_GLOBAL_SET
+    )
+    (study_dir / "input" / "system.yml").write_text(system_yaml)
+    return study_dir
+
+
+def test_load_study_raises_when_global_set_not_instantiated(tmp_path: Path) -> None:
+    study_dir = _minimal_study_with_set(
+        tmp_path,
+        """\
+system:
+  components:
+    - id: A
+      model: lib.m
+      parameters:
+        - id: p
+          value: 1.0
+""",
+    )
+
+    with pytest.raises(ValueError, match="not instantiated"):
+        load_study(study_dir)

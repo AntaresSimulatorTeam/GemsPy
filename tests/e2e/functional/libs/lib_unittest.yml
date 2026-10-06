@@ -139,9 +139,8 @@ library:
         - id: d_min_up
         - id: d_min_down
         - id: nb_units_max
-        - id: nb_failures
           time-dependent: true
-          scenario-dependent: true
+          scenario-dependent: false
       variables:
         - id: generation
           lower-bound: 0

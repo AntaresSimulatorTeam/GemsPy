@@ -374,3 +374,53 @@ system:
         "technology": "nuclear",
         "company": "rhonepower",
     }
+
+
+_SYSTEM_WITH_SETS = """\
+system:
+  sets:
+    - id: fuel
+      elements: [gas, coal]
+  components:
+    - id: A
+      model: basic.area
+      sets:
+        - id: segment
+          elements: 0..2
+      parameters:
+        - id: p
+          value: 1.0
+          indexed-by: [fuel]
+"""
+
+
+def test_parse_yaml_system_sets_and_indexed_by() -> None:
+    system = parse_yaml_system(io.StringIO(_SYSTEM_WITH_SETS))
+    assert system.sets is not None
+    assert system.sets[0].id == "fuel"
+    assert system.sets[0].elements == ["gas", "coal"]
+    component = system.components[0]
+    assert component.sets is not None
+    assert component.sets[0].id == "segment"
+    assert component.sets[0].elements == [0, 1, 2]
+    assert component.parameters[0].indexed_by == ["fuel"]
+
+
+def test_parse_yaml_system_sets_and_indexed_by_default_absent() -> None:
+    system = parse_yaml_system(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
+    assert system.sets is None
+    for component in system.components:
+        assert component.sets is None
+
+
+@pytest.mark.parametrize(
+    "elements, error",
+    [
+        ("not-a-range", "Invalid elements range"),
+        ("5..2", "Range start must be"),
+    ],
+)
+def test_set_instance_invalid_range_raises(elements: str, error: str) -> None:
+    system_yaml = f"system:\n\n  sets:\n\n    - id: fuel\n\n      elements: {elements}\n\n  components: []\n"
+    with pytest.raises(ValidationError, match=error):
+        parse_yaml_system(io.StringIO(system_yaml))

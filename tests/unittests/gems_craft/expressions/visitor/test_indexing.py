@@ -11,14 +11,23 @@
 # This file is part of the Antares project.
 
 
-from gems_craft.expression import param, var
+import pytest
+
+from gems_craft.expression import literal, param, var
 from gems_craft.expression.expression import (
     DualNode,
+    ExpressionNode,
     LowerBoundNode,
     ReducedCostNode,
     UpperBoundNode,
+    port_field,
 )
-from gems_craft.expression.indexing import IndexingStructureProvider, compute_indexation
+from gems_craft.expression.indexing import (
+    IndexingStructureProvider,
+    IndexingUsageError,
+    UnresolvedPortFieldError,
+    compute_indexation,
+)
 from gems_craft.expression.indexing_structure import IndexingStructure
 
 
@@ -129,20 +138,74 @@ def test_dual_reduced_cost_indexing() -> None:
     )
 
 
-def test_set_index_sum_over_indexing_placeholder() -> None:
-    """SetIndexNode/SumOverNode don't yet affect IndexingStructure (no `sets`
-    dimension exists there yet -- see indexing.py TODOs); for now they just
-    propagate the operand's time/scenario structure unchanged. This test
-    documents today's placeholder behavior and should be revisited once
-    IndexingStructure grows a `sets` dimension (custom sets, phase 2)."""
-    x = var("x")
-    provider = StructureProvider()
+class _SetStructureProvider(IndexingStructureProvider):
+    """Variable 'x' is time/scenario-varying and indexed by 'fuel' and 'segment'."""
 
-    assert compute_indexation(x.set_index("fuel"), provider) == IndexingStructure(
-        True, True
+    def get_component_variable_structure(
+        self, component_id: str, name: str
+    ) -> IndexingStructure:
+        raise NotImplementedError()
+
+    def get_component_parameter_structure(
+        self, component_id: str, name: str
+    ) -> IndexingStructure:
+        raise NotImplementedError()
+
+    def get_parameter_structure(self, name: str) -> IndexingStructure:
+        raise NotImplementedError()
+
+    def get_variable_structure(self, name: str) -> IndexingStructure:
+        return IndexingStructure(True, True, frozenset({"fuel", "segment"}))
+
+    def get_constraint_structure(self, name: str) -> IndexingStructure:
+        raise NotImplementedError()
+
+
+@pytest.mark.parametrize(
+    "expr, sets",
+    [
+        # an explicit position or a sum_over removes the set dimension...
+        (var("x").set_index("fuel", position=literal(2)), {"segment"}),
+        (var("x").sum_over("fuel"), {"segment"}),
+        # ...a bare or relative-shift index keeps it
+        (var("x").set_index("fuel"), {"fuel", "segment"}),
+        (var("x").set_index("fuel", relative_shift=literal(1)), {"fuel", "segment"}),
+    ],
+)
+def test_set_index_and_sum_over_structure(expr: ExpressionNode, sets: set) -> None:
+    assert compute_indexation(expr, _SetStructureProvider()) == IndexingStructure(
+        True, True, frozenset(sets)
     )
-    assert compute_indexation(x.sum_over("fuel"), provider) == IndexingStructure(
-        True, True
+
+
+def test_combine_does_not_drop_sets_after_time_scenario_settled() -> None:
+    """Regression test for _combine's former short-circuit: once time and
+    scenario are both known to vary, further operands must still contribute
+    their `sets` to the union instead of being skipped."""
+    x = var("x")  # fully time/scenario-varying, no sets
+    y = var("y")
+
+    class MixedProvider(IndexingStructureProvider):
+        def get_component_variable_structure(self, component_id, name):  # type: ignore[no-untyped-def]
+            raise NotImplementedError()
+
+        def get_component_parameter_structure(self, component_id, name):  # type: ignore[no-untyped-def]
+            raise NotImplementedError()
+
+        def get_parameter_structure(self, name: str) -> IndexingStructure:
+            raise NotImplementedError()
+
+        def get_variable_structure(self, name: str) -> IndexingStructure:
+            if name == "x":
+                return IndexingStructure(True, True)
+            return IndexingStructure(True, True, frozenset({"fuel"}))
+
+        def get_constraint_structure(self, name: str) -> IndexingStructure:
+            raise NotImplementedError()
+
+    provider = MixedProvider()
+    assert compute_indexation(x + y, provider) == IndexingStructure(
+        True, True, frozenset({"fuel"})
     )
 
 
@@ -154,3 +217,47 @@ def test_lower_upper_bound_indexing() -> None:
     assert compute_indexation(UpperBoundNode("x"), provider) == IndexingStructure(
         True, True
     )
+
+
+class _ConstantParamProvider(StructureProvider):
+    def get_parameter_structure(self, name: str) -> IndexingStructure:
+        return IndexingStructure(False, False)
+
+
+@pytest.mark.parametrize("expr", [param("p").shift(1), param("p").eval(1)])
+def test_time_shift_or_eval_on_non_time_dependent_raises(expr: ExpressionNode) -> None:
+    with pytest.raises(IndexingUsageError, match="not time-dependent"):
+        compute_indexation(expr, _ConstantParamProvider())
+
+
+def test_unresolved_port_field_raises() -> None:
+    with pytest.raises(UnresolvedPortFieldError):
+        compute_indexation(
+            port_field("p", "f").sum_connections(), _ConstantParamProvider()
+        )
+
+
+def test_index_error_reported_alongside_unresolved_port_field() -> None:
+    """An invalid time shift is still reported when a sibling operand (before or
+    after it) holds an unresolved port field."""
+    provider = _ConstantParamProvider()
+    port = port_field("p", "f").sum_connections()
+    bad = param("p").shift(1)
+    with pytest.raises(IndexingUsageError):
+        compute_indexation(port + bad, provider)
+    with pytest.raises(IndexingUsageError):
+        compute_indexation(bad + port, provider)
+
+
+def test_time_shift_on_unresolved_port_field_is_deferred() -> None:
+    with pytest.raises(UnresolvedPortFieldError):
+        compute_indexation(
+            port_field("p", "f").sum_connections().shift(1), _ConstantParamProvider()
+        )
+
+
+def test_sum_over_unindexed_operand_warns() -> None:
+    x = var("x")
+    provider = _SetStructureProvider()
+    with pytest.warns(UserWarning, match="not indexed by .other."):
+        compute_indexation(x.sum_over("other"), provider)

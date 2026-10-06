@@ -165,6 +165,39 @@ library:
     assert input_lib.models[0].taxonomy_category == "balance"
 
 
+def test_sets_and_indexed_by_parse() -> None:
+    input_lib = parse_yaml_library(io.StringIO("""
+library:
+  id: sets_lib
+  sets: [{id: fuel, description: fuel types}]
+  models:
+    - id: bus
+      sets: [{id: segment}]
+      parameters: [{id: p, indexed-by: [fuel]}]
+      variables: [{id: v, indexed-by: [fuel]}]
+"""))
+    model = input_lib.models[0]
+    assert [s.id for s in input_lib.sets] == ["fuel"]
+    assert input_lib.sets[0].description == "fuel types"
+    assert [s.id for s in model.sets] == ["segment"]
+    assert model.parameters[0].indexed_by == ["fuel"]
+    assert model.variables[0].indexed_by == ["fuel"]
+
+
+def test_sets_and_indexed_by_default_empty() -> None:
+    input_lib = parse_yaml_library(io.StringIO("""
+library:
+  id: no_sets_lib
+  models:
+    - id: bus
+      parameters: [{id: p}]
+      variables: [{id: v}]
+"""))
+    model = input_lib.models[0]
+    assert input_lib.sets == [] and model.sets == []
+    assert model.parameters[0].indexed_by == [] and model.variables[0].indexed_by == []
+
+
 def test_library_version_parsing() -> None:
     yaml_content = """
 library:
@@ -619,6 +652,20 @@ def test_sum_connections_on_own_port_in_extra_output_raises() -> None:
         )
     )
     with pytest.raises(ValueError, match="sum_connections"):
+        resolve_library([input_lib])
+
+
+def test_sum_connections_in_objective_contribution_raises() -> None:
+    """sum_connections is rejected in objective contributions, even on a port field not defined here."""
+    yaml = _port_model_yaml().replace(
+        "      ports:",
+        "      objective-contributions:\n"
+        "        - id: obj\n"
+        "          expression: sum(generation + sum_connections(balance_port.flow))\n"
+        "      ports:",
+    )
+    input_lib = parse_yaml_library(io.StringIO(yaml))
+    with pytest.raises(ValueError, match="sum_connections is not allowed"):
         resolve_library([input_lib])
 
 
