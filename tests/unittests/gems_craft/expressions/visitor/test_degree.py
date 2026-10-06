@@ -27,6 +27,7 @@ from gems_craft.expression.expression import (
     AbsNode,
     CeilNode,
     DualNode,
+    ExpressionNode,
     FloorNode,
     LowerBoundNode,
     ReducedCostNode,
@@ -94,14 +95,17 @@ def test_lower_upper_bound_degree() -> None:
     assert visit(UpperBoundNode("x"), ExpressionDegreeVisitor()) == math.inf
 
 
-def test_set_index_sum_over_degree() -> None:
-    x = var("x")
-    p = param("p")
-
-    assert visit(x.set_index("fuel"), ExpressionDegreeVisitor()) == 1
-    assert visit(p.set_index("fuel", position=2), ExpressionDegreeVisitor()) == 0
-    assert visit(x.sum_over("fuel"), ExpressionDegreeVisitor()) == 1
-    assert visit(p.sum_over("fuel"), ExpressionDegreeVisitor()) == 0
+@pytest.mark.parametrize(
+    "expr, degree",
+    [
+        (var("x").set_index("fuel"), 1),
+        (param("p").set_index("fuel", position=2), 0),
+        (var("x").sum_over("fuel"), 1),
+        (param("p").sum_over("fuel"), 0),
+    ],
+)
+def test_set_index_sum_over_degree(expr: ExpressionNode, degree: int) -> None:
+    assert visit(expr, ExpressionDegreeVisitor()) == degree
 
 
 @pytest.mark.xfail(reason="Degree simplification not implemented")
