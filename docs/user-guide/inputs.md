@@ -66,12 +66,12 @@ database = build_data_base(input_system, Path(series_dir))
 ~~~
 
 `build_data_base()` reads all timeseries files referenced by the system
-(`.txt` or `.csv`) from `series_dir`.
+(`.txt`, `.tsv` or `.csv`) from `series_dir`.
 
 ### Loading set-indexed data
 
-A parameter with `indexed-by` set(s) reads a tidy CSV (`<value>.csv`, with a
-header row) from `series_dir`, with one row per combination:
+A parameter with `indexed-by` set(s) reads a tidy file (`<value>.txt`,
+`.tsv` or `.csv`, with a header row) from `series_dir`, with one row per combination:
 
 ~~~ csv
 time,fuel,value
