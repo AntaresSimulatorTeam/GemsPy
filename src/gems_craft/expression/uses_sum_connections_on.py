@@ -32,6 +32,8 @@ from gems_craft.expression.expression import (
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -83,6 +85,12 @@ class UsesSumConnectionsOnVisitor(ExpressionVisitor[bool]):
         return visit(node.operand, self)
 
     def all_time_sum(self, node: AllTimeSumNode) -> bool:
+        return visit(node.operand, self)
+
+    def set_index(self, node: SetIndexNode) -> bool:
+        return visit(node.operand, self)
+
+    def sum_over(self, node: SumOverNode) -> bool:
         return visit(node.operand, self)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> bool:

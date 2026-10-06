@@ -77,8 +77,9 @@ The codebase is split into three packages along a solver-dependency boundary:
 
 **`gems_craft/expression/`** — Mathematical expression language and AST (structural/static analysis only — no numeric evaluation).
 - `ExpressionNode`: base frozen dataclass for all expression tree nodes
-- Grammar is defined in `grammar/Expr.g4` and parsed via ANTLR4 (generated files live in `expression/parsing/antlr/` — do not edit directly)
+- Grammar is defined in `grammar/Expr.g4` and parsed via ANTLR4 (generated files live in `expression/parsing/antlr/` — do not edit directly). Regenerate with `grammar/generate-parser.sh` after any grammar change; it needs Java (the `antlr4-tools` pip package auto-installs a JRE on first run, prompting unless piped `yes`) — pin `ANTLR4_TOOLS_ANTLR_VERSION` to the version already in `antlr4-python3-runtime`'s installed version (`pip show antlr4-python3-runtime`) to match the runtime and skip a network lookup. Reformat the regenerated files with `black`/`isort` afterwards to match the committed style.
 - `ExpressionVisitor` is the dominant pattern for traversing and transforming expression trees (linearization support, printing, degree analysis, indexing)
+- Custom-set indexing (`SetIndexNode`, `SumOverNode` — `X[fuel]`, `X[fuel=2]`, `X[fuel+1]`, `X[segment=2, fuel=1]`, `sum_over(fuel, expr)`) is wired through the grammar/AST/visitor layer only so far; `IndexingStructure`, the model schema (`sets`/`indexed-by`), and solve-time execution in `gems_runner` don't support it yet, so this syntax isn't reachable through a real model library today — `EvaluationVisitor` and `VectorizedBuilderBase` raise `NotImplementedError` for these two node types.
 - Numeric evaluation (`EvaluationVisitor`) lives in `gems_runner.expression.evaluate`, not here — several of its node handlers (`dual()`, `reduced_cost()`, `variable()`) are solver-output-shaped and only make sense at solve time.
 
 **`gems_craft/study/`** — Study definition and instantiation.

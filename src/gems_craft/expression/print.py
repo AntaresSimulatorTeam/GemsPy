@@ -27,6 +27,8 @@ from gems_craft.expression.expression import (
     PortFieldNode,
     ReducedCostNode,
     RoundNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -102,16 +104,46 @@ class PrinterVisitor(ExpressionVisitor[str]):
         return node.name
 
     def time_shift(self, node: TimeShiftNode) -> str:
-        return f"({visit(node.operand, self)}.shift({visit(node.time_shift, self)}))"
+        return f"({visit(node.operand, self)}[t{self._signed_offset(node.time_shift)}])"
+
+    def _signed_offset(self, offset: ExpressionNode) -> str:
+        """Prints a shift amount with its sign (`+1.0`, `-1.0`), never `+-`."""
+        if isinstance(offset, LiteralNode) and offset.value < 0:
+            return f"-{-offset.value}"
+        if isinstance(offset, NegationNode):
+            return f"-{visit(offset.operand, self)}"
+        return f"+{visit(offset, self)}"
 
     def time_eval(self, node: TimeEvalNode) -> str:
-        return f"({visit(node.operand, self)}.eval({visit(node.eval_time, self)}))"
+        return f"({visit(node.operand, self)}[t={visit(node.eval_time, self)}])"
 
     def time_sum(self, node: TimeSumNode) -> str:
         return f"({visit(node.operand, self)}.time_sum({visit(node.from_time, self)}, {visit(node.to_time, self)}))"
 
     def all_time_sum(self, node: AllTimeSumNode) -> str:
         return f"({visit(node.operand, self)}.time_sum())"
+
+    def set_index(self, node: SetIndexNode) -> str:
+        # Multi-set indexing (x[fuel=1, segment=2]) is nested single-set
+        # SetIndexNodes in the AST; collapse a directly-nested chain of them
+        # into one bracket rather than printing one pair of brackets per set.
+        terms = []
+        current: ExpressionNode = node
+        while isinstance(current, SetIndexNode):
+            terms.append(self._set_index_term(current))
+            current = current.operand
+        terms.reverse()
+        return f"({visit(current, self)}[{', '.join(terms)}])"
+
+    def _set_index_term(self, node: SetIndexNode) -> str:
+        if node.position is not None:
+            return f"{node.set_id}={visit(node.position, self)}"
+        if node.relative_shift is not None:
+            return f"{node.set_id}{self._signed_offset(node.relative_shift)}"
+        return node.set_id
+
+    def sum_over(self, node: SumOverNode) -> str:
+        return f"sum_over({node.set_id}, {visit(node.operand, self)})"
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> str:
         return f"({visit(node.operand, self)}.{str(node.name)})"

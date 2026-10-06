@@ -294,6 +294,101 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
 
 
 @pytest.mark.parametrize(
+    "sets, expression_str, expected",
+    [
+        ({"fuel"}, "x[fuel]", var("x").set_index("fuel")),
+        ({"fuel"}, "x[fuel=2]", var("x").set_index("fuel", position=literal(2))),
+        ({"fuel"}, "x[t=2]", var("x").eval(literal(2))),
+        (
+            {"fuel"},
+            "x[t=2, fuel=1]",
+            var("x").eval(literal(2)).set_index("fuel", position=literal(1)),
+        ),
+        (
+            {"fuel"},
+            "x[fuel+1]",
+            var("x").set_index("fuel", relative_shift=literal(1)),
+        ),
+        (
+            {"fuel"},
+            "x[fuel-1]",
+            var("x").set_index("fuel", relative_shift=-literal(1)),
+        ),
+        ({"fuel"}, "x[fuel+0]", var("x").set_index("fuel")),
+        (
+            {"segment", "fuel"},
+            "x[segment=2, fuel=1]",
+            var("x")
+            .set_index("fuel", position=literal(1))
+            .set_index("segment", position=literal(2)),
+        ),
+        (
+            {"fuel"},
+            "x[fuel=3, 2]",
+            var("x").eval(literal(2)).set_index("fuel", position=literal(3)),
+        ),
+        (
+            {"fuel"},
+            "sum_over(fuel, x)",
+            var("x").sum_over("fuel"),
+        ),
+        (
+            {"fuel"},
+            "(x + p)[fuel]",
+            (var("x") + param("p")).set_index("fuel"),
+        ),
+    ],
+)
+def test_parsing_visitor_with_sets(
+    sets: Set[str], expression_str: str, expected: ExpressionNode
+) -> None:
+    identifiers = ModelIdentifiers(
+        variables={"x"}, parameters={"p"}, constraints=set(), sets=sets
+    )
+    expr = parse_expression(expression_str, identifiers)
+    assert expressions_equal(expr, expected)
+
+
+@pytest.mark.parametrize(
+    "lhs, rhs",
+    [
+        ("x[t=2]", "x[2]"),  # keyword time form == legacy bare form
+        ("x[segment=2, fuel=1]", "x[fuel=1, segment=2]"),  # term order is irrelevant
+        ("x[fuel=3, 2]", "x[2, fuel=3]"),
+    ],
+)
+def test_parsing_equivalent_index_forms(lhs: str, rhs: str) -> None:
+    identifiers = ModelIdentifiers(
+        variables={"x"}, parameters=set(), constraints=set(), sets={"segment", "fuel"}
+    )
+    assert expressions_equal(
+        parse_expression(lhs, identifiers), parse_expression(rhs, identifiers)
+    )
+
+
+@pytest.mark.parametrize(
+    "expression_str, match",
+    [
+        ("x[2, 3]", "more than one term"),
+        ("x[fuel, fuel=2]", "indexed more than once"),
+        ("x[notaset]", "not a valid variable or parameter"),
+        ("x[2*fuel+1]", "not a valid variable or parameter"),
+        ("x[fuel=2, fuel+1]", "indexed more than once"),
+        ("x[nonexistent=2]", "neither 't' nor a declared set"),
+        ("sum(fuel-p..fuel, x)", "must start with 't'"),
+        ("sum(t-p..fuel, x)", "must start with 't'"),
+        ("sum(foo..t, x)", "must start with 't'"),
+    ],
+)
+def test_parsing_custom_set_indexing_raises(expression_str: str, match: str) -> None:
+    identifiers = ModelIdentifiers(
+        variables={"x"}, parameters={"p"}, constraints=set(), sets={"fuel", "segment"}
+    )
+    with pytest.raises(ParsingException, match=match):
+        parse_expression(expression_str, identifiers)
+
+
+@pytest.mark.parametrize(
     "expression_str",
     [
         "1**3",
