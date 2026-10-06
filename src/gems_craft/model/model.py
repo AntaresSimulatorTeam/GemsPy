@@ -18,15 +18,13 @@ defining parameters, variables, and equations.
 
 import itertools
 import warnings
-from dataclasses import dataclass, field, fields, is_dataclass, replace
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
+from dataclasses import dataclass, field, replace
+from typing import Any, Dict, Iterable, List, Optional
 
 from gems_craft.expression import ExpressionNode
 from gems_craft.expression.degree import is_linear
-from gems_craft.expression.expression import ParameterNode, TimeSumNode
 from gems_craft.expression.indexing import IndexingStructureProvider, compute_indexation
 from gems_craft.expression.indexing_structure import IndexingStructure
-from gems_craft.expression.print import print_expr
 from gems_craft.model.constraint import Constraint
 from gems_craft.model.parameter import Parameter
 from gems_craft.model.port import PortFieldDefinition, PortFieldId, PortType
@@ -121,49 +119,6 @@ def _normalize_objective_contributions(
             expr = expr.expec()
         result[contrib_id] = expr
     return result
-
-
-def _nodes(node: Any, node_type: type) -> Iterator[Any]:
-    """Nodes of a given type in an expression tree, or in any dataclass holding
-    expressions."""
-    if isinstance(node, node_type):
-        yield node
-    if isinstance(node, (list, tuple)):
-        children: Iterable[Any] = node
-    elif is_dataclass(node) and not isinstance(node, type):
-        children = (getattr(node, f.name) for f in fields(node))
-    else:
-        return
-    for child in children:
-        yield from _nodes(child, node_type)
-
-
-def _model_expressions(model: "Model") -> Iterator[Tuple[str, Any]]:
-    """(description, object holding expressions) for every part of a model."""
-    for name, c in model.constraints.items():
-        yield f"constraint '{name}'", c
-    for name, c in model.binding_constraints.items():
-        yield f"binding constraint '{name}'", c
-    for name, v in model.variables.items():
-        yield f"bounds of variable '{name}'", v
-    for name, e in (model.objective_contributions or {}).items():
-        yield f"objective contribution '{name}'", e
-    for name, e in (model.extra_outputs or {}).items():
-        yield f"extra-output '{name}'", e
-    for d in model.port_fields_definitions.values():
-        yield f"definition of port field '{d.port_field}'", d
-
-
-def time_sum_bound_parameters(
-    model: "Model",
-) -> Iterator[Tuple[str, ExpressionNode, str]]:
-    """(parameter, bound, where) for each parameter used in a time sum bound of
-    the model."""
-    for where, holder in _model_expressions(model):
-        for time_sum in _nodes(holder, TimeSumNode):
-            for bound in (time_sum.from_time, time_sum.to_time):
-                for parameter in _nodes(bound, ParameterNode):
-                    yield parameter.name, bound, where
 
 
 def _is_objective_contribution_valid(

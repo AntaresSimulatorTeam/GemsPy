@@ -11,13 +11,14 @@
 # This file is part of the Antares project.
 
 """
-E2E test: bounds of a time sum ``sum(S .. E, X)``, as in Antares Simulator.
+E2E test: bounds of a time sum ``sum(S .. E, X)``.
 
 A bound is either relative to the current time step (``t``, ``t + ...``,
 ``t - ...``) or an absolute time index of the block (an expression without
 ``t``). Both kinds can be mixed, e.g. ``sum(0 .. t, x)`` is a cumulative sum.
 """
 
+import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -179,11 +180,20 @@ def test_absolute_index_refers_to_the_block(tmp_path: Path) -> None:
     assert _solve(study_dir)["a"] == [3, 3, 7, 7]
 
 
-def test_bound_given_a_time_series_raises(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "time_sum, bound",
+    [
+        pytest.param("sum(0 .. d, x)", "d", id="absolute"),
+        pytest.param("sum(t - d .. t, x)", "(t + -(d))", id="relative"),
+    ],
+)
+def test_bound_varying_in_time_raises(
+    tmp_path: Path, time_sum: str, bound: str
+) -> None:
     study_dir = _make_study(
         tmp_path,
         variables=["x", "a"],
-        constraints=["x = d", "a = sum(0 .. d, x)"],
+        constraints=["x = d", f"a = {time_sum}"],
         objective="sum(x)",
         data={"d": [1, 2, 3, 4]},
         constants={},
@@ -192,14 +202,16 @@ def test_bound_given_a_time_series_raises(tmp_path: Path) -> None:
 
     with pytest.raises(
         ValueError,
-        match="Component 'm1' \\(model 'lib.m'\\): a time sum bound must be fixed "
-        "in time, but parameter 'd' of 'd' in constraint 'c1' is a time series",
+        match=re.escape(
+            f"Model 'lib.m': a time sum bound must be fixed in time, but '{bound}' "
+            "varies in time for component(s) m1."
+        ),
     ):
         _solve(study_dir)
 
 
 def test_bound_declared_time_dependent_but_given_a_constant(tmp_path: Path) -> None:
-    """As in Antares, the data decides: a parameter declared time-dependent can
+    """The data decides: a parameter declared time-dependent can
     be a bound if the component gives it a constant value."""
     study_dir = _make_study(
         tmp_path,
@@ -224,10 +236,9 @@ def test_bound_declared_time_dependent_but_given_a_constant(tmp_path: Path) -> N
     assert results["r"] == [5, 3, 5, 7]
 
 
-# Objectives computed with antares-modeler 10.1.1 on the same library and system
-# (which also gives the same value of gen at every time step).
+# Expected objective of each study.
 @pytest.mark.parametrize(
-    "constraints, antares_objective",
+    "constraints, expected_objective",
     [
         pytest.param(
             [
@@ -247,8 +258,8 @@ def test_bound_declared_time_dependent_but_given_a_constant(tmp_path: Path) -> N
         ),
     ],
 )
-def test_objective_matches_antares(
-    tmp_path: Path, constraints: List[str], antares_objective: float
+def test_objective_matches_reference(
+    tmp_path: Path, constraints: List[str], expected_objective: float
 ) -> None:
     nb_time_steps = 168
     study_dir = _make_study(
@@ -266,4 +277,4 @@ def test_objective_matches_antares(
         nb_time_steps=nb_time_steps,
     )
 
-    assert _solve(study_dir)["objective-value"] == [antares_objective]
+    assert _solve(study_dir)["objective-value"] == [expected_objective]

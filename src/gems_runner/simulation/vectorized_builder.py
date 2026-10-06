@@ -69,6 +69,7 @@ from gems_craft.expression.expression import (
     UpperBoundNode,
     VariableNode,
 )
+from gems_craft.expression.print import print_expr
 from gems_craft.expression.visitor import (
     ExpressionVisitor,
     ExpressionVisitorOperations,
@@ -275,12 +276,12 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         from_da = (
             xr.DataArray(float(from_shift_scalar))
             if from_shift_scalar is not None
-            else visit(from_offset, self)
+            else self._bound_fixed_in_time(visit(from_offset, self), node.from_time)
         )
         to_da = (
             xr.DataArray(float(to_shift_scalar))
             if to_shift_scalar is not None
-            else visit(to_offset, self)
+            else self._bound_fixed_in_time(visit(to_offset, self), node.to_time)
         )
         if not isinstance(from_da, xr.DataArray):
             raise ValueError(
@@ -315,28 +316,45 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
             acc = contrib if acc is None else _linopy_add(acc, contrib)
         return acc  # type: ignore[return-value]
 
+    def _bound_fixed_in_time(self, value: Any, bound: ExpressionNode) -> Any:
+        """A time sum bound must be fixed in time, which depends on the data of
+        each component: a parameter declared time-dependent is accepted when its
+        values do not vary in time."""
+        if not isinstance(value, xr.DataArray) or "time" not in value.dims:
+            return value
+        first = value.isel(time=0, drop=True)
+        varies = (value != first).any("time")
+        if not bool(varies.any()):
+            return first
+        other_dims = [d for d in varies.dims if d != "component"]
+        if other_dims:
+            varies = varies.any(dim=other_dims)
+        components = (
+            [str(c) for c in varies["component"].values[varies.values]]
+            if "component" in varies.dims
+            else []
+        )
+        raise ValueError(
+            f"Model '{self.model_id}': a time sum bound must be fixed in time, "
+            f"but '{print_expr(bound)}' varies in time"
+            + (f" for component(s) {', '.join(components)}." if components else ".")
+        )
+
     def _time_sum_bound(self, bound: ExpressionNode, t: xr.DataArray) -> xr.DataArray:
         """Time index of a time sum bound at each time step: ``t + offset`` for a
         relative bound, the bound itself for an absolute one."""
         relative = isinstance(bound, RelativeTimeNode)
-        if isinstance(bound, RelativeTimeNode):
-            bound = bound.offset
+        value_node = bound.offset if isinstance(bound, RelativeTimeNode) else bound
         try:
-            value: xr.DataArray = xr.DataArray(float(self._eval_int(bound)))
+            value: xr.DataArray = xr.DataArray(float(self._eval_int(value_node)))
         except (ValueError, KeyError):
-            result = visit(bound, self)
+            result = visit(value_node, self)
             if not isinstance(result, xr.DataArray):
                 raise ValueError(
                     f"A time sum bound must be a constant or parameter expression, "
                     f"got {type(result).__name__!r}."
                 )
-            if "time" in result.dims:
-                # declared time-dependent: allowed when the values do not vary
-                first = result.isel(time=0, drop=True)
-                if not bool((result == first).all()):
-                    raise ValueError("A time sum bound must be fixed in time.")
-                result = first
-            value = result
+            value = self._bound_fixed_in_time(result, bound)
         value = value.astype(int)
         return value + t if relative else value
 
