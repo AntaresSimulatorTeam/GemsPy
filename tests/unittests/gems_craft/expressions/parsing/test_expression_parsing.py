@@ -375,6 +375,9 @@ def test_parsing_equivalent_index_forms(lhs: str, rhs: str) -> None:
         ("x[2*fuel+1]", "not a valid variable or parameter"),
         ("x[fuel=2, fuel+1]", "indexed more than once"),
         ("x[nonexistent=2]", "neither 't' nor a declared set"),
+        ("sum(fuel-p..fuel, x)", "must start with 't'"),
+        ("sum(t-p..fuel, x)", "must start with 't'"),
+        ("sum(foo..t, x)", "must start with 't'"),
     ],
 )
 def test_parsing_custom_set_indexing_raises(expression_str: str, match: str) -> None:

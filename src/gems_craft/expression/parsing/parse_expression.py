@@ -262,6 +262,14 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         return None, lambda expr: expr.eval(eval_time)
 
     def visitTimeSum(self, ctx: ExprParser.TimeSumContext) -> ExpressionNode:
+        # Bounds are time offsets: the leading token is dropped by `visitShift`,
+        # so anything other than 't' would be silently ignored.
+        for bound_ctx in (ctx.from_, ctx.to):  # type: ignore
+            if bound_ctx.TIME() is None:  # type: ignore
+                raise ValueError(
+                    f"Time-sum bounds must start with 't', got "
+                    f"'{bound_ctx.IDENTIFIER().getText()}'."  # type: ignore
+                )
         shifted_expr = ctx.expr().accept(self)  # type: ignore
         from_shift = ctx.from_.accept(self)  # type: ignore
         to_shift = ctx.to.accept(self)  # type: ignore
