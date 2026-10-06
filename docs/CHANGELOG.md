@@ -15,8 +15,7 @@ All notable changes to GemsPy are documented here.
   `scenario-dependent` is now time- or scenario-dependent, as in Antares
   Simulator (it was constant). A component may still give it a constant value.
   Declare `time-dependent: false` / `scenario-dependent: false` for parameters
-  that must stay constant, e.g. those used in an objective without `sum`, as a
-  bound of a time- or scenario-independent variable, or bound to a heuristic.
+  that must stay constant.
 - **Breaking** - loading a study whose library declares a `taxonomy` raises
   `ValueError` if no taxonomy is supplied, or if its id differs from the declared
   one.
