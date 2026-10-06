@@ -11,6 +11,11 @@ All notable changes to GemsPy are documented here.
   field. `parse_yaml_library` is unchanged and performs no validation.
 
 ### Changed
+- **Breaking** - a model parameter that omits `time-dependent` or
+  `scenario-dependent` is now time- or scenario-dependent, as in Antares
+  Simulator (it was constant). A component may still give it a constant value.
+  Declare `time-dependent: false` / `scenario-dependent: false` for parameters
+  that must stay constant.
 - **Breaking** - loading a study whose library declares a `taxonomy` raises
   `ValueError` if no taxonomy is supplied, or if its id differs from the declared
   one.
