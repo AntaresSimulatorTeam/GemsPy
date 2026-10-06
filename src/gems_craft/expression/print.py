@@ -26,6 +26,7 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    RelativeTimeNode,
     RoundNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -108,7 +109,18 @@ class PrinterVisitor(ExpressionVisitor[str]):
         return f"({visit(node.operand, self)}.eval({visit(node.eval_time, self)}))"
 
     def time_sum(self, node: TimeSumNode) -> str:
-        return f"({visit(node.operand, self)}.time_sum({visit(node.from_time, self)}, {visit(node.to_time, self)}))"
+        bounds = ", ".join(
+            (
+                visit(bound.offset, self)
+                if isinstance(bound, RelativeTimeNode)
+                else f"index:{visit(bound, self)}"
+            )
+            for bound in (node.from_time, node.to_time)
+        )
+        return f"({visit(node.operand, self)}.time_sum({bounds}))"
+
+    def relative_time(self, node: RelativeTimeNode) -> str:
+        return f"(t + {visit(node.offset, self)})"
 
     def all_time_sum(self, node: AllTimeSumNode) -> str:
         return f"({visit(node.operand, self)}.time_sum())"

@@ -60,6 +60,7 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
@@ -246,12 +247,18 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         return operand.isel(time=timestep)  # type: ignore[union-attr,attr-defined,return-value]
 
     def time_sum(self, node: TimeSumNode) -> VectorizedExpr:
+        if not isinstance(node.from_time, RelativeTimeNode) or not isinstance(
+            node.to_time, RelativeTimeNode
+        ):
+            return self._time_sum_with_absolute_bound(node)
+        from_offset = node.from_time.offset
+        to_offset = node.to_time.offset
         try:
-            from_shift_scalar: Optional[int] = self._eval_int(node.from_time)
+            from_shift_scalar: Optional[int] = self._eval_int(from_offset)
         except (ValueError, KeyError):
             from_shift_scalar = None
         try:
-            to_shift_scalar: Optional[int] = self._eval_int(node.to_time)
+            to_shift_scalar: Optional[int] = self._eval_int(to_offset)
         except (ValueError, KeyError):
             to_shift_scalar = None
 
@@ -268,12 +275,12 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         from_da = (
             xr.DataArray(float(from_shift_scalar))
             if from_shift_scalar is not None
-            else visit(node.from_time, self)
+            else visit(from_offset, self)
         )
         to_da = (
             xr.DataArray(float(to_shift_scalar))
             if to_shift_scalar is not None
-            else visit(node.to_time, self)
+            else visit(to_offset, self)
         )
         if not isinstance(from_da, xr.DataArray):
             raise ValueError(
@@ -307,6 +314,61 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
             contrib = shifted * mask  # type: ignore[operator]
             acc = contrib if acc is None else _linopy_add(acc, contrib)
         return acc  # type: ignore[return-value]
+
+    def _time_sum_bound(self, bound: ExpressionNode, t: xr.DataArray) -> xr.DataArray:
+        """Time index of a time sum bound at each time step: ``t + offset`` for a
+        relative bound, the bound itself for an absolute one."""
+        relative = isinstance(bound, RelativeTimeNode)
+        if isinstance(bound, RelativeTimeNode):
+            bound = bound.offset
+        try:
+            value: xr.DataArray = xr.DataArray(float(self._eval_int(bound)))
+        except (ValueError, KeyError):
+            result = visit(bound, self)
+            if not isinstance(result, xr.DataArray):
+                raise ValueError(
+                    f"A time sum bound must be a constant or parameter expression, "
+                    f"got {type(result).__name__!r}."
+                )
+            if "time" in result.dims:
+                raise ValueError("A time sum bound must be fixed in time.")
+            value = result
+        value = value.astype(int)
+        return value + t if relative else value
+
+    def _time_sum_with_absolute_bound(self, node: TimeSumNode) -> VectorizedExpr:
+        """Time sum with at least one absolute bound (a time index of the block).
+
+        At time step ``t``, the operand is summed over the positions from the
+        start to the end bound, wrapped cyclically into the block, as ``x[N]``.
+        With two absolute bounds the result is time-independent. A start after
+        the end gives an empty sum.
+        """
+        T = self.block_length
+        t = xr.DataArray(np.arange(T), dims="time")
+        start = self._time_sum_bound(node.from_time, t)
+        end = self._time_sum_bound(node.to_time, t)
+        operand = visit(node.operand, self)
+
+        acc: Optional[Any] = None
+        for position in range(int(start.min()), int(end.max()) + 1):
+            # Select one time step and drop the time dimension and coordinate.
+            term = (
+                operand.isel(time=[position % T]).sum("time")  # type: ignore[union-attr]
+                if self._has_dim(operand, "time")
+                else operand
+            )
+            mask = (start <= position) & (end >= position)
+            if not mask.dims:
+                if not bool(mask):
+                    continue
+                contrib = term
+            else:
+                contrib = term * mask.astype(float)  # type: ignore[operator]
+            acc = contrib if acc is None else _linopy_add(acc, contrib)
+        if acc is None:  # empty sum at every time step
+            return operand * 0.0  # type: ignore[operator,return-value]
+        return acc  # type: ignore[no-any-return]
 
     def all_time_sum(self, node: AllTimeSumNode) -> VectorizedExpr:
         operand = visit(node.operand, self)
@@ -668,10 +730,14 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
 
     def time_sum(self, node: TimeSumNode) -> Optional[xr.DataArray]:
         operand_mask = visit(node.operand, self)
-        from_da = self._eval_as_da(node.from_time)
-        to_da = self._eval_as_da(node.to_time)
+        from_value, to_value = (
+            bound.offset if isinstance(bound, RelativeTimeNode) else bound
+            for bound in (node.from_time, node.to_time)
+        )
+        from_da = self._eval_as_da(from_value)
+        to_da = self._eval_as_da(to_value)
         if from_da is None or to_da is None:
-            unevaluable = node.from_time if from_da is None else node.to_time
+            unevaluable = from_value if from_da is None else to_value
             raise ValueError(
                 f"Time-sum bound is not evaluable to a literal or parameter: "
                 f"{unevaluable!r}. Only literals and parameter references are "
@@ -679,8 +745,14 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
             )
         T = self.block_length
         t = xr.DataArray(np.arange(T), dims="time")
-        # Every offset in [from, to] must be in bounds; the extreme values are binding.
-        own_mask = (t + from_da >= 0) & (t + to_da < T)
+        # Every position from the start to the end bound must be in the block;
+        # the extreme values are binding. A relative bound is an offset from t.
+        relative = [
+            isinstance(b, RelativeTimeNode) for b in (node.from_time, node.to_time)
+        ]
+        start = t + from_da if relative[0] else from_da + 0 * t
+        end = t + to_da if relative[1] else to_da + 0 * t
+        own_mask = (start >= 0) & (end < T)
         return _and_mask(operand_mask, own_mask)
 
     # ------------------------------------------------------------------ #

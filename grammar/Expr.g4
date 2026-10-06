@@ -27,7 +27,7 @@ expr
     | expr COMPARISON expr                     # comparison
     | 'sum' '(' expr ')'                       # allTimeSum
     | 'sum_connections' '(' portFieldExpr ')'  # portFieldSum
-    | 'sum' '(' from=shift '..' to=shift ',' expr ')'  # timeSum
+    | 'sum' '(' from=sum_bound '..' to=sum_bound ',' expr ')'  # timeSum
     | IDENTIFIER '(' argList? ')'              # function
     | IDENTIFIER '[' shift ']'                 # timeShift
     | IDENTIFIER '[' expr  ']'                 # timeIndex
@@ -36,6 +36,13 @@ expr
     ;
 
 argList : expr (',' expr)* ;
+
+// A time sum bound is either relative to the current time step ("t", "t + ...",
+// "t - ...") or an absolute time index (an expression without "t").
+sum_bound
+    : shift
+    | expr
+    ;
 
 atom
     : NUMBER                                   # number

@@ -11,7 +11,9 @@
 # This file is part of the Antares project.
 
 
-from gems_craft.expression import param, var
+import pytest
+
+from gems_craft.expression import param, relative_time, var
 from gems_craft.expression.expression import (
     DualNode,
     LowerBoundNode,
@@ -137,3 +139,31 @@ def test_lower_upper_bound_indexing() -> None:
     assert compute_indexation(UpperBoundNode("x"), provider) == IndexingStructure(
         True, True
     )
+
+
+class ConstantParameterProvider(StructureProvider):
+    def get_parameter_structure(self, name: str) -> IndexingStructure:
+        return IndexingStructure(False, False)
+
+
+def test_time_sum_with_absolute_bounds_is_time_independent() -> None:
+    expr = var("x").time_sum_between(0, param("p"))
+
+    assert compute_indexation(expr, ConstantParameterProvider()) == IndexingStructure(
+        False, True
+    )
+
+
+def test_time_sum_with_mixed_bounds_depends_on_time() -> None:
+    expr = var("x").time_sum_between(0, relative_time(0))
+
+    assert compute_indexation(expr, ConstantParameterProvider()) == IndexingStructure(
+        True, True
+    )
+
+
+def test_time_sum_bound_depending_on_time_raises() -> None:
+    expr = var("x").time_sum_between(param("p"), relative_time(0))
+
+    with pytest.raises(ValueError, match="must be fixed in time"):
+        compute_indexation(expr, StructureProvider())

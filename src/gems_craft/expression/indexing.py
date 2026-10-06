@@ -36,6 +36,7 @@ from .expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
@@ -116,7 +117,15 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return IndexingStructure(False, visit(node.operand, self).scenario)
 
     def time_sum(self, node: TimeSumNode) -> IndexingStructure:
-        return visit(node.operand, self)
+        bounds = (node.from_time, node.to_time)
+        for bound in bounds:
+            value = bound.offset if isinstance(bound, RelativeTimeNode) else bound
+            if visit(value, self).time:
+                raise ValueError("A time sum bound must be fixed in time.")
+        operand = visit(node.operand, self)
+        if not any(isinstance(bound, RelativeTimeNode) for bound in bounds):
+            return IndexingStructure(False, operand.scenario)
+        return operand
 
     def all_time_sum(self, node: AllTimeSumNode) -> IndexingStructure:
         return IndexingStructure(False, visit(node.operand, self).scenario)

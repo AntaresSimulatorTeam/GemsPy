@@ -38,6 +38,7 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
@@ -89,6 +90,8 @@ class EqualityVisitor:
             return self.time_eval(left, right)
         if isinstance(left, TimeSumNode) and isinstance(right, TimeSumNode):
             return self.time_sum(left, right)
+        if isinstance(left, RelativeTimeNode) and isinstance(right, RelativeTimeNode):
+            return self.visit(left.offset, right.offset)
         if isinstance(left, AllTimeSumNode) and isinstance(right, AllTimeSumNode):
             return self.all_time_sum(left, right)
         if isinstance(left, ScenarioOperatorNode) and isinstance(

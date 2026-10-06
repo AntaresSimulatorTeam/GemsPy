@@ -12,7 +12,14 @@
 
 import pytest
 
-from gems_craft.expression import ExpressionNode, copy_expression, literal, param, var
+from gems_craft.expression import (
+    ExpressionNode,
+    copy_expression,
+    literal,
+    param,
+    relative_time,
+    var,
+)
 from gems_craft.expression.equality import expressions_equal
 from gems_craft.expression.expression import (
     DualNode,
@@ -35,6 +42,8 @@ from gems_craft.expression.expression import (
         var("x") * 3,
         var("x").time_sum(1, 10),
         var("x").time_sum(1, param("p")),
+        var("x").time_sum_between(0, 2),
+        var("x").time_sum_between(0, relative_time(0)),
         var("x").time_sum(),
         var("x") + 5 <= 2,
         var("x").expec(),
@@ -64,6 +73,14 @@ def test_equals(expr: ExpressionNode) -> None:
         (
             var("x").time_sum(2, 10),
             var("x").time_sum(1, 10),
+        ),
+        (  # absolute vs relative bound
+            var("x").time_sum_between(0, relative_time(2)),
+            var("x").time_sum(0, 2),
+        ),
+        (
+            var("x").time_sum_between(relative_time(0), 2),
+            var("x").time_sum(0, 2),
         ),
         (var("x").expec(), var("y").expec()),
         # floor / ceil

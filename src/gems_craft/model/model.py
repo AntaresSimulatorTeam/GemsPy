@@ -18,13 +18,15 @@ defining parameters, variables, and equations.
 
 import itertools
 import warnings
-from dataclasses import dataclass, field, replace
-from typing import Any, Dict, Iterable, List, Optional
+from dataclasses import dataclass, field, fields, is_dataclass, replace
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
 from gems_craft.expression import ExpressionNode
 from gems_craft.expression.degree import is_linear
+from gems_craft.expression.expression import RelativeTimeNode, TimeSumNode
 from gems_craft.expression.indexing import IndexingStructureProvider, compute_indexation
 from gems_craft.expression.indexing_structure import IndexingStructure
+from gems_craft.expression.print import print_expr
 from gems_craft.model.constraint import Constraint
 from gems_craft.model.parameter import Parameter
 from gems_craft.model.port import PortFieldDefinition, PortFieldId, PortType
@@ -121,6 +123,54 @@ def _normalize_objective_contributions(
     return result
 
 
+def _time_sums(node: Any) -> Iterator[TimeSumNode]:
+    """Time sums of an expression tree, or of any dataclass holding expressions."""
+    if isinstance(node, TimeSumNode):
+        yield node
+    if isinstance(node, (list, tuple)):
+        children: Iterable[Any] = node
+    elif is_dataclass(node) and not isinstance(node, type):
+        children = (getattr(node, f.name) for f in fields(node))
+    else:
+        return
+    for child in children:
+        yield from _time_sums(child)
+
+
+def _model_expressions(model: "Model") -> Iterator[Tuple[str, Any]]:
+    """(description, object holding expressions) for every part of a model."""
+    for name, c in model.constraints.items():
+        yield f"constraint '{name}'", c
+    for name, c in model.binding_constraints.items():
+        yield f"binding constraint '{name}'", c
+    for name, v in model.variables.items():
+        yield f"bounds of variable '{name}'", v
+    for name, e in (model.objective_contributions or {}).items():
+        yield f"objective contribution '{name}'", e
+    for name, e in (model.extra_outputs or {}).items():
+        yield f"extra-output '{name}'", e
+    for d in model.port_fields_definitions.values():
+        yield f"definition of port field '{d.port_field}'", d
+
+
+def _check_time_sum_bounds(model: "Model") -> None:
+    """Time sum bounds must be fixed in time (the offset, for a relative bound)."""
+    provider = _make_structure_provider(model.parameters, model.variables)
+    for where, holder in _model_expressions(model):
+        for time_sum in _time_sums(holder):
+            for bound in (time_sum.from_time, time_sum.to_time):
+                value = bound.offset if isinstance(bound, RelativeTimeNode) else bound
+                try:
+                    time_dependent = compute_indexation(value, provider).time
+                except KeyError:
+                    continue  # unknown names are reported elsewhere
+                if time_dependent:
+                    raise ValueError(
+                        f"Model '{model.id}': a time sum bound must be fixed in time, "
+                        f"got '{print_expr(bound)}' in {where}."
+                    )
+
+
 def _is_objective_contribution_valid(
     model: "Model", objective_contribution: ExpressionNode
 ) -> bool:
@@ -180,6 +230,8 @@ class Model:
     properties: List[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
+        _check_time_sum_bounds(self)
+
         # Validate each contribution if present
         if self.objective_contributions:
             for expr in self.objective_contributions.values():

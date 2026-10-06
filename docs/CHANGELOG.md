@@ -9,6 +9,13 @@ All notable changes to GemsPy are documented here.
   the optional `input/taxonomy.yml` and calls
   `validate_libraries_against_taxonomy` on every library declaring a `taxonomy`
   field. `parse_yaml_library` is unchanged and performs no validation.
+- **Absolute bounds in time sums** - in `sum(S .. E, X)`, a bound can now be an
+  absolute time index of the block (an expression without `t`, e.g.
+  `sum(0 .. 2, x)`) as well as a bound relative to `t`, and both can be mixed
+  (e.g. `sum(0 .. t, x)`), as in Antares Simulator. Bounds must be fixed in time;
+  this is checked when the library is loaded. In Python, use
+  `expr.time_sum_between(from_bound, to_bound)` with `relative_time(offset)` for
+  bounds relative to `t`.
 
 ### Changed
 - **Breaking** - loading a study whose library declares a `taxonomy` raises

@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from gems_craft.expression.expression import literal, param, var
+from gems_craft.expression.expression import literal, param, relative_time, var
 from gems_craft.expression.visitor import visit
 from gems_runner.simulation.vectorized_builder import ShiftValidityVisitor
 
@@ -137,6 +137,30 @@ def test_time_sum_negative_from_blocks_t0():
 def test_time_sum_positive_to_blocks_last_t():
     # sum from 0 to 1: t=3 accesses t+1=4 >= 4, invalid; t=0,1,2 valid
     expr = var("x").time_sum(0, 1)
+    mask = visit(expr, _visitor(block_length=4))
+    assert mask is not None
+    np.testing.assert_array_equal(mask.values, [True, True, True, False])
+
+
+def test_time_sum_absolute_bounds_inside_block_all_valid():
+    # sum over the absolute indices 0..2: inside a block of 4 at every t
+    expr = var("x").time_sum_between(0, 2)
+    mask = visit(expr, _visitor(block_length=4))
+    assert mask is not None
+    np.testing.assert_array_equal(mask.values, [True, True, True, True])
+
+
+def test_time_sum_absolute_bound_outside_block_all_invalid():
+    # absolute end index 4 is outside a block of 4 at every t
+    expr = var("x").time_sum_between(0, 4)
+    mask = visit(expr, _visitor(block_length=4))
+    assert mask is not None
+    np.testing.assert_array_equal(mask.values, [False, False, False, False])
+
+
+def test_time_sum_mixed_bounds_blocks_last_t():
+    # sum from index 0 to t+1: t=3 accesses 4 >= 4, invalid
+    expr = var("x").time_sum_between(0, relative_time(1))
     mask = visit(expr, _visitor(block_length=4))
     assert mask is not None
     np.testing.assert_array_equal(mask.values, [True, True, True, False])

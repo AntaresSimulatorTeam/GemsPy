@@ -95,14 +95,27 @@ class ExpressionNode:
         from_shift: Optional[AnyExpression] = None,
         to_shift: Optional[AnyExpression] = None,
     ) -> "ExpressionNode":
+        """Sum over time: without bounds, over the whole horizon; otherwise from
+        ``t + from_shift`` to ``t + to_shift``. See ``time_sum_between`` for
+        absolute bounds."""
         if from_shift is None and to_shift is None:
             return AllTimeSumNode(self)
         if from_shift is None or to_shift is None:
             raise ValueError("Both time bounds of a time sum must be defined.")
+        return self.time_sum_between(
+            _as_relative_time(from_shift), _as_relative_time(to_shift)
+        )
+
+    def time_sum_between(
+        self, from_bound: AnyExpression, to_bound: AnyExpression
+    ) -> "ExpressionNode":
+        """Sum over time between two bounds: a ``relative_time(offset)`` bound
+        is relative to the current time step ``t``, any other expression is an
+        absolute time index of the block, as in ``x[N]``."""
         return TimeSumNode(
             operand=self,
-            from_time=_wrap_in_node(from_shift),
-            to_time=_wrap_in_node(to_shift),
+            from_time=_wrap_in_node(from_bound),
+            to_time=_wrap_in_node(to_bound),
         )
 
     def sum_connections(self) -> "ExpressionNode":
@@ -315,8 +328,29 @@ class TimeEvalNode(UnaryOperatorNode):
 
 @dataclass(frozen=True, eq=False)
 class TimeSumNode(UnaryOperatorNode):
+    """Sum of the operand between two time bounds: a ``RelativeTimeNode`` bound
+    is relative to the current time step ``t``, any other expression is an
+    absolute time index of the block, as in ``x[N]``."""
+
     from_time: ExpressionNode
     to_time: ExpressionNode
+
+
+@dataclass(frozen=True, eq=False)
+class RelativeTimeNode(ExpressionNode):
+    """``t + offset``: a time sum bound relative to the current time step.
+    Only valid as a bound of a ``TimeSumNode``."""
+
+    offset: ExpressionNode
+
+
+def relative_time(offset: AnyExpression) -> RelativeTimeNode:
+    """Time sum bound ``t + offset``, relative to the current time step."""
+    return RelativeTimeNode(_wrap_in_node(offset))
+
+
+def _as_relative_time(bound: AnyExpression) -> RelativeTimeNode:
+    return bound if isinstance(bound, RelativeTimeNode) else relative_time(bound)
 
 
 @dataclass(frozen=True, eq=False)
