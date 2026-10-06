@@ -204,7 +204,7 @@ class SimulationTable:
         ):
             series = grp.set_index([col_comp, col_time, col_scen, col_set_idx])[col_val]
             da = xr.DataArray.from_series(series).rename({col_set_idx: set_id})
-            ds = xr.merge([ds, da.to_dataset(name=out)])
+            ds = xr.merge([ds, da.to_dataset(name=out)], join="outer")
 
         scalars = df[df[col_comp].isna() & df[col_time].isna()]
         for _, row in scalars.iterrows():
