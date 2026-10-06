@@ -16,6 +16,7 @@ import pytest
 from gems_craft.expression import literal, param, var
 from gems_craft.expression.expression import (
     DualNode,
+    ExpressionNode,
     LowerBoundNode,
     ReducedCostNode,
     UpperBoundNode,
@@ -160,33 +161,20 @@ class _SetStructureProvider(IndexingStructureProvider):
         raise NotImplementedError()
 
 
-def test_set_index_removes_set_dimension_when_explicit_position() -> None:
-    x = var("x")
-    provider = _SetStructureProvider()
-
-    assert compute_indexation(
-        x.set_index("fuel", position=literal(2)), provider
-    ) == IndexingStructure(True, True, frozenset({"segment"}))
-
-
-def test_set_index_keeps_set_dimension_when_bare_or_shift() -> None:
-    x = var("x")
-    provider = _SetStructureProvider()
-
-    assert compute_indexation(x.set_index("fuel"), provider) == IndexingStructure(
-        True, True, frozenset({"fuel", "segment"})
-    )
-    assert compute_indexation(
-        x.set_index("fuel", relative_shift=literal(1)), provider
-    ) == IndexingStructure(True, True, frozenset({"fuel", "segment"}))
-
-
-def test_sum_over_removes_set_dimension() -> None:
-    x = var("x")
-    provider = _SetStructureProvider()
-
-    assert compute_indexation(x.sum_over("fuel"), provider) == IndexingStructure(
-        True, True, frozenset({"segment"})
+@pytest.mark.parametrize(
+    "expr, sets",
+    [
+        # an explicit position or a sum_over removes the set dimension...
+        (var("x").set_index("fuel", position=literal(2)), {"segment"}),
+        (var("x").sum_over("fuel"), {"segment"}),
+        # ...a bare or relative-shift index keeps it
+        (var("x").set_index("fuel"), {"fuel", "segment"}),
+        (var("x").set_index("fuel", relative_shift=literal(1)), {"fuel", "segment"}),
+    ],
+)
+def test_set_index_and_sum_over_structure(expr: ExpressionNode, sets: set) -> None:
+    assert compute_indexation(expr, _SetStructureProvider()) == IndexingStructure(
+        True, True, frozenset(sets)
     )
 
 
@@ -236,14 +224,10 @@ class _ConstantParamProvider(StructureProvider):
         return IndexingStructure(False, False)
 
 
-def test_time_shift_on_non_time_dependent_raises() -> None:
+@pytest.mark.parametrize("expr", [param("p").shift(1), param("p").eval(1)])
+def test_time_shift_or_eval_on_non_time_dependent_raises(expr: ExpressionNode) -> None:
     with pytest.raises(IndexingUsageError, match="not time-dependent"):
-        compute_indexation(param("p").shift(1), _ConstantParamProvider())
-
-
-def test_time_eval_on_non_time_dependent_raises() -> None:
-    with pytest.raises(IndexingUsageError, match="not time-dependent"):
-        compute_indexation(param("p").eval(1), _ConstantParamProvider())
+        compute_indexation(expr, _ConstantParamProvider())
 
 
 def test_unresolved_port_field_raises() -> None:

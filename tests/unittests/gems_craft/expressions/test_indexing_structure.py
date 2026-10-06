@@ -19,15 +19,9 @@ def test_or_unions_sets() -> None:
     assert a | b == IndexingStructure(True, True, frozenset({"fuel", "segment"}))
 
 
-def test_or_with_default_empty_sets() -> None:
+def test_set_varying_and_constant() -> None:
     assert IndexingStructure(True, True) == IndexingStructure(True, True, frozenset())
-
-
-def test_is_set_varying() -> None:
-    assert IndexingStructure(False, False, frozenset({"fuel"})).is_set_varying()
+    with_set = IndexingStructure(False, False, frozenset({"fuel"}))
+    assert with_set.is_set_varying() and not with_set.is_constant()
     assert not IndexingStructure(False, False).is_set_varying()
-
-
-def test_is_constant_accounts_for_sets() -> None:
     assert IndexingStructure(False, False).is_constant()
-    assert not IndexingStructure(False, False, frozenset({"fuel"})).is_constant()
