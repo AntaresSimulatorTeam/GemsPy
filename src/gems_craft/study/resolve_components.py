@@ -68,7 +68,13 @@ def resolve_system(input_system: SystemSchema, libraries: dict[str, Library]) ->
         _resolve_component(libraries, m) for m in input_system.components
     ]
 
-    s = System("study")
+    s = System(
+        "study",
+        global_sets={
+            inst.id: tuple(inst.elements)  # type: ignore[arg-type]
+            for inst in input_system.sets or []
+        },
+    )
     for component in components_list:
         s.add_component(component)
 
@@ -112,6 +118,10 @@ def _resolve_component(
         scenario_group=component.scenario_group,
         properties=properties,
         integer_strategy=component.integer_strategy,
+        local_sets={
+            inst.id: tuple(inst.elements)  # type: ignore[arg-type]
+            for inst in component.sets or []
+        },
     )
 
 

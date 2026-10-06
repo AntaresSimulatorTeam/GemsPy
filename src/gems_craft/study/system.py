@@ -16,7 +16,7 @@ including components and connections.
 """
 
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from gems_craft.expression.degree import is_linear
 from gems_craft.expression.uses_sum_connections_on import uses_sum_connections_on
@@ -25,6 +25,8 @@ from gems_craft.model.model import Model
 from gems_craft.model.port import PortFieldId
 from gems_craft.study.parsing import IntegerStrategy
 from gems_craft.utils import require_not_none
+
+SetElements = Tuple[Union[str, int], ...]
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,7 @@ class Component:
     scenario_group: Optional[str] = None
     properties: Dict[str, str] = field(default_factory=dict)
     integer_strategy: IntegerStrategy = field(default_factory=IntegerStrategy)
+    local_sets: Dict[str, SetElements] = field(default_factory=dict)
 
     def is_variable_in_model(self, var_id: str) -> bool:
         return var_id in self.model.variables.keys()
@@ -148,6 +151,7 @@ class System:
     """
 
     id: str
+    global_sets: Dict[str, SetElements] = field(default_factory=dict)
     _components: Dict[str, Component] = field(init=False, default_factory=dict)
     _connections: List[PortsConnection] = field(init=False, default_factory=list)
 
@@ -184,6 +188,15 @@ class System:
 
     def get_connection(self, idx: int) -> PortsConnection:
         return self._connections[idx]
+
+    def set_elements(self, component: Component, set_id: str) -> SetElements:
+        """Elements *component* sees for *set_id* (its local set, else the global one)."""
+        elements = component.local_sets.get(set_id, self.global_sets.get(set_id))
+        if elements is None:
+            raise KeyError(
+                f"Set {set_id!r} is not instantiated for component {component.id!r}."
+            )
+        return elements
 
     def is_empty(self) -> bool:
         return (not self._components) and (not self._connections)

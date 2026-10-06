@@ -32,7 +32,18 @@ optimization problem in four phases:
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    cast,
+)
 
 import linopy
 import numpy as np
@@ -43,6 +54,7 @@ from gems_craft.expression.expression import is_unbounded
 from gems_craft.expression.visitor import visit
 from gems_craft.model.common import ValueType
 from gems_craft.model.model import Model
+from gems_craft.model.parameter import Parameter
 from gems_craft.model.port import PortField, PortFieldId
 from gems_craft.model.variable import Variable
 from gems_craft.study.parsing import IntegerStrategyId
@@ -360,8 +372,11 @@ class OptimizationProblem:
         linopy_vars_by_component: Optional[
             Dict[Tuple[str, str, str], linopy.Variable]
         ] = None,
+        set_sizes: Optional[Dict[str, Dict[str, xr.DataArray]]] = None,
     ) -> None:
         self.name = name
+        # model_id -> set_id -> per-component element count (see VectorizedBuilderBase).
+        self.set_sizes = set_sizes or {}
         self.linopy_model = linopy_model
         self.study = study
         self.block = block
@@ -542,6 +557,37 @@ def _validate_initial_values(
     return values
 
 
+def _model_set_ids(model: Model) -> List[str]:
+    """Sorted ids of the custom sets indexing a parameter or variable of *model*."""
+    ids: Set[str] = set()
+    for param in model.parameters.values():
+        ids |= param.structure.sets
+    for var in model.variables.values():
+        ids |= var.structure.sets
+    return sorted(ids)
+
+
+def _set_validity(
+    sizes: Dict[str, xr.DataArray], dim_sizes: Dict[str, int]
+) -> Optional[xr.DataArray]:
+    """Boolean mask of the non-padded positions along the sets of *dim_sizes*.
+
+    ``sizes[set_id]`` holds each component's own element count, ``dim_sizes``
+    the padded dimension length of each set to check.  Returns ``None`` when
+    nothing is padded.
+    """
+    mask: Optional[xr.DataArray] = None
+    for set_id, n in dim_sizes.items():
+        if int(sizes[set_id].min()) == n:
+            continue
+        positions = xr.DataArray(
+            np.arange(n), dims=[set_id], coords={set_id: list(range(n))}
+        )
+        valid = positions < sizes[set_id]
+        mask = valid if mask is None else mask & valid
+    return mask
+
+
 class _OptimizationProblemBuilder:
     """
     Builds the linopy problem in 5 phases:
@@ -589,6 +635,8 @@ class _OptimizationProblemBuilder:
         self.linopy_vars_by_component: Dict[Tuple[str, str, str], linopy.Variable] = {}
         self.param_arrays: Dict[Tuple[str, str], xr.DataArray] = {}
         self.port_arrays: Dict[str, Dict[PortFieldId, VectorizedExpr]] = {}
+        # model_id -> set_id -> per-component element count (sets used by the model).
+        self.set_sizes: Dict[str, Dict[str, xr.DataArray]] = {}
 
     def build(self) -> OptimizationProblem:
         # Phase 1: parameter arrays
@@ -662,6 +710,7 @@ class _OptimizationProblemBuilder:
             linopy_vars_by_component=self.linopy_vars_by_component,
             param_arrays=self.param_arrays,
             objective_constant=objective_constant,
+            set_sizes=self.set_sizes,
         )
 
     # ------------------------------------------------------------------
@@ -671,59 +720,79 @@ class _OptimizationProblemBuilder:
     def _build_param_arrays_for_model(
         self, model: Model, components: List[Component]
     ) -> None:
-        T = self.block_length
-        S = len(self.scenario_ids)
-        C = len(components)
         comp_ids = [c.id for c in components]
-        abs_timesteps = self.block.timesteps  # mapping: block_t → abs_t
+
+        set_ids = _model_set_ids(model)
+        if set_ids:
+            self.set_sizes[model.id] = {
+                set_id: xr.DataArray(
+                    [
+                        len(self.study.system.set_elements(c, set_id))
+                        for c in components
+                    ],
+                    dims=["component"],
+                    coords={"component": comp_ids},
+                )
+                for set_id in set_ids
+            }
 
         for param in model.parameters.values():
-            use_time = param.structure.time
-            use_scenario = param.structure.scenario
+            self.param_arrays[(model.id, param.name)] = self._build_param_array(
+                model, param, components
+            )
 
-            # Determine the minimal shape for this parameter based on its
-            # declared structure. Using minimal shapes avoids spurious broadcasting
-            # (e.g., invest_cost * p_max should not gain time/scenario dims).
-            if use_time and use_scenario:
-                data = np.zeros((C, T, S))
-                dims = ["component", "time", "scenario"]
-                coords: Dict[str, object] = {
-                    "component": comp_ids,
-                    "time": self.time_coord,
-                    "scenario": self.local_scenario_coord,
-                }
-            elif use_time:
-                data = np.zeros((C, T))
-                dims = ["component", "time"]
-                coords = {"component": comp_ids, "time": self.time_coord}
-            elif use_scenario:
-                data = np.zeros((C, S))
-                dims = ["component", "scenario"]
-                coords = {"component": comp_ids, "scenario": self.local_scenario_coord}
-            else:
-                data = np.zeros((C,))
-                dims = ["component"]
-                coords = {"component": comp_ids}
+    def _build_param_array(
+        self, model: Model, param: Parameter, components: List[Component]
+    ) -> xr.DataArray:
+        """Array of *param*, dims ``[component][, time][, scenario][, *sets]``.
 
-            mc_scenarios = self.scenario_ids if use_scenario else None
-            for i, c in enumerate(components):
-                v = self.study.database.get_values(
+        Only the dimensions of the parameter's declared structure are kept: using
+        minimal shapes avoids spurious broadcasting (e.g., invest_cost * p_max
+        should not gain time/scenario dims). Set dimensions are padded (with
+        zeros) to the largest instantiation among *components*; dimensions a
+        component's data does not vary over (constant, or narrowed ``indexed-by``
+        override) are broadcast.
+        """
+        structure = param.structure
+        db = self.study.database
+
+        lead: Dict[str, int] = {}
+        if structure.time:
+            lead["time"] = self.block_length
+        if structure.scenario:
+            lead["scenario"] = len(self.scenario_ids)
+        dim_sizes = lead | self._set_dim_sizes(model.id, structure.sets)
+        dims = list(dim_sizes)
+        data = np.zeros((len(components),) + tuple(dim_sizes.values()))
+
+        for i, c in enumerate(components):
+            v = np.asarray(
+                db.get_values(
                     c.id,
                     param.name,
-                    abs_timesteps if use_time else None,
-                    mc_scenarios,
+                    self.block.timesteps if structure.time else None,
+                    self.scenario_ids if structure.scenario else None,
                 )
-                if use_time and use_scenario:
-                    data[i, :, :] = v  # (T, S)
-                elif use_time:
-                    data[i, :] = v  # (T,) or scalar
-                elif use_scenario:
-                    data[i, :] = v  # (S,) or scalar
-                else:
-                    data[i] = v  # scalar
+            )
+            # get_values returns the requested time/scenario axes followed by the
+            # data's own set axes (or a scalar for constant data).
+            v_dims = (
+                []
+                if v.ndim == 0
+                else list(lead) + list(db.get_data(c.id, param.name).set_dims)
+            )
+            missing = {d: n for d, n in lead.items() if d not in v_dims}
+            missing |= {
+                s: len(self.study.system.set_elements(c, s))
+                for s in structure.sets
+                if s not in v_dims
+            }
+            da = xr.DataArray(v, dims=v_dims).expand_dims(missing).transpose(*dims)
+            data[(i,) + tuple(slice(0, n) for n in da.shape)] = da.values
 
-            arr = xr.DataArray(data, dims=dims, coords=coords)
-            self.param_arrays[(model.id, param.name)] = arr
+        coords: Dict[str, object] = {"component": [c.id for c in components]}
+        coords.update({d: list(range(n)) for d, n in dim_sizes.items()})
+        return xr.DataArray(data, dims=["component"] + dims, coords=coords)
 
     # ------------------------------------------------------------------
     # Phase 2 — Variables
@@ -809,6 +878,15 @@ class _OptimizationProblemBuilder:
             for key, arr in self.param_arrays.items()
         }
 
+    def _set_sizes_for_components(
+        self, model_id: str, comp_ids: List[str]
+    ) -> Dict[str, xr.DataArray]:
+        """Restrict *model_id*'s per-component set sizes to *comp_ids*."""
+        return {
+            set_id: sizes.sel(component=comp_ids)
+            for set_id, sizes in self.set_sizes.get(model_id, {}).items()
+        }
+
     def _add_variable_for_group(
         self,
         model: Model,
@@ -826,6 +904,12 @@ class _OptimizationProblemBuilder:
         if var.structure.scenario:
             coords["scenario"] = self.local_scenario_coord
             dims.append("scenario")
+        # Custom-set dimensions, padded to the model-wide largest instantiation.
+        set_ids = sorted(var.structure.sets)
+        dim_sizes = self._set_dim_sizes(model.id, set_ids)
+        for s in set_ids:
+            coords[s] = list(range(dim_sizes[s]))
+            dims.append(s)
 
         var_shape = tuple(
             (
@@ -834,7 +918,11 @@ class _OptimizationProblemBuilder:
                 else (
                     len(self.time_coord)
                     if d == "time"
-                    else len(self.local_scenario_coord)
+                    else (
+                        len(self.local_scenario_coord)
+                        if d == "scenario"
+                        else dim_sizes[d]
+                    )
                 )
             )
             for d in dims
@@ -846,6 +934,7 @@ class _OptimizationProblemBuilder:
             param_arrays=self._param_arrays_for_components(model.id, comp_ids),
             port_arrays={},
             block_length=self.block_length,
+            set_sizes=self._set_sizes_for_components(model.id, comp_ids),
         )
 
         is_binary = var.data_type == ValueType.BINARY
@@ -879,6 +968,16 @@ class _OptimizationProblemBuilder:
                     f"for variable {comp_id}.{var.name}"
                 )
 
+        mask: Optional[xr.DataArray] = None
+        validity = _set_validity(
+            self._set_sizes_for_components(model.id, comp_ids), dim_sizes
+        )
+        if validity is not None:
+            full = xr.DataArray(
+                np.ones(var_shape, dtype=bool), dims=dims, coords=coords
+            )
+            mask = (validity & full).transpose(*dims)
+
         prefix = model.id.replace("-", "_")
         name = f"{prefix}__{var.name}{name_suffix}"
         return self.linopy_model.add_variables(
@@ -886,6 +985,7 @@ class _OptimizationProblemBuilder:
             upper=upper,
             coords=coords,
             name=name,
+            mask=mask,
             binary=var.data_type == ValueType.BINARY and not relax,
             integer=var.data_type == ValueType.INTEGER and not relax,
         )
@@ -959,22 +1059,24 @@ class _OptimizationProblemBuilder:
                 # Sanitize constraint name for LP format (spaces → underscores)
                 safe_name = constraint.name.replace(" ", "_").replace("-", "_")
 
+                padding_mask = self._padding_mask(model, lhs)
+
                 if constraint.is_equality:
                     lb = visit(constraint.lower_bound, builder)
                     if validity_mask is not None:
                         lb = _apply_validity_mask(lb, validity_mask)
-                    self.linopy_model.add_constraints(lhs == lb, name=f"{prefix}__{safe_name}__eq")  # type: ignore[operator,arg-type]
+                    self.linopy_model.add_constraints(lhs == lb, name=f"{prefix}__{safe_name}__eq", mask=padding_mask)  # type: ignore[operator,arg-type]
                 else:
                     if not is_unbounded(constraint.lower_bound):
                         lb = visit(constraint.lower_bound, builder)
                         if validity_mask is not None:
                             lb = _apply_validity_mask(lb, validity_mask)
-                        self.linopy_model.add_constraints(lhs >= lb, name=f"{prefix}__{safe_name}__lb")  # type: ignore[operator,arg-type]
+                        self.linopy_model.add_constraints(lhs >= lb, name=f"{prefix}__{safe_name}__lb", mask=padding_mask)  # type: ignore[operator,arg-type]
                     if not is_unbounded(constraint.upper_bound):
                         ub = visit(constraint.upper_bound, builder)
                         if validity_mask is not None:
                             ub = _apply_validity_mask(ub, validity_mask)
-                        self.linopy_model.add_constraints(lhs <= ub, name=f"{prefix}__{safe_name}__ub")  # type: ignore[operator,arg-type]
+                        self.linopy_model.add_constraints(lhs <= ub, name=f"{prefix}__{safe_name}__ub", mask=padding_mask)  # type: ignore[operator,arg-type]
 
     def _add_objectives_for_model(
         self,
@@ -1024,6 +1126,12 @@ class _OptimizationProblemBuilder:
         if isinstance(val, xr.DataArray):
             if val.dims == ():
                 return np.full(var_shape, float(val.item()))
+            if set(dims) - {"component", "time", "scenario"}:
+                # Custom-set dimensions: align by name rather than by position.
+                missing = {d: n for d, n in zip(dims, var_shape) if d not in val.dims}
+                if missing:
+                    val = val.expand_dims(missing)
+                return np.broadcast_to(val.transpose(*dims).values, var_shape).copy()  # type: ignore[return-value]
             arr = val.values  # shape may be a subset of var_shape dims
             for ax, d in enumerate(dims):
                 if d not in val.dims:
@@ -1044,7 +1152,22 @@ class _OptimizationProblemBuilder:
             param_arrays=self.param_arrays,
             port_arrays=port_arrays,
             block_length=self.block_length,
+            set_sizes=self.set_sizes.get(model.id, {}),
         )
+
+    def _padding_mask(
+        self, model: Model, expr: VectorizedExpr
+    ) -> Optional[xr.DataArray]:
+        """Mask of the non-padded set positions of *expr* (``None`` if nothing is padded)."""
+        used = [s for s in self.set_sizes.get(model.id, {}) if s in expr.dims]  # type: ignore[union-attr]
+        return _set_validity(
+            self.set_sizes.get(model.id, {}), self._set_dim_sizes(model.id, used)
+        )
+
+    def _set_dim_sizes(self, model_id: str, set_ids: Iterable[str]) -> Dict[str, int]:
+        """Padded dimension length of each of *set_ids* (largest instantiation)."""
+        sizes = self.set_sizes.get(model_id, {})
+        return {s: int(sizes[s].max()) for s in sorted(set_ids)}
 
 
 # ---------------------------------------------------------------------------

@@ -33,7 +33,7 @@ behaviour (operand-swap in addition, type guards in nonlinear functions).
 
 import functools
 from abc import abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Generic, Optional, Tuple, TypeVar, Union
 
 import linopy
@@ -139,12 +139,17 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         Keyed by ``PortFieldId(port_name, field_name)``.
     block_length:
         Number of time steps in the current time block.
+    set_sizes:
+        For each custom-set id used by the model, a ``component``-indexed
+        DataArray of how many elements each component instantiates (set
+        dimensions are padded to the largest one).
     """
 
     model_id: str
     param_arrays: Dict[Tuple[str, str], xr.DataArray]
     port_arrays: Dict[PortFieldId, T_expr]
     block_length: int
+    set_sizes: Dict[str, xr.DataArray] = field(default_factory=dict)
 
     # ------------------------------------------------------------------ #
     # Abstract                                                              #
@@ -317,19 +322,45 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         return operand * self.block_length  # type: ignore[operator,return-value]
 
     # ------------------------------------------------------------------ #
-    # Custom-set operators (not yet supported — see custom sets & indexing #
-    # design; implementing these requires threading a per-set dim through  #
-    # param_arrays/port_arrays first)                                      #
+    # Custom-set operators                                                  #
     # ------------------------------------------------------------------ #
 
     def set_index(self, node: SetIndexNode) -> VectorizedExpr:
-        raise NotImplementedError(
-            "Custom-set indexing is not yet supported by the vectorized builder."
-        )
+        operand = visit(node.operand, self)
+        set_id = node.set_id
+        if not self._has_dim(operand, set_id):
+            return operand  # type: ignore[return-value]
+
+        if node.position is not None:
+            position = self._eval_int_expr(node.position)
+            sizes = self.set_sizes.get(set_id)
+            limit = operand.sizes[set_id] if sizes is None else int(sizes.min())  # type: ignore[union-attr]
+            if not 0 <= position < limit:
+                raise ValueError(
+                    f"Position {position} is out of range for set {set_id!r} "
+                    f"(smallest instantiation has {limit} element(s))."
+                )
+            return operand.isel({set_id: position}, drop=True)  # type: ignore[union-attr,return-value]
+
+        if node.relative_shift is not None:
+            shift = self._eval_int_expr(node.relative_shift)
+            return self._apply_set_shift(operand, set_id, shift)  # type: ignore[no-any-return]
+
+        return operand  # type: ignore[return-value]
 
     def sum_over(self, node: SumOverNode) -> VectorizedExpr:
-        raise NotImplementedError(
-            "sum_over() is not yet supported by the vectorized builder."
+        operand = visit(node.operand, self)
+        set_id = node.set_id
+        if self._has_dim(operand, set_id):
+            return operand.sum(set_id)  # type: ignore[union-attr,return-value]
+        # Constant over the set: every element contributes the same value.
+        sizes = self.set_sizes.get(set_id)
+        if sizes is None:
+            raise KeyError(
+                f"Size of set {set_id!r} is unknown for model {self.model_id!r}."
+            )
+        return operand * (  # type: ignore[operator,return-value]
+            int(sizes.max()) if int(sizes.min()) == int(sizes.max()) else sizes
         )
 
     # ------------------------------------------------------------------ #
@@ -451,12 +482,47 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         """
         if not self._has_dim(operand, "time"):
             return operand
-        T = self.block_length
-        positions = (np.arange(T) + shift) % T
-        indexer = xr.DataArray(positions, dims="time")
-        result = operand.isel(time=indexer)  # type: ignore[union-attr]
-        if "time" in result.coords:  # type: ignore[operator]
-            result = result.assign_coords(time=list(range(T)))  # type: ignore[union-attr]
+        return self._shift_along(operand, "time", shift, self.block_length)
+
+    def _apply_set_shift(self, operand: Any, set_id: str, shift: int) -> Any:
+        """Apply a cyclic shift along *set_id* to *operand*.
+
+        The cycle length is the set's size, which can differ per component for
+        local sets (padded dimension): components are then grouped by size.
+        """
+        n_max = operand.sizes[set_id]
+        sizes = self.set_sizes.get(set_id)
+        if sizes is None or (int(sizes.min()) == n_max == int(sizes.max())):
+            return self._shift_along(operand, set_id, shift, n_max)
+
+        if not self._has_dim(operand, "component"):
+            raise ValueError(
+                f"Cannot shift along ragged set {set_id!r}: operand has no component "
+                "dimension."
+            )
+        sizes = sizes.sel(component=operand.coords["component"].values)
+        acc: Optional[Any] = None
+        for n in np.unique(sizes.values):
+            mask: xr.DataArray = (sizes == n).astype(float)
+            shifted = self._shift_along(operand, set_id, shift, int(n), n_max)
+            contrib = shifted * mask
+            acc = contrib if acc is None else _linopy_add(acc, contrib)
+        return acc
+
+    @staticmethod
+    def _shift_along(
+        operand: Any, dim: str, shift: int, cycle: int, length: Optional[int] = None
+    ) -> Any:
+        """Cyclic shift of period *cycle* along *dim* (padding maps inside the cycle).
+
+        Coordinates are reassigned after ``isel`` so that subsequent xarray
+        arithmetic aligns positionally rather than by the shifted values.
+        """
+        length = cycle if length is None else length
+        positions = (np.arange(length) + shift) % cycle
+        result = operand.isel({dim: xr.DataArray(positions, dims=dim)})
+        if dim in result.coords:
+            result = result.assign_coords({dim: list(range(length))})
         return result
 
     @staticmethod
@@ -544,6 +610,11 @@ class _ShiftAmountEvaluator(ExpressionVisitorOperations[xr.DataArray]):
         if "scenario" in da.dims:
             raise _ScenarioDependentShiftError(
                 f"Parameter '{node.name}' depends on scenario and cannot be used as a"
+                " shift amount."
+            )
+        if set(da.dims) - {"component"}:
+            raise ValueError(
+                f"Parameter '{node.name}' is set-indexed and cannot be used as a"
                 " shift amount."
             )
         return da

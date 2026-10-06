@@ -1,0 +1,63 @@
+library:
+  id: custom_sets
+  dependencies: [basic]
+  sets:
+    - id: fuel
+  models:
+    # Global set `fuel`, shared by all components.
+    - id: global-plant
+      parameters:
+        - id: cost
+          indexed-by: [fuel]
+      variables:
+        - id: gen
+          time-dependent: false
+          scenario-dependent: false
+          lower-bound: 0
+          upper-bound: 10
+          indexed-by: [fuel]
+      ports:
+        - id: balance_port
+          type: flow
+      port-field-definitions:
+        - port: balance_port
+          field: flow
+          definition: sum_over(fuel, gen)
+      constraints:
+        - id: first-fuel-cap
+          expression: gen[fuel=0] <= 2
+      objective-contributions:
+        - id: cost
+          expression: sum_over(fuel, cost * gen)
+
+    # Two local sets, instantiated with different sizes by each component.
+    - id: grid
+      sets:
+        - id: seg
+        - id: slot
+      parameters:
+        - id: cost
+          indexed-by: [seg, slot]
+        - id: cap
+          indexed-by: [seg, slot]
+        - id: ramp
+      variables:
+        - id: x
+          time-dependent: false
+          scenario-dependent: false
+          lower-bound: 0
+          upper-bound: cap
+          indexed-by: [seg, slot]
+      ports:
+        - id: balance_port
+          type: flow
+      port-field-definitions:
+        - port: balance_port
+          field: flow
+          definition: sum_over(seg, sum_over(slot, x))
+      constraints:
+        - id: cyclic-ramp-on-seg
+          expression: x[seg+1] - x <= ramp
+      objective-contributions:
+        - id: cost
+          expression: sum_over(seg, sum_over(slot, cost * x))
