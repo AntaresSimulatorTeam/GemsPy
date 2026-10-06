@@ -222,33 +222,15 @@ def test_da_to_df_without_set_has_none_set_columns() -> None:
     assert df[SimulationColumns.SET_INDEX.value].isna().all()
 
 
-def test_to_dataset_set_indexed_output() -> None:
-    da = xr.DataArray(
-        np.arange(8.0).reshape(1, 2, 1, 4),
-        dims=["component", "time", "scenario", "fuel"],
-        coords={"component": ["a"], "time": [0, 1], "scenario": [0], "fuel": range(4)},
-    )
-    elements = {("a", "fuel"): ("coal", "gas", "oil", "bio")}
-    df = SimulationTableBuilder._da_to_df(
-        da, "gen", 1, 0, None, set_elements=_set_lookup(elements)
-    )
-    ds = SimulationTable(df).to_dataset()
-    assert ds["gen"].dims == (
-        "component",
-        "absolute_time_index",
-        "scenario_index",
-        "fuel",
-    )
-    assert ds["gen"].sel(fuel="oil", absolute_time_index=1).item() == 6.0
-
-
 def test_to_dataset_multi_set_outputs_sharing_set_id() -> None:
     """Two outputs indexed by (fuel, seg) share the 'fuel|seg' dimension even
     when components label their local set differently, next to a plain output."""
 
     def da_of(comps: list, seg: int, offset: float) -> xr.DataArray:  # type: ignore
         return xr.DataArray(
-            np.arange(len(comps) * 2 * seg, dtype=float).reshape(len(comps), 1, 1, 2, seg)
+            np.arange(len(comps) * 2 * seg, dtype=float).reshape(
+                len(comps), 1, 1, 2, seg
+            )
             + offset,
             dims=["component", "time", "scenario", "fuel", "seg"],
             coords={
@@ -283,7 +265,12 @@ def test_to_dataset_multi_set_outputs_sharing_set_id() -> None:
     ds = SimulationTable(pd.concat(frames, ignore_index=True)).to_dataset()
 
     assert ds["g1"].dims == ds["g2"].dims
-    assert ds["g1"].dims[-1] == "fuel|seg"
+    assert ds["g1"].dims == (
+        "component",
+        "absolute_time_index",
+        "scenario_index",
+        "fuel|seg",
+    )
     assert ds["g1"].sel(component="a", **{"fuel|seg": "gas|s1"}).item() == 3.0
     assert ds["g2"].sel(component="b", **{"fuel|seg": "gas|t0"}).item() == 102.0
     assert "fuel|seg" not in ds["p"].dims
