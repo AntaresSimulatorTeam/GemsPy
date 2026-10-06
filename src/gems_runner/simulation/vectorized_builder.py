@@ -331,7 +331,11 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
                     f"got {type(result).__name__!r}."
                 )
             if "time" in result.dims:
-                raise ValueError("A time sum bound must be fixed in time.")
+                # declared time-dependent: allowed when the values do not vary
+                first = result.isel(time=0, drop=True)
+                if not bool((result == first).all()):
+                    raise ValueError("A time sum bound must be fixed in time.")
+                result = first
             value = result
         value = value.astype(int)
         return value + t if relative else value

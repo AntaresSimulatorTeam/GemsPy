@@ -23,7 +23,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
 from gems_craft.expression import ExpressionNode
 from gems_craft.expression.degree import is_linear
-from gems_craft.expression.expression import RelativeTimeNode, TimeSumNode
+from gems_craft.expression.expression import ParameterNode, TimeSumNode
 from gems_craft.expression.indexing import IndexingStructureProvider, compute_indexation
 from gems_craft.expression.indexing_structure import IndexingStructure
 from gems_craft.expression.print import print_expr
@@ -123,9 +123,10 @@ def _normalize_objective_contributions(
     return result
 
 
-def _time_sums(node: Any) -> Iterator[TimeSumNode]:
-    """Time sums of an expression tree, or of any dataclass holding expressions."""
-    if isinstance(node, TimeSumNode):
+def _nodes(node: Any, node_type: type) -> Iterator[Any]:
+    """Nodes of a given type in an expression tree, or in any dataclass holding
+    expressions."""
+    if isinstance(node, node_type):
         yield node
     if isinstance(node, (list, tuple)):
         children: Iterable[Any] = node
@@ -134,7 +135,7 @@ def _time_sums(node: Any) -> Iterator[TimeSumNode]:
     else:
         return
     for child in children:
-        yield from _time_sums(child)
+        yield from _nodes(child, node_type)
 
 
 def _model_expressions(model: "Model") -> Iterator[Tuple[str, Any]]:
@@ -153,22 +154,14 @@ def _model_expressions(model: "Model") -> Iterator[Tuple[str, Any]]:
         yield f"definition of port field '{d.port_field}'", d
 
 
-def _check_time_sum_bounds(model: "Model") -> None:
-    """Time sum bounds must be fixed in time (the offset, for a relative bound)."""
-    provider = _make_structure_provider(model.parameters, model.variables)
+def time_sum_bound_parameters(model: "Model") -> Iterator[Tuple[str, str, str]]:
+    """(parameter, bound, where) for each parameter used in a time sum bound of
+    the model, the bound being printed as in the expression."""
     for where, holder in _model_expressions(model):
-        for time_sum in _time_sums(holder):
+        for time_sum in _nodes(holder, TimeSumNode):
             for bound in (time_sum.from_time, time_sum.to_time):
-                value = bound.offset if isinstance(bound, RelativeTimeNode) else bound
-                try:
-                    time_dependent = compute_indexation(value, provider).time
-                except KeyError:
-                    continue  # unknown names are reported elsewhere
-                if time_dependent:
-                    raise ValueError(
-                        f"Model '{model.id}': a time sum bound must be fixed in time, "
-                        f"got '{print_expr(bound)}' in {where}."
-                    )
+                for parameter in _nodes(bound, ParameterNode):
+                    yield parameter.name, print_expr(bound), where
 
 
 def _is_objective_contribution_valid(
@@ -230,8 +223,6 @@ class Model:
     properties: List[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        _check_time_sum_bounds(self)
-
         # Validate each contribution if present
         if self.objective_contributions:
             for expr in self.objective_contributions.values():

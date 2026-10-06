@@ -179,7 +179,7 @@ def test_absolute_index_refers_to_the_block(tmp_path: Path) -> None:
     assert _solve(study_dir)["a"] == [3, 3, 7, 7]
 
 
-def test_bound_depending_on_time_raises(tmp_path: Path) -> None:
+def test_bound_given_a_time_series_raises(tmp_path: Path) -> None:
     study_dir = _make_study(
         tmp_path,
         variables=["x", "a"],
@@ -192,9 +192,36 @@ def test_bound_depending_on_time_raises(tmp_path: Path) -> None:
 
     with pytest.raises(
         ValueError,
-        match="a time sum bound must be fixed in time, got 'd' in constraint 'c1'",
+        match="Component 'm1' \\(model 'lib.m'\\): a time sum bound must be fixed "
+        "in time, but parameter 'd' of 'd' in constraint 'c1' is a time series",
     ):
-        load_study(study_dir)
+        _solve(study_dir)
+
+
+def test_bound_declared_time_dependent_but_given_a_constant(tmp_path: Path) -> None:
+    """As in Antares, the data decides: a parameter declared time-dependent can
+    be a bound if the component gives it a constant value."""
+    study_dir = _make_study(
+        tmp_path,
+        variables=["x", "a", "r"],
+        constraints=["x = d", "a = sum(0 .. last, x)", "r = sum(t - last .. t, x)"],
+        objective="sum(x)",
+        data={"d": [1, 2, 3, 4]},
+        constants={"last": 1},
+        nb_time_steps=4,
+    )
+    library = study_dir / "input" / "model-libraries" / "lib.yml"
+    library.write_text(
+        library.read_text().replace(
+            "        - id: last\n          time-dependent: false",
+            "        - id: last\n          time-dependent: true",
+        )
+    )
+
+    results = _solve(study_dir)
+
+    assert results["a"] == [3, 3, 3, 3]
+    assert results["r"] == [5, 3, 5, 7]
 
 
 # Objectives computed with antares-modeler 10.1.1 on the same library and system

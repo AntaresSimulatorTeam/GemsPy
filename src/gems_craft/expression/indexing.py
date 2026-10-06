@@ -118,10 +118,6 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
 
     def time_sum(self, node: TimeSumNode) -> IndexingStructure:
         bounds = (node.from_time, node.to_time)
-        for bound in bounds:
-            value = bound.offset if isinstance(bound, RelativeTimeNode) else bound
-            if visit(value, self).time:
-                raise ValueError("A time sum bound must be fixed in time.")
         operand = visit(node.operand, self)
         if not any(isinstance(bound, RelativeTimeNode) for bound in bounds):
             return IndexingStructure(False, operand.scenario)

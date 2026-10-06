@@ -10,7 +10,6 @@
 #
 # This file is part of the Antares project.
 import io
-import re
 from pathlib import Path
 
 import pytest
@@ -743,33 +742,14 @@ library:
 """
 
 
-@pytest.mark.parametrize(
-    "section,match",
-    [
-        pytest.param(
-            "      constraints:\n        - id: c1\n          expression: sum(0 .. d, x) <= 3",
-            "got 'd' in constraint 'c1'",
-            id="absolute-bound",
-        ),
-        pytest.param(
-            "      constraints:\n        - id: c1\n          expression: sum(t - d .. t, x) <= 3",
-            re.escape("got '(t + -(d))' in constraint 'c1'"),
-            id="relative-offset",
-        ),
-        pytest.param(
-            "      extra-outputs:\n        - id: out\n          expression: sum(0 .. d, x)",
-            "got 'd' in extra-output 'out'",
-            id="extra-output",
-        ),
-    ],
-)
-def test_time_sum_bound_depending_on_time_is_rejected_when_loaded(
-    section: str, match: str
-) -> None:
-    with pytest.raises(
-        ValueError, match=f"time sum bound must be fixed in time, {match}"
-    ):
-        resolve_library([parse_yaml_library(io.StringIO(_time_sum_lib_yaml(section)))])
+def test_time_sum_bound_declared_time_dependent_is_accepted_by_the_library() -> None:
+    """Whether a bound is fixed in time depends on the data given to each
+    component (checked with the study), not on the declaration."""
+    section = (
+        "      constraints:\n        - id: c1\n"
+        "          expression: sum(0 .. d, x) <= 3"
+    )
+    resolve_library([parse_yaml_library(io.StringIO(_time_sum_lib_yaml(section)))])
 
 
 def test_time_sum_bound_fixed_in_time_is_accepted() -> None:

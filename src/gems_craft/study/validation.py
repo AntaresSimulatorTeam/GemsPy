@@ -20,6 +20,8 @@ into its runtime objects) and from `study.py` (which only holds them together)
 from typing import Dict
 
 from gems_craft.model import Model
+from gems_craft.model.model import time_sum_bound_parameters
+from gems_craft.study.data import TimeScenarioSeriesData, TimeSeriesData
 from gems_craft.study.study import Study
 from gems_craft.study.system import System
 
@@ -60,4 +62,29 @@ def check_data_requirements(study: Study) -> None:
                 raise ValueError(
                     f"Data inconsistency for component: {component.id}, "
                     f"parameter: {param.name}. Requirement not met."
+                )
+    check_time_sum_bounds(study)
+
+
+def check_time_sum_bounds(study: Study) -> None:
+    """Validate that the parameters used in time sum bounds are fixed in time.
+
+    As in Antares Simulator, this depends on the data given to each component,
+    not on the model declaration: a parameter declared time-dependent may be
+    used in a bound if the component gives it a constant value.
+
+    Raises
+    ------
+    ValueError
+        If a component gives a time series to a parameter used in a time sum
+        bound.
+    """
+    for component in study.system.components:
+        for parameter, bound, where in time_sum_bound_parameters(component.model):
+            data = study.database.get_data(component.id, parameter)
+            if isinstance(data, (TimeSeriesData, TimeScenarioSeriesData)):
+                raise ValueError(
+                    f"Component '{component.id}' (model '{component.model.id}'): "
+                    f"a time sum bound must be fixed in time, but parameter "
+                    f"'{parameter}' of '{bound}' in {where} is a time series."
                 )

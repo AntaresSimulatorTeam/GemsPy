@@ -12,8 +12,9 @@ All notable changes to GemsPy are documented here.
 - **Absolute bounds in time sums** - in `sum(S .. E, X)`, a bound can now be an
   absolute time index of the block (an expression without `t`, e.g.
   `sum(0 .. 2, x)`) as well as a bound relative to `t`, and both can be mixed
-  (e.g. `sum(0 .. t, x)`), as in Antares Simulator. Bounds must be fixed in time;
-  this is checked when the library is loaded. In Python, use
+  (e.g. `sum(0 .. t, x)`), as in Antares Simulator. Bounds must be fixed in time:
+  as in Antares, a component may not give a time series to a parameter used in a
+  bound. In Python, use
   `expr.time_sum_between(from_bound, to_bound)` with `relative_time(offset)` for
   bounds relative to `t`.
 
