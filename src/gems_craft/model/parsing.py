@@ -22,8 +22,11 @@ from gems_craft.utils import ModifiedBaseModel
 
 class ParameterSchema(ModifiedBaseModel):
     id: str
-    time_dependent: bool = False
-    scenario_dependent: bool = False
+    # Same defaults as Antares Simulator: a parameter is time- and
+    # scenario-dependent unless declared otherwise. A component may still give
+    # it a constant value in the system file.
+    time_dependent: bool = True
+    scenario_dependent: bool = True
 
 
 class VariableSchema(ModifiedBaseModel):
