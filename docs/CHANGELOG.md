@@ -9,8 +9,17 @@ All notable changes to GemsPy are documented here.
   the optional `input/taxonomy.yml` and calls
   `validate_libraries_against_taxonomy` on every library declaring a `taxonomy`
   field. `parse_yaml_library` is unchanged and performs no validation.
+- **Custom-set indexing** - models and libraries declare `sets:`, parameters and
+  variables take `indexed-by:`, and `system.yml` instantiates the sets. New
+  expression forms `X[fuel]`, `X[fuel=2]`, `X[fuel+1]` and `sum_over(fuel, expr)`;
+  data is read from tidy CSV files and output tables gain `set_id` / `set_index`
+  columns.
 
 ### Changed
+- **Breaking** - a time shift or index (`x[t-1]`, `x[t=3]`) applied to an
+  expression that is not time-dependent now raises `ValueError` when the model is
+  built. Expressions are also printed as `x[t-1]` / `x[t=3]` instead of
+  `.shift(...)` / `.eval(...)`.
 - **Breaking** - loading a study whose library declares a `taxonomy` raises
   `ValueError` if no taxonomy is supplied, or if its id differs from the declared
   one.

@@ -56,7 +56,8 @@ df = results.data
 ~~~
 
 The DataFrame has columns: `block`, `component`, `output`,
-`absolute_time_index`, `block_time_index`, `scenario_index`, `value`, `basis_status`.
+`absolute_time_index`, `block_time_index`, `scenario_index`, `set_id`, `set_index`,
+`value`, `basis_status`.
 
 Reading the value of the optimisation variable `var_id` of component `component_id`
 for a single time step and scenario:
@@ -71,6 +72,27 @@ and `scenario_index`:
 ~~~ python
 sub = df[(df["component"] == component_id) & (df["output"] == var_id)]
 value_s0_t1 = sub[(sub["scenario_index"] == 0) & (sub["block_time_index"] == 1)]["value"].iloc[0]
+
+# set-indexed output: additionally filter by `set_index` (see below)
+value_set = sub[sub["set_index"] == "s0|f1"]["value"].iloc[0]
+~~~
+
+### Set-indexed outputs
+
+An output indexed by custom sets has one row per combination of set elements.
+`set_id` lists the sets (sorted by id, joined by `|`, e.g. `fuel|seg`) and `set_index`
+the element names of the row in the same order (e.g. `coal|s0`). Both are empty for
+outputs without a set dimension. Positions beyond a component's own set size (ragged
+local sets) produce no row.
+
+With the fluent API, the columns of a set-indexed output's pivot are a
+(`scenario_index`, `set_index`) MultiIndex, and `value(...)` returns data keyed by
+`set_index`:
+
+~~~ python
+view = results.component(component_id).output(var_id)
+view.value(time_index=0, scenario_index=0)  # Series indexed by set_index
+view.value(time_index=0, scenario_index=0)["s0|f1"]  # one element
 ~~~
 
 ---
