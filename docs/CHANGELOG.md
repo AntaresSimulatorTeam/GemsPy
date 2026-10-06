@@ -26,6 +26,14 @@ All notable changes to GemsPy are documented here.
   separate modules, as in `optim_config/`. No behavior change; names and
   import paths only.
 
+### Fixed
+- **`solver-options.logs` now controls solver output** - it was passed to the
+  solver as an unknown `solver_logs` option (HiGHS printed
+  `getOptionIndex: Option "solver_logs" is unknown` on every solve) and had no
+  effect. It is now translated into the solver's own output option
+  (`output_flag` for HiGHS, `OutputFlag` for Gurobi, `outputlog` for Xpress);
+  with `logs: false` HiGHS only prints its startup banner.
+
 ---
 
 ## [0.2.0] - 2026-08-24

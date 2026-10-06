@@ -217,8 +217,11 @@ class SimulationSession:
             initial_values=initial_values,
         )
         solver_name = self.optim_config.solver_options.name
+        # Explicit solver parameters take precedence over the logs switch.
         solver_kwargs = {
-            "solver_logs": self.optim_config.solver_options.logs,
+            **OptimizationProblem.log_output_options(
+                solver_name, self.optim_config.solver_options.logs
+            ),
             **self.optim_config.solver_options.parsed_parameters(),
         }
         problem.solve(solver_name=solver_name, **solver_kwargs)
