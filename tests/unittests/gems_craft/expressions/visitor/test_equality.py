@@ -115,19 +115,31 @@ def test_lower_upper_bound_equality() -> None:
     assert not expressions_equal(LowerBoundNode("x"), UpperBoundNode("x"))
 
 
-def test_set_index_sum_over_equality() -> None:
-    x = var("x")
-
-    assert not expressions_equal(x.set_index("fuel"), x.set_index("segment"))
-    assert not expressions_equal(x.set_index("fuel"), x.set_index("fuel", position=2))
-    assert not expressions_equal(
-        x.set_index("fuel", position=2), x.set_index("fuel", relative_shift=2)
-    )
-    assert not expressions_equal(
-        x.set_index("fuel", position=2), x.set_index("fuel", position=3)
-    )
-    assert expressions_equal(
-        x.set_index("fuel", position=2), x.set_index("fuel", position=2)
-    )
-    assert not expressions_equal(x.sum_over("fuel"), x.sum_over("segment"))
-    assert not expressions_equal(x.sum_over("fuel"), x.set_index("fuel"))
+@pytest.mark.parametrize(
+    "lhs, rhs, equal",
+    [
+        (
+            var("x").set_index("fuel", position=2),
+            var("x").set_index("fuel", position=2),
+            True,
+        ),
+        (var("x").set_index("fuel"), var("x").set_index("segment"), False),
+        (var("x").set_index("fuel"), var("x").set_index("fuel", position=2), False),
+        (
+            var("x").set_index("fuel", position=2),
+            var("x").set_index("fuel", relative_shift=2),
+            False,
+        ),
+        (
+            var("x").set_index("fuel", position=2),
+            var("x").set_index("fuel", position=3),
+            False,
+        ),
+        (var("x").sum_over("fuel"), var("x").sum_over("segment"), False),
+        (var("x").sum_over("fuel"), var("x").set_index("fuel"), False),
+    ],
+)
+def test_set_index_sum_over_equality(
+    lhs: ExpressionNode, rhs: ExpressionNode, equal: bool
+) -> None:
+    assert expressions_equal(lhs, rhs) is equal

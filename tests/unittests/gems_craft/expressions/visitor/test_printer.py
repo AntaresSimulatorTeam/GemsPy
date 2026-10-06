@@ -10,6 +10,8 @@
 #
 # This file is part of the Antares project.
 
+import pytest
+
 from gems_craft.expression import ExpressionNode, PrinterVisitor, param, var, visit
 from gems_craft.expression.expression import (
     DualNode,
@@ -67,41 +69,29 @@ def test_lower_upper_bound_printer() -> None:
     assert visit(UpperBoundNode("x"), PrinterVisitor()) == "upper_bound(x)"
 
 
-def test_set_index_sum_over_printer() -> None:
-    x = var("x")
-
-    assert visit(x.set_index("fuel"), PrinterVisitor()) == "(x[fuel])"
-    assert visit(x.set_index("fuel", position=2), PrinterVisitor()) == "(x[fuel=2.0])"
-    assert (
-        visit(x.set_index("fuel", relative_shift=1), PrinterVisitor())
-        == "(x[fuel+1.0])"
-    )
-    assert visit(x.sum_over("fuel"), PrinterVisitor()) == "sum_over(fuel, x)"
-
-
-def test_multiple_set_index_printer() -> None:
-    """Multi-set indexing is represented as nested single-set SetIndexNodes
-    in the AST, but the printer collapses a directly-nested chain into one
-    bracket: `x[fuel=1.0, segment=2.0]`."""
-    x = var("x")
-    expr = x.set_index("fuel", position=1).set_index("segment", position=2)
-
-    assert visit(expr, PrinterVisitor()) == "(x[fuel=1.0, segment=2.0])"
-
-    mixed = x.set_index("fuel").set_index("segment", relative_shift=1)
-    assert visit(mixed, PrinterVisitor()) == "(x[fuel, segment+1.0])"
-
-    # x[t+1, fuel]: the time term (a TimeShiftNode, not a SetIndexNode) prints
-    # its own bracket, so it must not be merged into the set's bracket
-    shifted_then_indexed = x.shift(1).set_index("fuel")
-    assert visit(shifted_then_indexed, PrinterVisitor()) == "((x[t+1.0])[fuel])"
-
-
-def test_negative_shift_prints_with_minus_sign() -> None:
-    x = var("x")
-    assert visit(x.shift(-1), PrinterVisitor()) == "(x[t-1.0])"
-    assert visit(x.shift(-param("p")), PrinterVisitor()) == "(x[t-p])"
-    assert (
-        visit(x.set_index("fuel", relative_shift=-1), PrinterVisitor())
-        == "(x[fuel-1.0])"
-    )
+@pytest.mark.parametrize(
+    "expr, printed",
+    [
+        (var("x").set_index("fuel"), "(x[fuel])"),
+        (var("x").set_index("fuel", position=2), "(x[fuel=2.0])"),
+        (var("x").set_index("fuel", relative_shift=1), "(x[fuel+1.0])"),
+        (var("x").set_index("fuel", relative_shift=-1), "(x[fuel-1.0])"),
+        (var("x").sum_over("fuel"), "sum_over(fuel, x)"),
+        # multi-set indexing: nested SetIndexNodes collapse into one bracket
+        (
+            var("x").set_index("fuel", position=1).set_index("segment", position=2),
+            "(x[fuel=1.0, segment=2.0])",
+        ),
+        (
+            var("x").set_index("fuel").set_index("segment", relative_shift=1),
+            "(x[fuel, segment+1.0])",
+        ),
+        # a time term is a TimeShiftNode: it keeps its own bracket
+        (var("x").shift(1).set_index("fuel"), "((x[t+1.0])[fuel])"),
+        # negative time shifts print with a minus sign, never "+-"
+        (var("x").shift(-1), "(x[t-1.0])"),
+        (var("x").shift(-param("p")), "(x[t-p])"),
+    ],
+)
+def test_set_index_sum_over_printer(expr: ExpressionNode, printed: str) -> None:
+    assert visit(expr, PrinterVisitor()) == printed
