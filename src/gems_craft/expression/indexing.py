@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional
@@ -160,6 +161,12 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
 
     def sum_over(self, node: SumOverNode) -> IndexingStructure:
         inner = visit(node.operand, self)
+        if node.set_id not in inner.sets:
+            warnings.warn(
+                f"sum_over({node.set_id}, ...) applied to "
+                f"'{print_expr(node.operand)}', which is not indexed by "
+                f"'{node.set_id}': its value is multiplied by the set size."
+            )
         return IndexingStructure(inner.time, inner.scenario, inner.sets - {node.set_id})
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> IndexingStructure:
