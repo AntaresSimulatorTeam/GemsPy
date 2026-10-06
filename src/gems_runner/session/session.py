@@ -10,8 +10,9 @@
 #
 # This file is part of the Antares project.
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 from uuid import uuid4
 
 import pandas as pd
@@ -36,9 +37,14 @@ from gems_runner.simulation.simulation_table import (
 )
 from gems_runner.simulation.time_block import TimeBlock
 
-# Called with (scenario_id, table) once a scenario's rows are available;
-# scenario_id is None for the rows shared by all scenarios (frontal mode).
-ScenarioCallback = Callable[[Optional[int], SimulationTable], None]
+
+@dataclass(frozen=True)
+class ScenarioResult:
+    """Results of one MC scenario, or, for ``scenario_id`` None, the rows shared
+    by all scenarios (frontal mode)."""
+
+    scenario_id: Optional[int]
+    table: SimulationTable
 
 
 class SimulationSession:
@@ -48,27 +54,11 @@ class SimulationSession:
         optim_config: OptimConfig,
         run_id: Optional[str] = None,
         output_dir: Optional[Path] = None,
-        on_scenario_done: Optional[ScenarioCallback] = None,
     ) -> None:
-        """
-        Args:
-            on_scenario_done: Optional callback receiving the results one
-                scenario at a time instead of as one table: ``run()`` then
-                returns an empty table. In sequential and parallel subproblem
-                modes it is called as soon as a scenario is solved. In frontal
-                mode it is called once the single solve is done: first with
-                ``None`` for the rows shared by all scenarios (only when there
-                are several scenarios), then for each scenario that has
-                scenario-dependent rows, built on demand; no table holding all
-                scenarios is built. A scenario without rows of its own is not
-                handed over, and the callback is never called in Benders mode,
-                which produces no table.
-        """
         self.study = study
         self.optim_config = optim_config
         self.run_id = run_id or str(uuid4())
         self.output_dir = output_dir
-        self.on_scenario_done = on_scenario_done
         self._apply_heuristics = should_apply_heuristics(study)
 
     @property
@@ -76,26 +66,54 @@ class SimulationSession:
         return self.optim_config.scenario_scope.scenario_ids
 
     def run(self) -> SimulationTable:
-        """Entry point. Dispatches to the appropriate resolution strategy."""
+        """Solve and return the results of all scenarios as one table (an
+        empty table in Benders mode, which produces no simulation table).
+
+        Holds all scenarios in memory; use ``iter_scenario_results`` to handle
+        the results one scenario at a time.
+        """
+        tables = [result.table for result in self.iter_scenario_results()]
+        if not tables:
+            return SimulationTable(pd.DataFrame(), table_id=self.run_id)
+        return merge_simulation_tables(tables, table_id=self.run_id)
+
+    def iter_scenario_results(self) -> Iterator[ScenarioResult]:
+        """Solve and yield the results one scenario at a time.
+
+        The optim-config is validated when this method is called; solving
+        starts when the iteration starts, and a scenario is only solved once
+        the previous result has been consumed.
+
+        - Sequential and parallel subproblem modes yield each scenario as soon
+          as it is solved.
+        - Frontal mode solves all scenarios at once, then yields the rows
+          shared by all scenarios (``scenario_id`` None, only when there are
+          several scenarios), then each scenario, built on demand from the
+          solution: no table holding all scenarios is built.
+        - Benders mode runs the decomposition and yields nothing, as it
+          produces no simulation table.
+
+        A scenario without rows of its own is not yielded.
+        """
         validate_optim_config(
             self.optim_config, self.study.system, self.study.scenario_builder
         )
         mode = self.optim_config.resolution.mode
         if mode == ResolutionMode.FRONTAL:
-            return self._run_frontal()
+            return self._iter_frontal()
         elif mode == ResolutionMode.SEQUENTIAL_SUBPROBLEMS:
-            return self._run_sequential()
+            return self._iter_sequential()
         elif mode == ResolutionMode.PARALLEL_SUBPROBLEMS:
-            return self._run_parallel()
+            return self._iter_parallel()
         elif mode == ResolutionMode.BENDERS_DECOMPOSITION:
-            return self._run_benders()
+            return self._iter_benders()
         raise ValueError(f"Unknown resolution mode: {mode}")
 
     # ------------------------------------------------------------------
     # Resolution strategies
     # ------------------------------------------------------------------
 
-    def _run_frontal(self) -> SimulationTable:
+    def _iter_frontal(self) -> Iterator[ScenarioResult]:
         block = TimeBlock(
             0,
             list(
@@ -105,20 +123,24 @@ class SimulationSession:
                 )
             ),
         )
-        if self.on_scenario_done is None:
-            _, table = self._run_block(block, scenario_ids=self.scenario_ids)
-            return table
         problem = self._solve_block(block, scenario_ids=self.scenario_ids)
-        self._hand_over_per_scenario(problem, self.scenario_ids, self.on_scenario_done)
-        return self._reduce([])
+        tables = SimulationTableBuilder().build_per_scenario(
+            problem, scenario_ids_remap=self.scenario_ids, table_id=self.run_id
+        )
+        common = tables.common()
+        if common is not None:
+            yield ScenarioResult(None, common)
+        for scenario_id in self.scenario_ids:
+            table = tables.scenario(scenario_id)
+            if table is not None:
+                yield ScenarioResult(scenario_id, table)
 
-    def _run_sequential(self) -> SimulationTable:
+    def _iter_sequential(self) -> Iterator[ScenarioResult]:
         cfg = self.optim_config.resolution
         block_length: int = cfg.block_length  # type: ignore[assignment]
         block_overlap: int = cfg.block_overlap
         carry_over_length: int = cfg.effective_carry_over_length
 
-        tables: List[SimulationTable] = []
         for scenario_id in self.scenario_ids:
             scenario_tables: List[SimulationTable] = []
             t_start = self.optim_config.time_scope.first_time_step
@@ -149,15 +171,12 @@ class SimulationSession:
                     length=carry_over_length,
                 )
                 block_id += 1
-            self._finish_scenario(scenario_id, scenario_tables, tables)
+            yield from self._scenario_result(scenario_id, scenario_tables)
 
-        return self._reduce(tables)
-
-    def _run_parallel(self) -> SimulationTable:
+    def _iter_parallel(self) -> Iterator[ScenarioResult]:
         cfg = self.optim_config.resolution
         block_length: int = cfg.block_length  # type: ignore[assignment]
 
-        tables: List[SimulationTable] = []
         for scenario_id in self.scenario_ids:
             scenario_tables: List[SimulationTable] = []
             starts = range(
@@ -183,11 +202,15 @@ class SimulationSession:
             for block in blocks:
                 _, table = self._run_block(block, scenario_ids=[scenario_id])
                 scenario_tables.append(table)
-            self._finish_scenario(scenario_id, scenario_tables, tables)
+            yield from self._scenario_result(scenario_id, scenario_tables)
 
-        return self._reduce(tables)
+    def _iter_benders(self) -> Iterator[ScenarioResult]:
+        """Run Benders decomposition; yields nothing, as Benders writes its
+        results itself and produces no simulation table."""
+        self._run_benders()
+        yield from ()
 
-    def _run_benders(self) -> SimulationTable:
+    def _run_benders(self) -> None:
         from gems_runner.simulation import (
             BendersRunner,
             build_couplings,
@@ -217,7 +240,6 @@ class SimulationSession:
             raise RuntimeError(
                 "Benders decomposition requires a master problem and an output directory for coupling files."
             )
-        return SimulationTable(pd.DataFrame())
 
     # ------------------------------------------------------------------
     # Map / reduce helpers
@@ -272,27 +294,6 @@ class SimulationSession:
             self._check_solved(problem)
         return problem
 
-    def _hand_over_per_scenario(
-        self,
-        problem: OptimizationProblem,
-        scenario_ids: List[int],
-        callback: ScenarioCallback,
-    ) -> None:
-        """Build the rows of a solved problem one scenario at a time and pass
-        them to *callback*, so that only one scenario's table is held in memory
-        at a time."""
-        tables = SimulationTableBuilder().build_per_scenario(
-            problem, scenario_ids_remap=scenario_ids, table_id=self.run_id
-        )
-
-        common = tables.common()
-        if common is not None:
-            callback(None, common)
-        for scenario_id in scenario_ids:
-            table = tables.scenario(scenario_id)
-            if table is not None:
-                callback(scenario_id, table)
-
     @staticmethod
     def _check_solved(problem: OptimizationProblem) -> None:
         if problem.status != "ok":
@@ -301,25 +302,15 @@ class SimulationSession:
                 f"(termination_condition={problem.termination_condition!r})."
             )
 
-    def _finish_scenario(
-        self,
-        scenario_id: int,
-        scenario_tables: List[SimulationTable],
-        tables: List[SimulationTable],
-    ) -> None:
-        """Hand one scenario's tables to ``on_scenario_done``, or keep them in
-        *tables* for the final merge when no callback is set."""
-        if self.on_scenario_done is None:
-            tables.extend(scenario_tables)
-        elif scenario_tables:
-            self.on_scenario_done(scenario_id, self._reduce(scenario_tables))
-
-    def _reduce(self, tables: List[SimulationTable]) -> SimulationTable:
-        """REDUCE: merge SimulationTables into one (an empty table for an
-        empty list)."""
-        if not tables:
-            return SimulationTable(pd.DataFrame(), table_id=self.run_id)
-        return merge_simulation_tables(tables, table_id=self.run_id)
+    def _scenario_result(
+        self, scenario_id: int, block_tables: List[SimulationTable]
+    ) -> Iterator[ScenarioResult]:
+        """REDUCE: merge one scenario's block tables into its result; yields
+        nothing when no block was solved."""
+        if block_tables:
+            yield ScenarioResult(
+                scenario_id, merge_simulation_tables(block_tables, table_id=self.run_id)
+            )
 
     @staticmethod
     def _extract_carry_over(

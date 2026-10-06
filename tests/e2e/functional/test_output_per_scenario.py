@@ -40,6 +40,7 @@ from gems_runner.simulation.simulation_table import (
     SimulationTableBuilder,
 )
 from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
+from gems_runner.simulation.time_block import TimeBlock
 from gems_runner.study.runner import run_study
 
 _STUDY_SRC = Path(__file__).parent / "studies" / "13_1"
@@ -135,43 +136,49 @@ def test_separate_scenario_modes_write_no_common_file(
         assert "p_max" in df["output"].values
 
 
-def _stream(
-    study_dir: Path,
-) -> Tuple[SimulationTable, Dict[Optional[int], SimulationTable]]:
-    """Run with on_scenario_done and collect the handed-over tables."""
+def _session(study_dir: Path) -> SimulationSession:
     optim_config = load_optim_config(study_dir / "input" / "optim-config.yml")
     assert optim_config is not None
+    return SimulationSession(load_study(study_dir), optim_config, run_id="run")
+
+
+def _stream(study_dir: Path) -> Dict[Optional[int], SimulationTable]:
+    """Iterate over the results and collect them by scenario."""
     streamed: Dict[Optional[int], SimulationTable] = {}
+    for result in _session(study_dir).iter_scenario_results():
+        assert result.scenario_id not in streamed, "scenario yielded twice"
+        streamed[result.scenario_id] = result.table
+    return streamed
 
-    def collect(scenario_id: Optional[int], table: SimulationTable) -> None:
-        assert scenario_id not in streamed, "scenario handed over twice"
-        streamed[scenario_id] = table
 
-    returned = SimulationSession(
-        load_study(study_dir),
-        optim_config,
-        run_id="run",
-        on_scenario_done=collect,
-    ).run()
-    return returned, streamed
+def _full_table(study_dir: Path, mode: str) -> SimulationTable:
+    """Reference table holding all scenarios, built without
+    iter_scenario_results: in frontal mode, from the solved problem in one go;
+    in the other modes, the scenarios are solved separately anyway."""
+    session = _session(study_dir)
+    if mode != "frontal":
+        return session.run()
+    time_scope = session.optim_config.time_scope
+    block = TimeBlock(
+        0, list(range(time_scope.first_time_step, time_scope.last_time_step + 1))
+    )
+    problem = session._solve_block(block, scenario_ids=session.scenario_ids)
+    return SimulationTableBuilder().build(
+        problem, scenario_ids_remap=session.scenario_ids, table_id="run"
+    )
 
 
 @pytest.mark.parametrize("mode", ["frontal", "sequential", "parallel"])
 def test_streamed_files_match_splitting_the_full_table(
     tmp_path: Path, mode: str
 ) -> None:
-    """Handing results over one scenario at a time gives byte-identical files
-    to solving everything first and splitting the full table, in both formats
+    """Yielding results one scenario at a time gives byte-identical files to
+    solving everything first and splitting the full table, in both formats
     (each study is solved once and written in both formats)."""
     study_dir = _make_study(tmp_path, mode)
-    optim_config = load_optim_config(study_dir / "input" / "optim-config.yml")
-    assert optim_config is not None
 
-    full_table = SimulationSession(
-        load_study(study_dir), optim_config, run_id="run"
-    ).run()
-    returned, streamed = _stream(study_dir)
-    assert returned.data.empty  # nothing kept once handed to the callback
+    full_table = _full_table(study_dir, mode)
+    streamed = _stream(study_dir)
 
     for output_format in OutputFormat:
         writer = SimulationTableWriter(output_format)
@@ -193,7 +200,7 @@ def test_streamed_files_match_splitting_the_full_table(
 def test_frontal_hands_over_common_rows_once_and_each_scenario_once(
     tmp_path: Path,
 ) -> None:
-    _, streamed = _stream(_make_study(tmp_path, "frontal"))
+    streamed = _stream(_make_study(tmp_path, "frontal"))
 
     assert sorted(streamed, key=lambda s: -1 if s is None else s) == [None, 0, 1]
     assert sorted(streamed[None].data["output"]) == ["objective-value", "p_max"]
@@ -246,11 +253,9 @@ def test_frontal_non_consecutive_scenario_ids(tmp_path: Path) -> None:
     assert optim_config.scenario_scope.scenario_ids == [0, 2]
     writer = SimulationTableWriter("parquet")
 
-    full_table = SimulationSession(
-        load_study(study_dir), optim_config, run_id="run"
-    ).run()
+    full_table = _full_table(study_dir, "frontal")
     split_paths = sorted(writer.write(full_table, tmp_path / "split"))
-    _, streamed = _stream(study_dir)
+    streamed = _stream(study_dir)
     streamed_paths = sorted(
         writer.write_scenario(table, tmp_path / "streamed", scenario_id)
         for scenario_id, table in streamed.items()
@@ -265,14 +270,12 @@ def test_frontal_non_consecutive_scenario_ids(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("mode", ["sequential", "parallel"])
-def test_each_scenario_is_handed_over_before_the_next_is_solved(
+def test_each_scenario_is_yielded_before_the_next_is_solved(
     tmp_path: Path, mode: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Only one scenario is held in memory: a scenario is handed over before
-    the next scenario is solved."""
+    """Only one scenario is held in memory: a scenario is yielded before the
+    next scenario is solved."""
     study_dir = _make_study(tmp_path, mode)
-    optim_config = load_optim_config(study_dir / "input" / "optim-config.yml")
-    assert optim_config is not None
     events: List[Tuple[str, Optional[int]]] = []
     solve_block = SimulationSession._solve_block
 
@@ -281,14 +284,8 @@ def test_each_scenario_is_handed_over_before_the_next_is_solved(
         return solve_block(self, block, scenario_ids, initial_values)
 
     monkeypatch.setattr(SimulationSession, "_solve_block", spy)
-    SimulationSession(
-        load_study(study_dir),
-        optim_config,
-        run_id="run",
-        on_scenario_done=lambda scenario_id, _table: events.append(
-            ("done", scenario_id)
-        ),
-    ).run()
+    for result in _session(study_dir).iter_scenario_results():
+        events.append(("done", result.scenario_id))
 
     assert events.index(("done", 0)) < events.index(("solve", 1))
 
@@ -304,7 +301,7 @@ def test_frontal_hand_over_never_builds_the_full_table(
         raise AssertionError("the full multi-scenario table was built")
 
     monkeypatch.setattr(SimulationTableBuilder, "build", fail)
-    _, streamed = _stream(study_dir)
+    streamed = _stream(study_dir)
 
     assert set(streamed) == {None, 0, 1}
 
@@ -323,3 +320,70 @@ def test_empty_scenario_scope_fails_before_solving(tmp_path: Path, mode: str) ->
     with pytest.raises(ValueError, match="empty scenario list"):
         run_study(study_dir)
     assert not (study_dir / "output").exists()
+
+
+@pytest.mark.parametrize("mode", ["frontal", "sequential", "parallel"])
+def test_run_returns_the_merge_of_the_iterated_results(
+    tmp_path: Path, mode: str
+) -> None:
+    study_dir = _make_study(tmp_path, mode)
+
+    returned = _session(study_dir).run()
+    iterated = [r.table.data for r in _session(study_dir).iter_scenario_results()]
+
+    assert returned.table_id == "run"
+    pd.testing.assert_frame_equal(returned.data, pd.concat(iterated, ignore_index=True))
+
+
+@pytest.mark.parametrize("mode", ["frontal", "sequential", "parallel"])
+def test_run_holds_the_same_rows_as_the_full_table(tmp_path: Path, mode: str) -> None:
+    """run() merges the per-scenario results: same rows as the table built in
+    one go from the solution, possibly in another order."""
+    study_dir = _make_study(tmp_path, mode)
+    columns = ["block", "component", "output", "absolute_time_index", "scenario_index"]
+
+    def rows(table: SimulationTable) -> pd.DataFrame:
+        return table.data.sort_values(columns, na_position="first").reset_index(
+            drop=True
+        )
+
+    pd.testing.assert_frame_equal(
+        rows(_session(study_dir).run()), rows(_full_table(study_dir, mode))
+    )
+
+
+@pytest.mark.parametrize("mode", ["frontal", "sequential", "parallel"])
+def test_nothing_is_solved_before_the_iteration_starts(
+    tmp_path: Path, mode: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    study_dir = _make_study(tmp_path, mode)
+    solved: List[int] = []
+    solve_block = SimulationSession._solve_block
+
+    def spy(self, block, scenario_ids, initial_values=None):  # type: ignore[no-untyped-def]
+        solved.append(scenario_ids[0])
+        return solve_block(self, block, scenario_ids, initial_values)
+
+    monkeypatch.setattr(SimulationSession, "_solve_block", spy)
+    results = _session(study_dir).iter_scenario_results()
+    assert solved == []
+
+    first = next(results)
+    assert solved
+    assert first.scenario_id in (None, 0)
+
+
+@pytest.mark.parametrize("mode", ["frontal", "sequential", "parallel"])
+def test_invalid_config_fails_when_iteration_is_requested(
+    tmp_path: Path, mode: str
+) -> None:
+    """The optim-config is validated when iter_scenario_results is called,
+    not at the first next()."""
+    study_dir = _make_study(tmp_path, mode)
+    config_path = study_dir / "input" / "optim-config.yml"
+    config_path.write_text(
+        config_path.read_text().replace("    - 1\n", "    - 1\n  exclude: [0, 1]\n")
+    )
+
+    with pytest.raises(ValueError, match="empty scenario list"):
+        _session(study_dir).iter_scenario_results()

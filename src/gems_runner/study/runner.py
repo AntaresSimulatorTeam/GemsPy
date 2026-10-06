@@ -6,7 +6,6 @@ from gems_craft.optim_config.parsing import OptimConfig, load_optim_config
 from gems_craft.study.folder import load_study
 from gems_craft.study.parsing import OutputFormat
 from gems_runner.session.session import SimulationSession
-from gems_runner.simulation.simulation_table import SimulationTable
 from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
 
 
@@ -43,18 +42,15 @@ def run_study(
     # Created before solving so that an invalid output format fails fast.
     writer = SimulationTableWriter(output_format)
 
-    def write_scenario(scenario_id: Optional[int], table: SimulationTable) -> None:
-        writer.write_scenario(table, output_dir, scenario_id)
-
-    # Results are handed over one scenario at a time and written immediately:
-    # in sequential/parallel modes as each scenario is solved, in frontal mode
-    # one after another after the single solve. No table holding all scenarios
-    # is built. Benders mode writes no simulation table.
     session = SimulationSession(
         study=study,
         optim_config=optim_config,
         run_id=run_id,
         output_dir=output_dir,
-        on_scenario_done=write_scenario,
     )
-    session.run()
+    # Results come one scenario at a time and are written immediately: in
+    # sequential/parallel modes as each scenario is solved, in frontal mode one
+    # after another after the single solve. No table holding all scenarios is
+    # built. Benders mode writes no simulation table.
+    for result in session.iter_scenario_results():
+        writer.write_scenario(result.table, output_dir, result.scenario_id)
