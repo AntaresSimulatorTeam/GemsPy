@@ -84,8 +84,10 @@ time,fuel,value
 Columns are matched by name, in any order. `value` is always required. `time`
 is required only if the parameter is `time-dependent`, and `scenario` only if it
 is `scenario-dependent`. There is one column per set listed in the component's
-own `indexed-by`; any other column is rejected. Set columns must hold exactly the elements instantiated in
-`system.yml`, and `time`/`scenario` values must be `0..n-1`.
+own `indexed-by`; any other column is rejected. Set columns must hold exactly the
+elements instantiated in `system.yml`, and `time`/`scenario` values must be
+`0..n-1`. Empty or non-numeric `value` cells are rejected.
+
 ### Assembling a Study
 
 Once you have `system` and `database`, wrap them in a `Study`:

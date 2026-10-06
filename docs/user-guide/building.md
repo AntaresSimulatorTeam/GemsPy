@@ -189,6 +189,8 @@ components.append(
 
 Components of one model may instantiate a local set (here `tier`) with
 different elements and sizes.
+An explicit position (`X[tier=2]`) must exist in every component's instantiation,
+so it is limited by the smallest one; use `X[tier]` or `sum_over` otherwise.
 
 A component may also set `integer_strategy` to relax or heuristically process
 its model's integer/binary variables — see

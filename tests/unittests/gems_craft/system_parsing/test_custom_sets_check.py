@@ -91,33 +91,6 @@ def test_missing_global_set_instantiation_raises() -> None:
         check_custom_sets(system, model_dict, lib_dict)
 
 
-_SYSTEM_EXTRA_GLOBAL = """\
-system:
-  sets:
-    - id: fuel
-      elements: [gas, coal]
-    - id: unknown_set
-      elements: [a, b]
-  components:
-    - id: A
-      model: setlib.m
-      sets:
-        - id: segment
-          elements: 0..2
-      parameters:
-        - id: p
-          value: 1.0
-"""
-
-
-def test_extra_unused_global_set_instantiation_is_allowed() -> None:
-    """Instantiating a set nothing actually uses is harmless (mirrors extra,
-    undeclared component properties/parameters also being allowed)."""
-    model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
-    system = _parse_system(_SYSTEM_EXTRA_GLOBAL)
-    check_custom_sets(system, model_dict, lib_dict)  # must not raise
-
-
 def test_unused_global_set_not_required_to_be_instantiated() -> None:
     """A library-declared global set that no model actually references via
     indexed_by doesn't need to be instantiated (mirrors how declaring a
@@ -190,4 +163,37 @@ def test_duplicate_set_elements_raises() -> None:
     model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
     system = _parse_system(_SYSTEM_DUPLICATE_ELEMENTS)
     with pytest.raises(ValueError, match="duplicate elements"):
+        check_custom_sets(system, model_dict, lib_dict)
+
+
+def test_element_containing_pipe_raises() -> None:
+    model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
+    system = _parse_system(_SYSTEM_OK.replace("[gas, coal]", "[gas, 'co|al']"))
+    with pytest.raises(ValueError, match=r"containing '\|'"):
+        check_custom_sets(system, model_dict, lib_dict)
+
+
+def test_instantiating_undeclared_global_set_raises() -> None:
+    model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
+    system = _parse_system(
+        _SYSTEM_OK.replace(
+            "  components:",
+            "    - id: ghost\n      elements: [a]\n  components:",
+            1,
+        )
+    )
+    with pytest.raises(ValueError, match="not declared by any library"):
+        check_custom_sets(system, model_dict, lib_dict)
+
+
+def test_instantiating_non_local_set_on_component_raises() -> None:
+    model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
+    system = _parse_system(
+        _SYSTEM_OK.replace(
+            "      parameters:",
+            "        - id: ghost\n          elements: [a]\n      parameters:",
+            1,
+        )
+    )
+    with pytest.raises(ValueError, match="not local sets of its model"):
         check_custom_sets(system, model_dict, lib_dict)

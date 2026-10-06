@@ -1,13 +1,27 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
 _BASE_DIMS = ("component", "time", "scenario")
+PARQUET_COMPRESSION: Literal["zstd"] = "zstd"
+PARQUET_COMPRESSION_LEVEL = 3
+PARQUET_ROW_GROUP_SIZE = 64_000
 
 
 class OutputView:
@@ -142,7 +156,14 @@ class SimulationTable:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         path = output_dir / f"simulation_table_{self.table_id}.parquet"
-        self._df.to_parquet(path, index=False)
+        self._df.to_parquet(
+            path,
+            engine="pyarrow",
+            index=False,
+            compression=PARQUET_COMPRESSION,
+            compression_level=PARQUET_COMPRESSION_LEVEL,
+            row_group_size=PARQUET_ROW_GROUP_SIZE,
+        )
         return path
 
     def to_netcdf(self, output_dir: Path) -> Path:
