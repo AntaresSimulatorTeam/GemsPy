@@ -97,27 +97,6 @@ def _minimal_study_with_set(tmp_path: Path, system_yaml: str) -> Path:
     return study_dir
 
 
-def test_load_study_checks_custom_sets_against_system_yml_ok(tmp_path: Path) -> None:
-    study_dir = _minimal_study_with_set(
-        tmp_path,
-        """\
-system:
-  sets:
-    - id: fuel
-      elements: [gas, coal]
-  components:
-    - id: A
-      model: lib.m
-      parameters:
-        - id: p
-          value: 1.0
-""",
-    )
-
-    study = load_study(study_dir)  # must not raise
-    assert len(list(study.system.components)) == 1
-
-
 def test_load_study_raises_when_global_set_not_instantiated(tmp_path: Path) -> None:
     study_dir = _minimal_study_with_set(
         tmp_path,

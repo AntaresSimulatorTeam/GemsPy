@@ -165,74 +165,37 @@ library:
     assert input_lib.models[0].taxonomy_category == "balance"
 
 
-def test_model_and_library_sets_parse() -> None:
-    yaml_content = """
+def test_sets_and_indexed_by_parse() -> None:
+    input_lib = parse_yaml_library(io.StringIO("""
 library:
   id: sets_lib
-  sets:
-    - id: fuel
-      description: fuel types
+  sets: [{id: fuel, description: fuel types}]
   models:
     - id: bus
-      sets:
-        - id: segment
-      parameters:
-        - id: v_nom
-"""
-    input_lib = parse_yaml_library(io.StringIO(yaml_content))
+      sets: [{id: segment}]
+      parameters: [{id: p, indexed-by: [fuel]}]
+      variables: [{id: v, indexed-by: [fuel]}]
+"""))
+    model = input_lib.models[0]
     assert [s.id for s in input_lib.sets] == ["fuel"]
     assert input_lib.sets[0].description == "fuel types"
-    assert [s.id for s in input_lib.models[0].sets] == ["segment"]
-
-
-def test_model_and_library_sets_default_empty() -> None:
-    yaml_content = """
-library:
-  id: no_sets_lib
-  models:
-    - id: bus
-"""
-    input_lib = parse_yaml_library(io.StringIO(yaml_content))
-    assert input_lib.sets == []
-    assert input_lib.models[0].sets == []
-
-
-def test_parameter_and_variable_indexed_by_parses() -> None:
-    yaml_content = """
-library:
-  id: indexed_lib
-  sets:
-    - id: fuel
-  models:
-    - id: bus
-      parameters:
-        - id: p
-          indexed-by: [fuel]
-      variables:
-        - id: v
-          indexed-by: [fuel]
-"""
-    input_lib = parse_yaml_library(io.StringIO(yaml_content))
-    model = input_lib.models[0]
+    assert [s.id for s in model.sets] == ["segment"]
     assert model.parameters[0].indexed_by == ["fuel"]
     assert model.variables[0].indexed_by == ["fuel"]
 
 
-def test_parameter_and_variable_indexed_by_defaults_empty() -> None:
-    yaml_content = """
+def test_sets_and_indexed_by_default_empty() -> None:
+    input_lib = parse_yaml_library(io.StringIO("""
 library:
-  id: no_index_lib
+  id: no_sets_lib
   models:
     - id: bus
-      parameters:
-        - id: p
-      variables:
-        - id: v
-"""
-    input_lib = parse_yaml_library(io.StringIO(yaml_content))
+      parameters: [{id: p}]
+      variables: [{id: v}]
+"""))
     model = input_lib.models[0]
-    assert model.parameters[0].indexed_by == []
-    assert model.variables[0].indexed_by == []
+    assert input_lib.sets == [] and model.sets == []
+    assert model.parameters[0].indexed_by == [] and model.variables[0].indexed_by == []
 
 
 def test_library_version_parsing() -> None:

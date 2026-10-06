@@ -11,6 +11,7 @@
 # This file is part of the Antares project.
 
 import io
+from typing import Optional
 
 import pytest
 
@@ -19,181 +20,90 @@ from gems_craft.model.resolve_library import resolve_library
 from gems_craft.study.parsing import parse_yaml_system
 from gems_craft.study.validation import check_custom_sets
 
-_LIB_WITH_GLOBAL_AND_LOCAL_SET = """\
+_LIB = """
 library:
   id: setlib
-  sets:
-    - id: fuel
+  sets: [{id: fuel}]
   models:
     - id: m
-      sets:
-        - id: segment
-      parameters:
-        - id: p
-          indexed-by: [fuel, segment]
+      sets: [{id: segment}]
+      parameters: [{id: p, indexed-by: [fuel, segment]}]
 """
 
+_GLOBAL = "[{id: fuel, elements: [gas, coal]}]"
+_LOCAL = "[{id: segment, elements: 0..2}]"
 
-def _resolve(lib_yaml: str):
-    lib = parse_yaml_library(io.StringIO(lib_yaml))
-    lib_dict = resolve_library([lib])
+
+def _system(global_sets: Optional[str] = _GLOBAL, local_sets: Optional[str] = _LOCAL):
+    lines = ["system:"]
+    if global_sets:
+        lines.append(f"  sets: {global_sets}")
+    lines += ["  components:", "    - id: A", "      model: setlib.m"]
+    if local_sets:
+        lines.append(f"      sets: {local_sets}")
+    lines.append("      parameters: [{id: p, value: 1.0}]")
+    return parse_yaml_system(io.StringIO("\n".join(lines)))
+
+
+def _check(system, lib_yaml: str = _LIB) -> None:
+    lib_dict = resolve_library([parse_yaml_library(io.StringIO(lib_yaml))])
     model_dict = {}
     for library in lib_dict.values():
         model_dict |= library.models
-    return model_dict, lib_dict
-
-
-def _parse_system(system_yaml: str):
-    return parse_yaml_system(io.StringIO(system_yaml))
-
-
-_SYSTEM_OK = """\
-system:
-  sets:
-    - id: fuel
-      elements: [gas, coal]
-  components:
-    - id: A
-      model: setlib.m
-      sets:
-        - id: segment
-          elements: 0..2
-      parameters:
-        - id: p
-          value: 1.0
-"""
+    check_custom_sets(system, model_dict, lib_dict)
 
 
 def test_valid_global_and_local_set_instantiation_ok() -> None:
-    model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
-    system = _parse_system(_SYSTEM_OK)
-    check_custom_sets(system, model_dict, lib_dict)  # must not raise
+    _check(_system())
 
 
-_SYSTEM_MISSING_GLOBAL = """\
-system:
-  components:
-    - id: A
-      model: setlib.m
-      sets:
-        - id: segment
-          elements: 0..2
-      parameters:
-        - id: p
-          value: 1.0
-"""
-
-
-def test_missing_global_set_instantiation_raises() -> None:
-    model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
-    system = _parse_system(_SYSTEM_MISSING_GLOBAL)
-    with pytest.raises(ValueError, match="not instantiated"):
-        check_custom_sets(system, model_dict, lib_dict)
+@pytest.mark.parametrize(
+    "system_args, error",
+    [
+        ({"global_sets": None}, "not instantiated"),
+        ({"local_sets": None}, "missing instantiation"),
+        (
+            {"global_sets": "[{id: fuel, elements: [gas, gas]}]"},
+            "duplicate elements",
+        ),
+        (
+            {"global_sets": "[{id: fuel, elements: [gas, 'co|al']}]"},
+            r"containing '\|'",
+        ),
+        (
+            {
+                "global_sets": "[{id: fuel, elements: [gas]}, {id: ghost, elements: [a]}]"
+            },
+            "not declared by any library",
+        ),
+        (
+            {
+                "local_sets": "[{id: segment, elements: 0..2}, {id: ghost, elements: [a]}]"
+            },
+            "not local sets of its model",
+        ),
+    ],
+    ids=[
+        "missing global set",
+        "missing local set",
+        "duplicate elements",
+        "pipe in element",
+        "undeclared global set",
+        "non-local set on component",
+    ],
+)
+def test_invalid_set_instantiation_raises(system_args: dict, error: str) -> None:
+    with pytest.raises(ValueError, match=error):
+        _check(_system(**system_args))
 
 
 def test_unused_global_set_not_required_to_be_instantiated() -> None:
-    """A library-declared global set that no model actually references via
-    indexed_by doesn't need to be instantiated (mirrors how declaring a
-    parameter time-dependent never forces the system to actually vary it)."""
-    lib = parse_yaml_library(io.StringIO("""
+    """A declared global set that no model references via indexed_by needn't be
+    instantiated (like a time-dependent parameter needn't actually vary)."""
+    lib = """
 library:
-  id: unused_set_lib
-  sets:
-    - id: fuel
-  models:
-    - id: m
-      parameters:
-        - id: p
-"""))
-    lib_dict = resolve_library([lib])
-    model_dict = {}
-    for library in lib_dict.values():
-        model_dict |= library.models
-    system = _parse_system("""
-system:
-  components:
-    - id: A
-      model: unused_set_lib.m
-      parameters:
-        - id: p
-          value: 1.0
-""")
-    check_custom_sets(system, model_dict, lib_dict)  # must not raise
-
-
-_SYSTEM_MISSING_LOCAL = """\
-system:
-  sets:
-    - id: fuel
-      elements: [gas, coal]
-  components:
-    - id: A
-      model: setlib.m
-      parameters:
-        - id: p
-          value: 1.0
+  id: setlib
+  sets: [{id: fuel}]
+  models: [{id: m, parameters: [{id: p}]}]
 """
-
-
-def test_missing_local_set_instantiation_raises() -> None:
-    model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
-    system = _parse_system(_SYSTEM_MISSING_LOCAL)
-    with pytest.raises(ValueError, match="missing instantiation"):
-        check_custom_sets(system, model_dict, lib_dict)
-
-
-_SYSTEM_DUPLICATE_ELEMENTS = """\
-system:
-  sets:
-    - id: fuel
-      elements: [gas, gas]
-  components:
-    - id: A
-      model: setlib.m
-      sets:
-        - id: segment
-          elements: 0..2
-      parameters:
-        - id: p
-          value: 1.0
-"""
-
-
-def test_duplicate_set_elements_raises() -> None:
-    model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
-    system = _parse_system(_SYSTEM_DUPLICATE_ELEMENTS)
-    with pytest.raises(ValueError, match="duplicate elements"):
-        check_custom_sets(system, model_dict, lib_dict)
-
-
-def test_element_containing_pipe_raises() -> None:
-    model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
-    system = _parse_system(_SYSTEM_OK.replace("[gas, coal]", "[gas, 'co|al']"))
-    with pytest.raises(ValueError, match=r"containing '\|'"):
-        check_custom_sets(system, model_dict, lib_dict)
-
-
-def test_instantiating_undeclared_global_set_raises() -> None:
-    model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
-    system = _parse_system(
-        _SYSTEM_OK.replace(
-            "  components:",
-            "    - id: ghost\n      elements: [a]\n  components:",
-            1,
-        )
-    )
-    with pytest.raises(ValueError, match="not declared by any library"):
-        check_custom_sets(system, model_dict, lib_dict)
-
-
-def test_instantiating_non_local_set_on_component_raises() -> None:
-    model_dict, lib_dict = _resolve(_LIB_WITH_GLOBAL_AND_LOCAL_SET)
-    system = _parse_system(
-        _SYSTEM_OK.replace(
-            "      parameters:",
-            "        - id: ghost\n          elements: [a]\n      parameters:",
-            1,
-        )
-    )
-    with pytest.raises(ValueError, match="not local sets of its model"):
-        check_custom_sets(system, model_dict, lib_dict)
+    _check(_system(global_sets=None, local_sets=None), lib)

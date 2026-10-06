@@ -349,27 +349,21 @@ def test_parsing_visitor_with_sets(
     assert expressions_equal(expr, expected)
 
 
-def test_parsing_keyword_time_form_same_as_bare_index() -> None:
-    """`x[t=2]` (keyword form) must parse to the exact same AST as `x[2]`
-    (legacy bare-expr form) -- both denote an absolute time index of 2."""
-    identifiers = ModelIdentifiers(variables={"x"}, parameters=set(), constraints=set())
-
-    keyword_form = parse_expression("x[t=2]", identifiers)
-    bare_form = parse_expression("x[2]", identifiers)
-    assert expressions_equal(keyword_form, bare_form)
-
-
-def test_parsing_index_term_order_independent() -> None:
+@pytest.mark.parametrize(
+    "lhs, rhs",
+    [
+        ("x[t=2]", "x[2]"),  # keyword time form == legacy bare form
+        ("x[segment=2, fuel=1]", "x[fuel=1, segment=2]"),  # term order is irrelevant
+        ("x[fuel=3, 2]", "x[2, fuel=3]"),
+    ],
+)
+def test_parsing_equivalent_index_forms(lhs: str, rhs: str) -> None:
     identifiers = ModelIdentifiers(
         variables={"x"}, parameters=set(), constraints=set(), sets={"segment", "fuel"}
     )
-    a = parse_expression("x[segment=2, fuel=1]", identifiers)
-    b = parse_expression("x[fuel=1, segment=2]", identifiers)
-    assert expressions_equal(a, b)
-
-    c = parse_expression("x[fuel=3, 2]", identifiers)
-    d = parse_expression("x[2, fuel=3]", identifiers)
-    assert expressions_equal(c, d)
+    assert expressions_equal(
+        parse_expression(lhs, identifiers), parse_expression(rhs, identifiers)
+    )
 
 
 @pytest.mark.parametrize(

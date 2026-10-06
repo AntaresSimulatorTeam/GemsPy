@@ -413,23 +413,14 @@ def test_parse_yaml_system_sets_and_indexed_by_default_absent() -> None:
         assert component.sets is None
 
 
-def test_set_instance_invalid_range_raises() -> None:
-    with pytest.raises(ValidationError, match="Invalid elements range"):
-        parse_yaml_system(io.StringIO("""\
-system:
-  sets:
-    - id: fuel
-      elements: not-a-range
-  components: []
-"""))
-
-
-def test_set_instance_reversed_range_raises() -> None:
-    with pytest.raises(ValidationError, match="Range start must be"):
-        parse_yaml_system(io.StringIO("""\
-system:
-  sets:
-    - id: fuel
-      elements: 5..2
-  components: []
-"""))
+@pytest.mark.parametrize(
+    "elements, error",
+    [
+        ("not-a-range", "Invalid elements range"),
+        ("5..2", "Range start must be"),
+    ],
+)
+def test_set_instance_invalid_range_raises(elements: str, error: str) -> None:
+    system_yaml = f"system:\n\n  sets:\n\n    - id: fuel\n\n      elements: {elements}\n\n  components: []\n"
+    with pytest.raises(ValidationError, match=error):
+        parse_yaml_system(io.StringIO(system_yaml))
