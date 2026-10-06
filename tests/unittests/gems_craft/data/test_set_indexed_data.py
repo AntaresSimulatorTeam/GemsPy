@@ -125,6 +125,7 @@ def test_constant_values_behave_like_varying_data() -> None:  # (d)
         ("fuel,time,value\ngas,0,1\ngas,2,1\ncoal,0,1\ncoal,2,1\n", "0..n-1"),
         ("fuel,time,value\ngas,a,1\ncoal,0,1\n", "integers"),
         ("fuel,time,value\ngas,0,x\ncoal,0,1\n", "numbers"),
+        ("fuel,time,value\ngas,0,\ncoal,0,1\n", "empty cells"),
         ("fuel,time,value,extra\ngas,0,1,1\ncoal,0,1,1\n", "unexpected \\['extra'\\]"),
     ],
 )

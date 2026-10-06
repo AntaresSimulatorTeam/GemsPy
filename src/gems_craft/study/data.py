@@ -339,6 +339,8 @@ def dataframe_to_set_indexed_series(
         value = pd.to_numeric(ts_dataframe["value"]).to_numpy(dtype=float)
     except ValueError:
         raise ValueError("Column 'value' must contain numbers.")
+    if np.isnan(value).any():
+        raise ValueError("Column 'value' must not contain empty cells.")
     values = np.empty(tuple(shape))
     values[tuple(codes)] = value
     return SetIndexedSeriesData(values=values, dims=tuple(key_cols), coords=coords)
