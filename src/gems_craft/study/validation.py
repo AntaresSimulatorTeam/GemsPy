@@ -45,6 +45,9 @@ def _check_set_elements(instance: SetInstanceSchema) -> None:
     elements = instance.elements
     if len(set(elements)) != len(elements):
         raise ValueError(f"Set '{instance.id}' has duplicate elements.")
+    # '|' joins element names in output tables' `set_index` column
+    if any("|" in str(e) for e in elements):
+        raise ValueError(f"Set '{instance.id}' has an element containing '|'.")
 
 
 def _sets_used_by_model(model: Model) -> Set[str]:
@@ -71,7 +74,10 @@ def check_custom_sets(
       - every local set actually used by a component's model is instantiated
         by that component;
       - every instantiated set's element list is duplicate-free (an empty
-        list is a valid, if degenerate, set).
+        list is a valid, if degenerate, set) and has no element containing
+        '|';
+      - every instantiated global set is declared by some library, and every
+        locally instantiated set is a local set of the component's model.
     """
     used_models = [
         model_dict[c.model] for c in input_study.components if c.model in model_dict
@@ -89,6 +95,13 @@ def check_custom_sets(
             "by a component's model but not instantiated in system.yml's "
             "system-level 'sets:'."
         )
+    declared_global = set().union(*(lib.sets for lib in lib_dict.values()))
+    unknown_global = instantiated_global.keys() - declared_global
+    if unknown_global:
+        raise ValueError(
+            f"System-level set(s) {sorted(unknown_global)} are instantiated in "
+            "system.yml but not declared by any library."
+        )
     for s in instantiated_global.values():
         _check_set_elements(s)
 
@@ -100,6 +113,12 @@ def check_custom_sets(
             _sets_used_by_model(component_model) & component_model.local_sets
         )
         instantiated_local = {s.id: s for s in (component.sets or [])}
+        unknown_local = instantiated_local.keys() - component_model.local_sets
+        if unknown_local:
+            raise ValueError(
+                f"Component '{component.id}' instantiates set(s) "
+                f"{sorted(unknown_local)} which are not local sets of its model."
+            )
         missing_local = used_local_sets - instantiated_local.keys()
         if missing_local:
             raise ValueError(

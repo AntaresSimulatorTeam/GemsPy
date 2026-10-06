@@ -270,3 +270,10 @@ def test_time_shift_on_unresolved_port_field_is_deferred() -> None:
         compute_indexation(
             port_field("p", "f").sum_connections().shift(1), _ConstantParamProvider()
         )
+
+
+def test_sum_over_unindexed_operand_warns() -> None:
+    x = var("x")
+    provider = _SetStructureProvider()
+    with pytest.warns(UserWarning, match="not indexed by .other."):
+        compute_indexation(x.sum_over("other"), provider)

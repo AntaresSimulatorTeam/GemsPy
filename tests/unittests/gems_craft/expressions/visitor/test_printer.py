@@ -95,3 +95,13 @@ def test_multiple_set_index_printer() -> None:
     # its own bracket, so it must not be merged into the set's bracket
     shifted_then_indexed = x.shift(1).set_index("fuel")
     assert visit(shifted_then_indexed, PrinterVisitor()) == "((x[t+1.0])[fuel])"
+
+
+def test_negative_shift_prints_with_minus_sign() -> None:
+    x = var("x")
+    assert visit(x.shift(-1), PrinterVisitor()) == "(x[t-1.0])"
+    assert visit(x.shift(-param("p")), PrinterVisitor()) == "(x[t-p])"
+    assert (
+        visit(x.set_index("fuel", relative_shift=-1), PrinterVisitor())
+        == "(x[fuel-1.0])"
+    )

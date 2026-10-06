@@ -140,6 +140,16 @@ def test_write_parquet_content_matches_original(tmp_path: Path) -> None:
     )
 
 
+def test_write_parquet_uses_zstd_compression(tmp_path: Path) -> None:
+    pq = pytest.importorskip("pyarrow.parquet")
+    st = SimulationTableBuilder().build(_make_problem(), table_id="test")  # type: ignore[arg-type]
+    path = st.to_parquet(tmp_path)
+
+    metadata = pq.ParquetFile(path).metadata
+    for column_index in range(metadata.num_columns):
+        assert metadata.row_group(0).column(column_index).compression == "ZSTD"
+
+
 # ---------------------------------------------------------------------------
 # Tests: write_netcdf()
 # ---------------------------------------------------------------------------
