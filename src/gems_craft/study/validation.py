@@ -143,9 +143,9 @@ def check_data_requirements(study: Study) -> None:
         for param in component.model.parameters.values():
             data_structure = study.database.get_data(component.id, param.name)
 
+            structure = component.model.parameters[param.name].structure
             if not data_structure.check_requirement(
-                component.model.parameters[param.name].structure.time,
-                component.model.parameters[param.name].structure.scenario,
+                structure.time, structure.scenario, structure.sets
             ):
                 raise ValueError(
                     f"Data inconsistency for component: {component.id}, "

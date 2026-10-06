@@ -66,7 +66,45 @@ database = build_data_base(input_system, Path(series_dir))
 ~~~
 
 `build_data_base()` reads all timeseries files referenced by the system
-(`.txt` or `.csv`) from `series_dir`.
+(`.txt`, `.tsv` or `.csv`) from `series_dir`.
+
+### Loading set-indexed data
+
+A parameter with `indexed-by` set(s) reads a tidy file (`<value>.txt`,
+`.tsv` or `.csv`, with a header row) from `series_dir`, with one row per combination:
+
+~~~ csv
+time,fuel,value
+0,gas,45.0
+0,coal,30.0
+1,gas,47.0
+1,coal,30.0
+~~~
+
+Columns are matched by name, in any order. `value` is always required. `time`
+is required only if the parameter is `time-dependent`, and `scenario` only if it
+is `scenario-dependent`. There is one column per set listed in the component's
+own `indexed-by`; any other column is rejected. Set columns must hold exactly the
+elements instantiated in `system.yml`, and `time`/`scenario` values must be
+`0..n-1`. Empty or non-numeric `value` cells are rejected.
+
+A parameter that depends on sets only (neither `time-dependent` nor
+`scenario-dependent`) may instead give its values inline in `system.yml`, as a
+mapping from element to value, nested in the order of `indexed-by` when there are
+several sets:
+
+~~~ yaml
+parameters:
+  - id: cost
+    indexed-by: [fuel]
+    value: {gas: 45, coal: 30}
+  - id: capacity
+    indexed-by: [fuel, segment]
+    value: {gas: {1: 3, 2: 4}, coal: {1: 5, 2: 6}}
+~~~
+
+The keys at each level must be exactly the elements instantiated for that set,
+and the leaves must be numbers.
 
 ### Assembling a Study
 

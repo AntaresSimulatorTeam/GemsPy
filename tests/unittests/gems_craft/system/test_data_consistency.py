@@ -33,6 +33,7 @@ from gems_craft.study import (
     DataBase,
     PortRef,
     ScenarioSeriesData,
+    SetIndexedSeriesData,
     Study,
     System,
     TimeIndex,
@@ -343,3 +344,50 @@ def test_load_data_from_txt() -> None:
         [[100, 200], [50, 100]], index=[0, 1], columns=[0, 1]
     )
     assert gen_costs.equals(expected_timeseries)
+
+
+# --- set-indexed data -------------------------------------------------------
+
+
+def _fuel_series(time: bool = False) -> SetIndexedSeriesData:
+    return SetIndexedSeriesData(
+        values=np.ones((2, 2)) if time else np.ones(2),
+        dims=("time", "fuel") if time else ("fuel",),
+        coords={"fuel": ("gas", "coal")},
+    )
+
+
+def _fuel_study(
+    data: SetIndexedSeriesData,
+    structure: IndexingStructure = IndexingStructure(True, False, frozenset({"fuel"})),
+) -> Study:
+    fuel_model = model(
+        id="FUEL",
+        parameters=[float_parameter("price", structure)],
+        variables=[float_variable("x")],
+    )
+    system = System("test")
+    system.add_component(create_component(model=fuel_model, id="F"))
+    database = DataBase()
+    database.add_data("F", "price", data)
+    return Study(system, database)
+
+
+@pytest.mark.parametrize(
+    "time_series, structure, passes",
+    [
+        (True, IndexingStructure(True, False, frozenset({"fuel"})), True),  # matching
+        (False, IndexingStructure(True, False, frozenset({"fuel"})), True),  # narrower
+        (True, IndexingStructure(True, False), False),  # model lacks the set
+    ],
+    ids=["matching", "narrower than model", "parameter without the set"],
+)
+def test_set_indexed_data_requirements(
+    time_series: bool, structure: IndexingStructure, passes: bool
+) -> None:
+    study = _fuel_study(_fuel_series(time=time_series), structure)
+    if passes:
+        check_data_requirements(study)
+    else:
+        with pytest.raises(ValueError, match="Requirement not met"):
+            check_data_requirements(study)

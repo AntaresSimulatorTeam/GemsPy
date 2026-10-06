@@ -10,7 +10,7 @@
 #
 # This file is part of the Antares project.
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from gems_craft.model.library import Library
 from gems_craft.study import (
@@ -26,8 +26,11 @@ from gems_craft.study.data import (
     TimeScenarioSeriesData,
     TimeSeriesData,
     dataframe_to_scenario_series,
+    dataframe_to_set_indexed_series,
     dataframe_to_time_series,
+    load_tidy_series_from_file,
     load_ts_from_file,
+    nested_dict_to_set_indexed_series,
 )
 from gems_craft.study.parsing import (
     ComponentPropertySchema,
@@ -143,14 +146,26 @@ def build_data_base(
     to data-series column indices at use time.
     """
     database = DataBase(scenario_builder=scenario_builder)
+    global_sets = {s.id: list(s.elements) for s in input_system.sets or []}
     for comp in input_system.components:
+        local_sets = {s.id: list(s.elements) for s in comp.sets or []}
         for param in comp.parameters or []:
             group = param.scenario_group or comp.scenario_group
+            set_elements: Dict[str, List[Union[str, int]]] = {}
+            for set_id in param.indexed_by:
+                elements = local_sets.get(set_id, global_sets.get(set_id))
+                if elements is None:
+                    raise ValueError(
+                        f"Component {comp.id!r}, parameter {param.id!r}: "
+                        f"indexed-by set {set_id!r} is not instantiated."
+                    )
+                set_elements[set_id] = elements
             param_value = _build_data(
                 param.time_dependent,
                 param.scenario_dependent,
                 param.value,
                 timeseries_dir,
+                set_elements,
             )
             database.add_data(comp.id, param.id, param_value, scenario_group=group)
 
@@ -160,9 +175,32 @@ def build_data_base(
 def _build_data(
     time_dependent: bool,
     scenario_dependent: bool,
-    param_value: Union[float, str],
+    param_value: Union[float, str, Dict[Union[str, int], Any]],
     timeseries_dir: Optional[Path],
+    set_elements: Optional[Dict[str, List[Union[str, int]]]] = None,
 ) -> AbstractDataStructure:
+    if isinstance(param_value, dict):
+        if not set_elements:
+            raise ValueError(
+                "Inline values are only allowed for parameters with 'indexed-by'."
+            )
+        if time_dependent or scenario_dependent:
+            raise ValueError(
+                "Inline values are only allowed for parameters that depend on sets "
+                "only; use a tidy CSV for time/scenario-dependent data."
+            )
+        return nested_dict_to_set_indexed_series(param_value, set_elements)
+    if set_elements:
+        if not isinstance(param_value, str):
+            raise ValueError(
+                f"A series name is expected for set-indexed data, got {param_value}"
+            )
+        return dataframe_to_set_indexed_series(
+            load_tidy_series_from_file(param_value, timeseries_dir),
+            time_dependent,
+            scenario_dependent,
+            set_elements,
+        )
     if isinstance(param_value, str):
         ts_data = load_ts_from_file(param_value, timeseries_dir)
         if time_dependent and scenario_dependent:
