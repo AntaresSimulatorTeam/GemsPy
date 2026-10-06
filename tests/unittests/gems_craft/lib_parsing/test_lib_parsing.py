@@ -407,7 +407,11 @@ library:
           variable-type: continuous
       parameters:
         - id: a
+          time-dependent: false
+          scenario-dependent: false
         - id: b
+          time-dependent: false
+          scenario-dependent: false
       ports: []
       binding-constraints:
         - id: balance
@@ -681,6 +685,43 @@ def test_lower_upper_bound_in_extra_output_accepted() -> None:
     assert expressions_equal(
         eo["eo"], LowerBoundNode("generation") + UpperBoundNode("generation")
     )
+
+
+@pytest.mark.parametrize(
+    "flags,expected",
+    [
+        pytest.param("", IndexingStructure(True, True), id="omitted"),
+        pytest.param(
+            "\n          time-dependent: false\n          scenario-dependent: false",
+            IndexingStructure(False, False),
+            id="both-false",
+        ),
+        pytest.param(
+            "\n          time-dependent: false",
+            IndexingStructure(False, True),
+            id="only-time-false",
+        ),
+        pytest.param(
+            "\n          scenario-dependent: false",
+            IndexingStructure(True, False),
+            id="only-scenario-false",
+        ),
+    ],
+)
+def test_parameter_dependency_defaults_to_true(
+    flags: str, expected: IndexingStructure
+) -> None:
+    """As in Antares Simulator, an omitted time-dependent / scenario-dependent
+    flag of a model parameter defaults to true."""
+    lib = resolve_library([parse_yaml_library(io.StringIO(f"""
+library:
+  id: probe
+  models:
+    - id: m
+      parameters:
+        - id: p{flags}
+"""))])
+    assert lib["probe"].models["probe.m"].parameters["p"].structure == expected
 
 
 def _time_sum_lib_yaml(section: str) -> str:
