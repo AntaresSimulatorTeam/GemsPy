@@ -45,6 +45,17 @@ class ModelIdentifiers:
     constraints: Set[str] = field(default_factory=set)
     sets: Set[str] = field(default_factory=set)
 
+    def __post_init__(self) -> None:
+        clashes = set(self.sets) & (set(self.variables) | set(self.parameters))
+        if clashes:
+            raise ValueError(
+                f"Set ids clash with variable/parameter ids: {sorted(clashes)}"
+            )
+        if "t" in self.sets:
+            raise ValueError(
+                "'t' is reserved for the time dimension and cannot be a set id."
+            )
+
     def is_variable(self, identifier: str) -> bool:
         return identifier in self.variables
 
@@ -122,7 +133,16 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             return var(identifier)
         elif self.identifiers.is_parameter(identifier):
             return param(identifier)
-        raise ValueError(f"{identifier} is not a valid variable or parameter name.")
+        if self.identifiers.is_set(identifier):
+            raise ValueError(
+                f"'{identifier}' is a set, not a valid variable or parameter name; "
+                f"a set can only be used as X[{identifier}], X[{identifier}+k], "
+                f"X[{identifier}=k] or sum_over({identifier}, ...)."
+            )
+        message = f"{identifier} is not a valid variable or parameter name."
+        if self.identifiers.sets:
+            message += f" (declared sets: {sorted(self.identifiers.sets)})"
+        raise ValueError(message)
 
     # Visit a parse tree produced by ExprParser#portField.
     def visitPortField(self, ctx: ExprParser.PortFieldContext) -> ExpressionNode:
@@ -130,7 +150,7 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
 
     # Visit a parse tree produced by ExprParser#comparison.
     def visitComparison(self, ctx: ExprParser.ComparisonContext) -> ExpressionNode:
-        op = ctx.COMPARISON().getText()  # type: ignore
+        op = ctx.op.text  # type: ignore
         exp1 = ctx.expr(0).accept(self)  # type: ignore
         exp2 = ctx.expr(1).accept(self)  # type: ignore
         comp = {
@@ -176,6 +196,7 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         terms sorted by set id.
         """
         time_applier: Optional[Callable[[ExpressionNode], ExpressionNode]] = None
+        time_term_text = ""
         set_appliers: Dict[str, Callable[[ExpressionNode], ExpressionNode]] = {}
 
         for term_ctx in index_list_ctx.indexTerm():  # type: ignore
@@ -184,9 +205,11 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
                 if time_applier is not None:
                     raise ValueError(
                         "An index list cannot contain more than one term denoting "
-                        "the (implicit) time dimension."
+                        f"the time dimension: got '{time_term_text}' and "
+                        f"'{term_ctx.getText()}' in '[{index_list_ctx.getText()}]'."
                     )
                 time_applier = apply
+                time_term_text = term_ctx.getText()
             else:
                 if set_id in set_appliers:
                     raise ValueError(f"Set '{set_id}' is indexed more than once.")
@@ -235,12 +258,6 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     ) -> Tuple[Optional[str], Callable[[ExpressionNode], ExpressionNode]]:
         """Returns (set_id, apply) -- set_id is None for a time-denoting term."""
         identifier: str = "t" if ctx.TIME() is not None else ctx.IDENTIFIER().getText()  # type: ignore
-        comparator: str = ctx.COMPARISON().getText()  # type: ignore
-        if comparator != "=":
-            raise ValueError(
-                f"'{comparator}' is not valid in the keyword index form "
-                f"('{identifier}{comparator}...'); only '=' is."
-            )
         position = ctx.expr().accept(self)  # type: ignore
         if identifier == "t":
             return None, lambda expr: expr.eval(position)
@@ -262,6 +279,14 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         return None, lambda expr: expr.eval(eval_time)
 
     def visitTimeSum(self, ctx: ExprParser.TimeSumContext) -> ExpressionNode:
+        # Bounds are time offsets: the leading token is dropped by `visitShift`,
+        # so anything other than 't' would be silently ignored.
+        for bound_ctx in (ctx.from_, ctx.to):  # type: ignore
+            if bound_ctx.TIME() is None:  # type: ignore
+                raise ValueError(
+                    f"Time-sum bounds must start with 't', got "
+                    f"'{bound_ctx.IDENTIFIER().getText()}'."  # type: ignore
+                )
         shifted_expr = ctx.expr().accept(self)  # type: ignore
         from_shift = ctx.from_.accept(self)  # type: ignore
         to_shift = ctx.to.accept(self)  # type: ignore

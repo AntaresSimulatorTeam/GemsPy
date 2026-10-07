@@ -15,7 +15,7 @@ def serializedATN():
     return [
         4,
         1,
-        19,
+        20,
         165,
         2,
         0,
@@ -381,7 +381,7 @@ def serializedATN():
         16,
         18,
         0,
-        3,
+        4,
         1,
         0,
         5,
@@ -392,6 +392,10 @@ def serializedATN():
         2,
         7,
         7,
+        1,
+        0,
+        18,
+        19,
         1,
         0,
         16,
@@ -939,8 +943,8 @@ def serializedATN():
         0,
         89,
         90,
-        5,
-        18,
+        7,
+        2,
         0,
         0,
         90,
@@ -1114,7 +1118,7 @@ def serializedATN():
         113,
         114,
         7,
-        2,
+        3,
         0,
         0,
         114,
@@ -1192,7 +1196,7 @@ def serializedATN():
         123,
         125,
         7,
-        2,
+        3,
         0,
         0,
         124,
@@ -1517,6 +1521,8 @@ class ExprParser(Parser):
         "']'",
         "<INVALID>",
         "'t'",
+        "<INVALID>",
+        "'='",
     ]
 
     symbolicNames = [
@@ -1538,6 +1544,7 @@ class ExprParser(Parser):
         "NUMBER",
         "TIME",
         "IDENTIFIER",
+        "EQ",
         "COMPARISON",
         "WS",
     ]
@@ -1584,8 +1591,9 @@ class ExprParser(Parser):
     NUMBER = 15
     TIME = 16
     IDENTIFIER = 17
-    COMPARISON = 18
-    WS = 19
+    EQ = 18
+    COMPARISON = 19
+    WS = 20
 
     def __init__(self, input: TokenStream, output: TextIO = sys.stdout):
         super().__init__(input, output)
@@ -1770,6 +1778,7 @@ class ExprParser(Parser):
             self, parser, ctx: ParserRuleContext
         ):  # actually a ExprParser.ExprContext
             super().__init__(parser)
+            self.op = None  # Token
             self.copyFrom(ctx)
 
         def expr(self, i: int = None):
@@ -1777,6 +1786,9 @@ class ExprParser(Parser):
                 return self.getTypedRuleContexts(ExprParser.ExprContext)
             else:
                 return self.getTypedRuleContext(ExprParser.ExprContext, i)
+
+        def EQ(self):
+            return self.getToken(ExprParser.EQ, 0)
 
         def COMPARISON(self):
             return self.getToken(ExprParser.COMPARISON, 0)
@@ -2218,7 +2230,13 @@ class ExprParser(Parser):
                                 self, "self.precpred(self._ctx, 8)"
                             )
                         self.state = 89
-                        self.match(ExprParser.COMPARISON)
+                        localctx.op = self._input.LT(1)
+                        _la = self._input.LA(1)
+                        if not (_la == 18 or _la == 19):
+                            localctx.op = self._errHandler.recoverInline(self)
+                        else:
+                            self._errHandler.reportMatch(self)
+                            self.consume()
                         self.state = 90
                         self.expr(9)
                         pass
@@ -2398,8 +2416,8 @@ class ExprParser(Parser):
             super().__init__(parser)
             self.copyFrom(ctx)
 
-        def COMPARISON(self):
-            return self.getToken(ExprParser.COMPARISON, 0)
+        def EQ(self):
+            return self.getToken(ExprParser.EQ, 0)
 
         def expr(self):
             return self.getTypedRuleContext(ExprParser.ExprContext, 0)
@@ -2443,7 +2461,7 @@ class ExprParser(Parser):
                     self._errHandler.reportMatch(self)
                     self.consume()
                 self.state = 114
-                self.match(ExprParser.COMPARISON)
+                self.match(ExprParser.EQ)
                 self.state = 115
                 self.expr(0)
                 pass

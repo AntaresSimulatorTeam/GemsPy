@@ -111,7 +111,11 @@ class PrinterVisitor(ExpressionVisitor[str]):
         if isinstance(offset, LiteralNode) and offset.value < 0:
             return f"-{-offset.value}"
         if isinstance(offset, NegationNode):
-            return f"-{visit(offset.operand, self)}"
+            text = visit(offset.operand, self)
+            # a nested negation prints as "-(...)": parenthesize to avoid "t--"
+            if isinstance(offset.operand, NegationNode):
+                text = f"({text})"
+            return f"-{text}"
         return f"+{visit(offset, self)}"
 
     def time_eval(self, node: TimeEvalNode) -> str:
