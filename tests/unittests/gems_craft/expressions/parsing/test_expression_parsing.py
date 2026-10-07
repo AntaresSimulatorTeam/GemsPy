@@ -443,8 +443,7 @@ def test_parsing_equivalent_index_forms(lhs: str, rhs: str) -> None:
         ("sum_over(other, x)", "'other' is not a declared set"),
         ("sum_over(p, x)", "'p' is not a declared set"),
         ("x[p=2]", "neither 't' nor a declared set"),
-        ("x[fuel>=2]", "'>=' is not valid in the keyword index form"),
-        ("x[t<=2]", "'<=' is not valid in the keyword index form"),
+        ("x[fuel>=2]", "'fuel' is a set"),
     ],
 )
 def test_parsing_custom_set_indexing_raises(expression_str: str, match: str) -> None:
@@ -483,6 +482,7 @@ def test_model_identifiers_reject_ambiguous_sets(
         "x[t+1-t]",
         "x[2*t]",
         "x[t 4]",
+        "x[t<=2]",
     ],
 )
 def test_parse_cancellation_should_throw(expression_str: str) -> None:

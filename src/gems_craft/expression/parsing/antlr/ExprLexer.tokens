@@ -15,8 +15,9 @@ T__13=14
 NUMBER=15
 TIME=16
 IDENTIFIER=17
-COMPARISON=18
-WS=19
+EQ=18
+COMPARISON=19
+WS=20
 '.'=1
 '-'=2
 '('=3
@@ -32,3 +33,4 @@ WS=19
 '['=13
 ']'=14
 't'=16
+'='=18

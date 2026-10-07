@@ -150,7 +150,7 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
 
     # Visit a parse tree produced by ExprParser#comparison.
     def visitComparison(self, ctx: ExprParser.ComparisonContext) -> ExpressionNode:
-        op = ctx.COMPARISON().getText()  # type: ignore
+        op = ctx.op.text  # type: ignore
         exp1 = ctx.expr(0).accept(self)  # type: ignore
         exp2 = ctx.expr(1).accept(self)  # type: ignore
         comp = {
@@ -258,12 +258,6 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     ) -> Tuple[Optional[str], Callable[[ExpressionNode], ExpressionNode]]:
         """Returns (set_id, apply) -- set_id is None for a time-denoting term."""
         identifier: str = "t" if ctx.TIME() is not None else ctx.IDENTIFIER().getText()  # type: ignore
-        comparator: str = ctx.COMPARISON().getText()  # type: ignore
-        if comparator != "=":
-            raise ValueError(
-                f"'{comparator}' is not valid in the keyword index form "
-                f"('{identifier}{comparator}...'); only '=' is."
-            )
         position = ctx.expr().accept(self)  # type: ignore
         if identifier == "t":
             return None, lambda expr: expr.eval(position)
