@@ -34,6 +34,13 @@ All notable changes to GemsPy are documented here.
   near-identical old names invited confusion. Reading and validating are now
   separate modules, as in `optim_config/`. No behavior change; names and
   import paths only.
+- **Breaking** - the legacy `X[param ± …]` index is now parsed as a shift
+  expression, where a leading sign binds first: `x[p - q*2]` parses to
+  `p + (-q)*2` instead of `p - (q*2)`. Same value, but a structurally different
+  AST.
+- **Breaking** - `x[p = 2]` (where `p` is neither `t` nor a set) now raises a
+  parsing error instead of being accepted as a time index and failing later,
+  when the problem is built.
 
 ### Fixed
 - **`solver-options.logs` now controls solver output** - it was passed to the
