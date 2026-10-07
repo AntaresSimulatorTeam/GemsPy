@@ -204,3 +204,50 @@ def test_build_data_base_constant_for_indexed_parameter(tmp_path: Path) -> None:
     yaml = SYSTEM_YAML.replace("value: price", "value: 2.0")
     with pytest.raises(ValueError, match="series name is expected"):
         build_data_base(parse_yaml_system(io.StringIO(yaml)), tmp_path)
+
+
+INLINE_YAML = """
+system:
+  sets:
+    - id: fuel
+      elements: [gas, coal]
+  components:
+    - id: C
+      model: lib.m
+      sets:
+        - id: seg
+          elements: [1, 2]
+      parameters:
+        - id: cost
+          indexed-by: [fuel]
+          value: {gas: 45, coal: 30}
+        - id: cap
+          indexed-by: [fuel, seg]
+          value: {gas: {1: 3, 2: 4}, coal: {1: 5, 2: 6.5}}
+"""
+
+
+def test_inline_values() -> None:
+    db = build_data_base(parse_yaml_system(io.StringIO(INLINE_YAML)), None)
+    cost, cap = db.get_data("C", "cost"), db.get_data("C", "cap")
+    assert isinstance(cost, SetIndexedSeriesData)
+    assert isinstance(cap, SetIndexedSeriesData)
+    assert cost.values.tolist() == [45, 30]
+    assert cap.dims == ("fuel", "seg")
+    assert cap.values.tolist() == [[3, 4], [5, 6.5]]
+
+
+@pytest.mark.parametrize(
+    "old, new, message",
+    [
+        ("{gas: 45, coal: 30}", "{gas: 45}", "do not match"),
+        ("{gas: 45, coal: 30}", "{gas: 45, coal: abc}", "must contain numbers"),
+        ("{gas: {1: 3, 2: 4}, coal:", "{gas: 3, coal:", "need a mapping"),
+        ("cost\n", "cost\n          time-dependent: true\n", "sets only"),
+        ("indexed-by: [fuel]\n          value: {", "value: {", "with 'indexed-by'"),
+    ],
+)
+def test_invalid_inline_values(old: str, new: str, message: str) -> None:
+    yaml = INLINE_YAML.replace(old, new, 1)
+    with pytest.raises(ValueError, match=message):
+        build_data_base(parse_yaml_system(io.StringIO(yaml)), None)

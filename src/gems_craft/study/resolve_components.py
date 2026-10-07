@@ -10,7 +10,7 @@
 #
 # This file is part of the Antares project.
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from gems_craft.model.library import Library
 from gems_craft.study import (
@@ -30,6 +30,7 @@ from gems_craft.study.data import (
     dataframe_to_time_series,
     load_tidy_series_from_file,
     load_ts_from_file,
+    nested_dict_to_set_indexed_series,
 )
 from gems_craft.study.parsing import (
     ComponentPropertySchema,
@@ -184,10 +185,21 @@ def build_data_base(
 def _build_data(
     time_dependent: bool,
     scenario_dependent: bool,
-    param_value: Union[float, str],
+    param_value: Union[float, str, Dict[Union[str, int], Any]],
     timeseries_dir: Optional[Path],
     set_elements: Optional[Dict[str, List[Union[str, int]]]] = None,
 ) -> AbstractDataStructure:
+    if isinstance(param_value, dict):
+        if not set_elements:
+            raise ValueError(
+                "Inline values are only allowed for parameters with 'indexed-by'."
+            )
+        if time_dependent or scenario_dependent:
+            raise ValueError(
+                "Inline values are only allowed for parameters that depend on sets "
+                "only; use a tidy CSV for time/scenario-dependent data."
+            )
+        return nested_dict_to_set_indexed_series(param_value, set_elements)
     if set_elements:
         if not isinstance(param_value, str):
             raise ValueError(

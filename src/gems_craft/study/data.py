@@ -12,7 +12,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -213,34 +213,32 @@ class SetIndexedSeriesData(AbstractDataStructure):
         return set(self.set_dims) <= set(sets)
 
 
-def load_ts_from_file(
-    timeseries_name: Optional[str], path_to_file: Optional[Path]
+_SERIES_SEPARATORS = {".txt": r"\s+", ".tsv": "\t", ".csv": ","}
+
+
+def _read_series_file(
+    name: Optional[str], directory: Optional[Path], **read_kwargs: Any
 ) -> pd.DataFrame:
-    if path_to_file is None or timeseries_name is None:
-        raise FileNotFoundError(f"File '{timeseries_name}' does not exist")
-
-    base_path = path_to_file / timeseries_name
-    candidates = [base_path.with_suffix(".txt"), base_path.with_suffix(".tsv")]
-
-    last_exc: Optional[Exception] = None
-    for candidate in candidates:
+    """Read ``<name>.txt``, ``.tsv`` or ``.csv`` (first one found) from ``directory``."""
+    if directory is None or name is None:
+        raise FileNotFoundError(f"File '{name}' does not exist")
+    for suffix, sep in _SERIES_SEPARATORS.items():
+        candidate = (directory / name).with_suffix(suffix)
         if not candidate.exists():
             continue
         try:
-            sep = r"\s+" if candidate.suffix == ".txt" else "\t"
-            return pd.read_csv(candidate, header=None, sep=sep)
+            return pd.read_csv(candidate, sep=sep, **read_kwargs)
         except Exception as e:
-            last_exc = e
-            break
-
-    if last_exc is not None:
-        raise Exception(
-            f"An error has arrived when processing '{candidate}': {last_exc}"
-        )
-
+            raise Exception(f"An error has arrived when processing '{candidate}': {e}")
     raise FileNotFoundError(
-        f"File '{timeseries_name}.txt' or '{timeseries_name}.tsv' does not exist"
+        f"File '{name}' ({', '.join(_SERIES_SEPARATORS)}) does not exist"
     )
+
+
+def load_ts_from_file(
+    timeseries_name: Optional[str], path_to_file: Optional[Path]
+) -> pd.DataFrame:
+    return _read_series_file(timeseries_name, path_to_file, header=None)
 
 
 def dataframe_to_time_series(ts_dataframe: pd.DataFrame) -> pd.Series:
@@ -263,16 +261,8 @@ def dataframe_to_scenario_series(ts_dataframe: pd.DataFrame) -> np.ndarray:
 def load_tidy_series_from_file(
     series_name: Optional[str], path_to_dir: Optional[Path]
 ) -> pd.DataFrame:
-    """Read ``<series_name>.csv`` (header row, comma-separated) as strings."""
-    if path_to_dir is None or series_name is None:
-        raise FileNotFoundError(f"File '{series_name}' does not exist")
-    candidate = (path_to_dir / series_name).with_suffix(".csv")
-    if not candidate.exists():
-        raise FileNotFoundError(f"File '{series_name}.csv' does not exist")
-    try:
-        return pd.read_csv(candidate, dtype=str, skipinitialspace=True)
-    except Exception as e:
-        raise Exception(f"An error has arrived when processing '{candidate}': {e}")
+    """Read a tidy series (header row) as strings."""
+    return _read_series_file(series_name, path_to_dir, dtype=str, skipinitialspace=True)
 
 
 def _positional_codes(column: pd.Series, name: str) -> np.ndarray:
@@ -349,6 +339,29 @@ def dataframe_to_set_indexed_series(
     values = np.empty(tuple(shape))
     values[tuple(codes)] = value
     return SetIndexedSeriesData(values=values, dims=tuple(key_cols), coords=coords)
+
+
+def _flatten_nested(node: Any, set_ids: List[str]) -> List[Dict[str, str]]:
+    if not set_ids:
+        return [{"value": str(node)}]
+    if not isinstance(node, dict):
+        raise ValueError(f"Inline values need a mapping over set '{set_ids[0]}'.")
+    return [
+        {set_ids[0]: str(k), **row}
+        for k, sub in node.items()
+        for row in _flatten_nested(sub, set_ids[1:])
+    ]
+
+
+def nested_dict_to_set_indexed_series(
+    value: Dict[Union[str, int], Any],
+    set_elements: Dict[str, List[Union[str, int]]],
+) -> SetIndexedSeriesData:
+    """Inline set-only values, nested per set in order, as a tidy series."""
+    df = pd.DataFrame(
+        _flatten_nested(value, list(set_elements)), columns=[*set_elements, "value"]
+    )
+    return dataframe_to_set_indexed_series(df, False, False, set_elements)
 
 
 @dataclass(frozen=True)

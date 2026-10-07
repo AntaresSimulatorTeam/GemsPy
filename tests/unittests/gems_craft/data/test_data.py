@@ -56,6 +56,12 @@ def test_load_ts_from_file_tsv(tmp_path: Path) -> None:
     assert df.iloc[1, 2] == 60
 
 
+def test_load_ts_from_file_csv(tmp_path: Path) -> None:
+    """Reads a comma-separated .csv file when no .txt/.tsv exists."""
+    (tmp_path / "series.csv").write_text("1,2\n3,4\n")
+    assert load_ts_from_file("series", tmp_path).shape == (2, 2)
+
+
 def test_load_ts_from_file_not_found_raises(tmp_path: Path) -> None:
     """Raises FileNotFoundError when neither .txt nor .tsv exists."""
     with pytest.raises(FileNotFoundError):
