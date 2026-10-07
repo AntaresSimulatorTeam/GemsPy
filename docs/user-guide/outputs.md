@@ -90,13 +90,13 @@ Parquet files are written with zstd compression (level 3) and row groups of
 64,000 rows.
 
 To write the results without holding all scenarios in memory, iterate over
-them one scenario at a time, as `gemspy` does (`scenario_id` is `None` for the
-rows shared by all scenarios):
+them one scenario at a time, as `gemspy` does. Each table holds the rows of one
+scenario, or the rows shared by all scenarios:
 
 ~~~ python
 writer = SimulationTableWriter(OutputFormat.PARQUET)
-for result in session.iter_scenario_results():
-    writer.write_scenario(result.table, Path("output/"), result.scenario_id)
+for table in session.iter_scenario_tables():
+    writer.write(table, Path("output/"))
 ~~~
 
 ### Output files of `gemspy`

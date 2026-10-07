@@ -230,50 +230,50 @@ def _outputs_and_scenarios(table: SimulationTable) -> list:
     )
 
 
-def test_per_scenario_tables_split_scenario_rows_from_shared_rows() -> None:
-    tables = SimulationTableBuilder().build_per_scenario(
+def test_scenario_tables_split_scenario_rows_from_shared_rows() -> None:
+    """Several scenarios: the shared rows come first, then each scenario."""
+    common, scenario_5, scenario_7 = SimulationTableBuilder().iter_scenario_tables(
         _make_scenario_dependent_problem(), scenario_ids_remap=[5, 7]  # type: ignore[arg-type]
     )
 
-    common = tables.common()
-    scenario_7 = tables.scenario(7)
-    assert common is not None and scenario_7 is not None
     assert _outputs_and_scenarios(common) == [("objective-value", None)]
+    assert _outputs_and_scenarios(scenario_5) == [("p", 5), ("p", 5)]
     assert _outputs_and_scenarios(scenario_7) == [("p", 7), ("p", 7)]
     assert list(scenario_7.data[SimulationColumns.VALUE.value]) == [2.0, 4.0]
 
 
-def test_per_scenario_tables_without_scenario_dependent_outputs() -> None:
-    """All outputs are shared by the scenarios: everything goes to common() and
-    no scenario has rows of its own, so no scenario file must be written."""
-    tables = SimulationTableBuilder().build_per_scenario(
-        _make_scenario_independent_problem(), scenario_ids_remap=[0, 1]  # type: ignore[arg-type]
+def test_scenario_tables_without_scenario_dependent_outputs() -> None:
+    """All outputs are shared by the scenarios: only the shared rows are
+    yielded, no scenario has rows of its own, so no scenario file is written."""
+    tables = list(
+        SimulationTableBuilder().iter_scenario_tables(
+            _make_scenario_independent_problem(), scenario_ids_remap=[0, 1]  # type: ignore[arg-type]
+        )
     )
 
-    common = tables.common()
-    assert common is not None
-    assert _outputs_and_scenarios(common) == [
+    assert len(tables) == 1
+    assert _outputs_and_scenarios(tables[0]) == [
         ("objective-value", None),
         ("p", None),
         ("p", None),
     ]
-    assert tables.scenario(0) is None
-    assert tables.scenario(1) is None
 
 
-def test_per_scenario_tables_single_scenario_owns_all_rows() -> None:
-    tables = SimulationTableBuilder().build_per_scenario(
-        _make_scenario_independent_problem(), scenario_ids_remap=[3]  # type: ignore[arg-type]
+def test_scenario_tables_single_scenario_owns_all_rows() -> None:
+    """A single scenario: one table, the same as build()."""
+    problem = _make_scenario_independent_problem()
+    tables = list(
+        SimulationTableBuilder().iter_scenario_tables(problem, scenario_ids_remap=[3])  # type: ignore[arg-type]
     )
 
-    assert tables.common() is None
-    scenario_3 = tables.scenario(3)
-    assert scenario_3 is not None
-    assert _outputs_and_scenarios(scenario_3) == [
+    assert len(tables) == 1
+    assert _outputs_and_scenarios(tables[0]) == [
         ("objective-value", 3),
         ("p", 3),
         ("p", 3),
     ]
+    full = SimulationTableBuilder().build(problem, scenario_ids_remap=[3])  # type: ignore[arg-type]
+    pd.testing.assert_frame_equal(tables[0].data, full.data)
 
 
 def test_builder_columns_match_the_writer_schema() -> None:
@@ -281,9 +281,7 @@ def test_builder_columns_match_the_writer_schema() -> None:
     list: every column the builder produces must be in the writer schema."""
     problem = _make_scenario_dependent_problem()
     full = SimulationTableBuilder().build(problem, scenario_ids_remap=[0, 1])  # type: ignore[arg-type]
-    tables = SimulationTableBuilder().build_per_scenario(problem, scenario_ids_remap=[0, 1])  # type: ignore[arg-type]
-    common, scenario_0 = tables.common(), tables.scenario(0)
-    assert common is not None and scenario_0 is not None
+    tables = SimulationTableBuilder().iter_scenario_tables(problem, scenario_ids_remap=[0, 1])  # type: ignore[arg-type]
 
-    for table in (full, common, scenario_0):
+    for table in (full, *tables):
         assert list(table.data.columns) == SIMULATION_TABLE_SCHEMA.names

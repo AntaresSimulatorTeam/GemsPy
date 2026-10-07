@@ -142,18 +142,41 @@ def _session(study_dir: Path) -> SimulationSession:
     return SimulationSession(load_study(study_dir), optim_config, run_id="run")
 
 
+def _scenario_of(table: SimulationTable) -> Optional[int]:
+    """The scenario of a yielded table, or None for the rows shared by all
+    scenarios; a yielded table never mixes scenarios."""
+    scenarios = table.data["scenario_index"].unique()
+    assert len(scenarios) == 1, f"table mixes scenarios {list(scenarios)}"
+    return None if pd.isna(scenarios[0]) else int(scenarios[0])
+
+
 def _stream(study_dir: Path) -> Dict[Optional[int], SimulationTable]:
     """Iterate over the results and collect them by scenario."""
     streamed: Dict[Optional[int], SimulationTable] = {}
-    for result in _session(study_dir).iter_scenario_results():
-        assert result.scenario_id not in streamed, "scenario yielded twice"
-        streamed[result.scenario_id] = result.table
+    for table in _session(study_dir).iter_scenario_tables():
+        scenario_id = _scenario_of(table)
+        assert scenario_id not in streamed, "scenario yielded twice"
+        streamed[scenario_id] = table
     return streamed
+
+
+def _write_streamed(
+    writer: SimulationTableWriter,
+    streamed: Dict[Optional[int], SimulationTable],
+    output_dir: Path,
+) -> List[Path]:
+    """Write each yielded table, which must go to a file of its own."""
+    paths: List[Path] = []
+    for table in streamed.values():
+        written = writer.write(table, output_dir)
+        assert len(written) == 1, written
+        paths.extend(written)
+    return sorted(paths)
 
 
 def _full_table(study_dir: Path, mode: str) -> SimulationTable:
     """Reference table holding all scenarios, built without
-    iter_scenario_results: in frontal mode, from the solved problem in one go;
+    iter_scenario_tables: in frontal mode, from the solved problem in one go;
     in the other modes, the scenarios are solved separately anyway."""
     session = _session(study_dir)
     if mode != "frontal":
@@ -184,10 +207,7 @@ def test_streamed_files_match_splitting_the_full_table(
         writer = SimulationTableWriter(output_format)
         out_dir = tmp_path / output_format.value
         split_paths = sorted(writer.write(full_table, out_dir / "split"))
-        streamed_paths = sorted(
-            writer.write_scenario(table, out_dir / "streamed", scenario_id)
-            for scenario_id, table in streamed.items()
-        )
+        streamed_paths = _write_streamed(writer, streamed, out_dir / "streamed")
 
         assert split_paths, output_format
         assert [p.name for p in split_paths] == [p.name for p in streamed_paths]
@@ -256,10 +276,7 @@ def test_frontal_non_consecutive_scenario_ids(tmp_path: Path) -> None:
     full_table = _full_table(study_dir, "frontal")
     split_paths = sorted(writer.write(full_table, tmp_path / "split"))
     streamed = _stream(study_dir)
-    streamed_paths = sorted(
-        writer.write_scenario(table, tmp_path / "streamed", scenario_id)
-        for scenario_id, table in streamed.items()
-    )
+    streamed_paths = _write_streamed(writer, streamed, tmp_path / "streamed")
 
     assert _suffixes(streamed_paths) == ["scenario-0", "scenario-2", "scenario-common"]
     assert [p.name for p in split_paths] == [p.name for p in streamed_paths]
@@ -284,8 +301,8 @@ def test_each_scenario_is_yielded_before_the_next_is_solved(
         return solve_block(self, block, scenario_ids, initial_values)
 
     monkeypatch.setattr(SimulationSession, "_solve_block", spy)
-    for result in _session(study_dir).iter_scenario_results():
-        events.append(("done", result.scenario_id))
+    for table in _session(study_dir).iter_scenario_tables():
+        events.append(("done", _scenario_of(table)))
 
     assert events.index(("done", 0)) < events.index(("solve", 1))
 
@@ -329,7 +346,7 @@ def test_run_returns_the_merge_of_the_iterated_results(
     study_dir = _make_study(tmp_path, mode)
 
     returned = _session(study_dir).run()
-    iterated = [r.table.data for r in _session(study_dir).iter_scenario_results()]
+    iterated = [t.data for t in _session(study_dir).iter_scenario_tables()]
 
     assert returned.table_id == "run"
     pd.testing.assert_frame_equal(returned.data, pd.concat(iterated, ignore_index=True))
@@ -365,19 +382,19 @@ def test_nothing_is_solved_before_the_iteration_starts(
         return solve_block(self, block, scenario_ids, initial_values)
 
     monkeypatch.setattr(SimulationSession, "_solve_block", spy)
-    results = _session(study_dir).iter_scenario_results()
+    tables = _session(study_dir).iter_scenario_tables()
     assert solved == []
 
-    first = next(results)
+    first = next(tables)
     assert solved
-    assert first.scenario_id in (None, 0)
+    assert _scenario_of(first) in (None, 0)
 
 
 @pytest.mark.parametrize("mode", ["frontal", "sequential", "parallel"])
 def test_invalid_config_fails_when_iteration_is_requested(
     tmp_path: Path, mode: str
 ) -> None:
-    """The optim-config is validated when iter_scenario_results is called,
+    """The optim-config is validated when iter_scenario_tables is called,
     not at the first next()."""
     study_dir = _make_study(tmp_path, mode)
     config_path = study_dir / "input" / "optim-config.yml"
@@ -386,4 +403,4 @@ def test_invalid_config_fails_when_iteration_is_requested(
     )
 
     with pytest.raises(ValueError, match="empty scenario list"):
-        _session(study_dir).iter_scenario_results()
+        _session(study_dir).iter_scenario_tables()

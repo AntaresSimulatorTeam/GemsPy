@@ -52,5 +52,9 @@ def run_study(
     # sequential/parallel modes as each scenario is solved, in frontal mode one
     # after another after the single solve. No table holding all scenarios is
     # built. Benders mode writes no simulation table.
-    for result in session.iter_scenario_results():
-        writer.write_scenario(result.table, output_dir, result.scenario_id)
+    for table in session.iter_scenario_tables():
+        paths = writer.write(table, output_dir)
+        if len(paths) != 1:
+            raise RuntimeError(
+                f"Expected one simulation table file, got {[p.name for p in paths]}"
+            )

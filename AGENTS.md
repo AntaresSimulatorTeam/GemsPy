@@ -105,7 +105,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `VectorizedBuilderBase` (`vectorized_builder.py`): shared base for all vectorized visitors (used by both `linearize.py` and `extra_output.py`)
 - `TimeBlock` (`time_block.py`): defines the temporal window for one solve
 - `SimulationTableBuilder` (`simulation_table.py`): result extraction as a flat pandas `DataFrame`
-- `SimulationTableWriter` (`simulation_table_writer.py`): writes a `SimulationTable` as CSV or Parquet, one file per scenario, fed by `SimulationSession.iter_scenario_results()`, which yields each scenario as it is solved in sequential/parallel modes, and one after another after the single solve in frontal mode, built on demand by `SimulationTableBuilder.build_per_scenario`
+- `SimulationTableWriter` (`simulation_table_writer.py`): writes a `SimulationTable` as CSV or Parquet, one file per scenario, fed by `SimulationSession.iter_scenario_tables()`, which yields one table per scenario as it is solved in sequential/parallel modes, and one after another after the single solve in frontal mode, built on demand by `SimulationTableBuilder.iter_scenario_tables`
 - `apply_thermal_heuristics` (`heuristic_runner.py`): injects heuristic-derived bounds into a solved problem
 - `find_min_generation_fast` / `find_num_units_accurate` (`thermal_heuristic.py`): the `fast`/`accurate` heuristic functions
 

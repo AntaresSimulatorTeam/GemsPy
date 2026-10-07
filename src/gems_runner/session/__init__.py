@@ -10,6 +10,6 @@
 #
 # This file is part of the Antares project.
 
-from .session import ScenarioResult, SimulationSession
+from .session import SimulationSession
 
-__all__ = ["ScenarioResult", "SimulationSession"]
+__all__ = ["SimulationSession"]
