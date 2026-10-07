@@ -368,7 +368,7 @@ class OptimizationProblem:
         self._linopy_vars = linopy_vars
         self._linopy_vars_by_component = linopy_vars_by_component or {}
         self.param_arrays = param_arrays
-        # Constant term of the objective (linopy cannot represent pure-constant objectives).
+        # Constant term of the objective, kept outside linopy (which rejects constants in objectives).
         self._objective_constant: float = objective_constant
 
     @property
@@ -632,7 +632,7 @@ class _OptimizationProblemBuilder:
                 name=f"carry_over__{safe}",
             )
 
-        # Extract constant objective contribution (linopy cannot hold pure constants).
+        # Extract the constant part of the objective (whole objective or constant term of a mixed one), since linopy rejects constants.
         objective_constant = 0.0
         has_objective = False
         if total_obj is not None and not isinstance(

@@ -9,6 +9,12 @@ All notable changes to GemsPy are documented here.
   the optional `input/taxonomy.yml` and calls
   `validate_libraries_against_taxonomy` on every library declaring a `taxonomy`
   field. `parse_yaml_library` is unchanged and performs no validation.
+- **Constant terms in objective contributions** - an objective contribution can
+  now mix variables and constants (e.g. `sum(cost * generation + 1)`); this
+  previously raised `ValueError: Constant values in objective function not
+  supported`. `OptimizationProblem.objective_value` and the `objective-value`
+  row of the simulation table include the constant; `linopy_model.objective.value`
+  and the LP file written by `export_lp` do not.
 
 ### Changed
 - **Breaking** - loading a study whose library declares a `taxonomy` raises
