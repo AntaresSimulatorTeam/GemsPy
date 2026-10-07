@@ -91,6 +91,8 @@ def test_lower_upper_bound_printer() -> None:
         # negative time shifts print with a minus sign, never "+-"
         (var("x").shift(-1), "(x[t-1.0])"),
         (var("x").shift(-param("p")), "(x[t-p])"),
+        # a doubly negated shift is parenthesized, never "t--"
+        (var("x").shift(-(-param("p"))), "(x[t-(-(p))])"),
     ],
 )
 def test_set_index_sum_over_printer(expr: ExpressionNode, printed: str) -> None:
