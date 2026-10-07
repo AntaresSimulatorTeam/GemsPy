@@ -24,7 +24,7 @@ expr
     | '(' expr ')'                             # expression
     | expr op=('/' | '*') expr                 # muldiv
     | expr op=('+' | '-') expr                 # addsub
-    | expr COMPARISON expr                     # comparison
+    | expr op=(EQ | COMPARISON) expr           # comparison
     | 'sum' '(' expr ')'                       # allTimeSum
     | 'sum_connections' '(' portFieldExpr ')'  # portFieldSum
     | 'sum' '(' from=shift '..' to=shift ',' expr ')'  # timeSum
@@ -45,13 +45,11 @@ argList : expr (',' expr)* ;
 // (`X[2, 3]`) are also builder-level checks, not grammar-level ones.
 indexList : indexTerm (',' indexTerm)* ;
 
-// keywordTerm reuses the COMPARISON token rather than a bare '=' literal,
-// which would otherwise create a second, competing implicit lexer token for
-// '=' and shadow COMPARISON everywhere else. The builder rejects anything
-// other than a literal '=' here.
+// `X[name = 2]` also matches positionTerm (expr includes comparisons); ANTLR
+// picks the first alternative, so keywordTerm must stay before positionTerm.
 indexTerm
     : shift                                    # namedOrTimeShiftTerm
-    | (TIME | IDENTIFIER) COMPARISON expr      # keywordTerm
+    | (TIME | IDENTIFIER) EQ expr              # keywordTerm
     | expr                                     # positionTerm
     ;
 
@@ -97,6 +95,7 @@ fragment CHAR_OR_DIGIT : (CHAR | DIGIT);
 NUMBER        : DIGIT+ ('.' DIGIT+)?;
 TIME          : 't';
 IDENTIFIER    : CHAR CHAR_OR_DIGIT*;
-COMPARISON    : ( '=' | '>=' | '<=' );
+EQ            : '=';
+COMPARISON    : ( '>=' | '<=' );
 
 WS: (' ' | '\t' | '\r'| '\n') -> skip;
