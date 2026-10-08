@@ -53,7 +53,8 @@ All notable changes to GemsPy are documented here.
 - **Run folder only holds completed runs** - `gemspy` / `run_study` write into
   `output/incomplete/<run_id>/` and move it to `output/<run_id>/` once the run
   has completed. A failed run leaves no output; a killed run leaves its folder
-  in `output/incomplete/`.
+  in `output/incomplete/`. `run_study` returns the run folder, and `gemspy`
+  prints it.
 - Errors raised while solving a block in sequential and parallel subproblem
   modes now name the scenario and the block.
 

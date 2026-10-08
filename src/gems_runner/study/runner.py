@@ -1,8 +1,8 @@
 import shutil
+from contextlib import contextmanager
 from datetime import datetime
-from itertools import count
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Iterator, Optional, Tuple
 
 from gems_craft.optim_config.parsing import OptimConfig, load_optim_config
 from gems_craft.study.folder import load_study
@@ -19,7 +19,7 @@ def run_study(
     study_dir: Path,
     optim_config_path: Optional[Path] = None,
     output_format: OutputFormat = OutputFormat.CSV,
-) -> None:
+) -> Path:
     """
     Runs a simulation study and exports results to CSV or Parquet, one
     simulation table file per MC scenario.
@@ -41,6 +41,9 @@ def run_study(
         output_format: Format of the simulation table files,
             ``OutputFormat.CSV`` (default) or ``OutputFormat.PARQUET``
             (zstd-compressed).
+
+    Returns:
+        The run folder, ``study_dir/output/{run_id}/``.
     """
     study = load_study(study_dir)
 
@@ -53,69 +56,82 @@ def run_study(
     writer = SimulationTableWriter(output_format)
 
     output_root = study_dir / "output"
-    run_id, incomplete_dir = _reserve_run_folder(
-        output_root, datetime.now().strftime("%Y%m%dT%H%M")
-    )
-    try:
+    start_minute = datetime.now().strftime("%Y%m%dT%H%M")
+    with _run_folder(output_root, start_minute) as (run_id, folder):
         session = SimulationSession(
             study=study,
             optim_config=optim_config,
             run_id=run_id,
-            output_dir=incomplete_dir,
+            output_dir=folder,
         )
         # Results come one scenario at a time and are written immediately: in
         # sequential/parallel modes as each scenario is solved, in frontal mode
         # one after another after the single solve. No table holding all
         # scenarios is built. Benders mode writes no simulation table.
         for table in session.iter_scenario_tables():
-            paths = writer.write(table, incomplete_dir)
+            paths = writer.write(table, folder)
             if len(paths) != 1:
                 raise RuntimeError(
                     "Expected one simulation table file, got "
                     f"{[p.name for p in paths]}"
                 )
-    except BaseException:
-        # BaseException: also on Ctrl+C. A killed process runs no cleanup; its
-        # folder stays in output/incomplete/, never in output/<run_id>/.
+    return output_root / run_id
+
+
+@contextmanager
+def _run_folder(output_root: Path, base_run_id: str) -> Iterator[Tuple[str, Path]]:
+    """Reserve a run id and its folder in ``output/incomplete/``, and yield
+    them. On success, the folder is renamed to ``output/<run_id>/``; the
+    reservation guarantees that it does not exist, so the whole run appears at
+    once. On failure, the folder is removed.
+
+    A killed process runs no cleanup: its folder stays in ``output/incomplete/``,
+    never in ``output/<run_id>/``.
+    """
+    output_existed = output_root.exists()
+    run_id, incomplete_dir = _reserve_run_folder(output_root, base_run_id)
+    try:
+        yield run_id, incomplete_dir
+    except BaseException:  # also on Ctrl+C
         shutil.rmtree(incomplete_dir, ignore_errors=True)
-        _remove_empty_dirs(incomplete_dir.parent, output_root)
+        _remove_empty_dir(incomplete_dir.parent)
+        if not output_existed:
+            _remove_empty_dir(output_root)
         raise
-    # The run folder is reserved, so output/<run_id>/ does not exist: the rename
-    # moves the whole run at once.
     incomplete_dir.rename(output_root / run_id)
-    _remove_empty_dirs(incomplete_dir.parent)
+    _remove_empty_dir(incomplete_dir.parent)
 
 
 def _reserve_run_folder(output_root: Path, base_run_id: str) -> Tuple[str, Path]:
     """Reserve a run id whose folder exists neither in *output_root* nor in its
     incomplete folder, and create the incomplete folder.
 
+    The first free id among ``base_run_id``, ``base_run_id-2``, ... is taken.
     ``mkdir(exist_ok=False)`` is atomic, so two runs started at the same time
     never get the same folder.
     """
-    for attempt in count(1):
+    attempt = 1
+    while True:
         run_id = base_run_id if attempt == 1 else f"{base_run_id}-{attempt}"
-        if (output_root / run_id).exists():
-            continue
+        attempt += 1
         incomplete_dir = output_root / INCOMPLETE_DIR_NAME / run_id
         try:
             incomplete_dir.mkdir(parents=True)
         except (FileExistsError, FileNotFoundError):
+            # FileExistsError: a running or killed run has this id.
             # FileNotFoundError: another run removed the empty incomplete
-            # folder while this one was creating it; try the next id.
+            # folder while this one was creating it.
             continue
-        # A run with this id may have completed between the check and mkdir.
         if (output_root / run_id).exists():
+            # A completed run has this id.
             incomplete_dir.rmdir()
             continue
         return run_id, incomplete_dir
-    raise AssertionError("unreachable")
 
 
-def _remove_empty_dirs(*dirs: Path) -> None:
-    """Remove each of *dirs* if it exists and is empty, in order."""
-    for directory in dirs:
-        try:
-            directory.rmdir()
-        except OSError:
-            pass
+def _remove_empty_dir(directory: Path) -> None:
+    """Remove *directory* if it exists and is empty."""
+    try:
+        directory.rmdir()
+    except OSError:
+        pass

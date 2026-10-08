@@ -138,7 +138,8 @@ going, files are written to `output/incomplete/<run_id>/`, which is moved to
 
 `<run_id>` is the start time to the minute (`YYYYMMDDTHHMM`). A run started in
 the same minute as an earlier one gets a `-2` suffix (then `-3`, ...), in its
-folder and file names.
+folder and file names. `gemspy` prints the run folder at the end
+(`Results written to ...`), and `run_study` returns it.
 
 The equivalent Python call is
 `run_study(Path("path/to/study_dir"), output_format=OutputFormat.PARQUET)`,

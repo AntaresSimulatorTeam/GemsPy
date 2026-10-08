@@ -64,11 +64,12 @@ def _write_structure_txt(
 
 def main_cli() -> None:
     parsed_args = parse_cli()
-    run_study(
+    run_folder = run_study(
         study_dir=parsed_args.study_dir,
         optim_config_path=parsed_args.optim_config_path,
         output_format=parsed_args.output_format,
     )
+    print(f"Results written to {run_folder}")
 
 
 if __name__ == "__main__":

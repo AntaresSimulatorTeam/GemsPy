@@ -433,10 +433,11 @@ def _files(folder: Path) -> Dict[str, bytes]:
 @pytest.mark.parametrize("mode", ["frontal", "sequential", "parallel"])
 def test_completed_run_is_moved_to_its_run_folder(tmp_path: Path, mode: str) -> None:
     study_dir = _make_study(tmp_path, mode)
-    run_study(study_dir)
+    run_folder = run_study(study_dir)
 
     (run_id,) = _output_entries(study_dir)
     assert run_id != INCOMPLETE_DIR_NAME
+    assert run_folder == study_dir / "output" / run_id
     files = sorted(_files(study_dir / "output" / run_id))
     assert files[:2] == [
         f"simulation_table_{run_id}_scenario-0.csv",
@@ -495,6 +496,23 @@ def test_run_interrupted_while_writing_leaves_no_output(
     assert not (study_dir / "output").exists()
 
 
+def test_failed_run_keeps_an_output_folder_it_did_not_create(tmp_path: Path) -> None:
+    """The failed run removes what it created, not an empty output/ folder that
+    was already there."""
+    study_dir = _make_study(tmp_path, "sequential")
+    (study_dir / "output").mkdir()
+    config_path = study_dir / "input" / "optim-config.yml"
+    config_path.write_text(
+        config_path.read_text().replace("    - 1\n", "    - 1\n    - 2\n")
+    )
+
+    with pytest.raises(IndexError):
+        run_study(study_dir)
+
+    assert (study_dir / "output").is_dir()
+    assert _output_entries(study_dir) == []
+
+
 def test_failed_run_keeps_the_other_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -522,8 +540,9 @@ def test_runs_started_in_the_same_minute_get_their_own_folder(
     run_study(study_dir)
     first_run = _files(study_dir / "output" / "20261008T1012")
 
-    run_study(study_dir)
+    second_folder = run_study(study_dir)
 
+    assert second_folder == study_dir / "output" / "20261008T1012-2"
     assert _output_entries(study_dir) == ["20261008T1012", "20261008T1012-2"]
     assert _files(study_dir / "output" / "20261008T1012") == first_run
     assert sorted(_files(study_dir / "output" / "20261008T1012-2")) == [

@@ -20,11 +20,18 @@ import pytest
 import gems_runner.main.main as main_module
 from gems_craft.study.parsing import OutputFormat
 
+_RUN_FOLDER = Path("my_study") / "output" / "20261008T1012-2"
+
 
 def _run_main_cli(monkeypatch: pytest.MonkeyPatch, argv: List[str]) -> Dict[str, Any]:
     """Run main_cli with *argv* and return the arguments passed to run_study."""
     calls: List[Dict[str, Any]] = []
-    monkeypatch.setattr(main_module, "run_study", lambda **kwargs: calls.append(kwargs))
+
+    def run_study(**kwargs: Any) -> Path:
+        calls.append(kwargs)
+        return _RUN_FOLDER
+
+    monkeypatch.setattr(main_module, "run_study", run_study)
     monkeypatch.setattr(sys, "argv", ["gemspy", *argv])
     main_module.main_cli()
     assert len(calls) == 1
@@ -47,3 +54,12 @@ def test_main_cli_passes_output_format_to_run_study(
 def test_main_cli_defaults_to_csv(monkeypatch: pytest.MonkeyPatch) -> None:
     kwargs = _run_main_cli(monkeypatch, ["--study", "my_study"])
     assert kwargs["output_format"] is OutputFormat.CSV
+
+
+def test_main_cli_prints_the_run_folder(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The run folder may have a -2, -3, ... suffix: the user is told where the
+    results are."""
+    _run_main_cli(monkeypatch, ["--study", "my_study"])
+    assert capsys.readouterr().out == f"Results written to {_RUN_FOLDER}\n"
