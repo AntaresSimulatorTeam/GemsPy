@@ -241,7 +241,17 @@ class SimulationSession:
         scenario_ids_remap equals scenario_ids because the list of MC scenario IDs
         IS the mapping from internal 0-based position to actual MC identifier.
         """
-        problem = self._solve_block(block, scenario_ids, initial_values)
+        try:
+            problem = self._solve_block(block, scenario_ids, initial_values)
+        except Exception as error:
+            # The errors raised while building or solving name neither the
+            # scenario nor the block.
+            error.add_note(
+                f"While solving scenario {', '.join(map(str, scenario_ids))}, "
+                f"block {block.id} "
+                f"(time steps {block.timesteps[0]}-{block.timesteps[-1]})."
+            )
+            raise
         table = SimulationTableBuilder().build(
             problem, scenario_ids_remap=scenario_ids, table_id=self.run_id
         )

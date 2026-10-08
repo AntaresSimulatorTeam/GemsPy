@@ -23,10 +23,12 @@ the 13_1 investment study extended to 4 time steps and 2 MC scenarios.
   in frontal mode each scenario's rows are built on demand after the solve.
 """
 
+import errno
 import shutil
 import textwrap
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 import pandas as pd
 import pytest
@@ -41,7 +43,7 @@ from gems_runner.simulation.simulation_table import (
 )
 from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
 from gems_runner.simulation.time_block import TimeBlock
-from gems_runner.study.runner import run_study
+from gems_runner.study.runner import INCOMPLETE_DIR_NAME, run_study
 
 _STUDY_SRC = Path(__file__).parent / "studies" / "13_1"
 
@@ -404,3 +406,164 @@ def test_invalid_config_fails_when_iteration_is_requested(
 
     with pytest.raises(ValueError, match="empty scenario list"):
         _session(study_dir).iter_scenario_tables()
+
+
+# ---------------------------------------------------------------------------
+# Run folder: output/<run_id>/ only holds completed runs
+# ---------------------------------------------------------------------------
+
+
+class _FixedTime:
+    """Stands for datetime in the runner: every run starts in the same minute."""
+
+    @staticmethod
+    def now() -> datetime:
+        return datetime(2026, 10, 8, 10, 12, 30)
+
+
+def _output_entries(study_dir: Path) -> List[str]:
+    output = study_dir / "output"
+    return sorted(p.name for p in output.iterdir()) if output.exists() else []
+
+
+def _files(folder: Path) -> Dict[str, bytes]:
+    return {p.name: p.read_bytes() for p in sorted(folder.iterdir())}
+
+
+@pytest.mark.parametrize("mode", ["frontal", "sequential", "parallel"])
+def test_completed_run_is_moved_to_its_run_folder(tmp_path: Path, mode: str) -> None:
+    study_dir = _make_study(tmp_path, mode)
+    run_study(study_dir)
+
+    (run_id,) = _output_entries(study_dir)
+    assert run_id != INCOMPLETE_DIR_NAME
+    files = sorted(_files(study_dir / "output" / run_id))
+    assert files[:2] == [
+        f"simulation_table_{run_id}_scenario-0.csv",
+        f"simulation_table_{run_id}_scenario-1.csv",
+    ]
+
+
+@pytest.mark.parametrize("mode", ["sequential", "parallel"])
+def test_failed_run_leaves_no_output(tmp_path: Path, mode: str) -> None:
+    """Scenario 2 has no column in the data series: the run fails after
+    scenarios 0 and 1 were written. Nothing is left in output/, and the error
+    names the failing scenario and block."""
+    study_dir = _make_study(tmp_path, mode)
+    config_path = study_dir / "input" / "optim-config.yml"
+    config_path.write_text(
+        config_path.read_text().replace("    - 1\n", "    - 1\n    - 2\n")
+    )
+
+    with pytest.raises(IndexError) as raised:
+        run_study(study_dir)
+
+    assert not (study_dir / "output").exists()
+    assert any(
+        note.startswith("While solving scenario 2, block 0")
+        for note in getattr(raised.value, "__notes__", [])
+    )
+
+
+@pytest.mark.parametrize(
+    "error",
+    [OSError(errno.ENOSPC, "No space left on device"), KeyboardInterrupt()],
+    ids=["disk-full", "ctrl-c"],
+)
+def test_run_interrupted_while_writing_leaves_no_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: BaseException
+) -> None:
+    """Frontal mode: the scenario-common file and scenario 0 are written, then
+    writing scenario 1 fails."""
+    study_dir = _make_study(tmp_path, "frontal")
+    write = SimulationTableWriter.write
+    calls: List[int] = []
+
+    def failing_write(  # type: ignore[no-untyped-def]
+        self, table: SimulationTable, output_dir: Path
+    ) -> List[Path]:
+        calls.append(1)
+        if len(calls) == 3:
+            raise error
+        return write(self, table, output_dir)
+
+    monkeypatch.setattr(SimulationTableWriter, "write", failing_write)
+    with pytest.raises(type(error)):
+        run_study(study_dir)
+
+    assert len(calls) == 3
+    assert not (study_dir / "output").exists()
+
+
+def test_failed_run_keeps_the_other_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    study_dir = _make_study(tmp_path, "sequential")
+    run_study(study_dir)
+    (completed,) = _output_entries(study_dir)
+    config_path = study_dir / "input" / "optim-config.yml"
+    config_path.write_text(
+        config_path.read_text().replace("    - 1\n", "    - 1\n    - 2\n")
+    )
+
+    with pytest.raises(IndexError):
+        run_study(study_dir)
+
+    assert _output_entries(study_dir) == [completed]
+
+
+def test_runs_started_in_the_same_minute_get_their_own_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The second run gets a -2 suffix, in its folder and file names, and the
+    first run's files are left as they were."""
+    monkeypatch.setattr("gems_runner.study.runner.datetime", _FixedTime)
+    study_dir = _make_study(tmp_path, "frontal")
+    run_study(study_dir)
+    first_run = _files(study_dir / "output" / "20261008T1012")
+
+    run_study(study_dir)
+
+    assert _output_entries(study_dir) == ["20261008T1012", "20261008T1012-2"]
+    assert _files(study_dir / "output" / "20261008T1012") == first_run
+    assert sorted(_files(study_dir / "output" / "20261008T1012-2")) == [
+        "simulation_table_20261008T1012-2_scenario-0.csv",
+        "simulation_table_20261008T1012-2_scenario-1.csv",
+        "simulation_table_20261008T1012-2_scenario-common.csv",
+    ]
+
+
+def test_folder_left_by_a_killed_run_is_not_reused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A killed run leaves its folder in output/incomplete/: a new run started
+    in the same minute neither reuses nor removes it."""
+    monkeypatch.setattr("gems_runner.study.runner.datetime", _FixedTime)
+    study_dir = _make_study(tmp_path, "frontal")
+    leftover = study_dir / "output" / INCOMPLETE_DIR_NAME / "20261008T1012"
+    leftover.mkdir(parents=True)
+    (leftover / "partial.csv").write_text("partial")
+
+    run_study(study_dir)
+
+    assert _output_entries(study_dir) == ["20261008T1012-2", INCOMPLETE_DIR_NAME]
+    assert _files(leftover) == {"partial.csv": b"partial"}
+
+
+def test_files_written_by_the_session_are_moved_too(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Benders mode writes its own files (structure.txt...) into the session's
+    output folder, and no simulation table: they end up in output/<run_id>/."""
+    study_dir = _make_study(tmp_path, "frontal")
+
+    def benders_like(self: SimulationSession) -> Iterator[SimulationTable]:
+        assert self.output_dir is not None
+        (self.output_dir / "structure.txt").write_text("structure")
+        yield from ()
+
+    monkeypatch.setattr(SimulationSession, "iter_scenario_tables", benders_like)
+    run_study(study_dir)
+
+    (run_id,) = _output_entries(study_dir)
+    assert _files(study_dir / "output" / run_id) == {"structure.txt": b"structure"}

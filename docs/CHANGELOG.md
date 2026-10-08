@@ -50,6 +50,12 @@ All notable changes to GemsPy are documented here.
   `SimulationTableWriter(format).write(table, output_dir)`.
 - `pyarrow>=15.0` is now a runtime dependency.
 - Benders decomposition mode no longer writes an empty simulation table file.
+- **Run folder only holds completed runs** - `gemspy` / `run_study` write into
+  `output/incomplete/<run_id>/` and move it to `output/<run_id>/` once the run
+  has completed. A failed run leaves no output; a killed run leaves its folder
+  in `output/incomplete/`.
+- Errors raised while solving a block in sequential and parallel subproblem
+  modes now name the scenario and the block.
 
 ### Fixed
 - **`solver-options.logs` now controls solver output** - it was passed to the
@@ -64,6 +70,8 @@ All notable changes to GemsPy are documented here.
   value now carry their scenario in `scenario_index` instead of an empty value.
 - **Empty scenario scope** - a scenario scope resolving to no scenario is now
   rejected with a clear error before solving, instead of crashing.
+- **Runs started in the same minute** no longer write into the same output
+  folder: the second one gets a `-2` suffix (then `-3`, ...) in its run id.
 
 ---
 

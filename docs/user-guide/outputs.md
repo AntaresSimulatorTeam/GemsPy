@@ -126,6 +126,20 @@ common file is written.
 In `benders-decomposition` mode no simulation table is written: the solve is
 done by Antares Xpansion.
 
+`output/<run_id>/` only appears once the run has completed. While the run is
+going, files are written to `output/incomplete/<run_id>/`, which is moved to
+`output/<run_id>/` at the end:
+
+- if the run fails, the incomplete folder is removed, and the error names the
+  scenario and the block being solved (sequential and parallel subproblem
+  modes);
+- if the process is killed, its folder stays in `output/incomplete/` and can be
+  deleted.
+
+`<run_id>` is the start time to the minute (`YYYYMMDDTHHMM`). A run started in
+the same minute as an earlier one gets a `-2` suffix (then `-3`, ...), in its
+folder and file names.
+
 The equivalent Python call is
 `run_study(Path("path/to/study_dir"), output_format=OutputFormat.PARQUET)`,
 with `OutputFormat` imported from `gems_craft.study.parsing`.
