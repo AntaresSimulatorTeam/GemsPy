@@ -25,14 +25,8 @@ def run_study(
 
     Run parameters (time scope, solver options, scenario scope) are read from
     ``study_dir/input/optim-config.yml``; defaults apply when the file is absent.
-    Results are written to ``study_dir/output/{run_id}/``, which only appears
-    once the run has completed: files are written to
-    ``study_dir/output/incomplete/{run_id}/`` while the run is going, and that
-    folder is renamed to ``study_dir/output/{run_id}/`` at the end. If the run
-    fails or the process is killed, the folder stays in ``output/incomplete/``
-    with the scenarios that finished (it is removed if nothing was written).
-    ``run_id`` is the start time to the minute, with a ``-2``, ``-3``, ...
-    suffix if that run folder already exists.
+    Results are written to ``study_dir/output/{run_id}/`` once the run has
+    completed; a failed run leaves them in ``study_dir/output/incomplete/``.
 
     Args:
         study_dir: The path to the study directory.
