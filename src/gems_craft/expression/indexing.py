@@ -117,11 +117,18 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return IndexingStructure(False, visit(node.operand, self).scenario)
 
     def time_sum(self, node: TimeSumNode) -> IndexingStructure:
-        bounds = (node.from_time, node.to_time)
+        relative = [
+            isinstance(bound, RelativeTimeNode)
+            for bound in (node.from_time, node.to_time)
+        ]
         operand = visit(node.operand, self)
-        if not any(isinstance(bound, RelativeTimeNode) for bound in bounds):
-            return IndexingStructure(False, operand.scenario)
-        return operand
+        if all(relative):
+            return operand
+        if any(relative):
+            # One bound moves with t and the other does not: the number of terms
+            # changes with t, even for an operand constant in time.
+            return IndexingStructure(True, operand.scenario)
+        return IndexingStructure(False, operand.scenario)
 
     def all_time_sum(self, node: AllTimeSumNode) -> IndexingStructure:
         return IndexingStructure(False, visit(node.operand, self).scenario)

@@ -132,6 +132,39 @@ def test_absolute_mixed_and_relative_bounds_in_constraints(tmp_path: Path) -> No
     assert results["r"] == [5, 3, 5, 7]
 
 
+_OUTSIDE_THE_BLOCK = {
+    "n": "sum(-1 .. 1, x)",  # negative start: time steps 3, 0, 1
+    "p": "sum(2 .. 5, x)",  # end past the block: time steps 2, 3, 0, 1
+    "w": "sum(0 .. 5, x)",  # wraps past the end: 0, 1 counted twice
+    "m": "sum(-1 .. t, x)",  # mixed: time step 3, then 0 .. t
+}
+
+
+@pytest.mark.parametrize("mode", ["cyclic", "drop"])
+def test_absolute_indices_outside_the_block_wrap(tmp_path: Path, mode: str) -> None:
+    """An absolute index outside the block wraps around it, as x[N], and never
+    causes the constraint to be dropped."""
+    study_dir = _make_study(
+        tmp_path,
+        variables=["x", *_OUTSIDE_THE_BLOCK],
+        constraints=["x = d", *(f"{v} = {s}" for v, s in _OUTSIDE_THE_BLOCK.items())],
+        objective="sum(x)",
+        data={"d": [1, 2, 3, 4]},
+        constants={},
+        nb_time_steps=4,
+        resolution="models:\n  - id: lib.m\n    out-of-bounds-processing:\n"
+        "      constraints:\n"
+        + "".join(f"        - id: c{i}\n          mode: {mode}\n" for i in range(1, 5)),
+    )
+
+    results = _solve(study_dir)
+
+    assert results["n"] == [7, 7, 7, 7]
+    assert results["p"] == [10, 10, 10, 10]
+    assert results["w"] == [13, 13, 13, 13]
+    assert results["m"] == [5, 7, 10, 14]
+
+
 def test_absolute_bounds_in_extra_outputs(tmp_path: Path) -> None:
     study_dir = _make_study(
         tmp_path,
