@@ -750,29 +750,24 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
 
     def time_sum(self, node: TimeSumNode) -> Optional[xr.DataArray]:
         operand_mask = visit(node.operand, self)
-        from_value, to_value = (
-            bound.offset if isinstance(bound, RelativeTimeNode) else bound
-            for bound in (node.from_time, node.to_time)
-        )
-        from_da = self._eval_as_da(from_value)
-        to_da = self._eval_as_da(to_value)
-        if from_da is None or to_da is None:
-            unevaluable = from_value if from_da is None else to_value
-            raise ValueError(
-                f"Time-sum bound is not evaluable to a literal or parameter: "
-                f"{unevaluable!r}. Only literals and parameter references are "
-                f"supported as bounds in OutOfBoundsMode.DROP constraints."
-            )
         T = self.block_length
         t = xr.DataArray(np.arange(T), dims="time")
-        # Every position from the start to the end bound must be in the block;
-        # the extreme values are binding. A relative bound is an offset from t.
-        relative = [
-            isinstance(b, RelativeTimeNode) for b in (node.from_time, node.to_time)
-        ]
-        start = t + from_da if relative[0] else from_da + 0 * t
-        end = t + to_da if relative[1] else to_da + 0 * t
-        own_mask = (start >= 0) & (end < T)
+        # Only relative bounds are checked: a relative start must not be before
+        # the block, a relative end not after it. An absolute bound is a time
+        # index of the block and wraps around it, as x[N], in every mode.
+        own_mask: Optional[xr.DataArray] = None
+        for bound, is_start in ((node.from_time, True), (node.to_time, False)):
+            if not isinstance(bound, RelativeTimeNode):
+                continue
+            offset = self._eval_as_da(bound.offset)
+            if offset is None:
+                raise ValueError(
+                    f"Time-sum bound is not evaluable to a literal or parameter: "
+                    f"{bound.offset!r}. Only literals and parameter references are "
+                    f"supported as bounds in OutOfBoundsMode.DROP constraints."
+                )
+            position = t + offset
+            own_mask = _and_mask(own_mask, position >= 0 if is_start else position < T)
         return _and_mask(operand_mask, own_mask)
 
     # ------------------------------------------------------------------ #

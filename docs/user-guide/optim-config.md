@@ -379,6 +379,13 @@ models:
           mode: drop   # do not enforce at t=0 where previous state is unknown
 ~~~
 
+Time sums `sum(S .. E, x)` follow the same rule for their bounds relative to
+`t`. A bound without `t` is an absolute time index of the block (of each block
+in `sequential-subproblems` and `parallel-subproblems` modes). Like `x[N]`, an
+absolute index outside the block wraps around it, in both modes: it never
+causes a constraint to be dropped. For example, in a block of 168 time steps,
+`sum(-1 .. 1, x)` sums the time steps 167, 0 and 1.
+
 ### `model-decomposition`
 
 The `model-decomposition` block assigns individual model elements to the master

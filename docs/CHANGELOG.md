@@ -14,7 +14,10 @@ All notable changes to GemsPy are documented here.
   `sum(0 .. 2, x)`) as well as a bound relative to `t`, and both can be mixed
   (e.g. `sum(0 .. t, x)`). Bounds must be fixed in time: this depends on the data
   of each component, so a parameter used in a bound may be declared
-  time-dependent if its values do not vary in time.
+  time-dependent if its values do not vary in time. An absolute bound is a
+  time index of the block (of each block in sequential and parallel subproblem
+  modes); outside the block, it wraps around it, and it never causes a
+  constraint to be dropped by `out-of-bounds-processing`.
   In Python, use
   `expr.time_sum_between(from_bound, to_bound)` with `relative_time(offset)` for
   bounds relative to `t`.

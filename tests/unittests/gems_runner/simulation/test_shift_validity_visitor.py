@@ -142,20 +142,20 @@ def test_time_sum_positive_to_blocks_last_t():
     np.testing.assert_array_equal(mask.values, [True, True, True, False])
 
 
-def test_time_sum_absolute_bounds_inside_block_all_valid():
-    # sum over the absolute indices 0..2: inside a block of 4 at every t
-    expr = var("x").time_sum_between(0, 2)
+@pytest.mark.parametrize("start, end", [(0, 2), (0, 4), (-1, 1)])
+def test_time_sum_absolute_bounds_never_dropped(start: int, end: int) -> None:
+    # Absolute indices wrap around the block, as x[N], also outside it.
+    expr = var("x").time_sum_between(start, end)
+    assert visit(expr, _visitor(block_length=4)) is None
+
+
+def test_time_sum_mixed_bounds_only_relative_bound_checked():
+    # sum from index -1 to t: the relative end stays in the block, the
+    # absolute start wraps; valid at every t
+    expr = var("x").time_sum_between(-1, relative_time(0))
     mask = visit(expr, _visitor(block_length=4))
     assert mask is not None
     np.testing.assert_array_equal(mask.values, [True, True, True, True])
-
-
-def test_time_sum_absolute_bound_outside_block_all_invalid():
-    # absolute end index 4 is outside a block of 4 at every t
-    expr = var("x").time_sum_between(0, 4)
-    mask = visit(expr, _visitor(block_length=4))
-    assert mask is not None
-    np.testing.assert_array_equal(mask.values, [False, False, False, False])
 
 
 def test_time_sum_mixed_bounds_blocks_last_t():
