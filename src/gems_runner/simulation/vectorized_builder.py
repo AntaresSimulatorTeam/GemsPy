@@ -372,25 +372,23 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         end = self._time_sum_bound(node.to_time, t)
         operand = visit(node.operand, self)
 
-        acc: Optional[Any] = None
-        for position in range(int(start.min()), int(end.max()) + 1):
-            # Select one time step and drop the time dimension and coordinate.
-            term = (
-                operand.isel(time=[position % T]).sum("time")  # type: ignore[union-attr]
-                if self._has_dim(operand, "time")
-                else operand
-            )
-            mask = (start <= position) & (end >= position)
-            if not mask.dims:
-                if not bool(mask):
-                    continue
-                contrib = term
-            else:
-                contrib = term * mask.astype(float)  # type: ignore[operator]
-            acc = contrib if acc is None else _linopy_add(acc, contrib)
-        if acc is None:  # empty sum at every time step
+        first, last = int(start.min()), int(end.max())
+        if last < first:  # empty sum at every time step
             return operand * 0.0  # type: ignore[operator,return-value]
-        return acc  # type: ignore[no-any-return]
+        if not self._has_dim(operand, "time"):
+            # The same value at every position: multiply by their number.
+            count = (end - start + 1).clip(min=0).astype(float)
+            return operand * count  # type: ignore[operator,return-value]
+
+        # Time steps of the block reached by the positions first..last.
+        sources = np.unique(np.arange(first, last + 1) % T)
+        source = xr.DataArray(sources, dims="time_src", coords={"time_src": sources})
+        # Number of positions start..end that wrap onto each source time step
+        # (0 outside the range, more than 1 if the range wraps past it).
+        weight = ((end - source) // T - (start - 1 - source) // T).clip(min=0)
+        selected = operand.isel(time=sources).rename(time="time_src")  # type: ignore[union-attr]
+        # One vectorized product instead of one operation per position.
+        return (selected * weight.astype(float)).sum("time_src")  # type: ignore[no-any-return]
 
     def all_time_sum(self, node: AllTimeSumNode) -> VectorizedExpr:
         operand = visit(node.operand, self)
