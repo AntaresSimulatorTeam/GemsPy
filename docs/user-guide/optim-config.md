@@ -493,20 +493,51 @@ models:
             type: variable-lower-bound
 ~~~
 
-Two heuristics are built in, each expecting a fixed set of
-`heuristic-element` names:
-
-| Heuristic | `inputs` elements | `outputs` elements |
-|---|---|---|
-| `fast` | `generation_power`, `cluster_max_generation`, `min_power_per_unit`, `max_power_per_unit`, `min_up_duration`, `min_down_duration` | `minimum_generation_power`, `maximum_generation_power` |
-| `accurate` | `num_units_on_opt`, `num_units_max`, `min_up_duration`, `min_down_duration` | `minimum_num_units_on` |
-
 !!! note
     The `heuristic` strategy triggers an automatic second solve in
     `SimulationSession` and is incompatible with `resolution.mode:
     benders-decomposition`. `validate_optim_config()` checks both the
     `heuristic-id` ↔ `heuristics` consistency and that every bound `id` exists
     on the model with the expected time-dependence.
+
+#### Available heuristics
+
+Two heuristics are available. Both derive, from the first solve, a commitment
+of the thermal units that respects the minimum up and down durations. Each one
+expects a fixed set of `heuristic-element` names, listed below; `inputs` and
+`outputs` must list exactly these elements.
+
+**`accurate`** computes the minimum number of units on at each time step by
+solving a small linear problem: it starts from the solved number of units on,
+rounded up, and enforces the minimum up and down durations.
+
+| Element | Direction | Time-dependent | Meaning |
+|---|---|---|---|
+| `num_units_on_opt` | input | Yes | Number of units on in the first solve |
+| `num_units_max` | input | Either | Maximum number of units on |
+| `min_up_duration` | input | No | Minimum up duration, in time steps |
+| `min_down_duration` | input | No | Minimum down duration, in time steps |
+| `minimum_num_units_on` | output | Yes | Minimum number of units on |
+
+**`fast`** computes the number of units needed at each time step from the
+solved generation and the maximum generation of one unit. It groups the time
+steps into windows as long as the longer of the minimum up and down durations,
+and keeps each window's largest number of units. The minimum and maximum
+generation are that number of units times the minimum and maximum generation
+of one unit, capped by the maximum generation of the cluster.
+
+| Element | Direction | Time-dependent | Meaning |
+|---|---|---|---|
+| `generation_power` | input | Yes | Generation in the first solve |
+| `cluster_max_generation` | input | Either | Maximum generation of the cluster |
+| `min_power_per_unit` | input | No | Minimum generation of one unit |
+| `max_power_per_unit` | input | No | Maximum generation of one unit |
+| `min_up_duration` | input | No | Minimum up duration, in time steps |
+| `min_down_duration` | input | No | Minimum down duration, in time steps |
+| `minimum_generation_power` | output | Yes | Minimum generation |
+| `maximum_generation_power` | output | Yes | Maximum generation |
+
+"Either" accepts a time-dependent or a constant element.
 
 ---
 
