@@ -445,25 +445,38 @@ def test_completed_run_is_moved_to_its_run_folder(tmp_path: Path, mode: str) -> 
     ]
 
 
-@pytest.mark.parametrize("mode", ["sequential", "parallel"])
-def test_failed_run_leaves_no_output(tmp_path: Path, mode: str) -> None:
-    """Scenario 2 has no column in the data series: the run fails after
-    scenarios 0 and 1 were written. Nothing is left in output/, and the error
-    names the failing scenario and block."""
-    study_dir = _make_study(tmp_path, mode)
+def _add_scenario_without_data(study_dir: Path) -> None:
+    """Add scenario 2 to the scope: the data series has no column for it, so
+    the run fails once scenarios 0 and 1 are done."""
     config_path = study_dir / "input" / "optim-config.yml"
     config_path.write_text(
         config_path.read_text().replace("    - 1\n", "    - 1\n    - 2\n")
     )
 
+
+@pytest.mark.parametrize("mode", ["sequential", "parallel"])
+def test_failed_run_keeps_its_partial_output_in_incomplete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    """The scenarios that finished stay in output/incomplete/<run_id>/, never in
+    output/<run_id>/, and the error names the failing scenario and block, and
+    where the partial results are."""
+    monkeypatch.setattr("gems_runner.study.runner.datetime", _FixedTime)
+    study_dir = _make_study(tmp_path, mode)
+    _add_scenario_without_data(study_dir)
+
     with pytest.raises(IndexError) as raised:
         run_study(study_dir)
 
-    assert not (study_dir / "output").exists()
-    assert any(
-        note.startswith("While solving scenario 2, block 0")
-        for note in getattr(raised.value, "__notes__", [])
-    )
+    partial = study_dir / "output" / INCOMPLETE_DIR_NAME / "20261008T1012"
+    assert _output_entries(study_dir) == [INCOMPLETE_DIR_NAME]
+    assert sorted(_files(partial)) == [
+        "simulation_table_20261008T1012_scenario-0.csv",
+        "simulation_table_20261008T1012_scenario-1.csv",
+    ]
+    notes = getattr(raised.value, "__notes__", [])
+    assert any(note.startswith("While solving scenario 2, block 0") for note in notes)
+    assert f"Partial results of this run are in {partial}" in notes
 
 
 @pytest.mark.parametrize(
@@ -471,11 +484,12 @@ def test_failed_run_leaves_no_output(tmp_path: Path, mode: str) -> None:
     [OSError(errno.ENOSPC, "No space left on device"), KeyboardInterrupt()],
     ids=["disk-full", "ctrl-c"],
 )
-def test_run_interrupted_while_writing_leaves_no_output(
+def test_run_interrupted_while_writing_keeps_its_partial_output(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: BaseException
 ) -> None:
     """Frontal mode: the scenario-common file and scenario 0 are written, then
-    writing scenario 1 fails."""
+    writing scenario 1 fails. The two files stay in output/incomplete/."""
+    monkeypatch.setattr("gems_runner.study.runner.datetime", _FixedTime)
     study_dir = _make_study(tmp_path, "frontal")
     write = SimulationTableWriter.write
     calls: List[int] = []
@@ -493,41 +507,44 @@ def test_run_interrupted_while_writing_leaves_no_output(
         run_study(study_dir)
 
     assert len(calls) == 3
-    assert not (study_dir / "output").exists()
+    assert _output_entries(study_dir) == [INCOMPLETE_DIR_NAME]
+    partial = study_dir / "output" / INCOMPLETE_DIR_NAME / "20261008T1012"
+    assert sorted(_files(partial)) == [
+        "simulation_table_20261008T1012_scenario-0.csv",
+        "simulation_table_20261008T1012_scenario-common.csv",
+    ]
 
 
-def test_failed_run_keeps_an_output_folder_it_did_not_create(tmp_path: Path) -> None:
-    """The failed run removes what it created, not an empty output/ folder that
-    was already there."""
+def test_run_failing_before_writing_keeps_an_existing_output_folder(
+    tmp_path: Path,
+) -> None:
+    """A run that wrote nothing removes its empty folders, but not an empty
+    output/ folder that was already there."""
     study_dir = _make_study(tmp_path, "sequential")
     (study_dir / "output").mkdir()
     config_path = study_dir / "input" / "optim-config.yml"
     config_path.write_text(
-        config_path.read_text().replace("    - 1\n", "    - 1\n    - 2\n")
+        config_path.read_text().replace("    - 1\n", "    - 1\n  exclude: [0, 1]\n")
     )
 
-    with pytest.raises(IndexError):
+    with pytest.raises(ValueError, match="empty scenario list"):
         run_study(study_dir)
 
     assert (study_dir / "output").is_dir()
     assert _output_entries(study_dir) == []
 
 
-def test_failed_run_keeps_the_other_runs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_failed_run_keeps_the_other_runs(tmp_path: Path) -> None:
     study_dir = _make_study(tmp_path, "sequential")
     run_study(study_dir)
     (completed,) = _output_entries(study_dir)
-    config_path = study_dir / "input" / "optim-config.yml"
-    config_path.write_text(
-        config_path.read_text().replace("    - 1\n", "    - 1\n    - 2\n")
-    )
+    _add_scenario_without_data(study_dir)
 
     with pytest.raises(IndexError):
         run_study(study_dir)
 
-    assert _output_entries(study_dir) == [completed]
+    assert _output_entries(study_dir) == [completed, INCOMPLETE_DIR_NAME]
+    assert len(_files(study_dir / "output" / completed)) == 2
 
 
 def test_runs_started_in_the_same_minute_get_their_own_folder(

@@ -127,14 +127,15 @@ In `benders-decomposition` mode no simulation table is written: the solve is
 done by Antares Xpansion.
 
 `output/<run_id>/` only appears once the run has completed. While the run is
-going, files are written to `output/incomplete/<run_id>/`, which is moved to
-`output/<run_id>/` at the end:
+going, files are written to `output/incomplete/<run_id>/`, which is renamed to
+`output/<run_id>/` at the end (the files are not copied).
 
-- if the run fails, the incomplete folder is removed, and the error names the
-  scenario and the block being solved (sequential and parallel subproblem
-  modes);
-- if the process is killed, its folder stays in `output/incomplete/` and can be
-  deleted.
+If the run fails or the process is killed, its folder stays in
+`output/incomplete/`, with the files of the scenarios that finished, so that
+they can be inspected; delete it when it is no longer needed. The error says
+where the folder is and, in `sequential-subproblems` and
+`parallel-subproblems` modes, which scenario and block failed. A run that fails
+before writing anything (e.g. an invalid configuration) leaves no folder.
 
 `<run_id>` is the start time to the minute (`YYYYMMDDTHHMM`). A run started in
 the same minute as an earlier one gets a `-2` suffix (then `-3`, ...), in its

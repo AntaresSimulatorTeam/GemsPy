@@ -1,4 +1,3 @@
-import shutil
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -29,10 +28,11 @@ def run_study(
     Results are written to ``study_dir/output/{run_id}/``, which only appears
     once the run has completed: files are written to
     ``study_dir/output/incomplete/{run_id}/`` while the run is going, and that
-    folder is moved to ``study_dir/output/{run_id}/`` at the end. If the run
-    fails, the incomplete folder is removed; if the process is killed, it stays
-    in ``output/incomplete/``. ``run_id`` is the start time to the minute, with
-    a ``-2``, ``-3``, ... suffix if that run folder already exists.
+    folder is renamed to ``study_dir/output/{run_id}/`` at the end. If the run
+    fails or the process is killed, the folder stays in ``output/incomplete/``
+    with the scenarios that finished (it is removed if nothing was written).
+    ``run_id`` is the start time to the minute, with a ``-2``, ``-3``, ...
+    suffix if that run folder already exists.
 
     Args:
         study_dir: The path to the study directory.
@@ -83,20 +83,25 @@ def _run_folder(output_root: Path, base_run_id: str) -> Iterator[Tuple[str, Path
     """Reserve a run id and its folder in ``output/incomplete/``, and yield
     them. On success, the folder is renamed to ``output/<run_id>/``; the
     reservation guarantees that it does not exist, so the whole run appears at
-    once. On failure, the folder is removed.
+    once.
 
-    A killed process runs no cleanup: its folder stays in ``output/incomplete/``,
-    never in ``output/<run_id>/``.
+    On failure, the folder stays in ``output/incomplete/`` so that the scenarios
+    that finished can be inspected, and the error says where it is. A folder
+    with nothing in it (e.g. a configuration rejected before solving) is
+    removed. A killed process runs no code: its folder stays too.
     """
     output_existed = output_root.exists()
     run_id, incomplete_dir = _reserve_run_folder(output_root, base_run_id)
     try:
         yield run_id, incomplete_dir
-    except BaseException:  # also on Ctrl+C
-        shutil.rmtree(incomplete_dir, ignore_errors=True)
-        _remove_empty_dir(incomplete_dir.parent)
-        if not output_existed:
-            _remove_empty_dir(output_root)
+    except BaseException as error:  # also on Ctrl+C
+        if any(incomplete_dir.iterdir()):
+            error.add_note(f"Partial results of this run are in {incomplete_dir}")
+        else:
+            incomplete_dir.rmdir()
+            _remove_empty_dir(incomplete_dir.parent)
+            if not output_existed:
+                _remove_empty_dir(output_root)
         raise
     incomplete_dir.rename(output_root / run_id)
     _remove_empty_dir(incomplete_dir.parent)

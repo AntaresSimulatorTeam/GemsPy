@@ -51,10 +51,10 @@ All notable changes to GemsPy are documented here.
 - `pyarrow>=15.0` is now a runtime dependency.
 - Benders decomposition mode no longer writes an empty simulation table file.
 - **Run folder only holds completed runs** - `gemspy` / `run_study` write into
-  `output/incomplete/<run_id>/` and move it to `output/<run_id>/` once the run
-  has completed. A failed run leaves no output; a killed run leaves its folder
-  in `output/incomplete/`. `run_study` returns the run folder, and `gemspy`
-  prints it.
+  `output/incomplete/<run_id>/` and rename it to `output/<run_id>/` once the
+  run has completed. A failed or killed run leaves its folder, with the
+  scenarios that finished, in `output/incomplete/`. `run_study` returns the
+  run folder, and `gemspy` prints it.
 - Errors raised while solving a block in sequential and parallel subproblem
   modes now name the scenario and the block.
 
