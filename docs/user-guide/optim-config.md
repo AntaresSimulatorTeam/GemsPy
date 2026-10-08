@@ -82,6 +82,8 @@ models:
 | `last-time-step` | int | `0` | Last timestep index (0-based, inclusive) |
 
 The total number of timesteps solved is `last-time-step − first-time-step + 1`.
+`first-time-step` must not be greater than `last-time-step`; such a
+configuration is rejected when `optim-config.yml` is loaded.
 
 ---
 

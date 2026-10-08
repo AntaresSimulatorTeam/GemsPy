@@ -233,6 +233,17 @@ class TimeScopeConfig(ModifiedBaseModel):
     first_time_step: int = 0
     last_time_step: int = 0
 
+    @model_validator(mode="after")
+    def _validate_time_step_order(self) -> "TimeScopeConfig":
+        # An empty time scope would otherwise fail later with an error that does
+        # not mention it, or end without solving anything.
+        if self.first_time_step > self.last_time_step:
+            raise ValueError(
+                f"'first-time-step' ({self.first_time_step}) must be <= "
+                f"'last-time-step' ({self.last_time_step})"
+            )
+        return self
+
 
 class SolverOptionsConfig(ModifiedBaseModel):
     name: str = "highs"
