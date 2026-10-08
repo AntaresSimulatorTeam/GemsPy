@@ -119,6 +119,9 @@ def _reserve_run_folder(output_root: Path, base_run_id: str) -> Tuple[str, Path]
     while True:
         run_id = base_run_id if attempt == 1 else f"{base_run_id}-{attempt}"
         attempt += 1
+        if (output_root / run_id).exists():
+            # A completed run has this id.
+            continue
         incomplete_dir = output_root / INCOMPLETE_DIR_NAME / run_id
         try:
             incomplete_dir.mkdir(parents=True)
@@ -128,7 +131,7 @@ def _reserve_run_folder(output_root: Path, base_run_id: str) -> Tuple[str, Path]
             # folder while this one was creating it.
             continue
         if (output_root / run_id).exists():
-            # A completed run has this id.
+            # A run with this id completed between the check above and mkdir.
             incomplete_dir.rmdir()
             continue
         return run_id, incomplete_dir
