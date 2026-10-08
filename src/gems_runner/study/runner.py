@@ -9,8 +9,6 @@ from gems_craft.study.parsing import OutputFormat
 from gems_runner.session.session import SimulationSession
 from gems_runner.simulation.simulation_table_writer import SimulationTableWriter
 
-# Run folders are written here, then moved to ``output/<run_id>/`` once the run
-# has completed, so that ``output/<run_id>/`` never holds a partial run.
 INCOMPLETE_DIR_NAME = "incomplete"
 
 
