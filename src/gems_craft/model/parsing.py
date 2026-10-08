@@ -22,8 +22,8 @@ from gems_craft.utils import ModifiedBaseModel
 
 class ParameterSchema(ModifiedBaseModel):
     id: str
-    time_dependent: bool = False
-    scenario_dependent: bool = False
+    time_dependent: bool = True
+    scenario_dependent: bool = True
 
 
 class VariableSchema(ModifiedBaseModel):

@@ -17,8 +17,19 @@ All notable changes to GemsPy are documented here.
 - **Parquet output** - `gemspy --output-format csv|parquet` (default `csv`), or
   `run_study(output_format=...)`, chooses the file format. Parquet files are
   zstd-compressed.
+- **Constant terms in objective contributions** - an objective contribution can
+  now mix variables and constants (e.g. `sum(cost * generation + 1)`); this
+  previously raised `ValueError: Constant values in objective function not
+  supported`. `OptimizationProblem.objective_value` and the `objective-value`
+  row of the simulation table include the constant; `linopy_model.objective.value`
+  and the LP file written by `export_lp` do not.
 
 ### Changed
+- **Breaking** - a model parameter that omits `time-dependent` or
+  `scenario-dependent` is now time- or scenario-dependent, as in Antares
+  Simulator (it was constant). A component may still give it a constant value.
+  Declare `time-dependent: false` / `scenario-dependent: false` for parameters
+  that must stay constant.
 - **Breaking** - loading a study whose library declares a `taxonomy` raises
   `ValueError` if no taxonomy is supplied, or if its id differs from the declared
   one.
