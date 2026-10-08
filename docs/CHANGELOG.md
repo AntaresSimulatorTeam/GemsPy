@@ -18,6 +18,12 @@ All notable changes to GemsPy are documented here.
   In Python, use
   `expr.time_sum_between(from_bound, to_bound)` with `relative_time(offset)` for
   bounds relative to `t`.
+- **Constant terms in objective contributions** - an objective contribution can
+  now mix variables and constants (e.g. `sum(cost * generation + 1)`); this
+  previously raised `ValueError: Constant values in objective function not
+  supported`. `OptimizationProblem.objective_value` and the `objective-value`
+  row of the simulation table include the constant; `linopy_model.objective.value`
+  and the LP file written by `export_lp` do not.
 
 ### Changed
 - **Breaking** - a model parameter that omits `time-dependent` or
