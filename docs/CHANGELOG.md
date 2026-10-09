@@ -44,6 +44,9 @@ All notable changes to GemsPy are documented here.
   effect. It is now translated into the solver's own output option
   (`output_flag` for HiGHS, `OutputFlag` for Gurobi, `outputlog` for Xpress);
   with `logs: false` HiGHS only prints its startup banner.
+- **`first-time-step` greater than `last-time-step`** is now rejected when the
+  optim-config is loaded. The run used to fail later, with an error that did
+  not mention the time scope.
 
 ---
 
