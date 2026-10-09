@@ -18,9 +18,6 @@ All notable changes to GemsPy are documented here.
   time index of the block (of each block in sequential and parallel subproblem
   modes); outside the block, it wraps around it, and it never causes a
   constraint to be dropped by `out-of-bounds-processing`.
-  In Python, use
-  `expr.time_sum_between(from_bound, to_bound)` with `relative_time(offset)` for
-  bounds relative to `t`.
 - **Constant terms in objective contributions** - an objective contribution can
   now mix variables and constants (e.g. `sum(cost * generation + 1)`); this
   previously raised `ValueError: Constant values in objective function not
