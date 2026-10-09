@@ -197,6 +197,29 @@ def test_absolute_bound_given_by_a_parameter(tmp_path: Path) -> None:
     assert _solve(study_dir)["a"] == [5, 5, 5, 5]
 
 
+@pytest.mark.parametrize(
+    "time_sum, expected",
+    [
+        pytest.param("sum(0 .. d[1], x)", [6, 6, 6, 6], id="absolute"),
+        pytest.param("sum(t - (d[0]) .. t, x)", [5, 3, 5, 7], id="relative"),
+    ],
+)
+def test_bound_with_a_time_operator(
+    tmp_path: Path, time_sum: str, expected: List[float]
+) -> None:
+    study_dir = _make_study(
+        tmp_path,
+        variables=["x", "a"],
+        constraints=["x = d", f"a = {time_sum}"],
+        objective="sum(x)",
+        data={"d": [1, 2, 3, 4]},
+        constants={},
+        nb_time_steps=4,
+    )
+
+    assert _solve(study_dir)["a"] == expected
+
+
 def test_absolute_index_refers_to_the_block(tmp_path: Path) -> None:
     """In sequential mode, sum(0 .. 1, x) sums the first two steps of each block."""
     study_dir = _make_study(

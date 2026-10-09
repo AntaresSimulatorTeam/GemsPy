@@ -256,11 +256,11 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         to_offset = node.to_time.offset
         try:
             from_shift_scalar: Optional[int] = self._eval_int(from_offset)
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, NotImplementedError):
             from_shift_scalar = None
         try:
             to_shift_scalar: Optional[int] = self._eval_int(to_offset)
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, NotImplementedError):
             to_shift_scalar = None
 
         operand = visit(node.operand, self)
@@ -347,7 +347,7 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         value_node = bound.offset if isinstance(bound, RelativeTimeNode) else bound
         try:
             value: xr.DataArray = xr.DataArray(float(self._eval_int(value_node)))
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, NotImplementedError):
             result = visit(value_node, self)
             if not isinstance(result, xr.DataArray):
                 raise ValueError(
