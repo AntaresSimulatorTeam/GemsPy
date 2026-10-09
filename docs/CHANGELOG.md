@@ -12,12 +12,7 @@ All notable changes to GemsPy are documented here.
 - **Absolute bounds in time sums** - in `sum(S .. E, X)`, a bound can now be an
   absolute time index of the block (an expression without `t`, e.g.
   `sum(0 .. 2, x)`) as well as a bound relative to `t`, and both can be mixed
-  (e.g. `sum(0 .. t, x)`). Bounds must be fixed in time: this depends on the data
-  of each component, so a parameter used in a bound may be declared
-  time-dependent if its values do not vary in time. An absolute bound is a
-  time index of the block (of each block in sequential and parallel subproblem
-  modes); outside the block, it wraps around it, and it never causes a
-  constraint to be dropped by `out-of-bounds-processing`.
+  (e.g. `sum(0 .. t, x)`).
 - **Constant terms in objective contributions** - an objective contribution can
   now mix variables and constants (e.g. `sum(cost * generation + 1)`); this
   previously raised `ValueError: Constant values in objective function not
