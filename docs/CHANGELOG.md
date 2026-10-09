@@ -5,6 +5,10 @@ All notable changes to GemsPy are documented here.
 ## [Unreleased]
 
 ### Added
+- **`SimulationTable.objective_values()`** - returns the objective value of
+  every solved problem, with columns `block`, `scenario_index` and `value`.
+- **`block=` on the simulation table views** - `component(...).output(name,
+  block=...)` and `OutputView.value(..., block=...)` select one block.
 - **Taxonomy conformance checked when a study is loaded** - `load_study` reads
   the optional `input/taxonomy.yml` and calls
   `validate_libraries_against_taxonomy` on every library declaring a `taxonomy`
@@ -17,6 +21,16 @@ All notable changes to GemsPy are documented here.
   and the LP file written by `export_lp` do not.
 
 ### Changed
+- **Breaking** - `SimulationTable.data` has one fixed schema, whatever the
+  content: nullable `Int64` indices (empty for a missing dimension), `string`
+  labels and `float64` values (`SIMULATION_TABLE_SCHEMA` /
+  `SIMULATION_TABLE_DTYPES`). `scenario_index` was an `object` column mixing
+  ints and `None`. Comparisons on empty cells give `<NA>`, which filters treat
+  as no match.
+- **Breaking** - when the values requested from an `OutputView` include a
+  (time, scenario) solved in several blocks (overlapping sequential blocks, or
+  the per-block rows of an output without a time dimension), `value()` and
+  `data` raise unless `block=` is given. They silently returned the first row.
 - **Each run gets its own output folder** - the run id is now the start time to
   the second plus a short random suffix (e.g. `20261009T143502-3f9a1c`, it was
   `20261009T1435`), and `run_study` creates `output/<run_id>/` before solving,
@@ -44,6 +58,10 @@ All notable changes to GemsPy are documented here.
   import paths only.
 
 ### Fixed
+- **Outputs without a time or scenario dimension** - `OutputView.value()`
+  accepts any index for the missing dimension and returns the single stored
+  value; it raised `KeyError` for any index but 0. `OutputView.data` keeps one
+  row (or column) for that dimension, labelled `<NA>` (it was `0`).
 - **Scenario index of single-scenario solves** - a problem solved for a single
   scenario (every sequential/parallel block, a frontal run with one scenario)
   now fills `scenario_index` on every row, including the objective value and
