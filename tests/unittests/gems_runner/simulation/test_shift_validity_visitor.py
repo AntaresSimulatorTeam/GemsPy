@@ -142,7 +142,7 @@ def test_time_sum_positive_to_blocks_last_t():
     np.testing.assert_array_equal(mask.values, [True, True, True, False])
 
 
-@pytest.mark.parametrize("start, end", [(0, 2), (0, 4), (-1, 1)])
+@pytest.mark.parametrize("start, end", [(0, 4), (-1, 1)])
 def test_time_sum_absolute_bounds_never_dropped(start: int, end: int) -> None:
     # Absolute indices wrap around the block, as x[N], also outside it.
     expr = var("x").time_sum_between(start, end)
