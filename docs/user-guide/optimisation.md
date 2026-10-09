@@ -14,7 +14,9 @@ GemsPy offers three levels of abstraction for running an optimisation:
 
 The simplest way to run a study is a single function call.  It reads the study
 directory, loads `input/optim-config.yml` (using defaults when absent), solves
-the problem, and writes results to `output/<run_id>/`.
+the problem, and writes results to `output/<run_id>/`. The run id is the start
+time to the second plus a short random suffix (e.g. `20261009T143502-3f9a1c`),
+so every run gets its own folder.
 
 ~~~ python
 from pathlib import Path
