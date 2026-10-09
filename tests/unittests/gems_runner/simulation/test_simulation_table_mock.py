@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -108,7 +109,9 @@ def test_simulation_table_builder_manual(tmp_path: Path) -> None:
     parquet_path.unlink()
 
 
-def _make_problem_with_da(da: xr.DataArray, var_name: str = "p") -> "FakeProblem":
+def _make_problem_with_da(
+    da: xr.DataArray, var_name: str = "p", scenario_ids: Optional[list] = None
+) -> "FakeProblem":
     """Build a FakeProblem whose only variable has the given DataArray as solution."""
     fake_var = FakeLinopyVar(
         name=f"mod__{var_name}",
@@ -121,6 +124,7 @@ def _make_problem_with_da(da: xr.DataArray, var_name: str = "p") -> "FakeProblem
         models={0: FakeModel()},
         model_components={},
         study=FakeStudy(models={0: FakeModel()}, model_components={}),
+        scenario_ids=scenario_ids,
     )
 
 
@@ -173,3 +177,65 @@ def test_scalar_output_has_none_time_and_scenario_indices() -> None:
     assert pd.isna(rows.iloc[0][SimulationColumns.BLOCK_TIME_INDEX.value])
     assert pd.isna(rows.iloc[0][SimulationColumns.SCENARIO_INDEX.value])
     assert rows.iloc[0][SimulationColumns.VALUE.value] == 99.0
+
+
+# ---------------------------------------------------------------------------
+# Tests: scenario_index of single-scenario solves
+# ---------------------------------------------------------------------------
+
+SCENARIO_COL = SimulationColumns.SCENARIO_INDEX.value
+
+
+def _scalar_da() -> xr.DataArray:
+    """Solution of a variable without time and scenario dimensions."""
+    return xr.DataArray(
+        np.array([99.0]), dims=["component"], coords={"component": ["compA"]}
+    )
+
+
+def test_single_scenario_solve_tags_every_row() -> None:
+    """With one scenario, scenario-independent outputs and the objective value
+    get that scenario's id too."""
+    problem = _make_problem_with_da(_scalar_da())
+    data = SimulationTableBuilder().build(problem, scenario_ids_remap=[3]).data  # type: ignore[arg-type]
+
+    assert list(data[SCENARIO_COL]) == [3, 3]  # p, objective-value
+    assert data[SCENARIO_COL].dtype == "int64"
+
+
+def test_single_scenario_tag_matches_scenario_dependent_rows() -> None:
+    """Rows with and without a scenario dimension get the same scenario id."""
+    scenario_dependent = xr.DataArray(
+        np.array([[5.0]]),
+        dims=["component", "scenario"],
+        coords={"component": ["compA"], "scenario": [0]},
+    )
+    problem = _make_problem_with_da(scenario_dependent)
+    data = SimulationTableBuilder().build(problem, scenario_ids_remap=[7]).data  # type: ignore[arg-type]
+
+    assert list(data[SCENARIO_COL]) == [7, 7]
+
+
+def test_several_scenarios_keep_shared_rows_empty() -> None:
+    """With several scenarios, scenario-independent outputs and the objective
+    value are shared by all scenarios: their scenario index stays empty."""
+    problem = _make_problem_with_da(_scalar_da())
+    data = SimulationTableBuilder().build(problem, scenario_ids_remap=[0, 1]).data  # type: ignore[arg-type]
+
+    assert data[SCENARIO_COL].isna().all()
+
+
+def test_single_scenario_problem_is_tagged_without_remap() -> None:
+    """build(problem) without scenario_ids_remap uses the problem's own scenario
+    list; rows are labelled by scenario position, so the tag is 0."""
+    problem = _make_problem_with_da(_scalar_da(), scenario_ids=[4])
+    data = SimulationTableBuilder().build(problem).data  # type: ignore[arg-type]
+
+    assert list(data[SCENARIO_COL]) == [0, 0]
+
+
+def test_several_scenario_problem_keeps_shared_rows_empty_without_remap() -> None:
+    problem = _make_problem_with_da(_scalar_da(), scenario_ids=[0, 1])
+    data = SimulationTableBuilder().build(problem).data  # type: ignore[arg-type]
+
+    assert data[SCENARIO_COL].isna().all()

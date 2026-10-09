@@ -17,6 +17,12 @@ All notable changes to GemsPy are documented here.
   and the LP file written by `export_lp` do not.
 
 ### Changed
+- **Each run gets its own output folder** - the run id is now the start time to
+  the second plus a short random suffix (e.g. `20261009T143502-3f9a1c`, it was
+  `20261009T1435`), and `run_study` creates `output/<run_id>/` before solving,
+  failing over to a new id rather than reusing an existing folder. Runs started
+  in the same minute shared a folder, and the second run's files replaced or
+  mixed with the first run's.
 - **Breaking** - a model parameter that omits `time-dependent` or
   `scenario-dependent` is now time- or scenario-dependent, as in Antares
   Simulator (it was constant). A component may still give it a constant value.
@@ -38,6 +44,11 @@ All notable changes to GemsPy are documented here.
   import paths only.
 
 ### Fixed
+- **Scenario index of single-scenario solves** - a problem solved for a single
+  scenario (every sequential/parallel block, a frontal run with one scenario)
+  now fills `scenario_index` on every row, including the objective value and
+  outputs without a scenario dimension. They were left empty, so in sequential
+  and parallel modes the rows of different scenarios could not be told apart.
 - **`solver-options.logs` now controls solver output** - it was passed to the
   solver as an unknown `solver_logs` option (HiGHS printed
   `getOptionIndex: Option "solver_logs" is unknown` on every solve) and had no

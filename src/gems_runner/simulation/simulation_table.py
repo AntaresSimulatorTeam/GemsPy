@@ -192,6 +192,23 @@ class SimulationColumns(str, Enum):
     BASIS_STATUS = "basis_status"
 
 
+def _tag_single_scenario(df: pd.DataFrame, scenario_id: int) -> pd.DataFrame:
+    """Tag every row of a problem solved for a single MC scenario with it.
+
+    This is always the case in sequential/parallel modes, and in frontal mode
+    with one scenario: every row belongs to that scenario, including
+    scenario-independent outputs and the objective value, whose empty scenario
+    index would wrongly mean "shared by all scenarios".
+    """
+    scenario_col = SimulationColumns.SCENARIO_INDEX.value
+    column = df[scenario_col]
+    # where() + infer_objects() gives an int64 column on every pandas version:
+    # fillna() downcasts with a FutureWarning on pandas 2.x, and no longer
+    # downcasts on pandas 3.
+    df[scenario_col] = column.where(column.notna(), scenario_id).infer_objects()
+    return df
+
+
 class SimulationTableBuilder:
     """Builds simulation tables directly from a OptimizationProblem."""
 
@@ -225,7 +242,19 @@ class SimulationTableBuilder:
         )
         dfs.append(self._collect_objective_value(problem, block))
 
-        return SimulationTable(pd.concat(dfs, ignore_index=True), table_id=table_id)
+        df = pd.concat(dfs, ignore_index=True)
+        scenario_ids = (
+            scenario_ids_remap
+            if scenario_ids_remap is not None
+            else problem.scenario_ids
+        )
+        if scenario_ids is not None and len(scenario_ids) == 1:
+            # Same label as the rows that have a scenario dimension: the
+            # remapped id, or the scenario position 0 without a remap.
+            label = scenario_ids_remap[0] if scenario_ids_remap is not None else 0
+            df = _tag_single_scenario(df, label)
+
+        return SimulationTable(df, table_id=table_id)
 
     # -------------------------------------------------------------------------
     # Solver outputs

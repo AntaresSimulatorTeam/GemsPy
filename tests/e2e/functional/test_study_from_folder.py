@@ -1,3 +1,4 @@
+import re
 import shutil
 from pathlib import Path
 
@@ -71,3 +72,25 @@ def test_load_study_raises_on_taxonomy_id_mismatch(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="other_taxonomy"):
         load_study(study_dir)
+
+
+def _copy_13_1(tmp_path: Path) -> Path:
+    study_dir = tmp_path / "13_1"
+    shutil.copytree(Path(__file__).parent / "studies" / "13_1", study_dir)
+    return study_dir
+
+
+def test_runs_in_quick_succession_get_their_own_folder(tmp_path: Path) -> None:
+    study_dir = _copy_13_1(tmp_path)
+
+    run_study(study_dir)
+    run_study(study_dir)
+
+    run_dirs = sorted((study_dir / "output").iterdir())
+    assert len(run_dirs) == 2
+    for run_dir in run_dirs:
+        # Run id: start time to the second plus a short random suffix.
+        assert re.fullmatch(r"\d{8}T\d{6}-[0-9a-f]{6}", run_dir.name)
+        # Each folder holds exactly its own run's table, named after its run id.
+        files = [f.name for f in run_dir.iterdir()]
+        assert files == [f"simulation_table_{run_dir.name}.csv"]
