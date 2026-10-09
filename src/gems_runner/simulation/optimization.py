@@ -360,11 +360,14 @@ class OptimizationProblem:
         linopy_vars_by_component: Optional[
             Dict[Tuple[str, str, str], linopy.Variable]
         ] = None,
+        scenario_ids: Optional[List[int]] = None,
     ) -> None:
         self.name = name
         self.linopy_model = linopy_model
         self.study = study
         self.block = block
+        # MC scenarios the problem was built for (None if unknown).
+        self.scenario_ids = scenario_ids
         self._linopy_vars = linopy_vars
         self._linopy_vars_by_component = linopy_vars_by_component or {}
         self.param_arrays = param_arrays
@@ -670,6 +673,7 @@ class _OptimizationProblemBuilder:
             linopy_vars_by_component=self.linopy_vars_by_component,
             param_arrays=self.param_arrays,
             objective_constant=objective_constant,
+            scenario_ids=self.scenario_ids,
         )
 
     # ------------------------------------------------------------------
