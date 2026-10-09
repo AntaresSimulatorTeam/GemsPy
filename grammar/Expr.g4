@@ -17,6 +17,14 @@ portFieldExpr : IDENTIFIER '.' IDENTIFIER;
 /* To match the whole input */
 fullexpr: expr EOF;
 
+// A time sum bound is either an absolute time index (an expression without "t")
+// or relative to the current time step ("t", "t + ...", "t - ...").
+// Same rule, alternative order and position as in Antares Simulator's Expr.g4.
+sum_bound
+    : expr
+    | shift
+    ;
+
 expr
     : atom                                     # unsignedAtom
     | portFieldExpr                            # portField
@@ -36,13 +44,6 @@ expr
     ;
 
 argList : expr (',' expr)* ;
-
-// A time sum bound is either relative to the current time step ("t", "t + ...",
-// "t - ...") or an absolute time index (an expression without "t").
-sum_bound
-    : shift
-    | expr
-    ;
 
 atom
     : NUMBER                                   # number
