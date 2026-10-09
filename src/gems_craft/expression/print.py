@@ -25,6 +25,7 @@ from gems_craft.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RoundNode,
     TimeEvalNode,
@@ -88,6 +89,11 @@ class PrinterVisitor(ExpressionVisitor[str]):
         left_value = visit(node.left, self)
         right_value = visit(node.right, self)
         return f"({left_value} / {right_value})"
+
+    def power(self, node: PowerNode) -> str:
+        left_value = visit(node.left, self)
+        right_value = visit(node.right, self)
+        return f"({left_value} ^ {right_value})"
 
     def comparison(self, node: ComparisonNode) -> str:
         op = _COMPARISON_OPERATOR_TO_STRING[node.comparator]

@@ -23,6 +23,7 @@ from gems_craft.expression import (
     var,
     visit,
 )
+from gems_craft.expression.degree import is_constant, is_linear
 from gems_craft.expression.expression import (
     AbsNode,
     CeilNode,
@@ -102,3 +103,35 @@ def test_degree_computation_should_take_into_account_simplifications() -> None:
 
     expr = LiteralNode(0) * x
     assert visit(expr, ExpressionDegreeVisitor()) == 0
+
+
+def test_power_degree() -> None:
+    x = var("x")
+    p = param("p")
+
+    # Literals and parameters stay constant, whatever the exponent.
+    assert visit(param("p") ** 2, ExpressionDegreeVisitor()) == 0
+    assert visit(LiteralNode(2) ** p, ExpressionDegreeVisitor()) == 0
+    assert visit(p ** (1 + param("q")), ExpressionDegreeVisitor()) == 0
+
+    # A variable base raised to a non-negative integer literal stays polynomial.
+    assert visit(x**2, ExpressionDegreeVisitor()) == 2
+    assert visit(x**1, ExpressionDegreeVisitor()) == 1
+    assert visit(x**0, ExpressionDegreeVisitor()) == 0
+    assert visit((x * x) ** 2, ExpressionDegreeVisitor()) == 4
+
+    # Any other exponent on a variable base is not polynomial.
+    assert visit(x**p, ExpressionDegreeVisitor()) == math.inf
+    assert visit(x**0.5, ExpressionDegreeVisitor()) == math.inf
+    assert visit(x ** (-2), ExpressionDegreeVisitor()) == math.inf
+
+    # An inf-degree base stays inf, including for the exponent 0 (inf * 0 is nan).
+    assert visit(FloorNode(x) ** 2, ExpressionDegreeVisitor()) == math.inf
+    assert visit(FloorNode(x) ** 0, ExpressionDegreeVisitor()) == 0
+
+
+def test_variable_exponent_degree() -> None:
+    """A variable exponent is not polynomial, but must not break is_linear()."""
+    assert visit(param("p") ** var("x"), ExpressionDegreeVisitor()) == math.inf
+    assert not is_linear(param("p") ** var("x"))
+    assert not is_constant(param("p") ** var("x"))

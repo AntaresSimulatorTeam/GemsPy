@@ -35,8 +35,10 @@ from gems_craft.expression.expression import (
     AdditionNode,
     CeilNode,
     FloorNode,
+    LiteralNode,
     MaxNode,
     MinNode,
+    PowerNode,
     RoundNode,
     VariableNode,
 )
@@ -111,6 +113,28 @@ class VectorizedLinearExprBuilder(VectorizedBuilderBase[VectorizedExpr]):
     # ------------------------------------------------------------------ #
     # Overrides: nonlinear math functions (guard — variables not allowed)   #
     # ------------------------------------------------------------------ #
+
+    def power(self, node: PowerNode) -> VectorizedExpr:
+        exponent = visit(node.right, self)
+        if not isinstance(exponent, xr.DataArray):
+            raise NotImplementedError(
+                "The exponent of '^' must be a parameter (DataArray) expression; "
+                "it cannot depend on decision variables in a linear programme."
+            )
+        base = visit(node.left, self)
+        if isinstance(base, xr.DataArray):
+            return np.power(base, exponent)  # type: ignore[return-value]
+        # A variable base only stays linear for the literal exponents 0 and 1,
+        # which the degree check lets through; anything else is nonlinear.
+        if isinstance(node.right, LiteralNode):
+            if node.right.value == 1:
+                return base
+            if node.right.value == 0:
+                return xr.DataArray(1.0)  # type: ignore[return-value]
+        raise NotImplementedError(
+            "'^' is only supported for parameter (DataArray) expressions; "
+            "it cannot be used with decision variables in a linear programme."
+        )
 
     def floor(self, node: FloorNode) -> VectorizedExpr:
         operand = visit(node.operand, self)

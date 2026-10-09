@@ -59,6 +59,7 @@ from gems_craft.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
@@ -365,6 +366,11 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     # ------------------------------------------------------------------ #
     # Overridden in VectorizedLinearExprBuilder to raise when operands contain
     # linopy types: these operations cannot be expressed as linear constraints.
+
+    def power(self, node: PowerNode) -> VectorizedExpr:
+        base = visit(node.left, self)
+        exponent = visit(node.right, self)
+        return np.power(base, exponent)  # type: ignore[return-value,arg-type,call-overload]
 
     def floor(self, node: FloorNode) -> VectorizedExpr:
         operand = visit(node.operand, self)
@@ -702,6 +708,9 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return _and_mask(visit(node.left, self), visit(node.right, self))
 
     def comparison(self, node: ComparisonNode) -> Optional[xr.DataArray]:
+        return _and_mask(visit(node.left, self), visit(node.right, self))
+
+    def power(self, node: PowerNode) -> Optional[xr.DataArray]:
         return _and_mask(visit(node.left, self), visit(node.right, self))
 
     def floor(self, node: FloorNode) -> Optional[xr.DataArray]:

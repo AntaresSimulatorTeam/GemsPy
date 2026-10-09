@@ -33,6 +33,10 @@ from gems_craft.expression.expression import (
     ReducedCostNode,
     UpperBoundNode,
 )
+from gems_craft.expression.parsing.parse_expression import (
+    ModelIdentifiers,
+    parse_expression,
+)
 from gems_runner.expression import EvaluationContext, EvaluationVisitor, ValueProvider
 
 
@@ -115,6 +119,37 @@ def test_dual_reduced_cost_evaluation_raises() -> None:
         visit(DualNode("balance"), EvaluationVisitor(ctx))
     with pytest.raises(NotImplementedError, match="reduced_cost"):
         visit(ReducedCostNode("p"), EvaluationVisitor(ctx))
+
+
+def test_power_evaluation() -> None:
+    x = var("x")
+    p = param("p")
+    context = EvaluationContext(variables={"x": 3}, parameters={"p": 2})
+
+    assert visit(x**2, EvaluationVisitor(context)) == pytest.approx(9.0)
+    assert visit(x ** (2 + p), EvaluationVisitor(context)) == pytest.approx(81.0)
+    assert visit(x ** (-p), EvaluationVisitor(context)) == pytest.approx(1 / 9)
+    assert visit(x**0.5, EvaluationVisitor(context)) == pytest.approx(3**0.5)
+    assert visit(literal(2) ** p, EvaluationVisitor(context)) == pytest.approx(4.0)
+
+
+def test_power_precedence_evaluation() -> None:
+    """The parsed form must evaluate the way standard notation reads."""
+    identifiers = ModelIdentifiers(variables=set(), parameters=set())
+    context = EvaluationContext(variables={}, parameters={})
+
+    def value(expression_str: str) -> float:
+        expr = parse_expression(expression_str, identifiers)
+        return visit(expr, EvaluationVisitor(context))
+
+    assert value("-2^2") == pytest.approx(-4.0)  # not (-2)^2 = 4
+    assert value("2^-3") == pytest.approx(0.125)
+    assert value("2^3^2") == pytest.approx(512.0)  # not (2^3)^2 = 64
+    assert value("2*3^2") == pytest.approx(18.0)
+    assert value("2^3*2") == pytest.approx(16.0)
+    # the shift amounts of "x[t-2^2]" and "x[t-2^2*3]"
+    assert value("-2^2") == pytest.approx(-4.0)
+    assert value("-2^2*3") == pytest.approx(-12.0)
 
 
 def test_lower_upper_bound_evaluation_raises() -> None:
