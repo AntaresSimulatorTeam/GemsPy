@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 import xarray as xr
 
 PARQUET_COMPRESSION: Literal["zstd"] = "zstd"
@@ -13,43 +14,110 @@ PARQUET_ROW_GROUP_SIZE = 64_000
 
 
 class OutputView:
-    """A Time × Scenario pivot for one (component, output) combination.
+    """Time × Scenario values of one (component, output).
 
     Obtain via ``SimulationTable.component(...).output(...)``.
+
+    - An output without a time (or scenario) dimension has a single row (or
+      column), labelled ``<NA>``, and ``value()`` accepts any index for that
+      dimension.
+    - Several blocks can hold a value for the same (time, scenario):
+      overlapping sequential blocks, or the per-block rows of an output without
+      a time dimension. A call whose requested values include such a
+      (time, scenario) raises unless ``block=`` says which block to read.
     """
 
-    def __init__(self, df: pd.DataFrame) -> None:
-        # df: index = absolute_time_index, columns = scenario_index
-        self._df = df
+    def __init__(
+        self, rows: pd.DataFrame, name: str, block: Optional[int] = None
+    ) -> None:
+        # rows: long format, one row per (block, time, scenario).
+        self._rows = rows
+        self._name = name
+        self._block = block
+        self._time_missing = bool(rows[_TIME].isna().all())
+        self._scenario_missing = bool(rows[_SCENARIO].isna().all())
 
     @property
     def data(self) -> pd.DataFrame:
-        """Return the underlying Time × Scenario DataFrame."""
-        return self._df
+        """Return the Time × Scenario DataFrame.
+
+        Raises ``ValueError`` if a (time, scenario) has values from several
+        blocks: select one with ``output(name, block=...)``.
+        """
+        return self._frame(self._select(None, None, self._block))
 
     def value(
         self,
         time_index: Optional[int] = None,
         scenario_index: Optional[int] = None,
+        block: Optional[int] = None,
     ) -> Union[pd.DataFrame, "pd.Series[Any]", float]:
         """Return results filtered by time and/or scenario index.
 
-        Called with no arguments returns the full Time × Scenario DataFrame.
-        Called with one argument returns a ``pd.Series``:
+        Called with no index returns the full Time × Scenario DataFrame.
+        Called with one index returns a ``pd.Series``:
         - ``value(scenario_index=s)`` → Series indexed by absolute_time_index
         - ``value(time_index=t)``     → Series indexed by scenario_index
-        Called with both arguments returns a scalar ``float``.
+        Called with both indices returns a scalar ``float``.
+
+        An index of a dimension the output does not have is accepted and
+        ignored. ``block`` selects the block, and is required when a requested
+        (time, scenario) has values from several blocks.
         """
+        rows = self._select(
+            time_index, scenario_index, self._block if block is None else block
+        )
         if time_index is None and scenario_index is None:
-            return self._df
+            return self._frame(rows)
+        if rows.empty:
+            raise KeyError(
+                f"{self._name}: no value for time_index={time_index}, "
+                f"scenario_index={scenario_index}"
+            )
         if time_index is not None and scenario_index is not None:
-            return float(cast(Any, self._df.loc[time_index, scenario_index]))
+            return float(rows[_VALUE].iloc[0])
+        frame = self._frame(rows)
         if time_index is not None:
-            return self._df.loc[time_index]  # Series over scenarios
-        return self._df[scenario_index]  # Series over time
+            return frame.iloc[0]  # Series over scenarios
+        return frame.iloc[:, 0]  # Series over time
+
+    def _select(
+        self,
+        time_index: Optional[int],
+        scenario_index: Optional[int],
+        block: Optional[int],
+    ) -> pd.DataFrame:
+        """Rows matching the request; raises if a (time, scenario) of the
+        result has values from several blocks."""
+        rows = self._rows
+        if block is not None:
+            rows = rows[_equals(rows[_BLOCK], block)]
+        if time_index is not None and not self._time_missing:
+            rows = rows[_equals(rows[_TIME], time_index)]
+        if scenario_index is not None and not self._scenario_missing:
+            rows = rows[_equals(rows[_SCENARIO], scenario_index)]
+
+        shared = rows[rows.duplicated(subset=[_TIME, _SCENARIO], keep=False)]
+        if not shared.empty:
+            time, scenario = shared[_TIME].iloc[0], shared[_SCENARIO].iloc[0]
+            same_key = _same_key(shared[_TIME], time) & _same_key(
+                shared[_SCENARIO], scenario
+            )
+            blocks = sorted(int(b) for b in shared[same_key][_BLOCK].unique())
+            raise ValueError(
+                f"{self._name}: absolute_time_index={time}, "
+                f"scenario_index={scenario} has values from blocks {blocks}; "
+                "pass block= to choose one"
+            )
+        return rows
+
+    @staticmethod
+    def _frame(rows: pd.DataFrame) -> pd.DataFrame:
+        frame = rows.pivot(index=_TIME, columns=_SCENARIO, values=_VALUE)
+        return frame.sort_index(axis=0).sort_index(axis=1)
 
     def __repr__(self) -> str:
-        return repr(self._df)
+        return repr(self._rows)
 
 
 class ComponentView:
@@ -58,31 +126,22 @@ class ComponentView:
     Obtain via ``SimulationTable.component(...)``.
     """
 
-    def __init__(self, df: pd.DataFrame) -> None:
+    def __init__(self, df: pd.DataFrame, component_id: str) -> None:
         self._df = df
+        self._component_id = component_id
 
-    def output(self, output_id: str) -> OutputView:
-        """Return an OutputView for the given output name."""
-        col_output = SimulationColumns.OUTPUT.value
-        col_time = SimulationColumns.ABSOLUTE_TIME_INDEX.value
-        col_scenario = SimulationColumns.SCENARIO_INDEX.value
-        col_value = SimulationColumns.VALUE.value
+    def output(self, output_id: str, block: Optional[int] = None) -> OutputView:
+        """Return an OutputView for the given output name.
 
-        filtered = self._df[self._df[col_output] == output_id].copy()
-        # Dimension-independent outputs store None for the missing index.
-        # Fill with 0 so the pivot is always well-formed and the accessor
-        # API (value(time_index=t, scenario_index=s)) keeps working.
-        filtered[col_time] = filtered[col_time].fillna(0)
-        filtered[col_scenario] = filtered[col_scenario].fillna(0)
-        pivot = filtered.pivot_table(
-            index=col_time,
-            columns=col_scenario,
-            values=col_value,
-            aggfunc="first",
+        ``block`` restricts the view to one block, for outputs that have values
+        from several blocks for the same (time, scenario).
+        """
+        rows = self._df[_equals(self._df[_OUTPUT], output_id)]
+        return OutputView(
+            rows[[_BLOCK, _TIME, _SCENARIO, _VALUE]],
+            name=f"{self._component_id}.{output_id}",
+            block=block,
         )
-        pivot.index.name = col_time
-        pivot.columns.name = col_scenario
-        return OutputView(pivot)
 
 
 class SimulationTable:
@@ -118,8 +177,19 @@ class SimulationTable:
 
     def component(self, component_id: str) -> ComponentView:
         """Return a ComponentView filtered to the given component ID."""
-        mask = self._df[SimulationColumns.COMPONENT.value] == component_id
-        return ComponentView(self._df[mask])
+        mask = _equals(self._df[SimulationColumns.COMPONENT.value], component_id)
+        return ComponentView(self._df[mask], component_id)
+
+    def objective_values(self) -> pd.DataFrame:
+        """Return the objective value of every solved problem, with columns
+        ``block``, ``scenario_index`` and ``value``.
+
+        Sequential/parallel modes give one row per block and scenario. Frontal
+        mode gives one row, whose ``scenario_index`` is empty when the run has
+        several scenarios.
+        """
+        rows = self._df[_equals(self._df[_OUTPUT], OBJECTIVE_VALUE_OUTPUT)]
+        return rows[[_BLOCK, _SCENARIO, _VALUE]].reset_index(drop=True)
 
     def to_csv(self, output_dir: Path) -> Path:
         output_dir = Path(output_dir)
@@ -165,6 +235,10 @@ class SimulationTable:
         col_val = SimulationColumns.VALUE.value
 
         main = df.dropna(subset=[col_comp, col_time, col_scen])
+        # xarray needs numpy dtypes; these columns have no empty cell left.
+        main = main.astype(
+            {col_comp: object, col_out: object, col_time: "int64", col_scen: "int64"}
+        )
         indexed = main.set_index([col_comp, col_time, col_scen, col_out])[col_val]
         unstacked = indexed.unstack(col_out)
         ds = xr.Dataset.from_dataframe(unstacked)
@@ -190,6 +264,68 @@ class SimulationColumns(str, Enum):
     SCENARIO_INDEX = "scenario_index"
     VALUE = "value"
     BASIS_STATUS = "basis_status"
+
+
+_BLOCK = SimulationColumns.BLOCK.value
+_OUTPUT = SimulationColumns.OUTPUT.value
+_TIME = SimulationColumns.ABSOLUTE_TIME_INDEX.value
+_SCENARIO = SimulationColumns.SCENARIO_INDEX.value
+_VALUE = SimulationColumns.VALUE.value
+
+OBJECTIVE_VALUE_OUTPUT = "objective-value"
+
+# One schema for the simulation table, whatever the content: nullable integer
+# indices (empty for a missing dimension), string labels and float values.
+_INDEX_COLUMNS = {
+    SimulationColumns.BLOCK,
+    SimulationColumns.ABSOLUTE_TIME_INDEX,
+    SimulationColumns.BLOCK_TIME_INDEX,
+    SimulationColumns.SCENARIO_INDEX,
+}
+_LABEL_COLUMNS = {
+    SimulationColumns.COMPONENT,
+    SimulationColumns.OUTPUT,
+    SimulationColumns.BASIS_STATUS,
+}
+SIMULATION_TABLE_SCHEMA = pa.schema(
+    [
+        (
+            column.value,
+            (
+                pa.int64()
+                if column in _INDEX_COLUMNS
+                else pa.string() if column in _LABEL_COLUMNS else pa.float64()
+            ),
+        )
+        for column in SimulationColumns
+    ]
+)
+# Labels use the python-backed string dtype: with the pyarrow-backed one,
+# combining a label comparison and an index comparison with ``&`` raises on
+# empty cells (e.g. the component of the objective-value row).
+SIMULATION_TABLE_DTYPES: Dict[str, Any] = {
+    column.value: (
+        "Int64"
+        if column in _INDEX_COLUMNS
+        else pd.StringDtype("python") if column in _LABEL_COLUMNS else "float64"
+    )
+    for column in SimulationColumns
+}
+
+
+def _apply_schema(df: pd.DataFrame) -> pd.DataFrame:
+    """Give *df* the columns and dtypes of the simulation table schema."""
+    return df[list(SIMULATION_TABLE_DTYPES)].astype(SIMULATION_TABLE_DTYPES)
+
+
+def _equals(column: "pd.Series[Any]", value: Any) -> "pd.Series[bool]":
+    """``column == value`` as a plain boolean mask: empty cells never match."""
+    return column.eq(value).fillna(False).astype(bool)
+
+
+def _same_key(column: "pd.Series[Any]", value: Any) -> "pd.Series[bool]":
+    """Like ``_equals``, but an empty *value* matches the empty cells."""
+    return column.isna() if pd.isna(value) else _equals(column, value)
 
 
 def _tag_single_scenario(df: pd.DataFrame, scenario_id: int) -> pd.DataFrame:
@@ -254,7 +390,7 @@ class SimulationTableBuilder:
             label = scenario_ids_remap[0] if scenario_ids_remap is not None else 0
             df = _tag_single_scenario(df, label)
 
-        return SimulationTable(df, table_id=table_id)
+        return SimulationTable(_apply_schema(df), table_id=table_id)
 
     # -------------------------------------------------------------------------
     # Solver outputs
@@ -493,7 +629,7 @@ class SimulationTableBuilder:
                 {
                     SimulationColumns.BLOCK.value: block,
                     SimulationColumns.COMPONENT.value: None,
-                    SimulationColumns.OUTPUT.value: "objective-value",
+                    SimulationColumns.OUTPUT.value: OBJECTIVE_VALUE_OUTPUT,
                     SimulationColumns.ABSOLUTE_TIME_INDEX.value: None,
                     SimulationColumns.BLOCK_TIME_INDEX.value: None,
                     SimulationColumns.SCENARIO_INDEX.value: None,
