@@ -1,11 +1,37 @@
+import secrets
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 from gems_craft.optim_config.parsing import OptimConfig, load_optim_config
 from gems_craft.study.folder import load_study
 from gems_craft.study.parsing import OutputFormat
 from gems_runner.session.session import SimulationSession
+
+
+def _new_run_id() -> str:
+    """Start time to the second plus a short random suffix: seconds alone do
+    not separate runs started in quick succession."""
+    return f"{datetime.now().strftime('%Y%m%dT%H%M%S')}-{secrets.token_hex(3)}"
+
+
+def _reserve_output_dir(output_root: Path) -> Tuple[str, Path]:
+    """Create a new, empty run folder under *output_root* and return its run id
+    and path.
+
+    The folder is created without ``exist_ok``, so two runs can never share it.
+    It is reserved before solving because Benders mode writes ``structure.txt``
+    into it before the simulation table.
+    """
+    output_root.mkdir(parents=True, exist_ok=True)
+    while True:
+        run_id = _new_run_id()
+        output_dir = output_root / run_id
+        try:
+            output_dir.mkdir()
+        except FileExistsError:
+            continue
+        return run_id, output_dir
 
 
 def run_study(
@@ -35,8 +61,7 @@ def run_study(
     )
     optim_config = load_optim_config(resolved_config_path) or OptimConfig()
 
-    run_id = datetime.now().strftime("%Y%m%dT%H%M")
-    output_dir = study_dir / "output" / run_id
+    run_id, output_dir = _reserve_output_dir(study_dir / "output")
     session = SimulationSession(
         study=study,
         optim_config=optim_config,
