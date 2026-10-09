@@ -40,6 +40,8 @@ from gems_craft.expression.expression import (
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -91,6 +93,10 @@ class EqualityVisitor:
             return self.time_sum(left, right)
         if isinstance(left, AllTimeSumNode) and isinstance(right, AllTimeSumNode):
             return self.all_time_sum(left, right)
+        if isinstance(left, SetIndexNode) and isinstance(right, SetIndexNode):
+            return self.set_index(left, right)
+        if isinstance(left, SumOverNode) and isinstance(right, SumOverNode):
+            return self.sum_over(left, right)
         if isinstance(left, ScenarioOperatorNode) and isinstance(
             right, ScenarioOperatorNode
         ):
@@ -179,6 +185,24 @@ class EqualityVisitor:
 
     def all_time_sum(self, left: AllTimeSumNode, right: AllTimeSumNode) -> bool:
         return self.visit(left.operand, right.operand)
+
+    def set_index(self, left: SetIndexNode, right: SetIndexNode) -> bool:
+        if left.set_id != right.set_id:
+            return False
+        if (left.position is None) != (right.position is None):
+            return False
+        if (left.relative_shift is None) != (right.relative_shift is None):
+            return False
+        if left.position is not None and right.position is not None:
+            if not self.visit(left.position, right.position):
+                return False
+        if left.relative_shift is not None and right.relative_shift is not None:
+            if not self.visit(left.relative_shift, right.relative_shift):
+                return False
+        return self.visit(left.operand, right.operand)
+
+    def sum_over(self, left: SumOverNode, right: SumOverNode) -> bool:
+        return left.set_id == right.set_id and self.visit(left.operand, right.operand)
 
     def scenario_operator(
         self, left: ScenarioOperatorNode, right: ScenarioOperatorNode

@@ -129,6 +129,23 @@ def test_dual_reduced_cost_indexing() -> None:
     )
 
 
+def test_set_index_sum_over_indexing_placeholder() -> None:
+    """SetIndexNode/SumOverNode don't yet affect IndexingStructure (no `sets`
+    dimension exists there yet -- see indexing.py TODOs); for now they just
+    propagate the operand's time/scenario structure unchanged. This test
+    documents today's placeholder behavior and should be revisited once
+    IndexingStructure grows a `sets` dimension (custom sets, phase 2)."""
+    x = var("x")
+    provider = StructureProvider()
+
+    assert compute_indexation(x.set_index("fuel"), provider) == IndexingStructure(
+        True, True
+    )
+    assert compute_indexation(x.sum_over("fuel"), provider) == IndexingStructure(
+        True, True
+    )
+
+
 def test_lower_upper_bound_indexing() -> None:
     provider = StructureProvider()
     assert compute_indexation(LowerBoundNode("x"), provider) == IndexingStructure(

@@ -24,29 +24,46 @@ expr
     | '(' expr ')'                             # expression
     | expr op=('/' | '*') expr                 # muldiv
     | expr op=('+' | '-') expr                 # addsub
-    | expr COMPARISON expr                     # comparison
+    | expr op=(EQ | COMPARISON) expr           # comparison
     | 'sum' '(' expr ')'                       # allTimeSum
     | 'sum_connections' '(' portFieldExpr ')'  # portFieldSum
     | 'sum' '(' from=shift '..' to=shift ',' expr ')'  # timeSum
+    | 'sum_over' '(' IDENTIFIER ',' expr ')'   # sumOver
     | IDENTIFIER '(' argList? ')'              # function
-    | IDENTIFIER '[' shift ']'                 # timeShift
-    | IDENTIFIER '[' expr  ']'                 # timeIndex
-    | '(' expr ')' '[' shift ']'               # timeShiftExpr
-    | '(' expr ')' '[' expr ']'               # timeIndexExpr
+    | IDENTIFIER '[' indexList ']'             # bracketIndex
+    | '(' expr ')' '[' indexList ']'           # bracketIndexExpr
     ;
 
 argList : expr (',' expr)* ;
+
+// An index list is one or more comma-separated terms, in any order.
+// ANTLR only distinguishes the three shapes below; it cannot tell whether a
+// bare/signed identifier is a declared set, "t", or an ordinary
+// parameter -- that's resolved by ExpressionNodeBuilderVisitor via
+// ModelIdentifiers. Term order not mattering (`X[fuel=3, 2]` == `X[2,
+// fuel=3]`) and rejecting more than one term denoting the time dimension
+// (`X[2, 3]`) are also builder-level checks, not grammar-level ones.
+indexList : indexTerm (',' indexTerm)* ;
+
+// `X[name = 2]` also matches positionTerm (expr includes comparisons); ANTLR
+// picks the first alternative, so keywordTerm must stay before positionTerm.
+indexTerm
+    : shift                                    # namedOrTimeShiftTerm
+    | (TIME | IDENTIFIER) EQ expr              # keywordTerm
+    | expr                                     # positionTerm
+    ;
 
 atom
     : NUMBER                                   # number
     | IDENTIFIER                               # identifier
     ;
 
-// a shift is required to be either "t" or "t + ..." or "t - ..."
-// Note: simply defining it as "shift: TIME ('+' | '-') expr" won't work
-//       because the minus sign will not have the expected precedence:
-//       "t - d + 1" would be equivalent to "t - (d + 1)"
-shift: TIME shift_expr?;
+// A shift is required to be either "t"/a set id, or "t + ..."/"t - ...", or
+// "<set id> + ..."/"<set id> - ...".
+// Note: simply defining it as "shift: (TIME|IDENTIFIER) ('+' | '-') expr"
+//       won't work because the minus sign will not have the expected
+//       precedence: "t - d + 1" would be equivalent to "t - (d + 1)"
+shift: (TIME | IDENTIFIER) shift_expr?;
 
 // Because the shift MUST start with + or -, we need
 // to differentiate it from generic "expr".
@@ -78,6 +95,7 @@ fragment CHAR_OR_DIGIT : (CHAR | DIGIT);
 NUMBER        : DIGIT+ ('.' DIGIT+)?;
 TIME          : 't';
 IDENTIFIER    : CHAR CHAR_OR_DIGIT*;
-COMPARISON    : ( '=' | '>=' | '<=' );
+EQ            : '=';
+COMPARISON    : ( '>=' | '<=' );
 
 WS: (' ' | '\t' | '\r'| '\n') -> skip;
