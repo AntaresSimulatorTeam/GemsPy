@@ -16,10 +16,13 @@ from simulation_table_fakes import (
 )
 
 from gems_runner.simulation.simulation_table import (
+    SIMULATION_TABLE_DTYPES,
+    SIMULATION_TABLE_SCHEMA,
     ComponentView,
     OutputView,
     SimulationTable,
     SimulationTableBuilder,
+    _apply_schema,
 )
 
 # ---------------------------------------------------------------------------
@@ -258,3 +261,132 @@ def test_scalar_output_accessible_via_fluent_api() -> None:
     assert st.component("compA").output("p").value(
         time_index=0, scenario_index=0
     ) == pytest.approx(99.0)
+
+
+# ---------------------------------------------------------------------------
+# Tests: hand-built tables (missing dimensions, several blocks, objective)
+# ---------------------------------------------------------------------------
+
+
+def _table(rows: list) -> SimulationTable:
+    """SimulationTable from (block, component, output, time, scenario, value)."""
+    df = pd.DataFrame(
+        [
+            {
+                "block": b,
+                "component": c,
+                "output": o,
+                "absolute_time_index": t,
+                "block_time_index": None if t is None else t,
+                "scenario_index": s,
+                "value": v,
+                "basis_status": None,
+            }
+            for b, c, o, t, s, v in rows
+        ]
+    )
+    return SimulationTable(_apply_schema(df))
+
+
+def test_schema_dtypes_do_not_depend_on_content() -> None:
+    st = SimulationTableBuilder().build(_make_scalar_output_problem())  # type: ignore[arg-type]
+    assert st.data.dtypes.to_dict() == SIMULATION_TABLE_DTYPES
+    assert [f.name for f in SIMULATION_TABLE_SCHEMA] == list(st.data.columns)
+
+
+def test_scenario_independent_output_accepts_any_scenario_index() -> None:
+    st = SimulationTableBuilder().build(_make_scenario_independent_problem())  # type: ignore[arg-type]
+    view = st.component("compA").output("p")
+
+    assert view.value(time_index=1, scenario_index=5) == pytest.approx(20.0)
+    assert list(view.value(scenario_index=3)) == pytest.approx([10.0, 20.0])
+    # One column, labelled <NA>: the value is not repeated per scenario.
+    assert view.data.shape == (2, 1)
+    assert pd.isna(view.data.columns[0])
+
+
+def test_time_independent_output_accepts_any_time_index() -> None:
+    st = _table([(0, "g", "p_max", None, 0, 7.0), (0, "g", "p_max", None, 1, 9.0)])
+    view = st.component("g").output("p_max")
+
+    assert view.value(time_index=42, scenario_index=1) == pytest.approx(9.0)
+    assert list(view.value(time_index=3)) == pytest.approx([7.0, 9.0])
+    assert view.data.shape == (1, 2)
+    assert pd.isna(view.data.index[0])
+
+
+def test_scalar_output_accepts_any_index() -> None:
+    st = SimulationTableBuilder().build(_make_scalar_output_problem())  # type: ignore[arg-type]
+    view = st.component("compA").output("p")
+
+    assert view.value(time_index=8, scenario_index=3) == pytest.approx(99.0)
+    assert view.data.shape == (1, 1)
+
+
+def test_missing_value_still_raises_key_error() -> None:
+    st = SimulationTableBuilder().build(_make_multi_scenario_problem())  # type: ignore[arg-type]
+    with pytest.raises(KeyError):
+        st.component("compA").output("p").value(time_index=5, scenario_index=0)
+
+
+# Overlapping blocks: time 1 is solved in block 0 and in block 1.
+_OVERLAP = [
+    (0, "g", "p", 0, 0, 1.0),
+    (0, "g", "p", 1, 0, 2.0),
+    (1, "g", "p", 1, 0, 3.0),
+    (1, "g", "p", 2, 0, 4.0),
+]
+
+
+def test_several_blocks_raise_without_block() -> None:
+    view = _table(_OVERLAP).component("g").output("p")
+
+    with pytest.raises(ValueError, match=r"blocks \[0, 1\]"):
+        view.value(time_index=1, scenario_index=0)
+    with pytest.raises(ValueError, match="block="):
+        view.data
+
+
+def test_block_selects_among_several_blocks() -> None:
+    view = _table(_OVERLAP).component("g").output("p")
+
+    assert view.value(time_index=1, scenario_index=0, block=0) == pytest.approx(2.0)
+    assert view.value(time_index=1, scenario_index=0, block=1) == pytest.approx(3.0)
+    assert list(_table(_OVERLAP).component("g").output("p", block=1).data[0]) == [
+        3.0,
+        4.0,
+    ]
+
+
+def test_values_with_a_single_block_need_no_block() -> None:
+    """The check is made on the requested values, not on the whole view."""
+    view = _table(_OVERLAP).component("g").output("p")
+
+    assert view.value(time_index=0, scenario_index=0) == pytest.approx(1.0)
+    assert view.value(time_index=2, scenario_index=0) == pytest.approx(4.0)
+
+
+def test_per_block_rows_of_a_time_independent_output_need_a_block() -> None:
+    view = (
+        _table([(0, "g", "p_max", None, 0, 100.0), (1, "g", "p_max", None, 0, 80.0)])
+        .component("g")
+        .output("p_max")
+    )
+
+    with pytest.raises(ValueError, match="block="):
+        view.value(time_index=3, scenario_index=0)
+    assert view.value(time_index=3, scenario_index=0, block=1) == pytest.approx(80.0)
+
+
+def test_objective_values() -> None:
+    st = _table(
+        [
+            (0, "g", "p", 0, 0, 1.0),
+            (0, None, "objective-value", None, 0, 10.0),
+            (1, None, "objective-value", None, 0, 11.0),
+        ]
+    )
+    objective = st.objective_values()
+
+    assert list(objective.columns) == ["block", "scenario_index", "value"]
+    assert objective.values.tolist() == [[0, 0, 10.0], [1, 0, 11.0]]

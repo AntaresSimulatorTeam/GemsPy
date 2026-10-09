@@ -200,7 +200,7 @@ def test_single_scenario_solve_tags_every_row() -> None:
     data = SimulationTableBuilder().build(problem, scenario_ids_remap=[3]).data  # type: ignore[arg-type]
 
     assert list(data[SCENARIO_COL]) == [3, 3]  # p, objective-value
-    assert data[SCENARIO_COL].dtype == "int64"
+    assert data[SCENARIO_COL].dtype == "Int64"
 
 
 def test_single_scenario_tag_matches_scenario_dependent_rows() -> None:
