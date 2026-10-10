@@ -786,12 +786,19 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         first, last = int(start.min()), int(end.max())
         if last < first:  # empty sum: the operand is never read
             return own_mask
-        sources = np.unique(np.arange(first, last + 1) % T)
-        source = xr.DataArray(sources, dims="time_src")
-        # Whether a position start..end wraps onto each source time step.
-        summed = ((end - source) // T - (start - 1 - source) // T) > 0
-        source_valid = operand_mask.isel(time=sources).rename(time="time_src")
-        valid = (~summed | source_valid).all("time_src")  # type: ignore[operator]
+        # Running count of the invalid positions first..last (wrapped into the
+        # block): the count over start..end is the difference of two entries.
+        positions = xr.DataArray(np.arange(first, last + 1) % T, dims="position")
+        invalid = (~operand_mask).isel(time=positions).astype(int)  # type: ignore[operator]
+        counted = xr.concat(
+            [invalid.isel(position=[0]) * 0, invalid.cumsum("position")],
+            dim="position",
+        )
+        size = last - first + 1
+        upper = (end - first + 1).clip(0, size)
+        lower = (start - first).clip(0, size)
+        # 0 when every position is valid, and <= 0 for an empty range.
+        valid = counted.isel(position=upper) - counted.isel(position=lower) <= 0
         valid, _ = xr.broadcast(valid, t)
         return _and_mask(valid, own_mask)
 
