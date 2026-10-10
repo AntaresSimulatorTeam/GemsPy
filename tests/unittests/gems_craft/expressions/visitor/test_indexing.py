@@ -11,6 +11,8 @@
 # This file is part of the Antares project.
 
 
+import pytest
+
 from gems_craft.expression import param, relative_time, var
 from gems_craft.expression.expression import (
     DualNode,
@@ -158,4 +160,45 @@ def test_time_sum_with_mixed_bounds_of_a_constant_depends_on_time() -> None:
 
     assert compute_indexation(expr, ConstantParameterProvider()) == IndexingStructure(
         True, False
+    )
+
+
+class NamedParameterProvider(StructureProvider):
+    """d varies in time only, p in scenario only."""
+
+    def get_parameter_structure(self, name: str) -> IndexingStructure:
+        return {
+            "d": IndexingStructure(True, False),
+            "p": IndexingStructure(False, True),
+        }[name]
+
+
+@pytest.mark.parametrize(
+    "start, end, expected",
+    [
+        pytest.param(0, param("p"), IndexingStructure(False, True), id="absolute"),
+        pytest.param(
+            0, relative_time(param("p")), IndexingStructure(True, True), id="mixed"
+        ),
+        pytest.param(
+            relative_time(-param("p")),
+            relative_time(0),
+            IndexingStructure(True, True),
+            id="relative",
+        ),
+    ],
+)
+def test_time_sum_with_scenario_dependent_bound_depends_on_scenario(
+    start, end, expected
+) -> None:
+    expr = param("d").time_sum_between(start, end)
+
+    assert compute_indexation(expr, NamedParameterProvider()) == expected
+
+
+def test_time_sum_with_relative_bound_varying_in_time_depends_on_time() -> None:
+    expr = param("p").time_sum_between(relative_time(-param("d")), relative_time(0))
+
+    assert compute_indexation(expr, NamedParameterProvider()) == IndexingStructure(
+        True, True
     )
