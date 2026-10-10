@@ -166,6 +166,34 @@ def test_time_sum_mixed_bounds_blocks_last_t():
     np.testing.assert_array_equal(mask.values, [True, True, True, False])
 
 
+@pytest.mark.parametrize(
+    "start, end, expected",
+    [
+        # x[t-1] is out of the block at position 0
+        pytest.param(0, 2, [False, False, False, False], id="absolute-reads-0"),
+        pytest.param(1, 2, [True, True, True, True], id="absolute-skips-0"),
+        pytest.param(0, relative_time(0), [False] * 4, id="mixed-from-0"),
+        pytest.param(relative_time(0), 3, [False, True, True, True], id="mixed-to-3"),
+        pytest.param(
+            relative_time(-1),
+            relative_time(0),
+            [False, False, True, True],
+            id="relative",
+        ),
+    ],
+)
+def test_time_sum_shifted_operand_checked_at_summed_positions(start, end, expected):
+    expr = var("x").shift(-1).time_sum_between(start, end)
+    mask = visit(expr, _visitor(block_length=4))
+    assert mask is not None
+    np.testing.assert_array_equal(mask.values, expected)
+
+
+def test_time_sum_empty_does_not_read_operand():
+    expr = var("x").shift(-1).time_sum_between(2, 1)
+    assert visit(expr, _visitor(block_length=4)) is None
+
+
 # ---------------------------------------------------------------------------
 # time_sum with per-component parameter bounds
 # ---------------------------------------------------------------------------

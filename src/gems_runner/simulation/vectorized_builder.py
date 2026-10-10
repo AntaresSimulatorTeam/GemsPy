@@ -749,26 +749,53 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return _and_mask(operand_mask, own_mask)
 
     def time_sum(self, node: TimeSumNode) -> Optional[xr.DataArray]:
-        operand_mask = visit(node.operand, self)
         T = self.block_length
         t = xr.DataArray(np.arange(T), dims="time")
         # Only relative bounds are checked: a relative start must not be before
         # the block, a relative end not after it. An absolute bound is a time
         # index of the block and wraps around it, as x[N], in every mode.
         own_mask: Optional[xr.DataArray] = None
-        for bound, is_start in ((node.from_time, True), (node.to_time, False)):
-            if not isinstance(bound, RelativeTimeNode):
-                continue
-            offset = self._eval_as_da(bound.offset)
-            if offset is None:
-                raise ValueError(
-                    f"Time-sum bound is not evaluable to a literal or parameter: "
-                    f"{bound.offset!r}. Only literals and parameter references are "
-                    f"supported as bounds in OutOfBoundsMode.DROP constraints."
-                )
-            position = t + offset
-            own_mask = _and_mask(own_mask, position >= 0 if is_start else position < T)
-        return _and_mask(operand_mask, own_mask)
+        if isinstance(node.from_time, RelativeTimeNode):
+            own_mask = self._time_sum_position(node.from_time, t) >= 0
+        if isinstance(node.to_time, RelativeTimeNode):
+            own_mask = _and_mask(own_mask, self._time_sum_position(node.to_time, t) < T)
+
+        operand_mask = visit(node.operand, self)
+        if operand_mask is None or "time" not in operand_mask.dims:
+            return _and_mask(operand_mask, own_mask)
+
+        # The operand is read at the summed positions, not at t: an instance is
+        # valid only if the operand is valid at all of them.
+        start = self._time_sum_position(node.from_time, t)
+        end = self._time_sum_position(node.to_time, t)
+        first, last = int(start.min()), int(end.max())
+        if last < first:  # empty sum: the operand is never read
+            return own_mask
+        sources = np.unique(np.arange(first, last + 1) % T)
+        source = xr.DataArray(sources, dims="time_src")
+        # Whether a position start..end wraps onto each source time step.
+        summed = ((end - source) // T - (start - 1 - source) // T) > 0
+        source_valid = operand_mask.isel(time=sources).rename(time="time_src")
+        valid = (~summed | source_valid).all("time_src")  # type: ignore[operator]
+        valid, _ = xr.broadcast(valid, t)
+        return _and_mask(valid, own_mask)
+
+    def _time_sum_position(
+        self, bound: ExpressionNode, t: xr.DataArray
+    ) -> xr.DataArray:
+        """Time index of a time sum bound at each time step: ``t + offset`` for a
+        relative bound, the bound itself for an absolute one."""
+        relative = isinstance(bound, RelativeTimeNode)
+        value_node = bound.offset if isinstance(bound, RelativeTimeNode) else bound
+        value = self._eval_as_da(value_node)
+        if value is None:
+            raise ValueError(
+                f"Time-sum bound is not evaluable to a literal or parameter: "
+                f"{value_node!r}. Only literals and parameter references are "
+                f"supported as bounds in OutOfBoundsMode.DROP constraints."
+            )
+        value = value.astype(int)
+        return value + t if relative else value
 
     # ------------------------------------------------------------------ #
     # Structural nodes — AND-propagate children                             #
