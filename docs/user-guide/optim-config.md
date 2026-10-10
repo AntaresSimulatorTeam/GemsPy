@@ -379,6 +379,11 @@ models:
           mode: drop   # do not enforce at t=0 where previous state is unknown
 ~~~
 
+`drop` only applies to time indices relative to `t`. An absolute time index,
+as in `x[N]` or in a time sum bound without `t`, always wraps around the block,
+whatever the mode: in a block of 168 time steps, `sum(-1 .. 1, x)` sums the
+time steps 167, 0 and 1.
+
 ### `model-decomposition`
 
 The `model-decomposition` block assigns individual model elements to the master
