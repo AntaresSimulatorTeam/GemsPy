@@ -358,7 +358,10 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
                     f"A time sum bound must be a constant or parameter expression, "
                     f"got {type(result).__name__!r}."
                 )
-            value = self._bound_fixed_in_time(result, bound)
+            # A time operator such as d[0] leaves a scalar time coordinate.
+            value = self._bound_fixed_in_time(result, bound).drop_vars(
+                "time", errors="ignore"
+            )
         value = value.astype(int)
         return value + t if relative else value
 
@@ -692,6 +695,14 @@ def _and_mask(
 
 
 @dataclass(kw_only=True)
+class _TimeSumBoundEvaluator(VectorizedBuilderBase[xr.DataArray]):
+    """Evaluates time sum bounds with the component data, as the builders do."""
+
+    def variable(self, node: VariableNode) -> xr.DataArray:
+        raise ValueError(f"A time sum bound cannot contain the variable {node.name!r}.")
+
+
+@dataclass(kw_only=True)
 class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     """Walk an expression AST and compute a boolean [component, time] validity mask.
 
@@ -788,18 +799,15 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         self, bound: ExpressionNode, t: xr.DataArray
     ) -> xr.DataArray:
         """Time index of a time sum bound at each time step: ``t + offset`` for a
-        relative bound, the bound itself for an absolute one."""
-        relative = isinstance(bound, RelativeTimeNode)
-        value_node = bound.offset if isinstance(bound, RelativeTimeNode) else bound
-        value = self._eval_as_da(value_node)
-        if value is None:
-            raise ValueError(
-                f"Time-sum bound is not evaluable to a literal or parameter: "
-                f"{value_node!r}. Only literals and parameter references are "
-                f"supported as bounds in OutOfBoundsMode.DROP constraints."
-            )
-        value = value.astype(int)
-        return value + t if relative else value
+        relative bound, the bound itself for an absolute one. Evaluated as the
+        builders do, so that drop mode accepts the same bounds."""
+        evaluator = _TimeSumBoundEvaluator(
+            model_id=self.model_id,
+            param_arrays=self.param_arrays,
+            port_arrays={},
+            block_length=self.block_length,
+        )
+        return evaluator._time_sum_bound(bound, t)
 
     # ------------------------------------------------------------------ #
     # Structural nodes — AND-propagate children                             #

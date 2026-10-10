@@ -105,6 +105,13 @@ def _solve(study_dir: Path) -> Dict[str, List[float]]:
     }
 
 
+def _out_of_bounds(mode: str, constraints: List[str]) -> str:
+    return (
+        "models:\n  - id: lib.m\n    out-of-bounds-processing:\n      constraints:\n"
+        + "".join(f"        - id: {c}\n          mode: {mode}\n" for c in constraints)
+    )
+
+
 _SUMS = {
     "a": "sum(0 .. 2, x)",  # absolute bounds
     "c": "sum(0 .. t, x)",  # absolute start, relative end: cumulative sum
@@ -152,9 +159,7 @@ def test_absolute_indices_outside_the_block_wrap(tmp_path: Path, mode: str) -> N
         data={"d": [1, 2, 3, 4]},
         constants={},
         nb_time_steps=4,
-        resolution="models:\n  - id: lib.m\n    out-of-bounds-processing:\n"
-        "      constraints:\n"
-        + "".join(f"        - id: c{i}\n          mode: {mode}\n" for i in range(1, 5)),
+        resolution=_out_of_bounds(mode, ["c1", "c2", "c3", "c4"]),
     )
 
     results = _solve(study_dir)
@@ -198,23 +203,31 @@ def test_absolute_bound_given_by_a_parameter(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "time_sum, expected",
+    "mode, time_sum, expected",
     [
-        pytest.param("sum(0 .. d[1], x)", [6, 6, 6, 6], id="absolute"),
-        pytest.param("sum(t - (d[0]) .. t, x)", [5, 3, 5, 7], id="relative"),
+        pytest.param("cyclic", "sum(0 .. d[1], x)", [6, 6, 6, 6], id="absolute"),
+        pytest.param("drop", "sum(0 .. d[1], x)", [6, 6, 6, 6], id="absolute-drop"),
+        pytest.param("cyclic", "sum(t - (d[0]) .. t, x)", [5, 3, 5, 7], id="relative"),
+        # dropped at t = 0, where a is then 0
+        pytest.param(
+            "drop", "sum(t - (d[0]) .. t, x)", [0, 3, 5, 7], id="relative-drop"
+        ),
+        pytest.param("cyclic", "sum(t - (d[0]) .. 3, x)", [14, 10, 9, 7], id="mixed"),
+        pytest.param("drop", "sum(t - (d[0]) .. 3, x)", [0, 10, 9, 7], id="mixed-drop"),
     ],
 )
 def test_bound_with_a_time_operator(
-    tmp_path: Path, time_sum: str, expected: List[float]
+    tmp_path: Path, mode: str, time_sum: str, expected: List[float]
 ) -> None:
     study_dir = _make_study(
         tmp_path,
         variables=["x", "a"],
         constraints=["x = d", f"a = {time_sum}"],
-        objective="sum(x)",
+        objective="sum(x) + sum(a)",
         data={"d": [1, 2, 3, 4]},
         constants={},
         nb_time_steps=4,
+        resolution=_out_of_bounds(mode, ["c1"]),
     )
 
     assert _solve(study_dir)["a"] == expected
@@ -288,17 +301,27 @@ def test_bound_varying_in_time_raises(
         _solve(study_dir)
 
 
-def test_bound_declared_time_dependent_but_given_a_constant(tmp_path: Path) -> None:
-    """The data decides: a parameter declared time-dependent can
-    be a bound if the component gives it a constant value."""
+@pytest.mark.parametrize(
+    "mode, expected_r",
+    [
+        pytest.param("cyclic", [5, 3, 5, 7], id="cyclic"),
+        pytest.param("drop", [0, 3, 5, 7], id="drop"),  # dropped at t = 0
+    ],
+)
+def test_bound_declared_time_dependent_but_given_a_constant(
+    tmp_path: Path, mode: str, expected_r: List[float]
+) -> None:
+    """The data decides, in every mode: a parameter declared time-dependent
+    can be a bound if the component gives it a constant value."""
     study_dir = _make_study(
         tmp_path,
         variables=["x", "a", "r"],
         constraints=["x = d", "a = sum(0 .. last, x)", "r = sum(t - last .. t, x)"],
-        objective="sum(x)",
+        objective="sum(x) + sum(r)",
         data={"d": [1, 2, 3, 4]},
         constants={"last": 1},
         nb_time_steps=4,
+        resolution=_out_of_bounds(mode, ["c1", "c2"]),
     )
     library = study_dir / "input" / "model-libraries" / "lib.yml"
     library.write_text(
@@ -311,7 +334,7 @@ def test_bound_declared_time_dependent_but_given_a_constant(tmp_path: Path) -> N
     results = _solve(study_dir)
 
     assert results["a"] == [3, 3, 3, 3]
-    assert results["r"] == [5, 3, 5, 7]
+    assert results["r"] == expected_r
 
 
 # Expected objective of each study.

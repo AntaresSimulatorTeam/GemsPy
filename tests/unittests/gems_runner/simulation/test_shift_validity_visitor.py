@@ -285,7 +285,7 @@ def test_time_dependent_param_in_shift_raises(time_dependent_lag):
 
 def test_time_dependent_param_in_time_sum_bound_raises(time_dependent_lag):
     expr = var("x").time_sum(-param("lag"), 0)
-    with pytest.raises(ValueError, match="depends on time"):
+    with pytest.raises(ValueError, match="varies in time"):
         visit(expr, _visitor(time_dependent_lag, block_length=4))
 
 
