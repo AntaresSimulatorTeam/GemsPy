@@ -267,6 +267,8 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
 
         # Fast path: both bounds are compile-time integer constants.
         if from_shift_scalar is not None and to_shift_scalar is not None:
+            if to_shift_scalar < from_shift_scalar:  # empty sum
+                return operand * 0.0  # type: ignore[operator,return-value]
             result = self._apply_time_shift(operand, from_shift_scalar)
             for shift in range(from_shift_scalar + 1, to_shift_scalar + 1):
                 result = _linopy_add(result, self._apply_time_shift(operand, shift))
@@ -297,6 +299,8 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         to_int = to_da.astype(int)
         min_from = int(from_int.values.min())
         max_to = int(to_int.values.max())
+        if max_to < min_from:  # empty sum for every component
+            return operand * 0.0  # type: ignore[operator,return-value]
 
         acc: Optional[Any] = None
         for shift in range(min_from, max_to + 1):

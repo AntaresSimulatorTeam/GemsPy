@@ -220,6 +220,28 @@ def test_bound_with_a_time_operator(
     assert _solve(study_dir)["a"] == expected
 
 
+@pytest.mark.parametrize(
+    "time_sum",
+    [
+        pytest.param("sum(2 .. 1, x)", id="absolute"),
+        pytest.param("sum(t + 2 .. t + 1, x)", id="relative"),
+        pytest.param("sum(t + p .. t, x)", id="relative-parameter"),
+    ],
+)
+def test_start_after_end_gives_an_empty_sum(tmp_path: Path, time_sum: str) -> None:
+    study_dir = _make_study(
+        tmp_path,
+        variables=["x", "a"],
+        constraints=["x = d", f"a = {time_sum}"],
+        objective="sum(x) - sum(a)",
+        data={"d": [1, 2, 3, 4]},
+        constants={"p": 1},
+        nb_time_steps=4,
+    )
+
+    assert _solve(study_dir)["a"] == [0, 0, 0, 0]
+
+
 def test_absolute_index_refers_to_the_block(tmp_path: Path) -> None:
     """In sequential mode, sum(0 .. 1, x) sums the first two steps of each block."""
     study_dir = _make_study(
