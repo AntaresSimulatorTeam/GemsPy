@@ -38,6 +38,7 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
@@ -91,6 +92,15 @@ class ExpressionVisitor(ABC, Generic[T]):
 
     @abstractmethod
     def time_sum(self, node: TimeSumNode) -> T: ...
+
+    def relative_time(self, node: RelativeTimeNode) -> T:
+        """A ``RelativeTimeNode`` is only valid as a time sum bound, which the
+        ``time_sum`` method handles; visitors that visit the bounds override
+        this."""
+        raise ValueError(
+            "'t + offset' is only allowed as a bound of a time sum, "
+            f"not in {type(self).__name__}."
+        )
 
     @abstractmethod
     def all_time_sum(self, node: AllTimeSumNode) -> T: ...
@@ -161,6 +171,8 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
         return visitor.time_eval(root)
     elif isinstance(root, TimeSumNode):
         return visitor.time_sum(root)
+    elif isinstance(root, RelativeTimeNode):
+        return visitor.relative_time(root)
     elif isinstance(root, AllTimeSumNode):
         return visitor.all_time_sum(root)
     elif isinstance(root, ScenarioOperatorNode):

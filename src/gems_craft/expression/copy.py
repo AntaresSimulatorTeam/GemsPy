@@ -30,6 +30,7 @@ from .expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
     TimeEvalNode,
@@ -76,6 +77,9 @@ class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
             visit(node.from_time, self),
             visit(node.to_time, self),
         )
+
+    def relative_time(self, node: RelativeTimeNode) -> ExpressionNode:
+        return RelativeTimeNode(visit(node.offset, self))
 
     def all_time_sum(self, node: AllTimeSumNode) -> ExpressionNode:
         return AllTimeSumNode(visit(node.operand, self))

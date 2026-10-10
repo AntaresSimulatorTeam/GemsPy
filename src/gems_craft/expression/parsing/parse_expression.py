@@ -15,7 +15,7 @@ from typing import Set
 from antlr4 import CommonTokenStream, InputStream
 from antlr4.error.ErrorStrategy import BailErrorStrategy
 
-from gems_craft.expression import ExpressionNode, literal, param, var
+from gems_craft.expression import ExpressionNode, literal, param, relative_time, var
 from gems_craft.expression.equality import expressions_equal
 from gems_craft.expression.expression import (
     Comparator,
@@ -171,10 +171,17 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         return expr.eval(eval_time)
 
     def visitTimeSum(self, ctx: ExprParser.TimeSumContext) -> ExpressionNode:
-        shifted_expr = ctx.expr().accept(self)  # type: ignore
-        from_shift = ctx.from_.accept(self)  # type: ignore
-        to_shift = ctx.to.accept(self)  # type: ignore
-        return shifted_expr.time_sum(from_shift, to_shift)
+        summed_expr = ctx.expr().accept(self)  # type: ignore
+        from_bound = ctx.from_.accept(self)  # type: ignore
+        to_bound = ctx.to.accept(self)  # type: ignore
+        return summed_expr.time_sum_between(from_bound, to_bound)
+
+    def visitSum_bound(self, ctx: ExprParser.Sum_boundContext) -> ExpressionNode:
+        """A shift ("t", "t + ...") is relative to the current time step; any
+        other expression is an absolute time index."""
+        if ctx.shift() is not None:  # type: ignore
+            return relative_time(ctx.shift().accept(self))  # type: ignore
+        return ctx.expr().accept(self)  # type: ignore
 
     def visitAllTimeSum(self, ctx: ExprParser.AllTimeSumContext) -> ExpressionNode:
         shifted_expr = ctx.expr().accept(self)  # type: ignore

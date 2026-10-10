@@ -10,6 +10,7 @@ else:
 
 
 class ExprVisitor(ParseTreeVisitor):
+
     # Visit a parse tree produced by ExprParser#portFieldExpr.
     def visitPortFieldExpr(self, ctx: ExprParser.PortFieldExprContext):
         return self.visitChildren(ctx)
@@ -80,6 +81,10 @@ class ExprVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by ExprParser#argList.
     def visitArgList(self, ctx: ExprParser.ArgListContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#sum_bound.
+    def visitSum_bound(self, ctx: ExprParser.Sum_boundContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#number.

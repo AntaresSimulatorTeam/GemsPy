@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from gems_craft.expression.expression import literal, param, var
+from gems_craft.expression.expression import literal, param, relative_time, var
 from gems_craft.expression.visitor import visit
 from gems_runner.simulation.vectorized_builder import ShiftValidityVisitor
 
@@ -142,6 +142,58 @@ def test_time_sum_positive_to_blocks_last_t():
     np.testing.assert_array_equal(mask.values, [True, True, True, False])
 
 
+@pytest.mark.parametrize("start, end", [(0, 4), (-1, 1)])
+def test_time_sum_absolute_bounds_never_dropped(start: int, end: int) -> None:
+    # Absolute indices wrap around the block, as x[N], also outside it.
+    expr = var("x").time_sum_between(start, end)
+    assert visit(expr, _visitor(block_length=4)) is None
+
+
+def test_time_sum_mixed_bounds_only_relative_bound_checked():
+    # sum from index -1 to t: the relative end stays in the block, the
+    # absolute start wraps; valid at every t
+    expr = var("x").time_sum_between(-1, relative_time(0))
+    mask = visit(expr, _visitor(block_length=4))
+    assert mask is not None
+    np.testing.assert_array_equal(mask.values, [True, True, True, True])
+
+
+def test_time_sum_mixed_bounds_blocks_last_t():
+    # sum from index 0 to t+1: t=3 accesses 4 >= 4, invalid
+    expr = var("x").time_sum_between(0, relative_time(1))
+    mask = visit(expr, _visitor(block_length=4))
+    assert mask is not None
+    np.testing.assert_array_equal(mask.values, [True, True, True, False])
+
+
+@pytest.mark.parametrize(
+    "start, end, expected",
+    [
+        # x[t-1] is out of the block at position 0
+        pytest.param(0, 2, [False, False, False, False], id="absolute-reads-0"),
+        pytest.param(1, 2, [True, True, True, True], id="absolute-skips-0"),
+        pytest.param(0, relative_time(0), [False] * 4, id="mixed-from-0"),
+        pytest.param(relative_time(0), 3, [False, True, True, True], id="mixed-to-3"),
+        pytest.param(
+            relative_time(-1),
+            relative_time(0),
+            [False, False, True, True],
+            id="relative",
+        ),
+    ],
+)
+def test_time_sum_shifted_operand_checked_at_summed_positions(start, end, expected):
+    expr = var("x").shift(-1).time_sum_between(start, end)
+    mask = visit(expr, _visitor(block_length=4))
+    assert mask is not None
+    np.testing.assert_array_equal(mask.values, expected)
+
+
+def test_time_sum_empty_does_not_read_operand():
+    expr = var("x").shift(-1).time_sum_between(2, 1)
+    assert visit(expr, _visitor(block_length=4)) is None
+
+
 # ---------------------------------------------------------------------------
 # time_sum with per-component parameter bounds
 # ---------------------------------------------------------------------------
@@ -233,7 +285,7 @@ def test_time_dependent_param_in_shift_raises(time_dependent_lag):
 
 def test_time_dependent_param_in_time_sum_bound_raises(time_dependent_lag):
     expr = var("x").time_sum(-param("lag"), 0)
-    with pytest.raises(ValueError, match="depends on time"):
+    with pytest.raises(ValueError, match="varies in time"):
         visit(expr, _visitor(time_dependent_lag, block_length=4))
 
 

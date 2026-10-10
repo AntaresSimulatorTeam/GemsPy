@@ -13,7 +13,14 @@ from typing import Set
 
 import pytest
 
-from gems_craft.expression import ExpressionNode, literal, param, print_expr, var
+from gems_craft.expression import (
+    ExpressionNode,
+    literal,
+    param,
+    print_expr,
+    relative_time,
+    var,
+)
 from gems_craft.expression.equality import expressions_equal
 from gems_craft.expression.expression import (
     DualNode,
@@ -100,6 +107,30 @@ from gems_craft.expression.parsing.parse_expression import (
             {},
             "sum(t..t+5, x)",
             var("x").time_sum(literal(0), literal(5)),
+        ),
+        (
+            {"x"},
+            {},
+            "sum(0 .. 2, x)",
+            var("x").time_sum_between(literal(0), literal(2)),
+        ),
+        (
+            {"x"},
+            {},
+            "sum(0 .. t, x)",
+            var("x").time_sum_between(literal(0), relative_time(literal(0))),
+        ),
+        (
+            {"x"},
+            {"p"},
+            "sum(t - 1 .. p, x)",
+            var("x").time_sum_between(relative_time(-literal(1)), param("p")),
+        ),
+        (
+            {"x"},
+            {"p", "d"},
+            "sum(p .. d + 1, x)",
+            var("x").time_sum_between(param("p"), param("d") + literal(1)),
         ),
         ({"x"}, {}, "x[t]", var("x")),
         ({"x"}, {"p"}, "x[t+p]", var("x").shift(param("p"))),
@@ -301,6 +332,7 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
         "x[t+1-t]",
         "x[2*t]",
         "x[t 4]",
+        "sum(2*t .. t, x)",
     ],
 )
 def test_parse_cancellation_should_throw(expression_str: str) -> None:
