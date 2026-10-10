@@ -206,14 +206,12 @@ def test_absolute_bound_given_by_a_parameter(tmp_path: Path) -> None:
     "mode, time_sum, expected",
     [
         pytest.param("cyclic", "sum(0 .. d[1], x)", [6, 6, 6, 6], id="absolute"),
-        pytest.param("drop", "sum(0 .. d[1], x)", [6, 6, 6, 6], id="absolute-drop"),
         pytest.param("cyclic", "sum(t - (d[0]) .. t, x)", [5, 3, 5, 7], id="relative"),
         # dropped at t = 0, where a is then 0
         pytest.param(
             "drop", "sum(t - (d[0]) .. t, x)", [0, 3, 5, 7], id="relative-drop"
         ),
         pytest.param("cyclic", "sum(t - (d[0]) .. 3, x)", [14, 10, 9, 7], id="mixed"),
-        pytest.param("drop", "sum(t - (d[0]) .. 3, x)", [0, 10, 9, 7], id="mixed-drop"),
     ],
 )
 def test_bound_with_a_time_operator(

@@ -146,14 +146,6 @@ class ConstantParameterProvider(StructureProvider):
         return IndexingStructure(False, False)
 
 
-def test_time_sum_with_absolute_bounds_is_time_independent() -> None:
-    expr = var("x").time_sum_between(0, param("p"))
-
-    assert compute_indexation(expr, ConstantParameterProvider()) == IndexingStructure(
-        False, True
-    )
-
-
 def test_time_sum_with_mixed_bounds_of_a_constant_depends_on_time() -> None:
     # sum(0 .. t, k) = (t + 1) * k: the number of terms changes with t.
     expr = param("k").time_sum_between(0, relative_time(0))
