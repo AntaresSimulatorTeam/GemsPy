@@ -48,6 +48,11 @@ All notable changes to GemsPy are documented here.
   effect. It is now translated into the solver's own output option
   (`output_flag` for HiGHS, `OutputFlag` for Gurobi, `outputlog` for Xpress);
   with `logs: false` HiGHS only prints its startup banner.
+- **Time sums with bounds relative to `t`** - a start after the end now gives an
+  empty sum, a bound can contain a time operator (e.g. `t - (d[0])`), and a
+  scenario-dependent bound makes the sum scenario-dependent. In `drop` mode,
+  the operand is checked at every summed time step, and bounds are accepted as
+  in `cyclic` mode.
 
 ---
 
