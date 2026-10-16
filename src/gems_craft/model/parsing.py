@@ -54,6 +54,8 @@ class AreaConnectionSchema(ModifiedBaseModel):
     injection_to_balance: Optional[str] = None
     spillage_bound: Optional[str] = None
     unsupplied_energy_bound: Optional[str] = None
+    # Port field through which a component reads the marginal price of the legacy area
+    price: Optional[str] = None
 
 
 class PortThermalCapacitySchema(ModifiedBaseModel):

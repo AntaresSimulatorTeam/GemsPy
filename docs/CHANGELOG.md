@@ -5,6 +5,11 @@ All notable changes to GemsPy are documented here.
 ## [Unreleased]
 
 ### Added
+- **`price` in the `area-connection` of port types** - `AreaConnectionSchema`
+  accepts the optional `price` key of hybrid libraries (Antares Simulator
+  10.2), which names the port field through which a component reads the
+  marginal price of the legacy area it is connected to. `parse_yaml_library`
+  rejected libraries using it (`Extra inputs are not permitted`).
 - **`SimulationTable.objective_values()`** - returns the objective value of
   every solved problem, with columns `block`, `scenario_index` and `value`.
 - **`block=` on the simulation table views** - `component(...).output(name,

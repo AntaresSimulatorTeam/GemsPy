@@ -107,6 +107,18 @@ def test_load_library_parses_area_connection() -> None:
     )
 
 
+def test_load_library_parses_area_connection_price() -> None:
+    with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
+        lib = parse_yaml_library(f)
+    port = next(pt for pt in lib.port_types if pt.id == "flow_with_price")
+    assert port.area_connection == AreaConnectionSchema(
+        injection_to_balance="flow",
+        spillage_bound=None,
+        unsupplied_energy_bound=None,
+        price="price",
+    )
+
+
 def test_load_library_port_type_without_area_connection() -> None:
     with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
         lib = parse_yaml_library(f)
