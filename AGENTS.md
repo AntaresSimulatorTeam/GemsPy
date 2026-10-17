@@ -42,7 +42,7 @@ from gems_craft.study.folder import load_study
 from gems_runner.study.runner import run_study
 
 study = load_study(Path("path/to/study_dir"))   # reads input/, model-libraries/, data-series/
-run_study(Path("path/to/study_dir"))            # loads study, solves, writes CSV to output/
+run_study(Path("path/to/study_dir"))            # loads study, solves, writes output/<run_id>/simulation_table/ (Parquet)
 
 # Python API — programmatic study
 from gems_craft.study import Study
@@ -111,7 +111,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `apply_thermal_heuristics` (`heuristic_runner.py`): injects heuristic-derived bounds into a solved problem
 - `find_min_generation_fast` / `find_num_units_accurate` (`thermal_heuristic.py`): the `fast`/`accurate` heuristic functions
 
-**`gems_runner/session/`** — `SimulationSession`, the stateful entry point wrapping a loaded study for interactive solving.
+**`gems_runner/session/`** — `SimulationSession`, the stateful entry point wrapping a loaded study for interactive solving. With an `output_dir`, it writes each scenario to `output_dir/simulation_table/` as soon as it is solved (`output_format`, Parquet by default) and returns the stored table; otherwise results stay in memory. `run_study` and the `gemspy` CLI always store them, in `<study>/output/<run_id>/simulation_table/`.
 
 **`gems_runner/main/`** — the `gemspy` CLI entry point (`main_cli`).
 

@@ -23,7 +23,7 @@ from gems_runner.simulation.simulation_table import (
     SimulationTable,
     SimulationTableBuilder,
     _apply_schema,
-    merge_simulation_tables,
+    _concat_frames,
 )
 from gems_runner.simulation.table_store import _MemoryStore, _RowFilter
 
@@ -189,11 +189,15 @@ def test_the_builder_gives_the_table_the_run_scenarios() -> None:
     assert table.scenarios == [3, 7]
 
 
-def test_merging_keeps_the_union_of_the_scenarios() -> None:
-    first = _table([(0, "a", "p", 0, 0, 1.0)], scenarios=[0])
-    second = _table([(0, "a", "p", 0, 1, 2.0)], scenarios=[1])
+def test_concatenated_pieces_keep_the_schema() -> None:
+    first = _table([(0, "a", "p", 0, 0, 1.0)]).data
+    second = _table([(1, "a", "p", 0, 1, 2.0)]).data
 
-    assert merge_simulation_tables([first, second]).scenarios == [0, 1]
+    rows = _concat_frames([first, second])
+
+    assert len(rows) == 2
+    assert rows.dtypes.to_dict() == first.dtypes.to_dict()
+    assert _concat_frames([]).dtypes.to_dict() == first.dtypes.to_dict()
 
 
 # ---------------------------------------------------------------------------

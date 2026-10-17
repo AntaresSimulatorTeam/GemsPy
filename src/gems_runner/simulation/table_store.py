@@ -88,11 +88,17 @@ class _RowFilter:
 
     def expression(self) -> Optional[pc.Expression]:
         """The component and output filters as a pyarrow expression, None if
-        unrestricted. The scenario filter is applied by choosing the files."""
+        unrestricted. The scenario filter is applied by choosing the files.
+
+        The value set is typed as strings, so that an empty filter matches no
+        row; a value that is not a string never matches, as in memory."""
         expression: Optional[pc.Expression] = None
         for column, values in ((_COMPONENT, self.components), (_OUTPUT, self.outputs)):
             if values is not None:
-                term = pc.field(column).isin(sorted(values))  # type: ignore[no-untyped-call]
+                names = sorted(v for v in values if isinstance(v, str))
+                term = pc.field(column).isin(  # type: ignore[no-untyped-call]
+                    pa.array(names, type=pa.string())
+                )
                 expression = term if expression is None else expression & term
         return expression
 

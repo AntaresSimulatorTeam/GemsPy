@@ -8,7 +8,7 @@ import json
 import os
 import pickle
 from pathlib import Path
-from typing import Any, Tuple
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -439,6 +439,29 @@ def test_filters_and_iter_scenarios_match_the_table_in_memory(
         assert _keys(stored.to_pandas(**kwargs)) == _keys(table.to_pandas(**kwargs))
     assert [s for s, _ in stored.iter_scenarios()] == [None, 0, 1]
     for (s1, a), (s2, b) in zip(stored.iter_scenarios(), table.iter_scenarios()):
+        assert s1 == s2 and _keys(a) == _keys(b)
+
+
+@pytest.mark.parametrize("fmt", _FORMATS)
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        pytest.param({"components": []}, id="no-component"),
+        pytest.param({"outputs": []}, id="no-output"),
+        pytest.param({"components": [None]}, id="not-a-name"),
+        pytest.param({"components": ["gen", None]}, id="a-name-and-not-a-name"),
+    ],
+)
+def test_filters_matching_no_name_give_the_rows_of_the_table_in_memory(
+    tmp_path: Path, fmt: OutputFormat, kwargs: Dict[str, Any]
+) -> None:
+    table, stored = _table(), _stored(tmp_path, fmt)
+
+    assert _keys(stored.to_pandas(**kwargs)) == _keys(table.to_pandas(**kwargs))
+    parts = zip(
+        stored.iter_scenarios(**kwargs), table.iter_scenarios(**kwargs), strict=True
+    )
+    for (s1, a), (s2, b) in parts:
         assert s1 == s2 and _keys(a) == _keys(b)
 
 

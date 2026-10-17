@@ -29,6 +29,7 @@ import pandas as pd
 import pytest
 
 from gems_runner.study.runner import run_study
+from tests.e2e.functional.simulation_table_output import read_run_table
 
 _STUDY_SRC = Path(__file__).parent / "studies" / "dsr_3_blocks"
 
@@ -89,9 +90,7 @@ _KEY_COLS = [
 
 
 def _load_csv(study_dir: Path) -> pd.DataFrame:
-    output_files = list((study_dir / "output").glob("**/simulation_table_*.csv"))
-    assert len(output_files) == 1, f"Expected 1 output file, got {len(output_files)}"
-    return pd.read_csv(output_files[0])
+    return read_run_table(study_dir)
 
 
 def _run_with_config(study_dir: Path, config_yaml: str) -> pd.DataFrame:
