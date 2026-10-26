@@ -20,6 +20,7 @@ Negative tests verify that dual/reduced_cost are rejected when used in
 contexts where they are not allowed (constraints, objectives).
 """
 
+import shutil
 from pathlib import Path
 from typing import List
 
@@ -176,3 +177,46 @@ def test_dual_reduced_cost_multi_timestep(solver_name: str) -> None:
     assert_output_per_timestep(
         "oil_base_zone", "profit", [0.0, 500.0, 1999000.0], abs=1e-3
     )
+
+
+def test_area_connection_price_in_full_gems_study(tmp_path: Path) -> None:
+    """A library declaring area-connection.price also runs as a full GEMS study.
+
+    The hybrid-only area-connection key is ignored by GemsPy: the price field
+    is defined by the area model as dual(balance), so the generator profit
+    computed with sum_connections(balance_port.price) uses the nodal price.
+    """
+    study_dir = tmp_path / "10_5_1"
+    shutil.copytree(STUDIES_DIR / "10_5_1", study_dir)
+    lib_path = study_dir / "input" / "model-libraries" / "library-eo.yml"
+    lib_text = lib_path.read_text()
+    port_fields = "        - id: flow\n        - id: price\n"
+    assert port_fields in lib_text
+    lib_path.write_text(
+        lib_text.replace(
+            port_fields,
+            port_fields
+            + "      area-connection:\n"
+            + "        injection-to-balance: flow\n"
+            + "        price: price\n",
+        )
+    )
+
+    study = load_study(study_dir)
+    problem = build_problem(study, TimeBlock(1, [0]), [0])
+    problem.solve(solver_name="highs")
+
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == pytest.approx(1500.0)
+
+    st = SimulationTableBuilder().build(problem)
+    price = (
+        st.component("base_zone").output("price").value(time_index=0, scenario_index=0)
+    )
+    assert price == pytest.approx(50.0)
+    gas_profit = (
+        st.component("gas_base_zone")
+        .output("profit")
+        .value(time_index=0, scenario_index=0)
+    )
+    assert gas_profit == pytest.approx(4000.0)

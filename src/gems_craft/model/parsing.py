@@ -26,7 +26,19 @@ class ParameterSchema(ModifiedBaseModel):
     scenario_dependent: bool = True
 
 
-class VariableSchema(ModifiedBaseModel):
+class _ExpressionSchema(ModifiedBaseModel):
+    """Base of the schemas with expression fields.
+
+    A plain YAML number (e.g. ``definition: 0``) is read as the expression of
+    that literal, as if it were quoted.
+    """
+
+    model_config = ConfigDict(
+        **ModifiedBaseModel.model_config, coerce_numbers_to_str=True
+    )
+
+
+class VariableSchema(_ExpressionSchema):
     id: str
     time_dependent: bool = True
     scenario_dependent: bool = True
@@ -34,12 +46,8 @@ class VariableSchema(ModifiedBaseModel):
     upper_bound: Optional[str] = None
     variable_type: str = "continuous"
 
-    model_config = ConfigDict(
-        **ModifiedBaseModel.model_config, coerce_numbers_to_str=True
-    )
 
-
-class ConstraintSchema(ModifiedBaseModel):
+class ConstraintSchema(_ExpressionSchema):
     id: str
     expression: str
     lower_bound: Optional[str] = None
@@ -54,6 +62,8 @@ class AreaConnectionSchema(ModifiedBaseModel):
     injection_to_balance: Optional[str] = None
     spillage_bound: Optional[str] = None
     unsupplied_energy_bound: Optional[str] = None
+    # Port field through which a component reads the marginal price of the legacy area
+    price: Optional[str] = None
 
 
 class PortThermalCapacitySchema(ModifiedBaseModel):
@@ -73,7 +83,7 @@ class ModelPortSchema(ModifiedBaseModel):
     type: str
 
 
-class PortFieldDefinitionSchema(ModifiedBaseModel):
+class PortFieldDefinitionSchema(_ExpressionSchema):
     port: str
     field: str
     definition: str
@@ -83,13 +93,13 @@ class PropertySchema(ModifiedBaseModel):
     id: str
 
 
-class ObjectiveContributionSchema(ModifiedBaseModel):
+class ObjectiveContributionSchema(_ExpressionSchema):
     id: str
     expression: str
 
 
 @dataclass
-class ExtraOutputSchema(ModifiedBaseModel):
+class ExtraOutputSchema(_ExpressionSchema):
     id: str
     expression: str
 

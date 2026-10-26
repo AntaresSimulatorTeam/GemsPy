@@ -721,3 +721,65 @@ library:
         - id: p{flags}
 """))])
     assert lib["probe"].models["probe.m"].parameters["p"].structure == expected
+
+
+def _numbers_lib_yaml(zero: str, bound: str, cost: str, output: str) -> str:
+    """Model whose expression fields all hold a number."""
+    return f"""
+library:
+  id: test
+  port-types:
+    - id: flow
+      fields:
+        - id: flow
+  models:
+    - id: test_model
+      variables:
+        - id: x
+          lower-bound: {zero}
+          upper-bound: {bound}
+      ports:
+        - id: port1
+          type: flow
+      port-field-definitions:
+        - port: port1
+          field: flow
+          definition: {zero}
+      constraints:
+        - id: c
+          expression: x
+          lower-bound: {zero}
+          upper-bound: {bound}
+      binding-constraints:
+        - id: bc
+          expression: x
+          lower-bound: {zero}
+          upper-bound: {bound}
+      objective-contributions:
+        - id: cost
+          expression: {cost}
+      extra-outputs:
+        - id: out
+          expression: {output}
+"""
+
+
+def test_plain_numbers_in_expression_fields() -> None:
+    """A YAML number in an expression field is read as if it were quoted."""
+    unquoted = resolve_library(
+        [parse_yaml_library(io.StringIO(_numbers_lib_yaml("0", "1.5", "2", "-3")))]
+    )
+    quoted = resolve_library(
+        [
+            parse_yaml_library(
+                io.StringIO(_numbers_lib_yaml('"0"', '"1.5"', '"2"', '"-3"'))
+            )
+        ]
+    )
+    model_ = unquoted["test"].models["test.test_model"]
+    assert model_ == quoted["test"].models["test.test_model"]
+    pfd = model_.port_fields_definitions[_PFIELD_ID]
+    assert expressions_equal(pfd.definition, literal(0))
+    assert expressions_equal_if_present(model_.variables["x"].upper_bound, literal(1.5))
+    assert model_.objective_contributions is not None
+    assert expressions_equal(model_.objective_contributions["cost"], literal(2))
