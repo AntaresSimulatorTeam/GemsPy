@@ -171,6 +171,25 @@ def test_save_refuses_a_folder_that_is_not_empty(tmp_path: Path) -> None:
         _table().save(tmp_path / "table")
 
 
+def test_save_refuses_a_path_that_is_a_file(tmp_path: Path) -> None:
+    (tmp_path / "table").write_text("")
+    with pytest.raises(FileExistsError, match="is not a folder"):
+        _table().save(tmp_path / "table")
+
+
+def test_a_failed_save_removes_the_parent_folders_it_created(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(self: _TableWriter, df: pd.DataFrame, stem: str) -> Path:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(_TableWriter, "_write_file", fail)
+    with pytest.raises(OSError, match="disk full"):
+        _table().save(tmp_path / "new_a" / "new_b" / "table")
+
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_save_with_an_unknown_format_creates_no_folder(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="xlsx"):
         _table().save(tmp_path / "table", "xlsx")  # type: ignore[arg-type]

@@ -146,12 +146,13 @@ class _TableWriter:
         # Absolute: pyarrow reads a relative path such as "s3:x/..." as a URI.
         folder = Path(folder).resolve()
         output_format = OutputFormat(output_format)  # checked before any write
-        if folder.exists() and any(folder.iterdir()):
+        if folder.exists() and (not folder.is_dir() or any(folder.iterdir())):
             raise FileExistsError(
-                f"{folder} is not empty: a simulation table is written into a new "
-                "or empty folder."
+                f"{folder} is not empty, or is not a folder: a simulation table is "
+                "written into a new or empty folder."
             )
-        self._created_folder = not folder.exists()
+        # The folders created here, deepest first, so that abort() removes them.
+        self._created_folders = [p for p in [folder, *folder.parents] if not p.exists()]
         folder.mkdir(parents=True, exist_ok=True)
         self._folder = folder
         self._run_id = run_id
@@ -224,14 +225,14 @@ class _TableWriter:
         return manifest
 
     def abort(self) -> None:
-        """Remove what was written, so that the folder is as before: the files,
-        a partial manifest, and the folder itself if it was created here. No
+        """Remove what was written, so that the disk is as before: the files, a
+        partial manifest, and the folders created here, parents included. No
         write is accepted after it."""
         for path in [*self._written, self._folder / f"{MANIFEST_FILE}.tmp"]:
             path.unlink(missing_ok=True)
-        if self._created_folder and self._folder.is_dir():
-            if not any(self._folder.iterdir()):
-                self._folder.rmdir()
+        for created in self._created_folders:  # deepest first
+            if created.is_dir() and not any(created.iterdir()):
+                created.rmdir()
         self._finalized = True
 
     def _check_open(self) -> None:
