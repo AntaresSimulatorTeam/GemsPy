@@ -34,16 +34,22 @@ results = SimulationSession(
 ).run()
 ~~~
 
-Each scenario is written to `my_run/simulation_table/` as soon as it is solved,
-so the whole table is never held in memory, and `run()` returns the stored
-table. In frontal mode, the problem is solved once, then the rows of each
-scenario are built from the solution and written one scenario at a time.
+The results are written to `my_run/simulation_table/` as they are solved, so
+the whole table is never held in memory, and `run()` returns the stored table.
+In sequential and parallel modes, the rows of each block are passed to the
+file of their scenario as soon as the block is solved: CSV appends them at
+once, Parquet buffers them and writes row groups of up to 64,000 rows, so at
+most one row group of rows is held, and the memory of the solved problems is
+freed after each scenario. In frontal mode, the
+problem is solved once, then the rows of each scenario are built from the
+solution and written one scenario at a time.
 
 - `my_run/simulation_table/` must be missing or empty: use a new `output_dir`
   for each run. Otherwise `run()` raises `FileExistsError`, before anything is
   solved.
-- If the run fails or is interrupted, the scenario files written so far stay
-  in the folder, but no manifest is written, so `SimulationTable.open()`
+- If the run fails or is interrupted, the files of the scenarios completed so
+  far stay in the folder (the unfinished scenario's file is removed), but no
+  manifest is written, so `SimulationTable.open()`
   refuses it. Delete the folder, or use another `output_dir`, before running
   again.
 - Benders mode produces no simulation table: no `simulation_table/` folder is
