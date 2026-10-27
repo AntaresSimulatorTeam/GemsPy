@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 
+import gc
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Tuple
 from uuid import uuid4
@@ -45,9 +46,10 @@ SIMULATION_TABLE_FOLDER = "simulation_table"
 class SimulationSession:
     """Solves a study and returns its results as a ``SimulationTable``.
 
-    Without *output_dir*, the results stay in memory. With it, each scenario is
-    written to ``output_dir / "simulation_table"`` as soon as it is solved, and
-    ``run()`` returns the stored table (see docs/user-guide/outputs.md).
+    Without *output_dir*, the results stay in memory. With it, the rows of each
+    block are passed to ``output_dir / "simulation_table"`` as soon as it is
+    solved, and ``run()`` returns the stored table (see
+    docs/user-guide/outputs.md).
     """
 
     def __init__(
@@ -101,51 +103,73 @@ class SimulationSession:
                 "parallel-subproblems mode."
             )
 
-        frames = self._iter_scenario_frames(mode)
         if self.output_dir is None:
+            if mode == ResolutionMode.FRONTAL:
+                # One table, with the rows and order of build().
+                _, rows = self._run_block(
+                    self._frontal_block(), scenario_ids=self.scenario_ids
+                )
+            else:
+                rows = _concat_frames(
+                    r for _, blocks in self._iter_rows(mode) for r in blocks
+                )
             return SimulationTable(
-                _concat_frames(rows for _, rows in frames),
-                table_id=self.run_id,
-                scenarios=self.scenario_ids,
+                rows, table_id=self.run_id, scenarios=self.scenario_ids
             )
 
         # Resolved once, so that the table is opened where it was written even
         # if the working directory changes during the run.
         folder = Path(self.output_dir).resolve() / SIMULATION_TABLE_FOLDER
         writer = _TableWriter(folder, self.run_id, self.output_format)
-        for scenario, rows in frames:  # each scenario is written once solved
-            if scenario is None:
-                writer.write_common(rows)
-            else:
-                writer.write_scenario(rows, scenario)
+        try:
+            for scenario, blocks in self._iter_rows(mode):
+                if scenario is None:
+                    writer.write_common(_concat_frames(blocks))
+                    continue
+                writer.start_scenario(scenario)
+                for rows in blocks:  # each block is passed on as soon as solved
+                    writer.append(rows)
+                    del rows  # released before the next block is solved
+                writer.end_scenario()  # before the next scenario is solved
+                if mode != ResolutionMode.FRONTAL:
+                    # The solved problems hold reference cycles: free them now
+                    # rather than when the garbage collector runs.
+                    gc.collect()
+        except BaseException:  # Ctrl-C too
+            # The completed scenarios stay, without a manifest; the unfinished
+            # one is removed, so that no file is left open or half written.
+            writer.drop_open_scenario()
+            raise
         writer.finalize()  # the manifest last: the folder is complete
         return SimulationTable.open(folder)
 
     # ------------------------------------------------------------------
-    # Resolution strategies: the rows of the run, one scenario at a time
+    # Resolution strategies: the rows of the run, block by block
     # ------------------------------------------------------------------
 
-    def _iter_scenario_frames(
+    def _iter_rows(
         self, mode: ResolutionMode
-    ) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
-        """Solve and yield the rows of the run as ``(scenario, rows)``.
-        Private: results are returned by ``run()`` only.
+    ) -> Iterator[Tuple[Optional[int], Iterator[pd.DataFrame]]]:
+        """Yield ``(scenario, blocks)`` for each scenario of the run, where
+        *blocks* solves and yields the rows of the scenario's blocks, and
+        ``(None, blocks)`` first for rows shared by all scenarios. *blocks* must
+        be consumed before the next item is asked for. Private: results are
+        returned by ``run()`` only.
 
-        Sequential and parallel modes yield one frame per scenario, and solve
-        a scenario only once the previous one has been consumed. Frontal mode
-        solves once; with an ``output_dir``, it yields the rows shared by all
-        scenarios as ``(None, rows)``, then one frame per scenario; without
-        one, it yields every row in a single ``(None, rows)`` frame, in the
-        order of ``build()``."""
+        Sequential and parallel modes yield the rows of each block as soon as
+        it is solved. Frontal mode solves once, then yields the shared rows and
+        the rows of each scenario, built one scenario at a time."""
         if mode == ResolutionMode.FRONTAL:
             yield from self._iter_frontal()
         elif mode == ResolutionMode.SEQUENTIAL_SUBPROBLEMS:
-            yield from self._iter_sequential()
+            for scenario_id in self.scenario_ids:
+                yield scenario_id, self._sequential_blocks(scenario_id)
         else:
-            yield from self._iter_parallel()
+            for scenario_id in self.scenario_ids:
+                yield scenario_id, self._parallel_blocks(scenario_id)
 
-    def _iter_frontal(self) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
-        block = TimeBlock(
+    def _frontal_block(self) -> TimeBlock:
+        return TimeBlock(
             0,
             list(
                 range(
@@ -154,87 +178,63 @@ class SimulationSession:
                 )
             ),
         )
-        if self.output_dir is None:
-            # In memory: one frame, with the rows and order of build().
-            _, rows = self._run_block(block, scenario_ids=self.scenario_ids)
-            yield None, rows
-            return
-        # On disk: each scenario's rows are built from the solution arrays and
-        # written one at a time; the full table is never built.
-        problem = self._solve_block(block, scenario_ids=self.scenario_ids)
-        yield from SimulationTableBuilder()._iter_scenario_frames(
-            problem, self.scenario_ids
-        )
 
-    def _iter_sequential(self) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
+    def _iter_frontal(self) -> Iterator[Tuple[Optional[int], Iterator[pd.DataFrame]]]:
+        # The rows of each scenario are built from the solution arrays one at a
+        # time: the full table is never built.
+        problem = self._solve_block(self._frontal_block(), self.scenario_ids)
+        for scenario, rows in SimulationTableBuilder()._iter_scenario_frames(
+            problem, self.scenario_ids
+        ):
+            yield scenario, iter([rows])
+            del rows
+
+    def _sequential_blocks(self, scenario_id: int) -> Iterator[pd.DataFrame]:
         cfg = self.optim_config.resolution
         block_length: int = cfg.block_length  # type: ignore[assignment]
         block_overlap: int = cfg.block_overlap
         carry_over_length: int = cfg.effective_carry_over_length
 
-        for scenario_id in self.scenario_ids:
-            blocks: List[pd.DataFrame] = []
-            t_start = self.optim_config.time_scope.first_time_step
-            block_id = 0
-            carry_over: Dict[Tuple[str, str], xr.DataArray] = {}
+        t_start = self.optim_config.time_scope.first_time_step
+        block_id = 0
+        carry_over: Dict[Tuple[str, str], xr.DataArray] = {}
 
-            while t_start < self.optim_config.time_scope.last_time_step:
-                end = min(
-                    t_start + block_length,
-                    self.optim_config.time_scope.last_time_step + 1,
-                )
-                timesteps = list(range(t_start, end))
-                block = TimeBlock(block_id, timesteps)
-                problem, rows = self._run_block(
-                    block,
-                    scenario_ids=[scenario_id],
-                    initial_values=carry_over or None,
-                )
-                blocks.append(rows)
-                # Block N and block N+1 share `block_overlap` absolute
-                # timesteps: block N's local indices `block_length - overlap
-                # ...` are block N+1's local indices `0 ...`.
-                delta = block_length - block_overlap
-                t_start += delta
-                carry_over = self._extract_carry_over(
-                    problem,
-                    local_start=delta,
-                    length=carry_over_length,
-                )
-                block_id += 1
+        while t_start < self.optim_config.time_scope.last_time_step:
+            end = min(
+                t_start + block_length,
+                self.optim_config.time_scope.last_time_step + 1,
+            )
+            timesteps = list(range(t_start, end))
+            block = TimeBlock(block_id, timesteps)
+            problem, rows = self._run_block(
+                block,
+                scenario_ids=[scenario_id],
+                initial_values=carry_over or None,
+            )
+            yield rows
+            del rows  # written by the caller: not held during the next solve
+            # Block N and block N+1 share `block_overlap` absolute
+            # timesteps: block N's local indices `block_length - overlap
+            # ...` are block N+1's local indices `0 ...`.
+            delta = block_length - block_overlap
+            t_start += delta
+            carry_over = self._extract_carry_over(
+                problem,
+                local_start=delta,
+                length=carry_over_length,
+            )
+            block_id += 1
 
-            yield scenario_id, _concat_frames(blocks)
-
-    def _iter_parallel(self) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
+    def _parallel_blocks(self, scenario_id: int) -> Iterator[pd.DataFrame]:
         cfg = self.optim_config.resolution
         block_length: int = cfg.block_length  # type: ignore[assignment]
-
-        for scenario_id in self.scenario_ids:
-            starts = range(
-                self.optim_config.time_scope.first_time_step,
-                self.optim_config.time_scope.last_time_step + 1,
-                block_length,
-            )
-            blocks = [
-                TimeBlock(
-                    i,
-                    list(
-                        range(
-                            t,
-                            min(
-                                t + block_length,
-                                self.optim_config.time_scope.last_time_step + 1,
-                            ),
-                        )
-                    ),
-                )
-                for i, t in enumerate(starts)
-            ]
-            frames = [
-                self._run_block(block, scenario_ids=[scenario_id])[1]
-                for block in blocks
-            ]
-            yield scenario_id, _concat_frames(frames)
+        last = self.optim_config.time_scope.last_time_step
+        starts = range(
+            self.optim_config.time_scope.first_time_step, last + 1, block_length
+        )
+        for i, t in enumerate(starts):
+            block = TimeBlock(i, list(range(t, min(t + block_length, last + 1))))
+            yield self._run_block(block, scenario_ids=[scenario_id])[1]
 
     def _run_benders(self) -> None:
         from gems_runner.simulation import (

@@ -47,7 +47,7 @@ def run_study(
     ``study_dir/input/optim-config.yml``; defaults apply when the file is absent.
     Results are written to the table folder
     ``study_dir/output/{run_id}/simulation_table/`` (one file per scenario and
-    a ``manifest.json``), one scenario at a time as it is solved; reopen them
+    a ``manifest.json``), block by block as they are solved; reopen them
     with ``SimulationTable.open``. Benders mode writes no simulation table.
 
     Args:

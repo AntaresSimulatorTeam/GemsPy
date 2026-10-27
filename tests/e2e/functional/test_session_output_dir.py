@@ -165,29 +165,31 @@ def test_frontal_outputs_shared_by_every_scenario_go_to_the_common_file(
 
 
 @pytest.mark.parametrize("mode", ["sequential-overlap", "parallel"])
-def test_each_scenario_is_written_before_the_next_is_solved(
+def test_each_block_is_written_before_the_next_is_solved(
     tmp_path: Path, mode: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     events: List[Tuple[str, int]] = []
-    solve, write = SimulationSession._solve_block, _TableWriter.write_scenario
+    solve, append = SimulationSession._solve_block, _TableWriter.append
 
     def spy_solve(self: Any, block: Any, scenario_ids: List[int], *a: Any) -> Any:
         events.append(("solve", scenario_ids[0]))
         return solve(self, block, scenario_ids, *a)
 
-    def spy_write(self: Any, df: Any, scenario: Any = None) -> Any:
-        events.append(("write", scenario))
-        return write(self, df, scenario)
+    def spy_append(self: _TableWriter, df: Any) -> None:
+        events.append(("write", int(df["scenario_index"].iloc[0])))
+        append(self, df)
 
     monkeypatch.setattr(SimulationSession, "_solve_block", spy_solve)
-    monkeypatch.setattr(_TableWriter, "write_scenario", spy_write)
+    monkeypatch.setattr(_TableWriter, "append", spy_append)
 
     _session(_CONFIGS[mode], output_dir=tmp_path).run()
 
-    last_solve_of_0 = max(i for i, e in enumerate(events) if e == ("solve", 0))
-    first_solve_of_1 = events.index(("solve", 1))
-    assert last_solve_of_0 < events.index(("write", 0)) < first_solve_of_1
-    assert events[-1] == ("write", 1)
+    # solve, write, solve, write, ...: no block waits for the next to be solved
+    assert [k for k, _ in events] == ["solve", "write"] * (len(events) // 2)
+    assert [s for k, s in events if k == "solve"] == [
+        s for k, s in events if k == "write"
+    ]
+    assert len(events) > 4  # several blocks per scenario
 
 
 def test_frontal_never_builds_the_full_table_on_disk(
@@ -226,6 +228,34 @@ def test_an_interrupted_run_leaves_no_manifest(
 
     folder = tmp_path / SIMULATION_TABLE_FOLDER
     assert sorted(f.name for f in folder.iterdir()) == ["scenario-0.parquet"]
+    with pytest.raises(FileNotFoundError, match="has no manifest.json"):
+        SimulationTable.open(folder)
+
+
+@pytest.mark.parametrize("fmt", [OutputFormat.PARQUET, OutputFormat.CSV])
+@pytest.mark.parametrize("error", [RuntimeError("solver crashed"), KeyboardInterrupt()])
+def test_a_run_interrupted_within_a_scenario_keeps_only_complete_scenarios(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fmt: OutputFormat, error: Any
+) -> None:
+    solve, solved = SimulationSession._solve_block, []
+
+    def fail_on_the_second_block_of_scenario_1(
+        self: Any, block: Any, scenario_ids: List[int], *a: Any
+    ) -> Any:
+        solved.append(scenario_ids[0])
+        if solved.count(1) == 2:  # scenario 1's file is open, one block in
+            raise error
+        return solve(self, block, scenario_ids, *a)
+
+    monkeypatch.setattr(
+        SimulationSession, "_solve_block", fail_on_the_second_block_of_scenario_1
+    )
+
+    with pytest.raises(type(error)):
+        _session(_CONFIGS["parallel"], output_dir=tmp_path, output_format=fmt).run()
+
+    folder = tmp_path / SIMULATION_TABLE_FOLDER
+    assert sorted(f.name for f in folder.iterdir()) == [f"scenario-0.{fmt.value}"]
     with pytest.raises(FileNotFoundError, match="has no manifest.json"):
         SimulationTable.open(folder)
 

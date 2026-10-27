@@ -40,6 +40,7 @@ from gems_runner.simulation.table_schema import (
     _empty_frame,
     _equals,
     _same_key,
+    _with_schema,
 )
 from gems_runner.simulation.table_store import _MemoryStore, _RowFilter, _TableStore
 
@@ -614,7 +615,10 @@ class SimulationTableBuilder:
                 for name, da in arrays
                 if "scenario" in da.dims
             ]
-            yield scenario, _concat_frames(frames)
+            rows = _concat_frames(frames)
+            del frames  # the pieces are not held while the next scenario is built
+            yield scenario, rows
+            del rows
 
     def _collect_output_arrays(
         self, problem: OptimizationProblem
@@ -909,4 +913,4 @@ def _concat_frames(frames: Iterable[pd.DataFrame]) -> pd.DataFrame:
     frames = list(frames)
     if not frames:
         return _empty_frame()
-    return _apply_schema(pd.concat(frames, ignore_index=True))
+    return _with_schema(pd.concat(frames, ignore_index=True))
