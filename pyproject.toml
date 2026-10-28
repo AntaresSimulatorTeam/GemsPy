@@ -81,6 +81,7 @@ dev = [
     "types-PyYAML>=6.0.12",
     "antlr4-tools>=0.2.1",
     "pandas-stubs",
+    "pytest-xdist>=3.8.0",
 ]
 # Only needed for runnning solver specific tests (dual / reduced cost)
 solvers = [
