@@ -112,7 +112,7 @@ def _measure(study: str, mode: str, output_dir: str) -> None:
         output_dir=Path(output_dir) if output_dir else None,
     ).run()
     elapsed = time.perf_counter() - start
-    rows = sum(len(part) for _, part in table.iter_scenarios())
+    rows = sum(len(part) for _, part in table.iter_scenario_frames())
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e3
     print(json.dumps({"time": elapsed, "peak": peak, "rows": rows}))
 

@@ -52,8 +52,8 @@ def assert_same_tables(memory: SimulationTable, stored: SimulationTable) -> None
     assert stored.scenarios == memory.scenarios
     assert stored.table_id == memory.table_id
 
-    stored_parts = list(stored.iter_scenarios())
-    memory_parts = list(memory.iter_scenarios())
+    stored_parts = list(stored.iter_scenario_frames())
+    memory_parts = list(memory.iter_scenario_frames())
     assert [s for s, _ in stored_parts] == [s for s, _ in memory_parts]
     for (_, a), (_, b) in zip(stored_parts, memory_parts):
         pd.testing.assert_frame_equal(_sorted(a), _sorted(b))

@@ -105,7 +105,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `VectorizedBuilderBase` (`vectorized_builder.py`): shared base for all vectorized visitors (used by both `linearize.py` and `extra_output.py`)
 - `TimeBlock` (`time_block.py`): defines the temporal window for one solve
 - `SimulationTableBuilder` (`simulation_table.py`): result extraction as a flat pandas `DataFrame`
-- `SimulationTable` (`simulation_table.py`): the results of a run, in memory or stored on disk (`open` / `save`); reads its rows through an internal `_TableStore` (`table_store.py`: `_MemoryStore`; `table_folder.py`: `_FolderStore`) and exposes the views (`component(...).output(...)`) and `to_pandas` / `iter_scenarios` / `scan`
+- `SimulationTable` (`simulation_table.py`): the results of a run, in memory or stored on disk (`open` / `save`); reads its rows through an internal `_TableStore` (`table_store.py`: `_MemoryStore`; `table_folder.py`: `_FolderStore`) and exposes the views (`component(...).output(...)`) and `to_pandas` / `iter_scenario_frames` / `scan`
 - `_TableWriter`, `_Manifest` (`table_folder.py`): write a simulation table folder (one file per scenario, `scenario-common`, `manifest.json` written last)
 - `SimulationColumns`, `SIMULATION_TABLE_SCHEMA` (`table_schema.py`): columns and fixed schema of the simulation table
 - `apply_thermal_heuristics` (`heuristic_runner.py`): injects heuristic-derived bounds into a solved problem

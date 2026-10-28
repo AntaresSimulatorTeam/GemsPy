@@ -137,7 +137,7 @@ def test_a_scenario_without_rows_stays_listed(
 
     assert json.loads((folder / MANIFEST_FILE).read_text())["scenarios"] == [0, 1, 2]
     assert reopened.scenarios == [0, 1, 2]
-    assert [s for s, _ in reopened.iter_scenarios()] == [None, 0, 1, 2]
+    assert [s for s, _ in reopened.iter_scenario_frames()] == [None, 0, 1, 2]
     assert _keys(reopened.to_pandas(scenarios=[1])) == _keys(
         table.to_pandas(scenarios=[1])
     )
@@ -460,7 +460,9 @@ def test_to_pandas_without_filter_needs_load_all(tmp_path: Path) -> None:
         pytest.param(lambda t: t.to_pandas(load_all=True), id="load_all"),
         pytest.param(lambda t: t.to_pandas(components=["gen"]), id="filter"),
         pytest.param(lambda t: t.to_pandas(scenarios=[7]), id="no-scenario-file"),
-        pytest.param(lambda t: next(iter(t.iter_scenarios()))[1], id="iter_scenarios"),
+        pytest.param(
+            lambda t: next(iter(t.iter_scenario_frames()))[1], id="iter_scenario_frames"
+        ),
     ],
 )
 def test_reads_give_the_schema_without_converting_twice(
@@ -493,7 +495,7 @@ def test_load_all_on_disk_returns_the_rows_read_without_a_copy(
 
 
 @pytest.mark.parametrize("fmt", _FORMATS)
-def test_filters_and_iter_scenarios_match_the_table_in_memory(
+def test_filters_and_iter_scenario_frames_match_the_table_in_memory(
     tmp_path: Path, fmt: OutputFormat
 ) -> None:
     table, stored = _table(), _stored(tmp_path, fmt)
@@ -505,8 +507,10 @@ def test_filters_and_iter_scenarios_match_the_table_in_memory(
         {"components": ["gen"], "scenarios": [0]},
     ):
         assert _keys(stored.to_pandas(**kwargs)) == _keys(table.to_pandas(**kwargs))
-    assert [s for s, _ in stored.iter_scenarios()] == [None, 0, 1]
-    for (s1, a), (s2, b) in zip(stored.iter_scenarios(), table.iter_scenarios()):
+    assert [s for s, _ in stored.iter_scenario_frames()] == [None, 0, 1]
+    for (s1, a), (s2, b) in zip(
+        stored.iter_scenario_frames(), table.iter_scenario_frames()
+    ):
         assert s1 == s2 and _keys(a) == _keys(b)
 
 
@@ -527,7 +531,9 @@ def test_filters_matching_no_name_give_the_rows_of_the_table_in_memory(
 
     assert _keys(stored.to_pandas(**kwargs)) == _keys(table.to_pandas(**kwargs))
     parts = zip(
-        stored.iter_scenarios(**kwargs), table.iter_scenarios(**kwargs), strict=True
+        stored.iter_scenario_frames(**kwargs),
+        table.iter_scenario_frames(**kwargs),
+        strict=True,
     )
     for (s1, a), (s2, b) in parts:
         assert s1 == s2 and _keys(a) == _keys(b)

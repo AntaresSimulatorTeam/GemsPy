@@ -434,7 +434,7 @@ class _FolderStore:
     def read(self, row_filter: _RowFilter) -> pd.DataFrame:
         return self._read_files(self._files(row_filter.scenarios), row_filter)
 
-    def iter_scenarios(
+    def iter_scenario_frames(
         self, row_filter: _RowFilter
     ) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
         if self._manifest.has_common:

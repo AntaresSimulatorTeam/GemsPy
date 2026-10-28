@@ -155,7 +155,7 @@ def test_frontal_outputs_shared_by_every_scenario_go_to_the_common_file(
     ).run()
 
     assert_same_tables(memory, stored)
-    assert [(s, len(rows)) for s, rows in stored.iter_scenarios()][1:] == [
+    assert [(s, len(rows)) for s, rows in stored.iter_scenario_frames()][1:] == [
         (0, 0),
         (1, 0),
     ]

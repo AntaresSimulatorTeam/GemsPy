@@ -20,10 +20,11 @@ All notable changes to GemsPy are documented here.
 - **`block=` on the simulation table views** - `component(...).output(name,
   block=...)` and `OutputView.value(..., block=...)` select one block.
 - **Simulation table read API** - `SimulationTable.to_pandas(components,
-  outputs, scenarios)` returns part of the table, `iter_scenarios()` yields it
-  one scenario at a time, `scan()` returns a `pyarrow.dataset.Dataset`, and
-  `scenarios` lists the scenarios of the run. Scenario filters keep the rows
-  shared by all scenarios, which `iter_scenarios()` yields once, first.
+  outputs, scenarios)` returns part of the table, `iter_scenario_frames()`
+  yields it one scenario at a time, `scan()` returns a
+  `pyarrow.dataset.Dataset`, and `scenarios` lists the scenarios of the run.
+  Scenario filters keep the rows shared by all scenarios, which
+  `iter_scenario_frames()` yields once, first.
   `SimulationTable(df, table_id, scenarios=...)` takes the scenarios of the
   run, checked against the rows; the builder and the session pass them.
   `SimulationTable` is exported from `gems_runner.simulation`.
@@ -65,7 +66,7 @@ All notable changes to GemsPy are documented here.
 - **Breaking** - `SimulationSession(..., output_dir=...).run()` now stores the
   results on disk and returns the stored table, on which `data` raises: use
   `to_pandas(load_all=True)`, the filters of `to_pandas()`, or
-  `iter_scenarios()`. A new `output_format` argument chooses the format
+  `iter_scenario_frames()`. A new `output_format` argument chooses the format
   (Parquet by default). `output_dir/simulation_table/` must be missing or
   empty, so an `output_dir` holds a single run. Without `output_dir`, results
   stay in memory as before. `merge_simulation_tables` is removed.

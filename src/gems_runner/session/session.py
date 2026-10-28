@@ -111,7 +111,7 @@ class SimulationSession:
                 )
             else:
                 rows = _concat_frames(
-                    r for _, blocks in self._iter_rows(mode) for r in blocks
+                    r for _, blocks in self._iter_scenario_blocks(mode) for r in blocks
                 )
             return SimulationTable(
                 rows, table_id=self.run_id, scenarios=self.scenario_ids
@@ -122,7 +122,7 @@ class SimulationSession:
         folder = Path(self.output_dir).resolve() / SIMULATION_TABLE_FOLDER
         writer = _TableWriter(folder, self.run_id, self.output_format)
         try:
-            for scenario, blocks in self._iter_rows(mode):
+            for scenario, blocks in self._iter_scenario_blocks(mode):
                 if scenario is None:
                     writer.write_common(_concat_frames(blocks))
                     continue
@@ -147,7 +147,7 @@ class SimulationSession:
     # Resolution strategies: the rows of the run, block by block
     # ------------------------------------------------------------------
 
-    def _iter_rows(
+    def _iter_scenario_blocks(
         self, mode: ResolutionMode
     ) -> Iterator[Tuple[Optional[int], Iterator[pd.DataFrame]]]:
         """Yield ``(scenario, blocks)`` for each scenario of the run, where

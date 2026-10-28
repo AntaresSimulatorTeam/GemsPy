@@ -159,13 +159,13 @@ results.objective_values()  # columns: block, scenario_index, value
 results.scenarios                                   # [0, 1, ...]
 results.to_pandas(components=["gen_de"], scenarios=[0, 1])
 results.to_pandas(outputs=["generation"])
-for scenario, df in results.iter_scenarios():       # one scenario at a time
+for scenario, df in results.iter_scenario_frames():  # one scenario at a time
     ...
 dataset = results.scan()                            # pyarrow.dataset.Dataset
 ~~~
 
 - A scenario filter keeps the rows shared by all scenarios.
-  `iter_scenarios()` yields them once, first, as `(None, rows)`.
+  `iter_scenario_frames()` yields them once, first, as `(None, rows)`.
 - `scan()` hands the table to polars, duckdb or pyarrow, e.g.
   `polars.scan_pyarrow_dataset(results.scan())`.
 

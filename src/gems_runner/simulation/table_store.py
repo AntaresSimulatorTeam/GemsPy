@@ -133,7 +133,7 @@ class _TableStore(Protocol):
         """The rows passing *row_filter*, in no particular order."""
         ...
 
-    def iter_scenarios(
+    def iter_scenario_frames(
         self, row_filter: _RowFilter
     ) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
         """The rows passing *row_filter*, one scenario at a time.
@@ -219,7 +219,7 @@ class _MemoryStore:
             row_filter = replace(row_filter, components=None)
         return rows if row_filter.is_unrestricted else rows[row_filter.mask(rows)]
 
-    def iter_scenarios(
+    def iter_scenario_frames(
         self, row_filter: _RowFilter
     ) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
         rows = self.read(row_filter)

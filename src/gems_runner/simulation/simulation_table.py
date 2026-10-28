@@ -251,7 +251,7 @@ class SimulationTable:
     The rows are read through a storage: in memory (``SimulationTable(df)``),
     or a folder on disk (``SimulationTable.open(path)``), with the same API. The
     long-format DataFrame is accessible via the ``data`` property (in memory
-    only), and parts of it via ``to_pandas()``, ``iter_scenarios()`` and
+    only), and parts of it via ``to_pandas()``, ``iter_scenario_frames()`` and
     ``scan()``.
     """
 
@@ -297,7 +297,7 @@ class SimulationTable:
         path = Path(path)
         writer = _TableWriter(path, self.table_id, format)
         try:
-            for scenario, rows in self._store.iter_scenarios(_RowFilter()):
+            for scenario, rows in self._store.iter_scenario_frames(_RowFilter()):
                 if scenario is None:
                     writer.write_common(rows)
                 else:  # also a scenario without rows, so that it stays listed
@@ -314,13 +314,13 @@ class SimulationTable:
 
         Raises ``ValueError`` on a table stored on disk: use
         ``to_pandas(load_all=True)``, the filters of ``to_pandas()``, or
-        ``iter_scenarios()``.
+        ``iter_scenario_frames()``.
         """
         if self.path is not None:
             raise ValueError(
                 f"This simulation table is stored on disk ({self.path}): .data "
                 "would load it entirely. Use to_pandas(load_all=True), "
-                "to_pandas() with filters, or iter_scenarios()."
+                "to_pandas() with filters, or iter_scenario_frames()."
             )
         return self._store.read(_RowFilter())
 
@@ -385,7 +385,7 @@ class SimulationTable:
             return rows.copy()
         return rows
 
-    def iter_scenarios(
+    def iter_scenario_frames(
         self,
         components: Optional[Sequence[str]] = None,
         outputs: Optional[Sequence[str]] = None,
@@ -396,7 +396,7 @@ class SimulationTable:
         The rows shared by all scenarios come first, once, as ``(None, rows)``,
         and only if there are any; then every scenario of the run, in order.
         """
-        yield from self._store.iter_scenarios(
+        yield from self._store.iter_scenario_frames(
             _RowFilter(_filter_values(components), _filter_values(outputs))
         )
 
