@@ -38,11 +38,11 @@ The results are written to `my_run/simulation_table/` as they are solved, so
 the whole table is never held in memory, and `run()` returns the stored table.
 In sequential and parallel modes, the rows of each block are passed to the
 file of their scenario as soon as the block is solved: CSV appends them at
-once, Parquet buffers them and writes row groups of up to 64,000 rows, so at
-most one row group of rows is held, and the memory of the solved problems is
-freed after each scenario. In frontal mode, the
-problem is solved once, then the rows of each scenario are built from the
-solution and written one scenario at a time.
+once, Parquet buffers them and writes row groups of up to 64,000 rows, so
+about one row group of rows is held, and the memory of the solved problems is
+freed after each scenario. In frontal mode, the problem is solved once, then
+the rows of each scenario are built from the solution and written one scenario
+at a time.
 
 - `my_run/simulation_table/` must be missing or empty: use a new `output_dir`
   for each run. Otherwise `run()` raises `FileExistsError`, before anything is
@@ -109,6 +109,9 @@ simulation_table/
 - `scenario-common` holds the rows shared by all scenarios: outputs without a
   scenario dimension and the objective value of a frontal run with several
   scenarios. Their `scenario_index` is empty.
+- In sequential and parallel modes (and in frontal mode with one scenario),
+  each scenario is solved on its own: these rows carry its `scenario_index` and
+  go to its file, once per block, and there is no `scenario-common` file.
 - `manifest.json` holds the schema version, the `run_id`, the format, the
   scenarios of the run, whether there is a `scenario-common` file
   (`has_common`) and the column schema.
@@ -121,7 +124,8 @@ simulation_table/
   apart.
 
 Other tools can read the files directly, e.g. `scenario-*.parquet` with polars
-or duckdb: include the `scenario-common` file, which the glob matches.
+or duckdb: include the `scenario-common` file, which the glob matches. Check
+that `manifest.json` exists first: without it, the folder is an incomplete run.
 
 ---
 

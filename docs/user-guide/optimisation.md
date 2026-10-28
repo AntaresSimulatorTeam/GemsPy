@@ -15,7 +15,7 @@ GemsPy offers three levels of abstraction for running an optimisation:
 The simplest way to run a study is a single function call.  It reads the study
 directory, loads `input/optim-config.yml` (using defaults when absent), solves
 the problem, and writes the simulation table to folder
-`output/<run_id>/simulation_table/`, block by block as they are solved, in
+`output/<run_id>/simulation_table/` as it is solved, in
 Parquet by default (see [Retrieving outputs](outputs.md)). The run id is the
 start time to the second plus a short random suffix (e.g.
 `20261009T143502-3f9a1c`), so every run gets its own folder.
