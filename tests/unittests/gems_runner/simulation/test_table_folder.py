@@ -5,6 +5,7 @@
 SimulationTable.open() / save(), and reading through the folder store."""
 
 import json
+import math
 import os
 import pickle
 from pathlib import Path
@@ -392,7 +393,7 @@ def test_a_scenario_written_block_by_block_reads_back_whole(
     reopened = SimulationTable.open(tmp_path / "table")
     assert _keys(reopened.to_pandas(load_all=True)) == _keys(rows)
     if fmt == OutputFormat.PARQUET:  # buffered into row groups of 2 rows
-        assert pq.ParquetFile(path).metadata.num_row_groups == -(-len(rows) // 2)
+        assert pq.ParquetFile(path).metadata.num_row_groups == math.ceil(len(rows) / 2)
 
 
 def test_append_refuses_rows_of_another_scenario(tmp_path: Path) -> None:

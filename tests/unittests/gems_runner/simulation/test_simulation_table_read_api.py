@@ -274,13 +274,9 @@ def test_a_single_name_filters_like_a_list(kwargs: Any, as_list: Any) -> None:
 
 
 def test_iter_scenario_frames_accepts_a_single_name() -> None:
-    table = _table()
-    as_name = [
-        (s, _keys(df)) for s, df in table.iter_scenario_frames(components="load")
-    ]
-    as_list = [
-        (s, _keys(df)) for s, df in table.iter_scenario_frames(components=["load"])
-    ]
+    frames = _table().iter_scenario_frames
+    as_name = [(s, _keys(df)) for s, df in frames(components="load")]
+    as_list = [(s, _keys(df)) for s, df in frames(components=["load"])]
 
     assert as_name == as_list
     assert as_name[0][1] == {("load", "d", 0, 0)}
@@ -309,9 +305,7 @@ def test_to_pandas_load_all_has_no_effect_in_memory() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_iter_scenario_frames_yields_shared_rows_once_first_then_each_scenario() -> (
-    None
-):
+def test_iter_scenario_frames_yields_shared_rows_first_then_each_scenario() -> None:
     parts = list(_table().iter_scenario_frames())
 
     assert [scenario for scenario, _ in parts] == [None, 0, 1]

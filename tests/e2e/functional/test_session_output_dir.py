@@ -10,8 +10,8 @@
 #
 # This file is part of the Antares project.
 
-"""E2E test: a session given an output_dir stores its results on disk, one
-scenario at a time as they are solved, and returns the stored table."""
+"""E2E test: a session given an output_dir stores its results on disk, block
+by block as they are solved, and returns the stored table."""
 
 import json
 import os
@@ -44,7 +44,9 @@ from tests.e2e.functional.simulation_table_output import assert_same_tables
 _STUDY_13_1 = Path(__file__).parent / "studies" / "13_1"
 
 
-def _config(mode: ResolutionMode, scenarios: List[int], **resolution: int) -> Any:
+def _config(
+    mode: ResolutionMode, scenarios: List[int], **resolution: int
+) -> OptimConfig:
     return OptimConfig(
         time_scope=TimeScopeConfig(first_time_step=0, last_time_step=3),
         scenario_scope=ScenarioScopeConfig(include=scenarios),
@@ -155,10 +157,9 @@ def test_frontal_outputs_shared_by_every_scenario_go_to_the_common_file(
     ).run()
 
     assert_same_tables(memory, stored)
-    assert [(s, len(rows)) for s, rows in stored.iter_scenario_frames()][1:] == [
-        (0, 0),
-        (1, 0),
-    ]
+    parts = [(s, len(rows)) for s, rows in stored.iter_scenario_frames()]
+    assert parts[0][0] is None  # every row is in the common file
+    assert parts[1:] == [(0, 0), (1, 0)]
     manifest = json.loads((stored.path / MANIFEST_FILE).read_text())
     assert manifest["scenarios"] == [0, 1]
     assert manifest["has_common"] is True

@@ -102,7 +102,6 @@ _SEQUENTIAL_CONFIG = _BASE_CONFIG + textwrap.dedent("""\
 
 
 def _run_with_config(study_dir: Path, config_yaml: str):
-
     config_path = study_dir / "input" / "optim-config.yml"
     config_path.write_text(config_yaml)
     run_study(study_dir)
