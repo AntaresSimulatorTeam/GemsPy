@@ -42,7 +42,7 @@ from gems_craft.study.folder import load_study
 from gems_runner.study.runner import run_study
 
 study = load_study(Path("path/to/study_dir"))   # reads input/, model-libraries/, data-series/
-run_study(Path("path/to/study_dir"))            # loads study, solves, writes CSV to output/
+run_study(Path("path/to/study_dir"))            # loads study, solves, writes output/<run_id>/simulation_table/ (Parquet)
 
 # Python API — programmatic study
 from gems_craft.study import Study
@@ -105,13 +105,13 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `VectorizedBuilderBase` (`vectorized_builder.py`): shared base for all vectorized visitors (used by both `linearize.py` and `extra_output.py`)
 - `TimeBlock` (`time_block.py`): defines the temporal window for one solve
 - `SimulationTableBuilder` (`simulation_table.py`): result extraction as a flat pandas `DataFrame`
-- `SimulationTable` (`simulation_table.py`): the results of a run, in memory or stored on disk (`open` / `save`); reads its rows through an internal `_TableStore` (`table_store.py`: `_MemoryStore`; `table_folder.py`: `_FolderStore`) and exposes the views (`component(...).output(...)`) and `to_pandas` / `iter_scenarios` / `scan`
+- `SimulationTable` (`simulation_table.py`): the results of a run, in memory or stored on disk (`open` / `save`); reads its rows through an internal `_TableStore` (`table_store.py`: `_MemoryStore`; `table_folder.py`: `_FolderStore`) and exposes the views (`component(...).output(...)`) and `to_pandas` / `iter_scenario_frames` / `scan`
 - `_TableWriter`, `_Manifest` (`table_folder.py`): write a simulation table folder (one file per scenario, `scenario-common`, `manifest.json` written last)
 - `SimulationColumns`, `SIMULATION_TABLE_SCHEMA` (`table_schema.py`): columns and fixed schema of the simulation table
 - `apply_thermal_heuristics` (`heuristic_runner.py`): injects heuristic-derived bounds into a solved problem
 - `find_min_generation_fast` / `find_num_units_accurate` (`thermal_heuristic.py`): the `fast`/`accurate` heuristic functions
 
-**`gems_runner/session/`** — `SimulationSession`, the stateful entry point wrapping a loaded study for interactive solving.
+**`gems_runner/session/`** — `SimulationSession`, the stateful entry point wrapping a loaded study for interactive solving. With an `output_dir`, it writes the results to one file per scenario in `output_dir/simulation_table/` (`output_format`, Parquet by default, written in row groups of up to 64,000 rows) and returns the stored table: in sequential and parallel modes, the rows of each block as soon as the block is solved; in frontal mode, which solves once, one scenario at a time. Without an `output_dir`, results stay in memory. `run_study` and the `gemspy` CLI always store them, in `<study>/output/<run_id>/simulation_table/`. Benders mode writes no table folder and returns an empty table.
 
 **`gems_runner/main/`** — the `gemspy` CLI entry point (`main_cli`).
 

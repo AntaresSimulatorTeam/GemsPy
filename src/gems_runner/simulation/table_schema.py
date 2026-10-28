@@ -88,6 +88,16 @@ def _apply_schema(df: pd.DataFrame) -> pd.DataFrame:
     return df[list(SIMULATION_TABLE_DTYPES)].astype(SIMULATION_TABLE_DTYPES)
 
 
+def _with_schema(df: pd.DataFrame) -> pd.DataFrame:
+    """*df* itself if it already has the schema's columns, in order, and dtypes;
+    otherwise a converted copy. Frames built by the session already do."""
+    if df.dtypes.to_dict() == SIMULATION_TABLE_DTYPES and list(df.columns) == list(
+        SIMULATION_TABLE_DTYPES
+    ):
+        return df
+    return _apply_schema(df)
+
+
 def _empty_frame() -> pd.DataFrame:
     """A table without rows, with the columns and dtypes of the schema."""
     return pd.DataFrame(

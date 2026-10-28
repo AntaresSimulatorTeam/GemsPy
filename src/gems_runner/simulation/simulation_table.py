@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import (
     Any,
     Dict,
+    Iterable,
     Iterator,
     List,
     Optional,
@@ -36,8 +37,10 @@ from gems_runner.simulation.table_schema import (
     SIMULATION_TABLE_SCHEMA,
     SimulationColumns,
     _apply_schema,
+    _empty_frame,
     _equals,
     _same_key,
+    _with_schema,
 )
 from gems_runner.simulation.table_store import _MemoryStore, _RowFilter, _TableStore
 
@@ -248,7 +251,7 @@ class SimulationTable:
     The rows are read through a storage: in memory (``SimulationTable(df)``),
     or a folder on disk (``SimulationTable.open(path)``), with the same API. The
     long-format DataFrame is accessible via the ``data`` property (in memory
-    only), and parts of it via ``to_pandas()``, ``iter_scenarios()`` and
+    only), and parts of it via ``to_pandas()``, ``iter_scenario_frames()`` and
     ``scan()``.
     """
 
@@ -294,7 +297,7 @@ class SimulationTable:
         path = Path(path)
         writer = _TableWriter(path, self.table_id, format)
         try:
-            for scenario, rows in self._store.iter_scenarios(_RowFilter()):
+            for scenario, rows in self._store.iter_scenario_frames(_RowFilter()):
                 if scenario is None:
                     writer.write_common(rows)
                 else:  # also a scenario without rows, so that it stays listed
@@ -311,13 +314,13 @@ class SimulationTable:
 
         Raises ``ValueError`` on a table stored on disk: use
         ``to_pandas(load_all=True)``, the filters of ``to_pandas()``, or
-        ``iter_scenarios()``.
+        ``iter_scenario_frames()``.
         """
         if self.path is not None:
             raise ValueError(
                 f"This simulation table is stored on disk ({self.path}): .data "
                 "would load it entirely. Use to_pandas(load_all=True), "
-                "to_pandas() with filters, or iter_scenarios()."
+                "to_pandas() with filters, or iter_scenario_frames()."
             )
         return self._store.read(_RowFilter())
 
@@ -382,7 +385,7 @@ class SimulationTable:
             return rows.copy()
         return rows
 
-    def iter_scenarios(
+    def iter_scenario_frames(
         self,
         components: Optional[Sequence[str]] = None,
         outputs: Optional[Sequence[str]] = None,
@@ -393,7 +396,7 @@ class SimulationTable:
         The rows shared by all scenarios come first, once, as ``(None, rows)``,
         and only if there are any; then every scenario of the run, in order.
         """
-        yield from self._store.iter_scenarios(
+        yield from self._store.iter_scenario_frames(
             _RowFilter(_filter_values(components), _filter_values(outputs))
         )
 
@@ -522,22 +525,43 @@ class SimulationTableBuilder:
         scenario_ids_remap: Optional[List[int]] = None,
         table_id: str = "",
     ) -> SimulationTable:
-        block = problem.block.id
-        block_size = problem.block_length
+        return SimulationTable(
+            self._build_frame(problem, absolute_time_offset, scenario_ids_remap),
+            table_id=table_id,
+            scenarios=self._run_scenarios(problem, scenario_ids_remap),
+        )
 
+    @staticmethod
+    def _run_scenarios(
+        problem: OptimizationProblem, scenario_ids_remap: Optional[List[int]]
+    ) -> Optional[Sequence[int]]:
+        """The scenario labels of the rows: the remapped ids, or the positions."""
+        if scenario_ids_remap is not None:
+            return scenario_ids_remap
+        if problem.scenario_ids is not None:
+            return range(len(problem.scenario_ids))
+        return None
+
+    def _build_frame(
+        self,
+        problem: OptimizationProblem,
+        absolute_time_offset: Optional[int] = None,
+        scenario_ids_remap: Optional[List[int]] = None,
+    ) -> pd.DataFrame:
+        """All the rows of *problem*, with the schema's dtypes."""
+        block = problem.block.id
         if absolute_time_offset is None:
             # Use the first element of the block's absolute timestep list so that
             # the offset is correct for all modes, including blocks with overlap and
             # block ids that are not 1-based.
             absolute_time_offset = problem.block.timesteps[0]
 
-        dfs: list[pd.DataFrame] = []
-        dfs += self._collect_vars_outputs(
-            problem, block, absolute_time_offset, scenario_ids_remap
-        )
-        dfs += self._collect_extra_outputs(
-            problem, block, absolute_time_offset, scenario_ids_remap
-        )
+        dfs = [
+            self._da_to_df(
+                da, name, block, absolute_time_offset, None, scenario_ids_remap
+            )
+            for name, da in self._collect_output_arrays(problem)
+        ]
         dfs.append(self._collect_objective_value(problem, block))
 
         df = pd.concat(dfs, ignore_index=True)
@@ -551,15 +575,59 @@ class SimulationTableBuilder:
             # remapped id, or the scenario position 0 without a remap.
             label = scenario_ids_remap[0] if scenario_ids_remap is not None else 0
             df = _tag_single_scenario(df, label)
+        return _apply_schema(df)
 
-        # The scenario labels of the rows: the remapped ids, or the positions.
-        run_scenarios = (
-            scenario_ids_remap
-            if scenario_ids_remap is not None
-            else range(len(scenario_ids)) if scenario_ids is not None else None
-        )
-        return SimulationTable(
-            _apply_schema(df), table_id=table_id, scenarios=run_scenarios
+    def _iter_scenario_frames(
+        self, problem: OptimizationProblem, scenario_ids_remap: List[int]
+    ) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
+        """Yield the rows of *problem* one scenario at a time, so that no table
+        holding all scenarios is built.
+
+        With several scenarios, the rows shared by all of them (outputs without
+        a scenario dimension and the objective value) come first, as
+        ``(None, rows)``; then ``(scenario, rows)`` for every scenario, even one
+        without rows of its own. With a single scenario, every row belongs to
+        it: one frame is yielded, as built by ``_build_frame()``.
+        """
+        if len(scenario_ids_remap) == 1:
+            yield scenario_ids_remap[0], self._build_frame(
+                problem, scenario_ids_remap=scenario_ids_remap
+            )
+            return
+
+        block = problem.block.id
+        offset = problem.block.timesteps[0]
+        arrays = self._collect_output_arrays(problem)
+
+        shared = [
+            self._da_to_df(da, name, block, offset, None)
+            for name, da in arrays
+            if "scenario" not in da.dims
+        ]
+        shared.append(self._collect_objective_value(problem, block))
+        yield None, _apply_schema(pd.concat(shared, ignore_index=True))
+
+        for position, scenario in enumerate(scenario_ids_remap):
+            frames = [
+                self._da_to_df(
+                    da.isel(scenario=[position]), name, block, offset, None, [scenario]
+                )
+                for name, da in arrays
+                if "scenario" in da.dims
+            ]
+            rows = _concat_frames(frames)
+            del frames  # the pieces are not held while the next scenario is built
+            yield scenario, rows
+            del rows
+
+    def _collect_output_arrays(
+        self, problem: OptimizationProblem
+    ) -> List[Tuple[str, xr.DataArray]]:
+        """(output name, array) for every variable, then every extra output, in
+        table row order. Arrays keep their component, time and scenario
+        dimensions; ``_da_to_df`` turns them into rows."""
+        return self._collect_vars_outputs(problem) + self._collect_extra_outputs(
+            problem
         )
 
     # -------------------------------------------------------------------------
@@ -567,16 +635,12 @@ class SimulationTableBuilder:
     # -------------------------------------------------------------------------
 
     def _collect_vars_outputs(
-        self,
-        problem: OptimizationProblem,
-        block: int,
-        abs_offset: int,
-        scenario_ids_remap: Optional[List[int]] = None,
-    ) -> list[pd.DataFrame]:
-        dfs: list[pd.DataFrame] = []
+        self, problem: OptimizationProblem
+    ) -> List[Tuple[str, xr.DataArray]]:
+        arrays: List[Tuple[str, xr.DataArray]] = []
         solution = problem.linopy_model.solution
         if solution is None:
-            return dfs
+            return arrays
 
         for (mk, var_name), lv in problem._linopy_vars.items():
             sol_da = problem.get_variable_solution(mk, var_name)
@@ -584,33 +648,18 @@ class SimulationTableBuilder:
                 continue
 
             own_components = list(lv.coords["component"].values)
-            sol_da = sol_da.sel(component=own_components)
+            arrays.append((var_name, sol_da.sel(component=own_components)))
 
-            dfs.append(
-                self._da_to_df(
-                    sol_da,
-                    var_name,
-                    block,
-                    abs_offset,
-                    basis_status=None,
-                    scenario_ids_remap=scenario_ids_remap,
-                )
-            )
-
-        return dfs
+        return arrays
 
     # -------------------------------------------------------------------------
     # Extra outputs
     # -------------------------------------------------------------------------
 
     def _collect_extra_outputs(
-        self,
-        problem: OptimizationProblem,
-        block: int,
-        abs_offset: int,
-        scenario_ids_remap: Optional[List[int]] = None,
-    ) -> list[pd.DataFrame]:
-        dfs: list[pd.DataFrame] = []
+        self, problem: OptimizationProblem
+    ) -> List[Tuple[str, xr.DataArray]]:
+        arrays: List[Tuple[str, xr.DataArray]] = []
 
         var_solution_arrays: Dict[Tuple[str, str], xr.DataArray] = {}
         if problem.linopy_model.solution is not None:
@@ -671,18 +720,9 @@ class SimulationTableBuilder:
                     ]
                     result_da = result_da.sel(component=present)
 
-                dfs.append(
-                    self._da_to_df(
-                        result_da,
-                        out_id,
-                        block,
-                        abs_offset,
-                        basis_status=None,
-                        scenario_ids_remap=scenario_ids_remap,
-                    )
-                )
+                arrays.append((out_id, result_da))
 
-        return dfs
+        return arrays
 
     # -------------------------------------------------------------------------
     # Dual / reduced-cost arrays (helpers for _collect_extra_outputs)
@@ -867,13 +907,10 @@ class SimulationTableBuilder:
         )
 
 
-def merge_simulation_tables(
-    tables: List[SimulationTable], table_id: str = ""
-) -> SimulationTable:
-    """Concatenate multiple SimulationTables into one, over the union of
-    their scenarios."""
-    return SimulationTable(
-        pd.concat([t.data for t in tables], ignore_index=True),
-        table_id=table_id,
-        scenarios=sorted({s for t in tables for s in t.scenarios}),
-    )
+def _concat_frames(frames: Iterable[pd.DataFrame]) -> pd.DataFrame:
+    """Concatenate pieces of a run into one DataFrame with the schema's dtypes,
+    or an empty one for no piece."""
+    frames = list(frames)
+    if not frames:
+        return _empty_frame()
+    return _with_schema(pd.concat(frames, ignore_index=True))
