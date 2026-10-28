@@ -96,14 +96,20 @@ interoperate with [Antares Simulator](https://antares-simulator.org/).
 
 For the YAML fields in library and system files associated with the hybrid mode, see [this page](https://gems-energy.readthedocs.io/en/latest/interoperability/hybrid/hybrid-connections/) of the GEMS documentation website.
 
-Libraries are "cold" files: the same library YAML is often reused unchanged between a full GEMS study and a hybrid study of the same system. Hybrid-format libraries therefore load with the standard `parse_yaml_library` / `write_yaml_library` from `gems_craft` — the hybrid-only `area-connection` and `thermal-capacity-connection` port-type fields are recognized directly by `gems_craft`'s own schema (and simply ignored outside the hybrid workflow), so no separate hybrid library function is needed, and the same file works for either kind of study without a format change:
+Libraries are "cold" files: the same library YAML is often reused unchanged between a full GEMS study and a hybrid study of the same system. Both are read with `parse_yaml_library` from `gems_craft`. The hybrid-only `area-connection` and `thermal-capacity-connection` port-type fields live on `gems_craft`'s own schema and are ignored outside the hybrid workflow.
+
+Writing is split, because the two files do not keep the same empty keys. `write_yaml_library` writes a full GEMS library and omits empty keys. `write_yaml_hybrid_library` writes a hybrid library and keeps `injection-to-balance`, `spillage-bound` and `unsupplied-energy-bound` (as `null` when empty). `price` is omitted when empty in both.
 
 ~~~ python
+from pathlib import Path
+
 from gems_craft.model.parsing import parse_yaml_library, write_yaml_library
+from gems_craft_hybrid.model.parsing import write_yaml_hybrid_library
 
 with open("hybrid_lib.yml") as f:
     library = parse_yaml_library(f)
-write_yaml_library(library, Path("output/hybrid_lib.yml"))
+write_yaml_library(library, Path("output/library.yml"))
+write_yaml_hybrid_library(library, Path("output/hybrid_lib.yml"))
 ~~~
 
 
