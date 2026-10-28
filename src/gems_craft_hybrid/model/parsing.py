@@ -20,7 +20,7 @@ from gems_craft.model.parsing import LibrarySchema
 
 def write_yaml_hybrid_library(library: LibrarySchema, path: Path) -> None:
     """
-    An area-connection still writes its three mandatory keys, as null when unused. 
+    An area-connection still writes its three mandatory keys, as null when unused.
     price is omitted when empty, because earlier hybrid files reject that key.
     """
     data = library.model_dump(by_alias=True, exclude_none=True, mode="json")
