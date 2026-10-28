@@ -131,7 +131,7 @@ def write_yaml_system(system: SystemSchema, path: Path) -> None:
 class ParsedArguments:
     study_dir: Path
     optim_config_path: Optional[Path] = None
-    output_format: OutputFormat = OutputFormat.CSV
+    output_format: OutputFormat = OutputFormat.PARQUET
 
 
 def parse_cli() -> ParsedArguments:
@@ -152,9 +152,9 @@ def parse_cli() -> ParsedArguments:
     parser.add_argument(
         "--output-format",
         choices=[output_format.value for output_format in OutputFormat],
-        default=OutputFormat.CSV.value,
+        default=OutputFormat.PARQUET.value,
         dest="output_format",
-        help="format of the simulation table file (default: csv)",
+        help="format of the simulation table files (default: parquet)",
     )
 
     args = parser.parse_args()

@@ -2,11 +2,13 @@ import re
 import shutil
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 from gems_craft.study.folder import load_study
+from gems_runner.session.session import SIMULATION_TABLE_FOLDER
+from gems_runner.simulation.simulation_table import SimulationTable
 from gems_runner.study.runner import run_study
+from tests.e2e.functional.simulation_table_output import read_run_table
 
 TAXONOMY_FILE = Path("input") / "taxonomy.yml"
 
@@ -27,9 +29,7 @@ def test_run_study(tmp_path: Path) -> None:
 
     run_study(study_dir)
 
-    output_files = list((study_dir / "output").glob("**/simulation_table_*.csv"))
-    assert len(output_files) == 1
-    df = pd.read_csv(output_files[0])
+    df = read_run_table(study_dir)
     assert "objective-value" in df["output"].values
 
 
@@ -91,6 +91,7 @@ def test_runs_in_quick_succession_get_their_own_folder(tmp_path: Path) -> None:
     for run_dir in run_dirs:
         # Run id: start time to the second plus a short random suffix.
         assert re.fullmatch(r"\d{8}T\d{6}-[0-9a-f]{6}", run_dir.name)
-        # Each folder holds exactly its own run's table, named after its run id.
-        files = [f.name for f in run_dir.iterdir()]
-        assert files == [f"simulation_table_{run_dir.name}.csv"]
+        # Each folder holds exactly its own run's table, with its run id.
+        assert [f.name for f in run_dir.iterdir()] == [SIMULATION_TABLE_FOLDER]
+        table = SimulationTable.open(run_dir / SIMULATION_TABLE_FOLDER)
+        assert table.table_id == run_dir.name

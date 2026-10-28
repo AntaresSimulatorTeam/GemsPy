@@ -36,6 +36,7 @@ from gems_craft.study.folder import load_study
 from gems_runner.simulation import TimeBlock, build_problem
 from gems_runner.simulation.simulation_table import SimulationTableBuilder
 from gems_runner.study.runner import run_study
+from tests.e2e.functional.simulation_table_output import read_run_table
 
 _STUDY_SRC = Path(__file__).parent / "studies" / "13_1"
 
@@ -95,9 +96,7 @@ def _run_study(
 
     run_study(study_dir)
 
-    output_files = sorted((study_dir / "output").glob("**/simulation_table_*.csv"))
-    assert len(output_files) == 1
-    return pd.read_csv(output_files[0])
+    return read_run_table(study_dir)
 
 
 def _rows(df: pd.DataFrame, output: str) -> pd.DataFrame:

@@ -19,11 +19,18 @@ import pytest
 from gems_craft.study.parsing import OutputFormat, parse_cli
 
 
-def test_output_format_defaults_to_csv(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_output_format_defaults_to_parquet(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "argv", ["gemspy", "--study", "my_study"])
     parsed = parse_cli()
     assert parsed.study_dir == Path("my_study")
-    assert parsed.output_format is OutputFormat.CSV
+    assert parsed.output_format is OutputFormat.PARQUET
+
+
+def test_output_format_csv(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        sys, "argv", ["gemspy", "--study", "my_study", "--output-format", "csv"]
+    )
+    assert parse_cli().output_format is OutputFormat.CSV
 
 
 def test_output_format_parquet(monkeypatch: pytest.MonkeyPatch) -> None:

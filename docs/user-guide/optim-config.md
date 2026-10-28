@@ -141,6 +141,8 @@ scenario-scope:
 - Excludes that do not appear in the base set produce a warning and have no effect.
 - Output is always sorted in ascending order.
 - `exclude` cannot be used without `include`.
+- A scope that selects no scenario (e.g. everything excluded) is rejected
+  before anything is solved.
 
 **Default behaviour** (no `scenario-scope` key at all, or an empty block):
 runs scenario 0 only.

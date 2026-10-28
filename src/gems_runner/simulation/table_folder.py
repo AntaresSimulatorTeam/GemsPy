@@ -31,7 +31,7 @@ import os
 from dataclasses import asdict, dataclass
 from dataclasses import fields as dataclass_fields
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, cast
 
 import pandas as pd
 import pyarrow as pa
@@ -46,8 +46,8 @@ from gems_runner.simulation.table_schema import (
     PARQUET_COMPRESSION_LEVEL,
     PARQUET_ROW_GROUP_SIZE,
     SIMULATION_TABLE_SCHEMA,
-    _apply_schema,
     _empty_frame,
+    _with_schema,
 )
 from gems_runner.simulation.table_store import _RowFilter
 
@@ -136,7 +136,9 @@ class _Manifest:
 
 
 class _TableWriter:
-    """Writes a simulation table folder, one scenario at a time.
+    """Writes a simulation table folder, one scenario at a time, each given at
+    once (``write_scenario``) or block by block (``start_scenario``,
+    ``append``, ``end_scenario``).
 
     The folder is created if missing and refused if it is not empty. The
     manifest is written last, by ``finalize()``.
@@ -146,12 +148,13 @@ class _TableWriter:
         # Absolute: pyarrow reads a relative path such as "s3:x/..." as a URI.
         folder = Path(folder).resolve()
         output_format = OutputFormat(output_format)  # checked before any write
-        if folder.exists() and any(folder.iterdir()):
+        if folder.exists() and (not folder.is_dir() or any(folder.iterdir())):
             raise FileExistsError(
-                f"{folder} is not empty: a simulation table is written into a new "
-                "or empty folder."
+                f"{folder} is not empty, or is not a folder: a simulation table is "
+                "written into a new or empty folder."
             )
-        self._created_folder = not folder.exists()
+        # The folders created here, deepest first, so that abort() removes them.
+        self._created_folders = [p for p in [folder, *folder.parents] if not p.exists()]
         folder.mkdir(parents=True, exist_ok=True)
         self._folder = folder
         self._run_id = run_id
@@ -160,19 +163,55 @@ class _TableWriter:
         self._has_common = False
         self._finalized = False
         self._written: List[Path] = []
+        self._open: Optional[_TableFile] = None
+        self._open_scenario: Optional[int] = None
+
+    def start_scenario(self, scenario: int) -> None:
+        """Open the file of *scenario*, not written yet. Its rows are then
+        given block by block with ``append()``, and ``end_scenario()`` closes
+        it; a scenario closed without rows gets an empty file, so that it is
+        still listed in the manifest."""
+        self._check_open()
+        if self._open is not None:
+            raise ValueError(f"Scenario {self._open_scenario} is still open.")
+        # A plain int, so that the manifest can be written: a numpy integer is
+        # not JSON serializable. A float or a string is refused.
+        scenario = operator.index(scenario)
+        if scenario in self._scenarios:
+            raise ValueError(f"Scenario {scenario} is already written.")
+        self._open = self._open_file(_file_stem(scenario))
+        self._open_scenario = scenario
+
+    def append(self, df: pd.DataFrame) -> None:
+        """Write rows of the open scenario, all with its ``scenario_index``."""
+        if self._open is None:
+            raise ValueError("append() needs a scenario opened by start_scenario().")
+        in_rows = df[_SCENARIO]
+        if in_rows.isna().any() or not (in_rows == self._open_scenario).all():
+            labels = sorted({str(s) for s in in_rows.unique()})
+            raise ValueError(
+                f"append(): the rows are of scenario {', '.join(labels)}, "
+                f"not {self._open_scenario}."
+            )
+        self._open.append(df)
+
+    def end_scenario(self) -> Path:
+        """Close the file of the open scenario."""
+        if self._open is None:
+            raise ValueError("end_scenario() needs a scenario opened first.")
+        path = self._open.close()
+        self._scenarios.append(cast(int, self._open_scenario))
+        self._open, self._open_scenario = None, None
+        return path
 
     def write_scenario(self, df: pd.DataFrame, scenario: Optional[int] = None) -> Path:
-        """Write the rows of one scenario, not written yet.
+        """Write all the rows of one scenario, not written yet, at once.
 
         Every row must have the same, non-empty ``scenario_index``. Pass
         *scenario* for a scenario of the run without rows of its own: an empty
         file is written, so that the scenario is still listed in the manifest.
         """
         self._check_open()
-        if scenario is not None:
-            # A plain int, so that the manifest can be written: a numpy integer
-            # is not JSON serializable. A float or a string is refused.
-            scenario = operator.index(scenario)
         in_rows = df[_SCENARIO] if _SCENARIO in df.columns else pd.Series(dtype=int)
         labels = {int(s) for s in in_rows.dropna().unique()}
         if in_rows.isna().any() or len(labels) > 1 or (not labels and scenario is None):
@@ -187,16 +226,17 @@ class _TableWriter:
                 f"write_scenario(): the rows are of scenario {labels.pop()}, "
                 f"not {scenario}."
             )
-        if scenario in self._scenarios:
-            raise ValueError(f"Scenario {scenario} is already written.")
-        path = self._write_file(df, _file_stem(scenario))
-        self._scenarios.append(scenario)
-        return path
+        self.start_scenario(scenario)
+        if not df.empty:
+            self.append(df)
+        return self.end_scenario()
 
     def write_common(self, df: pd.DataFrame) -> Optional[Path]:
         """Write the rows shared by all scenarios, all with an empty
         ``scenario_index``. Nothing is written for no rows."""
         self._check_open()
+        if self._open is not None:
+            raise ValueError(f"Scenario {self._open_scenario} is still open.")
         if self._has_common:
             raise ValueError("The rows shared by all scenarios are already written.")
         if df[_SCENARIO].notna().any():
@@ -206,11 +246,19 @@ class _TableWriter:
         if df.empty:
             return None
         self._has_common = True
-        return self._write_file(df, COMMON_FILE_STEM)
+        common = self._open_file(COMMON_FILE_STEM)
+        try:
+            common.append(df)
+        except BaseException:
+            common.discard()  # closed before abort() removes it
+            raise
+        return common.close()
 
     def finalize(self) -> _Manifest:
         """Write the manifest, which marks the folder as complete."""
         self._check_open()
+        if self._open is not None:
+            raise ValueError(f"Scenario {self._open_scenario} is still open.")
         manifest = _Manifest(
             schema_version=MANIFEST_SCHEMA_VERSION,
             run_id=self._run_id,
@@ -223,42 +271,100 @@ class _TableWriter:
         self._finalized = True
         return manifest
 
+    def drop_open_scenario(self) -> None:
+        """Close and remove the file of the scenario still open, if any, so
+        that only complete scenarios stay on disk."""
+        if self._open is not None:
+            path = self._open.discard()
+            path.unlink(missing_ok=True)
+            self._written.remove(path)
+            self._open, self._open_scenario = None, None
+
     def abort(self) -> None:
-        """Remove what was written, so that the folder is as before: the files,
-        a partial manifest, and the folder itself if it was created here. No
+        """Remove what was written, so that the disk is as before: the files, a
+        partial manifest, and the folders created here, parents included. No
         write is accepted after it."""
+        self.drop_open_scenario()
         for path in [*self._written, self._folder / f"{MANIFEST_FILE}.tmp"]:
             path.unlink(missing_ok=True)
-        if self._created_folder and self._folder.is_dir():
-            if not any(self._folder.iterdir()):
-                self._folder.rmdir()
+        for created in self._created_folders:  # deepest first
+            if created.is_dir() and not any(created.iterdir()):
+                created.rmdir()
         self._finalized = True
 
     def _check_open(self) -> None:
         if self._finalized:
             raise ValueError("The simulation table folder is already finalized.")
 
-    def _write_file(self, df: pd.DataFrame, stem: str) -> Path:
+    def _open_file(self, stem: str) -> "_TableFile":
         path = self._folder / f"{stem}.{self._format.value}"
         self._written.append(path)  # before writing: a partial file is removed too
-        df = _empty_frame() if df.empty else _apply_schema(df)
-        if self._format == OutputFormat.CSV:
-            df.to_csv(path, index=False)
-            return path
+        return _TableFile(path, self._format)
+
+
+class _TableFile:
+    """One file of a table folder, written block by block.
+
+    Parquet: blocks are buffered up to ``PARQUET_ROW_GROUP_SIZE`` rows, then
+    written as a row group, so that at most a buffer of rows is held. CSV: the
+    header is written on opening, then each block is appended.
+    """
+
+    def __init__(self, path: Path, output_format: OutputFormat) -> None:
+        self._path = path
+        self._format = output_format
+        self._buffer: List[pa.Table] = []
+        self._buffered_rows = 0
+        self._parquet: Optional[pq.ParquetWriter] = None
+        if output_format == OutputFormat.CSV:
+            _empty_frame().to_csv(path, index=False)  # the header, even for 0 rows
+        else:
+            self._parquet = pq.ParquetWriter(  # type: ignore[no-untyped-call]
+                path,
+                SIMULATION_TABLE_SCHEMA,
+                compression=PARQUET_COMPRESSION,
+                compression_level=PARQUET_COMPRESSION_LEVEL,
+            )
+
+    def append(self, df: pd.DataFrame) -> None:
+        if df.empty:
+            return
+        df = _with_schema(df)
+        if self._parquet is None:
+            df.to_csv(self._path, index=False, header=False, mode="a")
+            return
         # Pandas metadata is dropped, so the file depends on the data and the
         # schema only. nthreads=1: pyarrow's default converts with a thread
-        # pool, started on every call, which is slower for one file per scenario.
-        table = pa.Table.from_pandas(
-            df, schema=SIMULATION_TABLE_SCHEMA, preserve_index=False, nthreads=1
-        ).replace_schema_metadata(None)
-        pq.write_table(  # type: ignore[no-untyped-call]
-            table,
-            path,
-            compression=PARQUET_COMPRESSION,
-            compression_level=PARQUET_COMPRESSION_LEVEL,
-            row_group_size=PARQUET_ROW_GROUP_SIZE,
+        # pool, started on every call, which is slower for small blocks.
+        self._buffer.append(
+            pa.Table.from_pandas(
+                df, schema=SIMULATION_TABLE_SCHEMA, preserve_index=False, nthreads=1
+            ).replace_schema_metadata(None)
         )
-        return path
+        self._buffered_rows += len(df)
+        if self._buffered_rows >= PARQUET_ROW_GROUP_SIZE:
+            self._flush()
+
+    def close(self) -> Path:
+        if self._parquet is not None:
+            self._flush()
+            self._parquet.close()  # type: ignore[no-untyped-call]
+        return self._path
+
+    def discard(self) -> Path:
+        """Close without flushing, and return the path; the caller removes the
+        file."""
+        self._buffer = []
+        if self._parquet is not None:
+            self._parquet.close()  # type: ignore[no-untyped-call]
+        return self._path
+
+    def _flush(self) -> None:
+        if self._buffer:
+            self._parquet.write_table(  # type: ignore[union-attr]
+                pa.concat_tables(self._buffer), row_group_size=PARQUET_ROW_GROUP_SIZE
+            )
+        self._buffer, self._buffered_rows = [], 0
 
 
 _PANDAS_TYPES = {pa.int64(): pd.Int64Dtype(), pa.string(): pd.StringDtype("python")}
@@ -328,7 +434,7 @@ class _FolderStore:
     def read(self, row_filter: _RowFilter) -> pd.DataFrame:
         return self._read_files(self._files(row_filter.scenarios), row_filter)
 
-    def iter_scenarios(
+    def iter_scenario_frames(
         self, row_filter: _RowFilter
     ) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
         if self._manifest.has_common:

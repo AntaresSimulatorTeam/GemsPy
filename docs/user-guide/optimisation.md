@@ -14,9 +14,11 @@ GemsPy offers three levels of abstraction for running an optimisation:
 
 The simplest way to run a study is a single function call.  It reads the study
 directory, loads `input/optim-config.yml` (using defaults when absent), solves
-the problem, and writes results to `output/<run_id>/`. The run id is the start
-time to the second plus a short random suffix (e.g. `20261009T143502-3f9a1c`),
-so every run gets its own folder.
+the problem, and writes the simulation table to folder
+`output/<run_id>/simulation_table/` as it is solved, in
+Parquet by default (see [Retrieving outputs](outputs.md)). The run id is the
+start time to the second plus a short random suffix (e.g.
+`20261009T143502-3f9a1c`), so every run gets its own folder.
 
 ~~~ python
 from pathlib import Path
@@ -35,8 +37,9 @@ run_study(Path("my_study"), optim_config_path=Path("configs/my_config.yml"))
 
 ## Mid-level: `SimulationSession`
 
-`SimulationSession` gives you explicit control over which configuration is used
-and lets you inspect the returned `SimulationTable` in memory.
+`SimulationSession` gives you explicit control over which configuration is used.
+`run()` returns a `SimulationTable`, held in memory, or stored on disk when an
+`output_dir` is given (see [Retrieving outputs](outputs.md)).
 
 ~~~ python
 from pathlib import Path

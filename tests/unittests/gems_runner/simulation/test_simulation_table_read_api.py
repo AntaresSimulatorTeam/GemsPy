@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 """Tests for the SimulationTable read API and its storage: to_pandas,
-iter_scenarios, scan, scenarios, path, and the cache of the lazy views."""
+iter_scenario_frames, scan, scenarios, path, and the cache of the lazy views."""
 
 from pathlib import Path
 from typing import Any, Iterator, List, Optional, Set, Tuple
@@ -23,7 +23,7 @@ from gems_runner.simulation.simulation_table import (
     SimulationTable,
     SimulationTableBuilder,
     _apply_schema,
-    merge_simulation_tables,
+    _concat_frames,
 )
 from gems_runner.simulation.table_store import _MemoryStore, _RowFilter
 
@@ -95,10 +95,10 @@ class _CountingStore:
         self.reads.append(row_filter)
         return self._store.read(row_filter)
 
-    def iter_scenarios(
+    def iter_scenario_frames(
         self, row_filter: _RowFilter
     ) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
-        return self._store.iter_scenarios(row_filter)
+        return self._store.iter_scenario_frames(row_filter)
 
     def scan(self) -> Any:
         return self._store.scan()
@@ -145,7 +145,7 @@ def test_the_run_scenarios_are_kept_when_no_row_names_them() -> None:
     table = _table(_SHARED_ROWS, scenarios=[0, 1, 2])
 
     assert table.scenarios == [0, 1, 2]
-    assert [s for s, _ in table.iter_scenarios()] == [None, 0, 1, 2]
+    assert [s for s, _ in table.iter_scenario_frames()] == [None, 0, 1, 2]
 
 
 def test_without_run_scenarios_they_come_from_the_rows() -> None:
@@ -189,11 +189,15 @@ def test_the_builder_gives_the_table_the_run_scenarios() -> None:
     assert table.scenarios == [3, 7]
 
 
-def test_merging_keeps_the_union_of_the_scenarios() -> None:
-    first = _table([(0, "a", "p", 0, 0, 1.0)], scenarios=[0])
-    second = _table([(0, "a", "p", 0, 1, 2.0)], scenarios=[1])
+def test_concatenated_pieces_keep_the_schema() -> None:
+    first = _table([(0, "a", "p", 0, 0, 1.0)]).data
+    second = _table([(1, "a", "p", 0, 1, 2.0)]).data
 
-    assert merge_simulation_tables([first, second]).scenarios == [0, 1]
+    rows = _concat_frames([first, second])
+
+    assert len(rows) == 2
+    assert rows.dtypes.to_dict() == first.dtypes.to_dict()
+    assert _concat_frames([]).dtypes.to_dict() == first.dtypes.to_dict()
 
 
 # ---------------------------------------------------------------------------
@@ -269,10 +273,10 @@ def test_a_single_name_filters_like_a_list(kwargs: Any, as_list: Any) -> None:
     assert _keys(rows) == _keys(table.to_pandas(**as_list))
 
 
-def test_iter_scenarios_accepts_a_single_name() -> None:
-    table = _table()
-    as_name = [(s, _keys(df)) for s, df in table.iter_scenarios(components="load")]
-    as_list = [(s, _keys(df)) for s, df in table.iter_scenarios(components=["load"])]
+def test_iter_scenario_frames_accepts_a_single_name() -> None:
+    frames = _table().iter_scenario_frames
+    as_name = [(s, _keys(df)) for s, df in frames(components="load")]
+    as_list = [(s, _keys(df)) for s, df in frames(components=["load"])]
 
     assert as_name == as_list
     assert as_name[0][1] == {("load", "d", 0, 0)}
@@ -297,12 +301,12 @@ def test_to_pandas_load_all_has_no_effect_in_memory() -> None:
 
 
 # ---------------------------------------------------------------------------
-# iter_scenarios
+# iter_scenario_frames
 # ---------------------------------------------------------------------------
 
 
-def test_iter_scenarios_yields_shared_rows_once_first_then_each_scenario() -> None:
-    parts = list(_table().iter_scenarios())
+def test_iter_scenario_frames_yields_shared_rows_first_then_each_scenario() -> None:
+    parts = list(_table().iter_scenario_frames())
 
     assert [scenario for scenario, _ in parts] == [None, 0, 1]
     assert _keys(parts[0][1]) == {
@@ -316,17 +320,17 @@ def test_iter_scenarios_yields_shared_rows_once_first_then_each_scenario() -> No
     }
 
 
-def test_iter_scenarios_applies_the_filters_and_skips_empty_shared_rows() -> None:
-    parts = list(_table().iter_scenarios(components=["load"]))
+def test_iter_scenario_frames_applies_the_filters_and_skips_empty_shared_rows() -> None:
+    parts = list(_table().iter_scenario_frames(components=["load"]))
 
     assert [scenario for scenario, _ in parts] == [0, 1]
     assert _keys(parts[1][1]) == {("load", "d", 0, 1)}
 
 
-def test_iter_scenarios_yields_a_scenario_without_matching_rows() -> None:
+def test_iter_scenario_frames_yields_a_scenario_without_matching_rows() -> None:
     table = _table([(0, "a", "p", 0, 0, 1.0), (0, "b", "p", 0, 1, 2.0)])
 
-    parts = dict(table.iter_scenarios(components=["b"]))
+    parts = dict(table.iter_scenario_frames(components=["b"]))
 
     assert list(parts) == [0, 1]
     assert parts[0].empty

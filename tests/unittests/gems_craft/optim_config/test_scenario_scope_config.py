@@ -245,3 +245,21 @@ def test_validate_optim_config_scenario_builder_accepts_valid_scenario_ids() -> 
     system = System(id="test")
 
     validate_optim_config(config, system, sb)  # must not raise
+
+
+@pytest.mark.parametrize(
+    "scope",
+    [
+        pytest.param({"include": ["0-2"], "exclude": ["0-2"]}, id="all-excluded"),
+        pytest.param({"include": []}, id="empty-include"),
+    ],
+)
+def test_validate_optim_config_rejects_an_empty_scenario_scope(scope: dict) -> None:
+    from gems_craft.optim_config.parsing import OptimConfig
+    from gems_craft.optim_config.validation import validate_optim_config
+    from gems_craft.study.system import System
+
+    config = OptimConfig.model_validate({"scenario-scope": scope})
+
+    with pytest.raises(ValueError, match="selects no scenario"):
+        validate_optim_config(config, System(id="test"))
