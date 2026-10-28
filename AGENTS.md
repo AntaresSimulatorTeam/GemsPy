@@ -111,7 +111,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `apply_thermal_heuristics` (`heuristic_runner.py`): injects heuristic-derived bounds into a solved problem
 - `find_min_generation_fast` / `find_num_units_accurate` (`thermal_heuristic.py`): the `fast`/`accurate` heuristic functions
 
-**`gems_runner/session/`** — `SimulationSession`, the stateful entry point wrapping a loaded study for interactive solving. With an `output_dir`, it passes the rows of each block to its scenario's file in `output_dir/simulation_table/` as soon as the block is solved (`output_format`, Parquet by default, written in row groups of up to 64,000 rows) and returns the stored table; otherwise results stay in memory. `run_study` and the `gemspy` CLI always store them, in `<study>/output/<run_id>/simulation_table/`. Benders mode writes no table folder and returns an empty table.
+**`gems_runner/session/`** — `SimulationSession`, the stateful entry point wrapping a loaded study for interactive solving. With an `output_dir`, it writes the results to one file per scenario in `output_dir/simulation_table/` (`output_format`, Parquet by default, written in row groups of up to 64,000 rows) and returns the stored table: in sequential and parallel modes, the rows of each block as soon as the block is solved; in frontal mode, which solves once, one scenario at a time. Without an `output_dir`, results stay in memory. `run_study` and the `gemspy` CLI always store them, in `<study>/output/<run_id>/simulation_table/`. Benders mode writes no table folder and returns an empty table.
 
 **`gems_runner/main/`** — the `gemspy` CLI entry point (`main_cli`).
 

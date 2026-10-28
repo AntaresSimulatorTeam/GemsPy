@@ -24,7 +24,10 @@ nature (they build a study with `gems_craft` and solve it with `gems_runner` in 
 | Unit — gems_craft / system parsing | `tests/unittests/gems_craft/system_parsing/` | System YAML parsing |
 | Unit — gems_craft_hybrid | `tests/unittests/gems_craft_hybrid/` | Hybrid GEMS/Antares Simulator schema parsing |
 | Unit — gems_runner / expression | `tests/unittests/gems_runner/expression/` | Solver-output expression evaluation (`dual()`, `reduced_cost()`, `lower_bound()`, `upper_bound()`, `variable()`) |
-| Unit — gems_runner / simulation | `tests/unittests/gems_runner/simulation/` | Full problem build + solve on small networks |
+| Unit — gems_runner / simulation | `tests/unittests/gems_runner/simulation/` | Full problem build + solve on small networks, and the simulation table (read API, storage on disk) |
 | End-to-end — functional | `tests/e2e/functional/` | Cross-cutting tests: library/system combinations, stochastic, investment, scenario builder |
 | End-to-end — models | `tests/e2e/models/` | Model-level tests (andromede-v1 models, operator tests, proof-of-concept models) |
 | End-to-end — studies | `tests/e2e/functional/studies/` | Full YAML study fixtures read by the functional end-to-end tests |
+
+`perf_*.py` scripts in `tests/e2e/functional/` are benchmarks run by hand (e.g.
+`python tests/e2e/functional/perf_simulation_table_memory.py`); pytest does not collect them.
