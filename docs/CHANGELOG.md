@@ -55,11 +55,14 @@ All notable changes to GemsPy are documented here.
 - **Breaking** - `run_study` and `gemspy` write the simulation table as a folder,
   `output/<run_id>/simulation_table/` (one file per scenario, a
   `scenario-common` file and a `manifest.json`), instead of a single
-  `simulation_table_<run_id>.csv` / `.parquet` file. The rows of each block
-  are passed to their scenario's file as soon as the block is solved (Parquet
-  writes them in row groups of up to 64,000 rows), so the whole table, or even
-  a whole scenario, is never held in memory; reopen it with
-  `SimulationTable.open()`.
+  `simulation_table_<run_id>.csv` / `.parquet` file. In sequential and
+  parallel modes, the rows of each block are passed to their scenario's file
+  as soon as the block is solved (Parquet writes them in row groups of up to
+  64,000 rows); frontal mode solves once and writes one scenario at a time.
+  The whole table is never held in memory; reopen it with
+  `SimulationTable.open()`. Benders mode writes no simulation table (it wrote
+  an empty `simulation_table_.csv`), and `SimulationSession.run()` returns an
+  empty table with the schema's columns.
 - **Breaking** - the default output format of `run_study` and of the CLI
   `--output-format` option is now Parquet (it was CSV). CSV is still available
   with `--output-format csv`.
@@ -68,8 +71,11 @@ All notable changes to GemsPy are documented here.
   `to_pandas(load_all=True)`, the filters of `to_pandas()`, or
   `iter_scenario_frames()`. A new `output_format` argument chooses the format
   (Parquet by default). `output_dir/simulation_table/` must be missing or
-  empty, so an `output_dir` holds a single run. Without `output_dir`, results
-  stay in memory as before. `merge_simulation_tables` is removed.
+  empty, so an `output_dir` holds a single run. If the run fails or is
+  interrupted, the completed scenarios stay without a manifest (the
+  unfinished one is removed), and `SimulationTable.open()` refuses the folder.
+  Without `output_dir`, results stay in memory as before.
+  `merge_simulation_tables` is removed.
 - **Clearer error for a single-time-step sequential run** - in
   `sequential-subproblems` mode, a time scope whose `first-time-step` equals
   its `last-time-step` still solves no block, but `run()` now fails
