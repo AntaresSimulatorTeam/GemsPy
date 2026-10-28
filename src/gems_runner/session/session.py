@@ -104,8 +104,13 @@ class SimulationSession:
             )
 
         if self.output_dir is None:
+            # In memory: the whole table is returned, so it is built at once.
+            # Frontal solves a single block holding every scenario: one call
+            # gives the table, with the rows and order of build(). The
+            # sub-problem modes concatenate the rows of their blocks.
+            # On disk (below), rows are written as they are solved instead,
+            # so the full table is never held.
             if mode == ResolutionMode.FRONTAL:
-                # One table, with the rows and order of build().
                 _, rows = self._run_block(
                     self._frontal_block(), scenario_ids=self.scenario_ids
                 )
@@ -127,9 +132,10 @@ class SimulationSession:
                     writer.write_common(_concat_frames(blocks))
                     continue
                 writer.start_scenario(scenario)
-                for rows in blocks:  # each block is passed on as soon as solved
-                    writer.append(rows)
-                    del rows  # released before the next block is solved
+                # Each block is passed on as soon as it is solved.
+                for block_dataframe in blocks:
+                    writer.append(block_dataframe)
+                    del block_dataframe  # released before the next block is solved
                 writer.end_scenario()  # before the next scenario is solved
                 if mode != ResolutionMode.FRONTAL:
                     # The solved problems hold reference cycles: free them now
@@ -163,10 +169,10 @@ class SimulationSession:
             yield from self._iter_frontal()
         elif mode == ResolutionMode.SEQUENTIAL_SUBPROBLEMS:
             for scenario_id in self.scenario_ids:
-                yield scenario_id, self._sequential_blocks(scenario_id)
+                yield scenario_id, self._iter_sequential(scenario_id)
         else:
             for scenario_id in self.scenario_ids:
-                yield scenario_id, self._parallel_blocks(scenario_id)
+                yield scenario_id, self._iter_parallel(scenario_id)
 
     def _frontal_block(self) -> TimeBlock:
         return TimeBlock(
@@ -189,7 +195,9 @@ class SimulationSession:
             yield scenario, iter([rows])
             del rows
 
-    def _sequential_blocks(self, scenario_id: int) -> Iterator[pd.DataFrame]:
+    def _iter_sequential(self, scenario_id: int) -> Iterator[pd.DataFrame]:
+        """Solve the blocks of *scenario_id* one after the other, each starting
+        from the end of the previous one, and yield the rows of each block."""
         cfg = self.optim_config.resolution
         block_length: int = cfg.block_length  # type: ignore[assignment]
         block_overlap: int = cfg.block_overlap
@@ -206,13 +214,14 @@ class SimulationSession:
             )
             timesteps = list(range(t_start, end))
             block = TimeBlock(block_id, timesteps)
-            problem, rows = self._run_block(
+            problem, block_dataframe = self._run_block(
                 block,
                 scenario_ids=[scenario_id],
                 initial_values=carry_over or None,
             )
-            yield rows
-            del rows  # written by the caller: not held during the next solve
+            yield block_dataframe
+            # Written by the caller: not held during the next solve.
+            del block_dataframe
             # Block N and block N+1 share `block_overlap` absolute
             # timesteps: block N's local indices `block_length - overlap
             # ...` are block N+1's local indices `0 ...`.
@@ -225,7 +234,9 @@ class SimulationSession:
             )
             block_id += 1
 
-    def _parallel_blocks(self, scenario_id: int) -> Iterator[pd.DataFrame]:
+    def _iter_parallel(self, scenario_id: int) -> Iterator[pd.DataFrame]:
+        """Solve the blocks of *scenario_id* independently of each other, and
+        yield the rows of each block."""
         cfg = self.optim_config.resolution
         block_length: int = cfg.block_length  # type: ignore[assignment]
         last = self.optim_config.time_scope.last_time_step
