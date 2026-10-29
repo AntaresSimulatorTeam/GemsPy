@@ -20,7 +20,6 @@ fullexpr: expr EOF;
 expr
     : atom                                     # unsignedAtom
     | portFieldExpr                            # portField
-    // Above negation and muldiv: "-2^2" is "-(2^2)", "2*3^2" is "2*(3^2)".
     | <assoc=right> expr '^' expr              # power
     | '-' expr                                 # negation
     | '(' expr ')'                             # expression
@@ -77,9 +76,6 @@ right_expr
     | shift_operand                            # rightOperand
     ;
 
-// "^" binds tighter than the leading sign and than "*" "/", as in "expr":
-// "t - 2^2" is "t - (2^2)" and "t - 2^2*3" is "t - (2^2)*3". Unlike in
-// "expr", the exponent cannot be signed, a fractional shift being meaningless.
 shift_operand
     : shift_primary ('^' shift_operand)?
     ;
