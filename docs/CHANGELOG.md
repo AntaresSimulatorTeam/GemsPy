@@ -134,6 +134,11 @@ All notable changes to GemsPy are documented here.
   `to_pandas()`. They raise on a table stored on disk.
 
 ### Fixed
+- **Empty `area-connection` keys of written libraries** - `write_yaml_library`
+  now always writes `injection-to-balance`, `spillage-bound` and
+  `unsupplied-energy-bound` (as `null` when empty), which Antares Simulator
+  requires. Empty keys were dropped, and Antares refused the library. The
+  optional `price` key is still omitted when empty.
 - **Empty scenario scope** - a `scenario-scope` that selects no scenario (e.g.
   every included scenario excluded) is rejected by `validate_optim_config` at
   the start of `SimulationSession.run()`, before anything is solved, instead of

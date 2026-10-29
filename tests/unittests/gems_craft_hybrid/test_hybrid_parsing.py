@@ -14,12 +14,17 @@
 area-connection / thermal-capacity-connection fields on the base PortTypeSchema."""
 
 from pathlib import Path
+from typing import Any, Dict
 
 import pytest
+from yaml import safe_load
 
 from gems_craft.model.parsing import (
     AreaConnectionSchema,
+    FieldSchema,
+    LibrarySchema,
     PortThermalCapacitySchema,
+    PortTypeSchema,
     parse_yaml_library,
     write_yaml_library,
 )
@@ -33,6 +38,8 @@ from gems_craft_hybrid.study.parsing import (
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
+# Full GEMS libraries, without any hybrid-only field
+FULL_GEMS_LIBS = Path(__file__).parents[1] / "gems_craft" / "lib_parsing" / "libs"
 
 
 def _load_hybrid_system(path: Path) -> HybridSystemSchema:
@@ -89,6 +96,17 @@ def test_write_yaml_system_roundtrip_hybrid(tmp_path: Path) -> None:
     write_yaml_system(original, out)
     reloaded = _load_hybrid_system(out)
     assert reloaded == original
+
+
+def test_write_yaml_system_without_hybrid_entries_writes_no_hybrid_key(
+    tmp_path: Path,
+) -> None:
+    system = HybridSystemSchema(id="full_gems")
+    out = tmp_path / "system.yml"
+    write_yaml_system(system, out)
+    written = out.read_text()
+    assert "area-connections" not in written
+    assert "thermal-capacity-connections" not in written
 
 
 # ---------------------------------------------------------------------------
@@ -159,6 +177,100 @@ def test_write_yaml_library_roundtrip_hybrid(tmp_path: Path) -> None:
     with out.open() as f:
         reloaded = parse_yaml_library(f)
     assert reloaded == original
+
+
+def _written_area_connections(path: Path) -> Dict[str, Dict[str, Any]]:
+    with path.open() as f:
+        tree = safe_load(f)
+    return {
+        port_type["id"]: port_type["area-connection"]
+        for port_type in tree["library"]["port-types"]
+        if "area-connection" in port_type
+    }
+
+
+def test_write_yaml_library_keeps_empty_area_connection_keys(tmp_path: Path) -> None:
+    with FIXTURES.joinpath("hybrid_lib.yml").open() as f:
+        library = parse_yaml_library(f)
+    out = tmp_path / "lib.yml"
+    write_yaml_library(library, out)
+    written = _written_area_connections(out)
+    # Mandatory keys first, in field order, then the optional price key
+    assert list(written["flow_with_price"]) == [
+        "injection-to-balance",
+        "spillage-bound",
+        "unsupplied-energy-bound",
+        "price",
+    ]
+    assert written == {
+        "flow": {
+            "injection-to-balance": "flow",
+            "spillage-bound": "flow",
+            "unsupplied-energy-bound": None,
+        },
+        "flow_with_price": {
+            "injection-to-balance": "flow",
+            "spillage-bound": None,
+            "unsupplied-energy-bound": None,
+            "price": "price",
+        },
+    }
+
+
+def test_write_yaml_library_writes_mandatory_area_connection_keys_of_python_library(
+    tmp_path: Path,
+) -> None:
+    library = LibrarySchema(
+        id="lib",
+        port_types=[
+            PortTypeSchema(
+                id="flow",
+                fields=[FieldSchema(id="flow")],
+                area_connection=AreaConnectionSchema(injection_to_balance="flow"),
+            ),
+            PortTypeSchema(id="plain", fields=[FieldSchema(id="flow")]),
+        ],
+    )
+    out = tmp_path / "lib.yml"
+    write_yaml_library(library, out)
+    assert _written_area_connections(out) == {
+        "flow": {
+            "injection-to-balance": "flow",
+            "spillage-bound": None,
+            "unsupplied-energy-bound": None,
+        }
+    }
+
+
+@pytest.mark.parametrize(
+    "library_file",
+    sorted(FULL_GEMS_LIBS.glob("*.yml")),
+    ids=lambda path: path.name,
+)
+def test_write_yaml_library_of_full_gems_library_writes_no_hybrid_key(
+    library_file: Path, tmp_path: Path
+) -> None:
+    with library_file.open() as f:
+        library = parse_yaml_library(f)
+    out = tmp_path / "lib.yml"
+    write_yaml_library(library, out)
+    written = out.read_text()
+    assert "area-connection" not in written
+    assert "thermal-capacity-connection" not in written
+
+
+def test_write_yaml_library_of_python_full_gems_library_writes_no_hybrid_key(
+    tmp_path: Path,
+) -> None:
+    library = LibrarySchema(
+        id="lib",
+        port_types=[PortTypeSchema(id="flow", fields=[FieldSchema(id="flow")])],
+    )
+    out = tmp_path / "lib.yml"
+    write_yaml_library(library, out)
+    written = out.read_text()
+    assert "area-connection" not in written
+    assert "thermal-capacity-connection" not in written
 
 
 # ---------------------------------------------------------------------------

@@ -12,9 +12,16 @@
 import typing
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import ConfigDict, Field, ValidationError
+from pydantic import (
+    ConfigDict,
+    Field,
+    SerializationInfo,
+    SerializerFunctionWrapHandler,
+    ValidationError,
+    model_serializer,
+)
 from yaml import safe_dump, safe_load
 
 from gems_craft.utils import ModifiedBaseModel
@@ -64,6 +71,33 @@ class AreaConnectionSchema(ModifiedBaseModel):
     unsupplied_energy_bound: Optional[str] = None
     # Port field through which a component reads the marginal price of the legacy area
     price: Optional[str] = None
+
+    @model_serializer(mode="wrap")
+    def _keep_mandatory_keys(
+        self, handler: SerializerFunctionWrapHandler, info: SerializationInfo
+    ) -> Dict[str, Any]:
+        """Always write the mandatory keys of the hybrid format, even when empty.
+
+        An area-connection missing one of these keys is invalid, so they are
+        written whatever the dump options (exclude_none, include, exclude), in
+        field order. The optional price key is still dropped when None, since
+        earlier versions of the hybrid format do not accept it.
+        """
+        data: Dict[str, Any] = handler(self)
+        mandatory: Dict[str, Any] = {}
+        for name in (
+            "injection_to_balance",
+            "spillage_bound",
+            "unsupplied_energy_bound",
+        ):
+            field = type(self).model_fields[name]
+            key = (
+                field.serialization_alias
+                if info.by_alias and field.serialization_alias
+                else name
+            )
+            mandatory[key] = data.pop(key, None)
+        return {**mandatory, **data}
 
 
 class PortThermalCapacitySchema(ModifiedBaseModel):

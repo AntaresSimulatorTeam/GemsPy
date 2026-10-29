@@ -107,11 +107,11 @@ def _normalize_objective_contributions(
     Contributions that are already fully scalar, or already wrapped in expec(),
     are returned unchanged with no warning.
 
-    This implements the iso-format behaviour of Antares Simulator v10.0.0 (Issue #76).
+    This implements the iso-format behaviour of the GEMS format (Issue #76).
 
-    TODO: This auto-wrapping is a temporary compatibility shim. Once Antares Simulator
-    natively supports the expec() operator in objective contributions, this function
-    should be removed and authors should be required to write expec() explicitly.
+    TODO: This auto-wrapping is a temporary compatibility shim. Once the expec()
+    operator is required in objective contributions, this function should be
+    removed and authors should be required to write expec() explicitly.
     """
 
     provider = _make_structure_provider(parameters, variables)
@@ -323,7 +323,7 @@ def model(
     vars_dict = {v.name: v for v in variables} if variables else {}
 
     # Auto-wrap any objective contribution that has a residual scenario dimension
-    # without an explicit expec() (Issue #76 / Antares Simulator v10.0.0 iso-format).
+    # without an explicit expec() (Issue #76, iso-format behaviour).
     if objective_contributions:
         objective_contributions = _normalize_objective_contributions(
             objective_contributions, params_dict, vars_dict
