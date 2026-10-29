@@ -4,171 +4,97 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
+Simulation results are now written to disk as they are solved, as one file per
+scenario; model semantics move closer to Antares Simulator; hybrid libraries
+can be written in the form Antares Simulator expects. This release contains
+breaking changes, marked **Breaking** below.
+
 ### Added
-- **`write_yaml_hybrid_library`** - writes a hybrid library and keeps
-  `injection-to-balance`, `spillage-bound` and `unsupplied-energy-bound`
-  (as `null` when empty), which Antares Simulator requires. `write_yaml_library`
-  stays the "full GEMS" writer and raises when a port type has
-  `area-connection` or `thermal-capacity-connection`, naming
-  `write_yaml_hybrid_library`. That writer also keeps a
-  `thermal-capacity-connection` when the port type has one. The optional
-  `price` key is still omitted when empty.
-- **`price` in the `area-connection` of port types** - `AreaConnectionSchema`
-  accepts the optional `price` key of hybrid libraries (Antares Simulator
-  10.2), which names the port field through which a component reads the
-  marginal price of the legacy area it is connected to. `parse_yaml_library`
-  rejected libraries using it (`Extra inputs are not permitted`).
-- **Plain numbers in expression fields** - in a model library, every
-  expression field (constraint expressions and bounds, port-field definitions,
-  objective contributions, extra outputs) now accepts a YAML number, such as
-  `definition: 0`, read as if it were quoted. Only variable bounds accepted one
-  before; elsewhere parsing failed with `Input should be a valid string`.
-- **`SimulationTable.objective_values()`** - returns the objective value of
-  every solved problem, with columns `block`, `scenario_index` and `value`.
-- **`block=` on the simulation table views** - `component(...).output(name,
-  block=...)` and `OutputView.value(..., block=...)` select one block.
-- **Simulation table read API** - `SimulationTable.to_pandas(components,
-  outputs, scenarios)` returns part of the table, `iter_scenario_frames()`
-  yields it one scenario at a time, `scan()` returns a
-  `pyarrow.dataset.Dataset`, and `scenarios` lists the scenarios of the run.
-  Scenario filters keep the rows shared by all scenarios, which
-  `iter_scenario_frames()` yields once, first.
-  `SimulationTable(df, table_id, scenarios=...)` takes the scenarios of the
-  run, checked against the rows; the builder and the session pass them.
-  `SimulationTable` is exported from `gems_runner.simulation`.
 - **Simulation tables stored on disk** - `SimulationTable.save(path, format)`
-  writes the table as a folder: one file per scenario of the run
-  (`scenario-<N>`, empty for a scenario without rows of its own), a
-  `scenario-common` file for the rows shared by all scenarios, and a
-  `manifest.json` written last, in Parquet (default) or CSV with one fixed
-  schema. `SimulationTable.open(path)` reads it back lazily, opening only the
-  files a call needs, and refuses a folder without a manifest. On such a table
-  `data` raises and `to_pandas()` without filter needs `load_all=True`.
-- **Taxonomy conformance checked when a study is loaded** - `load_study` reads
-  the optional `input/taxonomy.yml` and calls
-  `validate_libraries_against_taxonomy` on every library declaring a `taxonomy`
-  field. `parse_yaml_library` is unchanged and performs no validation.
-- **Absolute bounds in time sums** - in `sum(S .. E, X)`, a bound can now be an
-  absolute time index of the block (an expression that does not depend on `t`, e.g.
-  `sum(0 .. 2, x)`) as well as a bound relative to `t` (with a shift that does not depend on `t`), and both can be mixed
-  (e.g. `sum(0 .. t, x)`).
-- **Constant terms in objective contributions** - an objective contribution can
-  now mix variables and constants (e.g. `sum(cost * generation + 1)`); this
-  previously raised `ValueError: Constant values in objective function not
-  supported`. `OptimizationProblem.objective_value` and the `objective-value`
-  row of the simulation table include the constant; `linopy_model.objective.value`
-  and the LP file written by `export_lp` do not.
+  writes a folder with one file per scenario, a `scenario-common` file for the
+  rows shared by all scenarios and a `manifest.json` written last.
+  `SimulationTable.open(path)` reads it back lazily, opening only the files a
+  call needs. `SimulationTable` is exported from `gems_runner.simulation`.
+- **Simulation table read API** - `to_pandas(components, outputs, scenarios)`,
+  `iter_scenario_frames()`, `scan()` (a `pyarrow.dataset.Dataset`),
+  `scenarios`, `objective_values()`, and `block=` on `component(...).output(...)`
+  and `OutputView.value()` to select one block.
+- **Parquet output** - zstd-compressed Parquet, chosen with `--output-format` /
+  `output_format`. `pyarrow` is now a runtime dependency.
+- **Expression language**
+  - Time sums accept absolute bounds (e.g. `sum(0 .. 2, x)`, `sum(0 .. t, x)`)
+    as well as bounds relative to `t`.
+  - Objective contributions may contain constant terms (e.g.
+    `sum(cost * generation + 1)`); `objective_value` includes them, the
+    linopy objective and the LP export do not.
+  - Every expression field of a model library accepts a plain YAML number
+    (e.g. `definition: 0`), not only variable bounds.
+- **Taxonomy conformance** - `load_study` reads the optional
+  `input/taxonomy.yml` and checks every library declaring a `taxonomy` against
+  it.
+- **Hybrid libraries**
+  - `write_yaml_hybrid_library` writes a hybrid library with the three
+    mandatory `area-connection` keys (`null` when unused), as Antares Simulator
+    requires.
+  - Port types accept the optional `price` key in `area-connection` (Antares
+    Simulator 10.2).
 
 ### Changed
-- **Breaking** - `run_study` and `gemspy` write the simulation table as a folder,
-  `output/<run_id>/simulation_table/` (one file per scenario, a
-  `scenario-common` file and a `manifest.json`), instead of a single
-  `simulation_table_<run_id>.csv` / `.parquet` file. In sequential and
-  parallel modes, the rows of each block are passed to their scenario's file
-  as soon as the block is solved (Parquet writes them in row groups of up to
-  64,000 rows); frontal mode solves once and writes one scenario at a time.
-  The whole table is never held in memory; reopen it with
-  `SimulationTable.open()`. Benders mode writes no simulation table (it wrote
-  an empty `simulation_table_.csv`), and `SimulationSession.run()` returns an
-  empty table with the schema's columns.
-- **Breaking** - the default output format of `run_study` and of the CLI
-  `--output-format` option is now Parquet (it was CSV). CSV is still available
-  with `--output-format csv`.
-- **Breaking** - `SimulationSession(..., output_dir=...).run()` now stores the
-  results on disk and returns the stored table, on which `data` raises: use
-  `to_pandas(load_all=True)`, the filters of `to_pandas()`, or
-  `iter_scenario_frames()`. A new `output_format` argument chooses the format
-  (Parquet by default). `output_dir/simulation_table/` must be missing or
-  empty, so an `output_dir` holds a single run. If the run fails or is
-  interrupted, the completed scenarios stay without a manifest (the
-  unfinished one is removed), and `SimulationTable.open()` refuses the folder.
-  Without `output_dir`, results stay in memory as before.
-  `merge_simulation_tables` is removed.
-- **Clearer error for a single-time-step sequential run** - in
-  `sequential-subproblems` mode, a time scope whose `first-time-step` equals
-  its `last-time-step` still solves no block, but `run()` now fails
-  before solving anything with "Sequential mode solves no time block when the
-  time scope has a single time step (…): use frontal or parallel-subproblems
-  mode." instead of `ValueError: No objects to concatenate`.
-- **Scenario playlist removed** - scenario selection is now configured inline
-  through `scenario-scope`; the `playlist-file` option is no longer supported.
-- **Breaking** - a time-sum bound (an absolute bound, or the offset `k` of a
-  relative bound `t + k`) must now be declared time-independent and contain no
-  variable. This is checked when the model is created, whatever the data.
-  Since a parameter that omits `time-dependent` is time-dependent, parameters
-  used in bounds must declare `time-dependent: false`, e.g. `d_min_up` in
-  `sum(t - d_min_up + 1 .. t, x)`. Such models were previously accepted in
-  `cyclic` mode.
-- **Breaking** - `SimulationTable.data` has one fixed schema, whatever the
-  content: nullable `Int64` indices (empty for a missing dimension), `string`
-  labels and `float64` values (`SIMULATION_TABLE_SCHEMA` /
-  `SIMULATION_TABLE_DTYPES`). `scenario_index` was an `object` column mixing
-  ints and `None`. Comparisons on empty cells give `<NA>`, which filters treat
-  as no match.
-- **Breaking** - when the values requested from an `OutputView` include a
-  (time, scenario) solved in several blocks (overlapping sequential blocks, or
-  the per-block rows of an output without a time dimension), `value()` and
-  `data` raise unless `block=` is given. They silently returned the first row.
-- **Each run gets its own output folder** - the run id is now the start time to
-  the second plus a short random suffix (e.g. `20261009T143502-3f9a1c`, it was
-  `20261009T1435`), and `run_study` creates `output/<run_id>/` before solving,
-  failing over to a new id rather than reusing an existing folder. Runs started
-  in the same minute shared a folder, and the second run's files replaced or
-  mixed with the first run's.
-- **Breaking** - a model parameter that omits `time-dependent` or
-  `scenario-dependent` is now time- or scenario-dependent, as in Antares
-  Simulator (it was constant). A component may still give it a constant value.
-  Declare `time-dependent: false` / `scenario-dependent: false` for parameters
-  that must stay constant.
-- **Breaking** - loading a study whose library declares a `taxonomy` raises
-  `ValueError` if no taxonomy is supplied, or if its id differs from the declared
-  one.
-- **Breaking** - `TaxonomyData` renamed to `TaxonomySchema`; no alias kept.
-- **Breaking** - `check_library_against_taxonomy` moved from
-  `gems_craft.model.taxonomy` to the new `gems_craft.model.validation`, and
-  `consistency_check` from `gems_craft.study.resolve_components` to the new
-  `gems_craft.study.validation`, where it is renamed
-  `check_component_models`. The `Study.check_consistency()` method moved to
-  that same module as the function `check_data_requirements(study)` — the two
-  checks are disjoint (component model ids vs. database coverage) and their
-  near-identical old names invited confusion. Reading and validating are now
-  separate modules, as in `optim_config/`. No behavior change; names and
-  import paths only.
+- **Breaking** - **results written to disk as they are solved.** `run_study`
+  and the `gemspy` CLI write `output/<run_id>/simulation_table/` (see above),
+  in Parquet by default, instead of a single CSV file. Sequential and parallel
+  modes write each block as soon as it is solved, so the whole table is never
+  held in memory. `SimulationSession(..., output_dir=...)` does the same and
+  returns the stored table, on which `data` raises (use `to_pandas()` or
+  `iter_scenario_frames()`). Benders mode writes no table.
+- **Breaking** - **one fixed simulation table schema**: nullable `Int64`
+  indices, `string` labels, `float64` values (`SIMULATION_TABLE_SCHEMA`).
+  `OutputView.value()` and `data` raise when the requested values span several
+  blocks, unless `block=` is given.
+- **Breaking** - **model parameters are time- and scenario-dependent by
+  default**, as in Antares Simulator. Declare `time-dependent: false` /
+  `scenario-dependent: false` for parameters that must stay constant.
+- **Breaking** - **time-sum bounds** must be time-independent and contain no
+  variable, which is checked when the model is created.
+- **Breaking** - **taxonomy**: loading a study whose library declares a
+  `taxonomy` fails if no matching taxonomy is supplied. `TaxonomyData` is
+  renamed `TaxonomySchema`.
+- **Breaking** - **validation moved to dedicated modules**:
+  `check_library_against_taxonomy` to `gems_craft.model.validation`;
+  `consistency_check` and `Study.check_consistency()` to
+  `gems_craft.study.validation`, as `check_component_models` and
+  `check_data_requirements(study)`. No behavior change.
+- **Breaking** - `write_yaml_library` raises on a library whose port types have
+  `area-connection` or `thermal-capacity-connection`; use
+  `write_yaml_hybrid_library`.
+- **Unique output folder per run** - run ids now include seconds and a random
+  suffix (e.g. `20261009T143502-3f9a1c`), and an existing folder is never
+  reused.
 
 ### Deprecated
-- **`SimulationTable.to_csv()`, `to_parquet()`, `to_dataset()` and
-  `to_netcdf()`** - they emit a `DeprecationWarning` and will be removed in a
-  following release. Use `save()`, or build an xarray object from
-  `to_pandas()`. They raise on a table stored on disk.
+- `SimulationTable.to_csv()`, `to_parquet()`, `to_dataset()` and `to_netcdf()`:
+  use `save()`, or build an xarray object from `to_pandas()`.
+
+### Removed
+- **Breaking** - the `playlist-file` option of `scenario-scope`; list the
+  scenarios inline.
+- **Breaking** - `merge_simulation_tables`.
 
 ### Fixed
-- **Empty scenario scope** - a `scenario-scope` that selects no scenario (e.g.
-  every included scenario excluded) is rejected by `validate_optim_config` at
-  the start of `SimulationSession.run()`, before anything is solved, instead of
-  failing during the run with `No objects to concatenate` or `cannot reshape
-  array of size 0`.
-- **Outputs without a time or scenario dimension** - `OutputView.value()`
-  accepts any index for the missing dimension and returns the single stored
-  value; it raised `KeyError` for any index but 0. `OutputView.data` keeps one
-  row (or column) for that dimension, labelled `<NA>` (it was `0`).
-- **Scenario index of single-scenario solves** - a problem solved for a single
-  scenario (every sequential/parallel block, a frontal run with one scenario)
-  now fills `scenario_index` on every row, including the objective value and
-  outputs without a scenario dimension. They were left empty, so in sequential
-  and parallel modes the rows of different scenarios could not be told apart.
-- **`solver-options.logs` now controls solver output** - it was passed to the
-  solver as an unknown `solver_logs` option (HiGHS printed
-  `getOptionIndex: Option "solver_logs" is unknown` on every solve) and had no
-  effect. It is now translated into the solver's own output option
-  (`output_flag` for HiGHS, `OutputFlag` for Gurobi, `outputlog` for Xpress);
-  with `logs: false` HiGHS only prints its startup banner.
-- **Time sums with bounds relative to `t`** - a start after the end now gives an
-  empty sum, a bound can contain a time operator (e.g. `t - (d[0])`), and a
-  scenario-dependent bound makes the sum scenario-dependent. In `drop` mode,
-  the operand is checked at every summed time step.
-- **`first-time-step` greater than `last-time-step`** is now rejected when the
-  optim-config is loaded. The run used to fail later, with an error that did
-  not mention the time scope.
+- `solver-options.logs` now controls solver output; it was passed to the
+  solver as an unknown option and had no effect.
+- Rows of single-scenario solves (every sequential/parallel block) now carry
+  their `scenario_index`, so scenarios can be told apart.
+- `OutputView.value()` works on outputs without a time or scenario dimension
+  for any index of the missing dimension.
+- Time sums with bounds relative to `t`: a start after the end gives an empty
+  sum, bounds may contain time operators, and scenario-dependent bounds make
+  the sum scenario-dependent.
+- Invalid time or scenario scopes (`first-time-step` after `last-time-step`,
+  an empty scenario selection, a single-time-step sequential run) are rejected
+  before solving, with an explicit message.
 
 ---
 
