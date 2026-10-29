@@ -31,6 +31,7 @@ from gems_craft.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ScenarioOperatorNode,
     literal,
     maximum,
@@ -460,19 +461,35 @@ def test_power_of_parameter_as_coefficient_matches_expanded_expression(
     xr.testing.assert_allclose(result.coeffs, expanded.coeffs)
 
 
-def test_power_of_variable_to_one_is_the_variable(
-    builder: VectorizedLinearExprBuilder,
-    comp_time_var: linopy.Variable,
+@pytest.mark.parametrize(
+    "expr",
+    [
+        (-param("p")) ** 0.5,  # negative base, fractional exponent
+        literal(0) ** -param("p"),  # zero, negative exponent
+        literal(10) ** (literal(100) * param("p")),  # overflow
+    ],
+    ids=["complex", "division_by_zero", "overflow"],
+)
+def test_power_without_finite_real_value_raises(
+    builder: VectorizedLinearExprBuilder, expr: ExpressionNode
 ) -> None:
-    assert visit(var("x") ** 1, builder) is comp_time_var
+    with pytest.raises(ValueError, match="no finite real value"):
+        visit(expr, builder)
 
 
-def test_power_of_variable_to_zero_is_one(
+def test_power_of_infinite_parameter_is_infinite(
     builder: VectorizedLinearExprBuilder,
 ) -> None:
-    result = visit(var("x") ** 0, builder)
-    assert isinstance(result, xr.DataArray)
-    assert float(result) == pytest.approx(1.0)
+    result = visit(literal(float("inf")) ** 2, builder)
+    assert float(result) == float("inf")
+
+
+def test_power_node_of_variable_to_one_raises(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    """Built directly, without the simplification of ``**``."""
+    with pytest.raises(NotImplementedError, match=r"\^"):
+        visit(PowerNode(var("x"), literal(1)), builder)
 
 
 @pytest.mark.parametrize(

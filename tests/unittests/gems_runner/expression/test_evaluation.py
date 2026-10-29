@@ -123,10 +123,15 @@ def test_power() -> None:
     assert visit(-(p**2), EvaluationVisitor(context)) == pytest.approx(-4.0)
 
 
-def test_power_with_complex_result_raises() -> None:
+@pytest.mark.parametrize(
+    "expr",
+    [param("q") ** 0.5, literal(0) ** param("q"), literal(10) ** (-1000 * param("q"))],
+    ids=["complex", "division_by_zero", "overflow"],
+)
+def test_power_without_finite_real_value_raises(expr: ExpressionNode) -> None:
     context = EvaluationContext(parameters={"q": -2})
-    with pytest.raises(ValueError):
-        visit(param("q") ** 0.5, EvaluationVisitor(context))
+    with pytest.raises(ValueError, match="no finite real value"):
+        visit(expr, EvaluationVisitor(context))
 
 
 def test_dual_reduced_cost_evaluation_raises() -> None:

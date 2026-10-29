@@ -78,10 +78,10 @@ class ExpressionNode:
         return _apply_if_node(lhs, lambda x: DivisionNode(x, self))
 
     def __pow__(self, rhs: Any) -> "ExpressionNode":
-        return _apply_if_node(rhs, lambda x: PowerNode(self, x))
+        return _apply_if_node(rhs, lambda x: _power(self, x))
 
     def __rpow__(self, lhs: Any) -> "ExpressionNode":
-        return _apply_if_node(lhs, lambda x: PowerNode(x, self))
+        return _apply_if_node(lhs, lambda x: _power(x, self))
 
     def __le__(self, rhs: Any) -> "ExpressionNode":
         return _apply_if_node(
@@ -162,6 +162,16 @@ def _wrap_in_node(obj: Any) -> ExpressionNode:
     elif isinstance(obj, float) or isinstance(obj, int):
         return LiteralNode(float(obj))
     raise TypeError(f"Unable to wrap {obj} into an expression node")
+
+
+def _power(base: "ExpressionNode", exponent: "ExpressionNode") -> "ExpressionNode":
+    """``base ^ exponent``, where ``e ^ 1`` is ``e`` and ``e ^ 0`` is ``1``: no
+    ``PowerNode`` of a variable expression is then linear."""
+    if isinstance(exponent, LiteralNode) and exponent.value == 1:
+        return base
+    if isinstance(exponent, LiteralNode) and exponent.value == 0:
+        return LiteralNode(1)
+    return PowerNode(base, exponent)
 
 
 def _apply_if_node(

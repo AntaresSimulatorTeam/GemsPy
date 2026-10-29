@@ -331,6 +331,7 @@ _CONSTANT_EXPRS = [
     pytest.param("ceil(a)", param("a").ceil(), id="ceil"),
     pytest.param("a^2", param("a") ** 2, id="param_power_literal"),
     pytest.param("2^a", 2 ** param("a"), id="literal_power_param"),
+    pytest.param("x^0", literal(1), id="var_power_zero"),
     pytest.param(
         "a^(1 + b)", param("a") ** (1 + param("b")), id="param_power_expression"
     ),
@@ -341,7 +342,7 @@ _CONSTANT_EXPRS = [
 _LINEAR_EXPRS = [
     pytest.param("a * x", param("a") * var("x"), id="param_times_var"),
     pytest.param("x + y", var("x") + var("y"), id="sum_vars"),
-    pytest.param("x^1", var("x") ** 1, id="var_power_one"),
+    pytest.param("x^1", var("x"), id="var_power_one"),
 ]
 
 

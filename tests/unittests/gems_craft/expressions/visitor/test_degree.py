@@ -29,6 +29,7 @@ from gems_craft.expression.expression import (
     DualNode,
     FloorNode,
     LowerBoundNode,
+    PowerNode,
     ReducedCostNode,
     RoundNode,
     UpperBoundNode,
@@ -112,9 +113,11 @@ def test_power_degree() -> None:
     assert visit(p**2, ExpressionDegreeVisitor()) == 0
     assert visit(2**p, ExpressionDegreeVisitor()) == 0
     assert visit(p ** (1 + param("q")), ExpressionDegreeVisitor()) == 0
-    # A non-constant base is a polynomial for a non-negative integer literal.
+    # A non-constant base is a polynomial for an integer literal exponent; the
+    # exponents 0 and 1 are simplified when the node is built.
     assert visit(x**0, ExpressionDegreeVisitor()) == 0
     assert visit(x**1, ExpressionDegreeVisitor()) == 1
+    assert visit((x**0.5) ** 0, ExpressionDegreeVisitor()) == 0
     assert visit(x**2, ExpressionDegreeVisitor()) == 2
     assert visit((2 * x + p) ** 3, ExpressionDegreeVisitor()) == 3
     assert visit((x * x) ** 2, ExpressionDegreeVisitor()) == 4
@@ -124,3 +127,18 @@ def test_power_degree() -> None:
     assert visit(x**p, ExpressionDegreeVisitor()) == math.inf
     assert visit(2**x, ExpressionDegreeVisitor()) == math.inf
     assert visit(p**x, ExpressionDegreeVisitor()) == math.inf
+
+
+def test_power_node_with_exponent_zero_or_one_is_not_linear() -> None:
+    """Built directly, without the simplification of ``**``: the result does not
+    depend on the order of the operands of an addition."""
+    x = var("x")
+    y = var("y")
+    for exponent in [0, 1]:
+        power = PowerNode(x**0.5, LiteralNode(exponent))
+        assert visit(power + y, ExpressionDegreeVisitor()) == math.inf
+        assert visit(y + power, ExpressionDegreeVisitor()) == math.inf
+        assert (
+            visit(PowerNode(x, LiteralNode(exponent)), ExpressionDegreeVisitor())
+            == math.inf
+        )

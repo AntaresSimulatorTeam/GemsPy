@@ -296,6 +296,10 @@ def test_parsing_visitor(
         ({}, {}, "2^-3*2", (literal(2) ** -literal(3)) * 2),
         ({}, {}, "1 + 2^2", literal(1) + literal(2) ** 2),
         ({}, {"p"}, "floor(p)^2", param("p").floor() ** 2),
+        # The exponents 1 and 0 are simplified.
+        ({"x"}, {}, "x^1", var("x")),
+        ({"x"}, {}, "x^0", literal(1)),
+        ({"x"}, {}, "(x^0.5)^0 + x", literal(1) + var("x")),
         # The same precedence holds inside a time shift.
         ({"x"}, {}, "x[t-2^2]", var("x").shift(-(literal(2) ** 2))),
         ({"x"}, {}, "x[t-2^2*3]", var("x").shift(-(literal(2) ** 2) * 3)),

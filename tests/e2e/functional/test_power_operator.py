@@ -147,3 +147,13 @@ def test_power_of_variable_in_constraint_is_rejected(
 
     with pytest.raises(ValueError, match="Non-linear expression is not allowed"):
         load_study(study_dir)
+
+
+@pytest.mark.parametrize("constraint", ["x = (-d)^0.5", "x = 0^(-k)"])
+def test_power_without_finite_real_value_in_constraint_raises(
+    tmp_path: Path, constraint: str
+) -> None:
+    study_dir = _make_study(tmp_path, constraints=[constraint])
+
+    with pytest.raises(ValueError, match="no finite real value"):
+        _solve(study_dir)

@@ -242,6 +242,40 @@ def test_extra_output_power_on_variable() -> None:
     assert outputs["exponential"] == pytest.approx(81.0)
 
 
+def test_extra_output_power_without_finite_real_value_raises() -> None:
+    """A negative variable to a fractional power raises, rather than being
+    stored as NaN, as when the expression is evaluated by EvaluationVisitor."""
+    from gems_craft.expression import var
+    from gems_craft.expression.expression import literal
+    from gems_craft.model.model import model
+    from gems_craft.model.variable import float_variable
+    from gems_craft.study import DataBase, Study, System, create_component
+    from gems_runner.simulation import TimeBlock, build_problem
+
+    SIMPLE_MODEL = model(
+        id="SIMPLE_POWER_NAN",
+        variables=[
+            float_variable("a", lower_bound=literal(-4), upper_bound=literal(-4))
+        ],
+        extra_outputs={"square_root": var("a") ** 0.5},
+        # linopy >= 0.9 refuses to solve a model with no objective.
+        objective_contributions={
+            "null_objective": (literal(0) * var("a")).time_sum().expec()
+        },
+    )
+
+    system = System("test_power_nan_extra")
+    system.add_component(create_component(model=SIMPLE_MODEL, id="comp_1"))
+
+    problem = build_problem(
+        Study(system, DataBase()), TimeBlock(1, [0]), scenario_ids=list(range(1))
+    )
+    problem.solve(solver_name="highs")
+
+    with pytest.raises(ValueError, match="no finite real value"):
+        SimulationTableBuilder().build(problem)
+
+
 def test_extra_output_min_on_variable() -> None:
     """
     min(variable, parameter) is allowed in extra outputs and evaluated

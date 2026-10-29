@@ -94,8 +94,25 @@ T_expr = TypeVar("T_expr", bound=VectorizedExpr)
 
 
 # ---------------------------------------------------------------------------
-# Module-level helper — also used by optimization.py
+# Module-level helpers — also used by optimization.py and linearize.py
 # ---------------------------------------------------------------------------
+
+
+def _real_power(base: xr.DataArray, exponent: xr.DataArray) -> xr.DataArray:
+    """``base ^ exponent``, raising where it has no finite real value although
+    both operands are finite, as ``EvaluationVisitor`` does: a negative base
+    with a fractional exponent, zero with a negative exponent, or an overflow.
+    """
+    with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
+        result: xr.DataArray = np.float_power(base, exponent)  # type: ignore[assignment]
+    undefined = ~np.isfinite(result) & np.isfinite(base) & np.isfinite(exponent)
+    if undefined.any():
+        raise ValueError(
+            "^ has no finite real value for some values of its operands: "
+            "a negative base with a fractional exponent, zero with a negative "
+            "exponent, or an overflow."
+        )
+    return result
 
 
 def _linopy_add(a: VectorizedExpr, b: VectorizedExpr) -> VectorizedExpr:
@@ -202,10 +219,10 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     def power(self, node: PowerNode) -> VectorizedExpr:
         """DataArray default; overridden in
         :class:`~gems_runner.simulation.linearize.VectorizedLinearExprBuilder`
-        to raise when the base contains linopy types."""
+        to raise when an operand contains linopy types."""
         left = visit(node.left, self)
         right = visit(node.right, self)
-        return np.power(left, right)  # type: ignore[return-value,arg-type,call-overload]
+        return _real_power(left, right)  # type: ignore[arg-type]
 
     def comparison(self, node: ComparisonNode) -> VectorizedExpr:
         raise NotImplementedError(
@@ -629,6 +646,9 @@ class _ShiftAmountEvaluator(ExpressionVisitorOperations[xr.DataArray]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> xr.DataArray:
         raise NotImplementedError
+
+    def power(self, node: PowerNode) -> xr.DataArray:
+        return _real_power(visit(node.left, self), visit(node.right, self))
 
     def floor(self, node: FloorNode) -> xr.DataArray:
         return np.floor(visit(node.operand, self))  # type: ignore[return-value]

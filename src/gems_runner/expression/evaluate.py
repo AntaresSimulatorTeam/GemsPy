@@ -117,8 +117,15 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
         raise NotImplementedError()
 
     def power(self, node: PowerNode) -> float:
-        # math.pow raises on a complex result, where ``**`` would return one.
-        return math.pow(visit(node.left, self), visit(node.right, self))
+        base: float = visit(node.left, self)
+        exponent: float = visit(node.right, self)
+        # Unlike ``**``, math.pow never returns a complex number.
+        try:
+            return math.pow(base, exponent)
+        except (ValueError, OverflowError) as error:
+            raise ValueError(
+                f"{base} ^ {exponent} has no finite real value."
+            ) from error
 
     def floor(self, node: FloorNode) -> float:
         return float(math.floor(visit(node.operand, self)))
