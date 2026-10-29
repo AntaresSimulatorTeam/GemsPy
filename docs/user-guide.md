@@ -33,8 +33,3 @@ of `^` can only be parameters and literals (`p^2`, `2^p`, `p^(1 + q)`), and
 `x^2` on a variable `x` is rejected with
 `Non-linear expression is not allowed in ...`. In extra outputs, which are
 evaluated after the solve, variables are allowed (`x^(2 + p)`).
-
-!!! note
-    Antares Simulator currently parses `-2^2` as `(-2)^2 = 4`: a model using
-    a negated power without parentheses gives different results in the two
-    interpreters until Antares Simulator is aligned on this convention.
