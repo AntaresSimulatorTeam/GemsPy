@@ -96,9 +96,9 @@ interoperate with [Antares Simulator](https://antares-simulator.org/).
 
 For the YAML fields in library and system files associated with the hybrid mode, see [this page](https://gems-energy.readthedocs.io/en/latest/interoperability/hybrid/hybrid-connections/) of the GEMS documentation website.
 
-Libraries are "cold" files: the same library YAML is often reused unchanged between a full GEMS study and a hybrid study of the same system. Both are read with `parse_yaml_library` from `gems_craft`. The hybrid-only `area-connection` and `thermal-capacity-connection` port-type fields live on `gems_craft`'s own schema and are ignored outside the hybrid workflow.
+Libraries are "cold" files: the same library YAML is often reused unchanged between a "full GEMS" study and a hybrid study of the same system. Both are read with `parse_yaml_library` from `gems_craft`. The hybrid-only `area-connection` and `thermal-capacity-connection` port-type fields live on `gems_craft`'s own schema and are ignored outside the hybrid workflow.
 
-Writing is split, because the two files do not keep the same empty keys. `write_yaml_library` writes a full GEMS library and omits empty keys. It raises `ValueError` when a port type has `area-connection`, and the message names `write_yaml_hybrid_library`. That function writes a hybrid library and keeps `injection-to-balance`, `spillage-bound` and `unsupplied-energy-bound` (as `null` when empty). `price` is omitted when empty.
+Writing is split, because the two files do not keep the same empty keys. `write_yaml_library` writes a "full GEMS" library and omits empty keys. It raises `ValueError` when a port type has `area-connection`, and the message names `write_yaml_hybrid_library`. That function writes a hybrid library and keeps `injection-to-balance`, `spillage-bound` and `unsupplied-energy-bound` (as `null` when empty). `price` is omitted when empty.
 
 ~~~ python
 from pathlib import Path
@@ -112,7 +112,7 @@ write_yaml_hybrid_library(library, Path("output/hybrid_lib.yml"))
 ~~~
 
 
-System files, by contrast, are necessarily different between a full GEMS study and a hybrid study of the same setup — a hybrid system file describes area/thermal-capacity connections a full GEMS system wouldn't have. Since there's no cross-format file to keep compatible, parsing can afford to stay strict: hybrid systems still require the dedicated `gems_craft_hybrid` functions — load and write them with `parse_yaml_hybrid_system` / `write_yaml_system` — and `parse_yaml_system` (standard) rejects hybrid-only fields outright.
+ contrast, are necessarily different between a "full GEMS" study and a hybrid study of the same setup — a hybrid system file describes area/thermal-capacity connections a "full GEMS" system wouldn't have. Since there's no cross-format file to keep compatible, parsing can afford to stay strict: hybrid systems still require the dedicated `gems_craft_hybrid` functions — load and write them with `parse_yaml_hybrid_system` / `write_yaml_system` — and `parse_yaml_system` (standard) rejects hybrid-only fields outright.System files, by
 
 ~~~ python
 from gems_craft.study.parsing import write_yaml_system

@@ -8,7 +8,7 @@ All notable changes to GemsPy are documented here.
 - **`write_yaml_hybrid_library`** - writes a hybrid library and keeps
   `injection-to-balance`, `spillage-bound` and `unsupplied-energy-bound`
   (as `null` when empty), which Antares Simulator requires. `write_yaml_library`
-  stays the full GEMS writer and raises when a port type has
+  stays the "full GEMS" writer and raises when a port type has
   `area-connection` or `thermal-capacity-connection`, naming
   `write_yaml_hybrid_library`. That writer also keeps a
   `thermal-capacity-connection` when the port type has one. The optional
@@ -204,7 +204,7 @@ All notable changes to GemsPy are documented here.
 - **Standard library parsing now accepts hybrid port-type fields** -
   `parse_yaml_library` (the standard, non-hybrid parser) no longer rejects
   `area-connection` / `thermal-capacity-connection` on port-types, so a
-  library YAML file can be used as-is in both full GEMS and hybrid studies.
+  library YAML file can be used as-is in both "full GEMS" and hybrid studies.
   `AreaConnectionSchema` and `PortThermalCapacitySchema` moved from the
   deleted `gems_craft_hybrid/model/` (`HybridLibrarySchema` /
   `HybridPortTypeSchema`) directly onto `gems_craft`'s own `PortTypeSchema`;

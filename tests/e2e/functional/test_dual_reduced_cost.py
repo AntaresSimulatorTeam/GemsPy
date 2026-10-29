@@ -180,7 +180,7 @@ def test_dual_reduced_cost_multi_timestep(solver_name: str) -> None:
 
 
 def test_area_connection_price_in_full_gems_study(tmp_path: Path) -> None:
-    """A library declaring area-connection.price also runs as a full GEMS study.
+    """A library declaring area-connection.price also runs as a "full GEMS" study.
 
     The hybrid-only area-connection key is ignored by GemsPy: the price field
     is defined by the area model as dual(balance), so the generator profit

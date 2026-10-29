@@ -39,7 +39,7 @@ from gems_craft_hybrid.study.parsing import (
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
-# Full GEMS libraries, without any hybrid-only field
+# "Full GEMS" libraries, without any hybrid-only field
 FULL_GEMS_LIBS = Path(__file__).parents[1] / "gems_craft" / "lib_parsing" / "libs"
 
 

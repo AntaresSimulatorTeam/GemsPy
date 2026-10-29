@@ -97,7 +97,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 
 **`gems_craft/libs/`** — Resolves the path to bundled YAML model libraries shipped with the package.
 
-**`gems_craft_hybrid/model/`** — `write_yaml_hybrid_library`: writes a hybrid library and keeps the mandatory empty `area-connection` keys. `write_yaml_library` remains the full GEMS writer: it omits empty keys and raises when a port type has `area-connection`.
+**`gems_craft_hybrid/model/`** — `write_yaml_hybrid_library`: writes a hybrid library and keeps the mandatory empty `area-connection` keys. `write_yaml_library` remains the "full GEMS" writer: it omits empty keys and raises when a port type has `area-connection`.
 
 **`gems_craft_hybrid/study/`** — `HybridSystemSchema(SystemSchema)`: adds `area-connections` (`AreaConnectionsSchema`) and `thermal-capacity-connections` (`ThermalCapacityConnectionSchema`, referencing a `ThermalComponentSchema`).
 
