@@ -8,8 +8,11 @@ All notable changes to GemsPy are documented here.
 - **`write_yaml_hybrid_library`** - writes a hybrid library and keeps
   `injection-to-balance`, `spillage-bound` and `unsupplied-energy-bound`
   (as `null` when empty), which Antares Simulator requires. `write_yaml_library`
-  stays the full GEMS writer and omits empty keys. The optional `price` key
-  is still omitted when empty.
+  stays the full GEMS writer and raises when a port type has
+  `area-connection` or `thermal-capacity-connection`, naming
+  `write_yaml_hybrid_library`. That writer also keeps a
+  `thermal-capacity-connection` when the port type has one. The optional
+  `price` key is still omitted when empty.
 - **`price` in the `area-connection` of port types** - `AreaConnectionSchema`
   accepts the optional `price` key of hybrid libraries (Antares Simulator
   10.2), which names the port field through which a component reads the

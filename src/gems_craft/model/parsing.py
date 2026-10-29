@@ -142,6 +142,17 @@ def parse_yaml_library(input: typing.TextIO) -> LibrarySchema:
 
 
 def write_yaml_library(library: LibrarySchema, path: Path) -> None:
+    for port_type in library.port_types:
+        if port_type.area_connection is not None:
+            port_type_field = "area-connection"
+        elif port_type.thermal_capacity_connection is not None:
+            port_type_field = "thermal-capacity-connection"
+        else:
+            continue
+        raise ValueError(
+            f"Library '{library.id}' has {port_type_field} on port type '{port_type.id}'. "
+            "Write it with gems_craft_hybrid.model.parsing.write_yaml_hybrid_library."
+        )
     data = {
         "library": library.model_dump(by_alias=True, exclude_none=True, mode="json")
     }

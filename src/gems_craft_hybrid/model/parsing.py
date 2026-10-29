@@ -22,6 +22,7 @@ def write_yaml_hybrid_library(library: LibrarySchema, path: Path) -> None:
     """
     An area-connection still writes its three mandatory keys, as null when unused.
     price is omitted when empty, because earlier hybrid files reject that key.
+    A thermal-capacity-connection is written when the port type has one.
     """
     data = library.model_dump(by_alias=True, exclude_none=True, mode="json")
     for port_type, dumped in zip(library.port_types, data["port-types"]):
