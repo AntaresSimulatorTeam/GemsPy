@@ -16,8 +16,9 @@ uv sync --group dev
 **Test:**
 ```bash
 uv run pytest                                          # run all tests
+uv run pytest -n auto                                  # run all tests in parallel
 uv run pytest tests/path/to/test_file.py::test_name   # run a single test
-uv run pytest --cov gems_craft --cov gems_craft_hybrid --cov gems_runner --cov-report xml  # with coverage
+uv run pytest -n auto --cov gems_craft --cov gems_craft_hybrid --cov gems_runner --cov-report xml  # with coverage
 ```
 
 **Lint & Format:**
