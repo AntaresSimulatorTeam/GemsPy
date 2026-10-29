@@ -5,6 +5,14 @@ All notable changes to GemsPy are documented here.
 ## [Unreleased]
 
 ### Added
+- **`write_yaml_hybrid_library`** - writes a hybrid library and keeps
+  `injection-to-balance`, `spillage-bound` and `unsupplied-energy-bound`
+  (as `null` when empty), which Antares Simulator requires. `write_yaml_library`
+  stays the "full GEMS" writer and raises when a port type has
+  `area-connection` or `thermal-capacity-connection`, naming
+  `write_yaml_hybrid_library`. That writer also keeps a
+  `thermal-capacity-connection` when the port type has one. The optional
+  `price` key is still omitted when empty.
 - **`price` in the `area-connection` of port types** - `AreaConnectionSchema`
   accepts the optional `price` key of hybrid libraries (Antares Simulator
   10.2), which names the port field through which a component reads the
@@ -134,11 +142,6 @@ All notable changes to GemsPy are documented here.
   `to_pandas()`. They raise on a table stored on disk.
 
 ### Fixed
-- **Empty `area-connection` keys of written libraries** - `write_yaml_library`
-  now always writes `injection-to-balance`, `spillage-bound` and
-  `unsupplied-energy-bound` (as `null` when empty), which Antares Simulator
-  requires. Empty keys were dropped, and Antares refused the library. The
-  optional `price` key is still omitted when empty.
 - **Empty scenario scope** - a `scenario-scope` that selects no scenario (e.g.
   every included scenario excluded) is rejected by `validate_optim_config` at
   the start of `SimulationSession.run()`, before anything is solved, instead of
@@ -201,7 +204,7 @@ All notable changes to GemsPy are documented here.
 - **Standard library parsing now accepts hybrid port-type fields** -
   `parse_yaml_library` (the standard, non-hybrid parser) no longer rejects
   `area-connection` / `thermal-capacity-connection` on port-types, so a
-  library YAML file can be used as-is in both full GEMS and hybrid studies.
+  library YAML file can be used as-is in both "full GEMS" and hybrid studies.
   `AreaConnectionSchema` and `PortThermalCapacitySchema` moved from the
   deleted `gems_craft_hybrid/model/` (`HybridLibrarySchema` /
   `HybridPortTypeSchema`) directly onto `gems_craft`'s own `PortTypeSchema`;
