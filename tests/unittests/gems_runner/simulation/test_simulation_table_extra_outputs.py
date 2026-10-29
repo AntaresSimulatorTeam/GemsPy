@@ -188,6 +188,60 @@ def test_extra_output_abs_round_on_variable() -> None:
     assert rounded == pytest.approx(3.0)
 
 
+def test_extra_output_power_on_variable() -> None:
+    """
+    ^ applied to a decision variable is allowed in extra outputs (post-solve
+    evaluation), including with parameter, negative and fractional exponents,
+    even though it would be rejected as nonlinear inside a constraint or bound.
+    """
+    from gems_craft.expression import param, var
+    from gems_craft.expression.expression import literal
+    from gems_craft.model.model import model
+    from gems_craft.model.parameter import float_parameter
+    from gems_craft.model.variable import float_variable
+    from gems_craft.study import ConstantData, DataBase, Study, System, create_component
+    from gems_runner.simulation import TimeBlock, build_problem
+
+    SIMPLE_MODEL = model(
+        id="SIMPLE_POWER",
+        parameters=[float_parameter("e")],
+        variables=[float_variable("a", lower_bound=literal(4), upper_bound=literal(4))],
+        extra_outputs={
+            "power_expression": var("a") ** (2 + param("e")),
+            "inverse": var("a") ** -literal(1),
+            "square_root": var("a") ** 0.5,
+            "exponential": param("e") ** var("a"),
+        },
+        # linopy >= 0.9 refuses to solve a model with no objective.
+        objective_contributions={
+            "null_objective": (literal(0) * var("a")).time_sum().expec()
+        },
+    )
+
+    database = DataBase()
+    comp = create_component(model=SIMPLE_MODEL, id="comp_1")
+    database.add_data("comp_1", "e", ConstantData(-3.0))
+
+    system = System("test_power_extra")
+    system.add_component(comp)
+
+    problem = build_problem(
+        Study(system, database), TimeBlock(1, [0]), scenario_ids=list(range(1))
+    )
+    problem.solve(solver_name="highs")
+
+    df = SimulationTableBuilder().build(problem)
+    outputs = {
+        name: df.component("comp_1").output(name).value(time_index=0, scenario_index=0)
+        for name in ["power_expression", "inverse", "square_root", "exponential"]
+    }
+    # a = 4, e = -3
+    assert outputs["power_expression"] == pytest.approx(0.25)
+    assert outputs["inverse"] == pytest.approx(0.25)
+    assert outputs["square_root"] == pytest.approx(2.0)
+    assert outputs["exponential"] == pytest.approx(81.0)
+
+
 def test_extra_output_min_on_variable() -> None:
     """
     min(variable, parameter) is allowed in extra outputs and evaluated

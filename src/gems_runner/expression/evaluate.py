@@ -30,6 +30,7 @@ from gems_craft.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
@@ -114,6 +115,10 @@ class EvaluationVisitor(ExpressionVisitorOperations[float]):
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> float:
         raise NotImplementedError()
+
+    def power(self, node: PowerNode) -> float:
+        # math.pow raises on a complex result, where ``**`` would return one.
+        return math.pow(visit(node.left, self), visit(node.right, self))
 
     def floor(self, node: FloorNode) -> float:
         return float(math.floor(visit(node.operand, self)))

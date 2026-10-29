@@ -59,6 +59,7 @@ from gems_craft.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RelativeTimeNode,
     RoundNode,
@@ -197,6 +198,14 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         left = visit(node.left, self)
         right = visit(node.right, self)
         return left / right  # type: ignore[operator,return-value]
+
+    def power(self, node: PowerNode) -> VectorizedExpr:
+        """DataArray default; overridden in
+        :class:`~gems_runner.simulation.linearize.VectorizedLinearExprBuilder`
+        to raise when the base contains linopy types."""
+        left = visit(node.left, self)
+        right = visit(node.right, self)
+        return np.power(left, right)  # type: ignore[return-value,arg-type,call-overload]
 
     def comparison(self, node: ComparisonNode) -> VectorizedExpr:
         raise NotImplementedError(
@@ -807,6 +816,9 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return _and_mask(visit(node.left, self), visit(node.right, self))
 
     def division(self, node: DivisionNode) -> Optional[xr.DataArray]:
+        return _and_mask(visit(node.left, self), visit(node.right, self))
+
+    def power(self, node: PowerNode) -> Optional[xr.DataArray]:
         return _and_mask(visit(node.left, self), visit(node.right, self))
 
     def comparison(self, node: ComparisonNode) -> Optional[xr.DataArray]:

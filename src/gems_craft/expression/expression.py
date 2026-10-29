@@ -77,6 +77,12 @@ class ExpressionNode:
     def __rtruediv__(self, lhs: Any) -> "ExpressionNode":
         return _apply_if_node(lhs, lambda x: DivisionNode(x, self))
 
+    def __pow__(self, rhs: Any) -> "ExpressionNode":
+        return _apply_if_node(rhs, lambda x: PowerNode(self, x))
+
+    def __rpow__(self, lhs: Any) -> "ExpressionNode":
+        return _apply_if_node(lhs, lambda x: PowerNode(x, self))
+
     def __le__(self, rhs: Any) -> "ExpressionNode":
         return _apply_if_node(
             rhs, lambda x: ComparisonNode(self, x, Comparator.LESS_THAN)
@@ -295,6 +301,13 @@ class MultiplicationNode(BinaryOperatorNode):
 
 @dataclass(frozen=True, eq=False)
 class DivisionNode(BinaryOperatorNode):
+    pass
+
+
+@dataclass(frozen=True, eq=False)
+class PowerNode(BinaryOperatorNode):
+    """``left ^ right``: ``left`` raised to the power ``right``."""
+
     pass
 
 

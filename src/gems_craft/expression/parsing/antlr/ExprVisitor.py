@@ -79,6 +79,10 @@ class ExprVisitor(ParseTreeVisitor):
     def visitFunction(self, ctx: ExprParser.FunctionContext):
         return self.visitChildren(ctx)
 
+    # Visit a parse tree produced by ExprParser#power.
+    def visitPower(self, ctx: ExprParser.PowerContext):
+        return self.visitChildren(ctx)
+
     # Visit a parse tree produced by ExprParser#argList.
     def visitArgList(self, ctx: ExprParser.ArgListContext):
         return self.visitChildren(ctx)
@@ -99,14 +103,6 @@ class ExprVisitor(ParseTreeVisitor):
     def visitShift(self, ctx: ExprParser.ShiftContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#signedAtom.
-    def visitSignedAtom(self, ctx: ExprParser.SignedAtomContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by ExprParser#signedExpression.
-    def visitSignedExpression(self, ctx: ExprParser.SignedExpressionContext):
-        return self.visitChildren(ctx)
-
     # Visit a parse tree produced by ExprParser#shiftMuldiv.
     def visitShiftMuldiv(self, ctx: ExprParser.ShiftMuldivContext):
         return self.visitChildren(ctx)
@@ -115,16 +111,28 @@ class ExprVisitor(ParseTreeVisitor):
     def visitShiftAddsub(self, ctx: ExprParser.ShiftAddsubContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#rightExpression.
-    def visitRightExpression(self, ctx: ExprParser.RightExpressionContext):
+    # Visit a parse tree produced by ExprParser#signedOperand.
+    def visitSignedOperand(self, ctx: ExprParser.SignedOperandContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#rightOperand.
+    def visitRightOperand(self, ctx: ExprParser.RightOperandContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#rightMuldiv.
     def visitRightMuldiv(self, ctx: ExprParser.RightMuldivContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#rightAtom.
-    def visitRightAtom(self, ctx: ExprParser.RightAtomContext):
+    # Visit a parse tree produced by ExprParser#shift_operand.
+    def visitShift_operand(self, ctx: ExprParser.Shift_operandContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#shiftAtom.
+    def visitShiftAtom(self, ctx: ExprParser.ShiftAtomContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#shiftExpression.
+    def visitShiftExpression(self, ctx: ExprParser.ShiftExpressionContext):
         return self.visitChildren(ctx)
 
 

@@ -35,8 +35,10 @@ from gems_craft.expression.expression import (
     AdditionNode,
     CeilNode,
     FloorNode,
+    LiteralNode,
     MaxNode,
     MinNode,
+    PowerNode,
     RoundNode,
     VariableNode,
 )
@@ -107,6 +109,22 @@ class VectorizedLinearExprBuilder(VectorizedBuilderBase[VectorizedExpr]):
         for op in operands[1:]:
             result = _linopy_add(result, op)
         return result
+
+    def power(self, node: PowerNode) -> VectorizedExpr:
+        """Power of a parameter expression, or of a variable expression to the
+        literal exponent 0 or 1: the only ones the degree check lets through."""
+        base = visit(node.left, self)
+        exponent = visit(node.right, self)
+        if isinstance(base, xr.DataArray) and isinstance(exponent, xr.DataArray):
+            return np.power(base, exponent)  # type: ignore[return-value]
+        if isinstance(node.right, LiteralNode) and node.right.value == 0:
+            return xr.DataArray(1.0)
+        if isinstance(node.right, LiteralNode) and node.right.value == 1:
+            return base
+        raise NotImplementedError(
+            "^ is only supported for parameter (DataArray) expressions; "
+            "it cannot be used with decision variables in a linear programme."
+        )
 
     # ------------------------------------------------------------------ #
     # Overrides: nonlinear math functions (guard — variables not allowed)   #

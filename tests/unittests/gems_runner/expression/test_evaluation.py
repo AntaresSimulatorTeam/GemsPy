@@ -109,6 +109,26 @@ def test_abs_round() -> None:
     assert visit(param("p").round(), EvaluationVisitor(context)) == -3.0
 
 
+def test_power() -> None:
+    context = EvaluationContext(variables={"x": 3}, parameters={"p": 2, "q": -2})
+    x = var("x")
+    p = param("p")
+
+    assert visit(x**2, EvaluationVisitor(context)) == pytest.approx(9.0)
+    assert visit(2**x, EvaluationVisitor(context)) == pytest.approx(8.0)
+    assert visit(x ** (2 + p), EvaluationVisitor(context)) == pytest.approx(81.0)
+    assert visit(x ** param("q"), EvaluationVisitor(context)) == pytest.approx(1 / 9)
+    assert visit(x**0.5, EvaluationVisitor(context)) == pytest.approx(3**0.5)
+    assert visit(param("q") ** 3, EvaluationVisitor(context)) == pytest.approx(-8.0)
+    assert visit(-(p**2), EvaluationVisitor(context)) == pytest.approx(-4.0)
+
+
+def test_power_with_complex_result_raises() -> None:
+    context = EvaluationContext(parameters={"q": -2})
+    with pytest.raises(ValueError):
+        visit(param("q") ** 0.5, EvaluationVisitor(context))
+
+
 def test_dual_reduced_cost_evaluation_raises() -> None:
     ctx = EvaluationContext()
     with pytest.raises(NotImplementedError, match="dual"):

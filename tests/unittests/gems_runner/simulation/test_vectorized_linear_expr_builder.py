@@ -25,6 +25,7 @@ import xarray as xr
 
 from gems_craft.expression.expression import (
     AllTimeSumNode,
+    ExpressionNode,
     LiteralNode,
     MaxNode,
     MinNode,
@@ -424,6 +425,71 @@ def test_round_banker_on_da(builder: VectorizedLinearExprBuilder) -> None:
     # Banker's rounding: 2.5 -> 2, 3.5 -> 4.
     assert float(visit(literal(2.5).round(), builder)) == pytest.approx(2.0)
     assert float(visit(literal(3.5).round(), builder)) == pytest.approx(4.0)
+
+
+# ---------------------------------------------------------------------------
+# 9b. power — linopy guard
+# ---------------------------------------------------------------------------
+
+
+def test_power_of_parameter_matches_expanded_expression(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    result = visit(param("p") ** 3, builder)
+    assert isinstance(result, xr.DataArray)
+    expanded = visit(param("p") * param("p") * param("p"), builder)
+    xr.testing.assert_allclose(result, expanded)
+
+
+def test_power_with_parameter_exponent(builder: VectorizedLinearExprBuilder) -> None:
+    result = visit(literal(2) ** param("p"), builder)
+    expected = xr.DataArray(
+        [[2.0, 4.0, 8.0], [16.0, 32.0, 64.0]],
+        dims=["component", "time"],
+        coords={"component": ["c1", "c2"], "time": [0, 1, 2]},
+    )
+    xr.testing.assert_allclose(result, expected)
+
+
+def test_power_of_parameter_as_coefficient_matches_expanded_expression(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    result = visit(param("p") ** 2 * var("x"), builder)
+    expanded = visit(param("p") * param("p") * var("x"), builder)
+    assert isinstance(result, linopy.LinearExpression)
+    xr.testing.assert_allclose(result.coeffs, expanded.coeffs)
+
+
+def test_power_of_variable_to_one_is_the_variable(
+    builder: VectorizedLinearExprBuilder,
+    comp_time_var: linopy.Variable,
+) -> None:
+    assert visit(var("x") ** 1, builder) is comp_time_var
+
+
+def test_power_of_variable_to_zero_is_one(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    result = visit(var("x") ** 0, builder)
+    assert isinstance(result, xr.DataArray)
+    assert float(result) == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    "exponent", [literal(2), param("p")], ids=["literal", "parameter"]
+)
+def test_power_of_variable_raises(
+    builder: VectorizedLinearExprBuilder, exponent: ExpressionNode
+) -> None:
+    with pytest.raises(NotImplementedError, match=r"\^"):
+        visit(var("x") ** exponent, builder)
+
+
+def test_power_with_variable_exponent_raises(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    with pytest.raises(NotImplementedError, match=r"\^"):
+        visit(literal(2) ** var("x"), builder)
 
 
 # ---------------------------------------------------------------------------

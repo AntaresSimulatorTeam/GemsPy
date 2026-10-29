@@ -102,3 +102,25 @@ def test_degree_computation_should_take_into_account_simplifications() -> None:
 
     expr = LiteralNode(0) * x
     assert visit(expr, ExpressionDegreeVisitor()) == 0
+
+
+def test_power_degree() -> None:
+    x = var("x")
+    p = param("p")
+
+    # A constant base gives a constant power, whatever the constant exponent.
+    assert visit(p**2, ExpressionDegreeVisitor()) == 0
+    assert visit(2**p, ExpressionDegreeVisitor()) == 0
+    assert visit(p ** (1 + param("q")), ExpressionDegreeVisitor()) == 0
+    # A non-constant base is a polynomial for a non-negative integer literal.
+    assert visit(x**0, ExpressionDegreeVisitor()) == 0
+    assert visit(x**1, ExpressionDegreeVisitor()) == 1
+    assert visit(x**2, ExpressionDegreeVisitor()) == 2
+    assert visit((2 * x + p) ** 3, ExpressionDegreeVisitor()) == 3
+    assert visit((x * x) ** 2, ExpressionDegreeVisitor()) == 4
+    # Otherwise it is not.
+    assert visit(x**0.5, ExpressionDegreeVisitor()) == math.inf
+    assert visit(x ** -LiteralNode(1), ExpressionDegreeVisitor()) == math.inf
+    assert visit(x**p, ExpressionDegreeVisitor()) == math.inf
+    assert visit(2**x, ExpressionDegreeVisitor()) == math.inf
+    assert visit(p**x, ExpressionDegreeVisitor()) == math.inf

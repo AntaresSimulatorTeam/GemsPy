@@ -41,6 +41,7 @@ from .expression import (
     MultiplicationNode,
     NegationNode,
     ParameterNode,
+    PowerNode,
     ScenarioOperatorNode,
     VariableNode,
 )
@@ -71,6 +72,25 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         if right_degree != 0:
             raise ValueError("Degree computation not implemented for divisions.")
         return visit(node.left, self)
+
+    def power(self, node: PowerNode) -> int | float:
+        """
+        A constant base gives a constant power; a non-constant base gives a
+        polynomial only for a non-negative integer literal exponent.
+        """
+        if visit(node.right, self) != 0:
+            return math.inf
+        base_degree = visit(node.left, self)
+        if base_degree == 0:
+            return 0
+        exponent = node.right
+        if (
+            isinstance(exponent, LiteralNode)
+            and exponent.value >= 0
+            and float(exponent.value).is_integer()
+        ):
+            return base_degree * int(exponent.value)
+        return math.inf
 
     def comparison(self, node: ComparisonNode) -> int | float:
         return max(visit(node.left, self), visit(node.right, self))
