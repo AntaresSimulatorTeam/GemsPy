@@ -20,6 +20,7 @@ fullexpr: expr EOF;
 expr
     : atom                                     # unsignedAtom
     | portFieldExpr                            # portField
+    | <assoc=right> expr '^' expr              # power
     | '-' expr                                 # negation
     | '(' expr ')'                             # expression
     | expr op=('/' | '*') expr                 # muldiv
@@ -67,14 +68,21 @@ shift: TIME shift_expr?;
 shift_expr
     : shift_expr op=('*' | '/') right_expr     # shiftMuldiv
     | shift_expr op=('+' | '-') right_expr     # shiftAddsub
-    | op=('+' | '-') atom                      # signedAtom
-    | op=('+' | '-') '(' expr ')'              # signedExpression
+    | op=('+' | '-') shift_operand             # signedOperand
     ;
 
 right_expr
     : right_expr op=('/' | '*') right_expr     # rightMuldiv
-    | '(' expr ')'                             # rightExpression
-    | atom                                     # rightAtom
+    | shift_operand                            # rightOperand
+    ;
+
+shift_operand
+    : shift_primary ('^' shift_operand)?
+    ;
+
+shift_primary
+    : atom                                     # shiftAtom
+    | '(' expr ')'                             # shiftExpression
     ;
 
 

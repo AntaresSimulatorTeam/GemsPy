@@ -53,6 +53,8 @@ from gems_craft.expression.expression import (
         var("x").round(),
         maximum(var("x"), param("p")),
         minimum(var("x"), param("p")),
+        var("x") ** 2,
+        2 ** param("p"),
     ],
 )
 def test_equals(expr: ExpressionNode) -> None:
@@ -97,6 +99,11 @@ def test_equals(expr: ExpressionNode) -> None:
         (maximum(var("x"), param("p")), maximum(var("y"), param("p"))),
         (minimum(var("x"), param("p")), minimum(var("x"), param("q"))),
         (maximum(var("x"), param("p")), minimum(var("x"), param("p"))),  # Max vs Min
+        # power
+        (var("x") ** 2, var("x") ** 3),
+        (var("x") ** 2, var("y") ** 2),
+        (param("p") ** 2, 2 ** param("p")),  # operands swapped
+        (var("x") ** 2, var("x") * 2),  # different node type
     ],
 )
 def test_not_equals(lhs: ExpressionNode, rhs: ExpressionNode) -> None:

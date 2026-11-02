@@ -23,6 +23,7 @@ from gems_craft.expression import (
     MultiplicationNode,
     NegationNode,
     ParameterNode,
+    PowerNode,
     VariableNode,
 )
 from gems_craft.expression.expression import (
@@ -122,6 +123,9 @@ class _PortFieldExpressionChecker(ExpressionVisitor[None]):
         self._visit_binary_op(node)
 
     def division(self, node: DivisionNode) -> None:
+        self._visit_binary_op(node)
+
+    def power(self, node: PowerNode) -> None:
         self._visit_binary_op(node)
 
     def comparison(self, node: ComparisonNode) -> None:

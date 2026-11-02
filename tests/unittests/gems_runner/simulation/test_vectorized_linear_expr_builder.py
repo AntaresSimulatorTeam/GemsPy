@@ -25,11 +25,13 @@ import xarray as xr
 
 from gems_craft.expression.expression import (
     AllTimeSumNode,
+    ExpressionNode,
     LiteralNode,
     MaxNode,
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ScenarioOperatorNode,
     literal,
     maximum,
@@ -424,6 +426,87 @@ def test_round_banker_on_da(builder: VectorizedLinearExprBuilder) -> None:
     # Banker's rounding: 2.5 -> 2, 3.5 -> 4.
     assert float(visit(literal(2.5).round(), builder)) == pytest.approx(2.0)
     assert float(visit(literal(3.5).round(), builder)) == pytest.approx(4.0)
+
+
+# ---------------------------------------------------------------------------
+# 9b. power — linopy guard
+# ---------------------------------------------------------------------------
+
+
+def test_power_of_parameter_matches_expanded_expression(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    result = visit(param("p") ** 3, builder)
+    assert isinstance(result, xr.DataArray)
+    expanded = visit(param("p") * param("p") * param("p"), builder)
+    xr.testing.assert_allclose(result, expanded)
+
+
+def test_power_with_parameter_exponent(builder: VectorizedLinearExprBuilder) -> None:
+    result = visit(literal(2) ** param("p"), builder)
+    expected = xr.DataArray(
+        [[2.0, 4.0, 8.0], [16.0, 32.0, 64.0]],
+        dims=["component", "time"],
+        coords={"component": ["c1", "c2"], "time": [0, 1, 2]},
+    )
+    xr.testing.assert_allclose(result, expected)
+
+
+def test_power_of_parameter_as_coefficient_matches_expanded_expression(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    result = visit(param("p") ** 2 * var("x"), builder)
+    expanded = visit(param("p") * param("p") * var("x"), builder)
+    assert isinstance(result, linopy.LinearExpression)
+    xr.testing.assert_allclose(result.coeffs, expanded.coeffs)
+
+
+@pytest.mark.parametrize(
+    "expr",
+    [
+        (-param("p")) ** 0.5,  # negative base, fractional exponent
+        literal(0) ** -param("p"),  # zero, negative exponent
+        literal(10) ** (literal(100) * param("p")),  # overflow
+    ],
+    ids=["complex", "division_by_zero", "overflow"],
+)
+def test_power_without_finite_real_value_raises(
+    builder: VectorizedLinearExprBuilder, expr: ExpressionNode
+) -> None:
+    with pytest.raises(ValueError, match="no finite real value"):
+        visit(expr, builder)
+
+
+def test_power_of_infinite_parameter_is_infinite(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    result = visit(literal(float("inf")) ** 2, builder)
+    assert float(result) == float("inf")
+
+
+def test_power_node_of_variable_to_one_raises(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    """Built directly, without the simplification of ``**``."""
+    with pytest.raises(NotImplementedError, match=r"\^"):
+        visit(PowerNode(var("x"), literal(1)), builder)
+
+
+@pytest.mark.parametrize(
+    "exponent", [literal(2), param("p")], ids=["literal", "parameter"]
+)
+def test_power_of_variable_raises(
+    builder: VectorizedLinearExprBuilder, exponent: ExpressionNode
+) -> None:
+    with pytest.raises(NotImplementedError, match=r"\^"):
+        visit(var("x") ** exponent, builder)
+
+
+def test_power_with_variable_exponent_raises(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    with pytest.raises(NotImplementedError, match=r"\^"):
+        visit(literal(2) ** var("x"), builder)
 
 
 # ---------------------------------------------------------------------------

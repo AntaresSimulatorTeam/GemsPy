@@ -37,6 +37,7 @@ from gems_craft.expression.expression import (
     FloorNode,
     MaxNode,
     MinNode,
+    PowerNode,
     RoundNode,
     VariableNode,
 )
@@ -46,6 +47,7 @@ from gems_runner.simulation.vectorized_builder import (
     VectorizedBuilderBase,
     VectorizedExpr,
     _linopy_add,
+    _real_power,
 )
 
 
@@ -107,6 +109,16 @@ class VectorizedLinearExprBuilder(VectorizedBuilderBase[VectorizedExpr]):
         for op in operands[1:]:
             result = _linopy_add(result, op)
         return result
+
+    def power(self, node: PowerNode) -> VectorizedExpr:
+        base = visit(node.left, self)
+        exponent = visit(node.right, self)
+        if isinstance(base, xr.DataArray) and isinstance(exponent, xr.DataArray):
+            return _real_power(base, exponent)
+        raise NotImplementedError(
+            "^ is only supported for parameter (DataArray) expressions; "
+            "it cannot be used with decision variables in a linear programme."
+        )
 
     # ------------------------------------------------------------------ #
     # Overrides: nonlinear math functions (guard — variables not allowed)   #

@@ -186,3 +186,21 @@ def test_time_sum_with_scenario_dependent_bound_depends_on_scenario(
     expr = param("d").time_sum_between(start, end)
 
     assert compute_indexation(expr, NamedParameterProvider()) == expected
+
+
+def test_power_of_differently_indexed_terms() -> None:
+    class CustomStructureProvider(StructureProvider):
+        def get_parameter_structure(self, name: str) -> IndexingStructure:
+            return IndexingStructure(name == "p_time", name == "p_scenario")
+
+    provider = CustomStructureProvider()
+
+    assert compute_indexation(
+        param("p_time") ** param("p_scenario"), provider
+    ) == IndexingStructure(True, True)
+    assert compute_indexation(param("p_time") ** 2, provider) == IndexingStructure(
+        True, False
+    )
+    assert compute_indexation(2 ** param("p_scenario"), provider) == IndexingStructure(
+        False, True
+    )

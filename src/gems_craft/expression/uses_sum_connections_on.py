@@ -29,6 +29,7 @@ from gems_craft.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
@@ -62,6 +63,9 @@ class UsesSumConnectionsOnVisitor(ExpressionVisitor[bool]):
         return visit(node.left, self) or visit(node.right, self)
 
     def division(self, node: DivisionNode) -> bool:
+        return visit(node.left, self) or visit(node.right, self)
+
+    def power(self, node: PowerNode) -> bool:
         return visit(node.left, self) or visit(node.right, self)
 
     def comparison(self, node: ComparisonNode) -> bool:
