@@ -76,7 +76,10 @@ class SimulationSession:
         its results: the stored table with an ``output_dir``, a table in memory
         otherwise, and an empty table in Benders mode."""
         validate_optim_config(
-            self.optim_config, self.study.system, self.study.scenario_builder
+            self.optim_config,
+            self.study.system,
+            self.study.scenario_builder,
+            self.study.database,
         )
         mode = self.optim_config.resolution.mode
         if mode == ResolutionMode.BENDERS_DECOMPOSITION:

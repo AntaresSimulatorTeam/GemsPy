@@ -34,7 +34,8 @@ Each non-empty, non-comment line has the form:
 
 - `<scenario_group>` — a group name you assign to one or more components
 - `<mc_scenario>` — the MC scenario index (**0-based** in the file)
-- `<time_serie_number>` — the column of the timeseries file to use (1-based)
+- `<time_serie_number>` — the column of the timeseries file to use (1-based:
+  a number below 1 raises a `ValueError`)
 
 ### Example
 
@@ -59,6 +60,9 @@ demand, 3 = 4
     file. Missing entries raise a `ValueError` at load time.
     `validate_optim_config()` cross-checks the [scenario scope](optim-config.md#scenario-scope)
     against the scenario builder and reports any out-of-bounds indices.
+    A scenario whose time series is not in the data-series file raises a
+    `ValueError` naming the component, the parameter and the file, before
+    the run starts.
 
 ---
 

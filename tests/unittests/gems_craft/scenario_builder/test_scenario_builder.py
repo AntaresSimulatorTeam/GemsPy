@@ -80,3 +80,13 @@ def test_resolve_vectorized_unknown_group_raises(
     mc = np.array([0, 1], dtype=int)
     with pytest.raises(ValueError, match="not defined in the scenario builder"):
         scenario_builder.resolve_vectorized("nonexistent-group", mc)
+
+
+@pytest.mark.parametrize("number", ["0", "-1"])
+def test_load_refuses_time_series_number_below_one(tmp_path: Path, number: str) -> None:
+    """Time series numbers are 1-based: 0 would read the last column."""
+    path = tmp_path / "modeler-scenariobuilder.dat"
+    path.write_text(f"wind, 0 = 1\nwind, 1 = {number}\n")
+
+    with pytest.raises(ValueError, match="time series numbers start at 1"):
+        ScenarioBuilder.load(path)

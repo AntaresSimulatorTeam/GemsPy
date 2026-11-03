@@ -12,6 +12,8 @@
 
 from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
+import numpy as np
+
 from gems_craft.expression.expression import (
     AdditionNode,
     BinaryOperatorNode,
@@ -37,6 +39,7 @@ if TYPE_CHECKING:
     from gems_craft.model.model import Model
     from gems_craft.model.parameter import Parameter
     from gems_craft.model.variable import Variable
+    from gems_craft.study.data import DataBase
     from gems_craft.study.scenario_builder import ScenarioBuilder
     from gems_craft.study.system import System
 
@@ -315,10 +318,32 @@ def _check_no_integer_variables_in_subproblems(
                         )
 
 
+def _check_time_series_exist(
+    system: "System",
+    database: "DataBase",
+    scenario_ids: List[int],
+    errors: List[str],
+) -> None:
+    """Report the scenario-dependent parameters whose data has no time series
+    for some selected scenarios: the problem builder reads only those per
+    scenario."""
+    scenarios = np.asarray(scenario_ids, dtype=int)  # once, not per parameter
+    for component in system.all_components:
+        for parameter in component.model.parameters.values():
+            if not parameter.structure.scenario:
+                continue
+            message = database.check_time_series(
+                component.id, parameter.name, scenarios
+            )
+            if message is not None:
+                errors.append(message)
+
+
 def validate_optim_config(
     config: OptimConfig,
     system: "System",
     scenario_builder: Optional["ScenarioBuilder"] = None,
+    database: Optional["DataBase"] = None,
 ) -> None:
     """Cross-validate optim-config entries against the resolved system.
 
@@ -334,6 +359,8 @@ def validate_optim_config(
     - If ``scenario_builder`` is provided, every scenario index in
       ``config.scenario_scope.scenario_ids`` is defined for every scenario
       group in the builder.
+    - If ``database`` is provided, every selected scenario has a time series
+      in the data of each scenario-dependent parameter.
 
     Raises ``ValueError`` listing all violations found.
     """
@@ -347,6 +374,10 @@ def validate_optim_config(
     if scenario_builder is not None:
         errors.extend(
             scenario_builder.validate_mc_scenarios(config.scenario_scope.scenario_ids)
+        )
+    if database is not None and config.scenario_scope.scenario_ids:
+        _check_time_series_exist(
+            system, database, config.scenario_scope.scenario_ids, errors
         )
 
     for model_config in config.models:

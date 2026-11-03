@@ -263,3 +263,69 @@ def test_validate_optim_config_rejects_an_empty_scenario_scope(scope: dict) -> N
 
     with pytest.raises(ValueError, match="selects no scenario"):
         validate_optim_config(config, System(id="test"))
+
+
+# ---------------------------------------------------------------------------
+# validate_optim_config — time series of the scenario-dependent parameters
+# ---------------------------------------------------------------------------
+
+
+def _wind_system_and_database() -> tuple:
+    """wind_farm.p_max is scenario-dependent with 4 time series;
+    wind_farm.cost is time-dependent only, with 1 column."""
+    import numpy as np
+    import pandas as pd
+
+    from gems_craft.expression.indexing_structure import IndexingStructure
+    from gems_craft.model.model import model
+    from gems_craft.model.parameter import float_parameter
+    from gems_craft.study.data import (
+        DataBase,
+        TimeScenarioSeriesData,
+        TimeSeriesData,
+    )
+    from gems_craft.study.system import System, create_component
+
+    wind = model(
+        id="wind",
+        parameters=[
+            float_parameter("p_max", IndexingStructure(time=True, scenario=True)),
+            float_parameter("cost", IndexingStructure(time=True, scenario=False)),
+        ],
+    )
+    system = System(id="test")
+    system.add_component(create_component(model=wind, id="wind_farm"))
+    database = DataBase()
+    database.add_data(
+        "wind_farm",
+        "p_max",
+        TimeScenarioSeriesData(pd.DataFrame(np.ones((2, 4)))),
+        series_name="wind_data",
+    )
+    database.add_data("wind_farm", "cost", TimeSeriesData(pd.Series([1.0, 2.0])))
+    return system, database
+
+
+def test_validate_optim_config_rejects_missing_time_series() -> None:
+    from gems_craft.optim_config.parsing import OptimConfig
+    from gems_craft.optim_config.validation import validate_optim_config
+
+    config = OptimConfig.model_validate({"scenario-scope": {"include": ["0-5"]}})
+    system, database = _wind_system_and_database()
+
+    with pytest.raises(
+        ValueError,
+        match=r"Component 'wind_farm', parameter 'p_max', scenarios 4, 5: "
+        r"time series 5, 6 do not exist in 'wind_data'",
+    ):
+        validate_optim_config(config, system, None, database)
+
+
+def test_validate_optim_config_accepts_existing_time_series() -> None:
+    from gems_craft.optim_config.parsing import OptimConfig
+    from gems_craft.optim_config.validation import validate_optim_config
+
+    config = OptimConfig.model_validate({"scenario-scope": {"include": ["0-3"]}})
+    system, database = _wind_system_and_database()
+
+    validate_optim_config(config, system, None, database)  # must not raise
