@@ -55,14 +55,39 @@ demand, 2 = 3
 demand, 3 = 4
 ```
 
+### Scenarios without a line
+
+A scenario that has no line in its group uses the default: MC scenario `n`
+uses time series `n + 1`, as for components without a group. So only the
+lines that differ from the default are needed:
+
+```
+# Scenario 2 uses time series 1; scenarios 0, 1, 3, ... use 1, 2, 4, ...
+wind, 2 = 1
+```
+
+This applies to a gap (no line for scenario 1 between lines for 0 and 2) and
+to the scenarios after the group's last line. Before the run, a `UserWarning`
+per group lists the selected scenarios that use the default, so that a
+forgotten line does not go unnoticed:
+
+```
+Scenario group 'wind': scenarios 0, 1, 3 have no line in modeler-scenariobuilder.dat and use the default (scenario n uses time series n+1).
+```
+
 !!! note
-    Every selected MC scenario index must be listed for every group in the
-    file. Missing entries raise a `ValueError` at load time.
-    `validate_optim_config()` cross-checks the [scenario scope](optim-config.md#scenario-scope)
-    against the scenario builder and reports any out-of-bounds indices.
-    A scenario whose time series is not in the data-series file raises a
-    `ValueError` naming the component, the parameter and the file, before
-    the run starts.
+    Before the run starts, `validate_optim_config()` also raises a
+    `ValueError`:
+
+    - for a scenario whose time series is not in the data-series file, naming
+      the component, the parameter and the file, and whether the time series
+      number comes from a line or from the default;
+    - for a `scenario-group` of a component that is not in the file (most
+      likely a typo).
+
+    MC scenarios start at 0 and time series numbers at 1: a negative scenario
+    or a time series number below 1 raises a `ValueError` when the file is
+    loaded.
 
 ---
 
@@ -112,8 +137,10 @@ study = load_study(Path("my_study"))
 # study.scenario_builder is populated from modeler-scenariobuilder.dat
 ~~~
 
-When the file is absent, `study.scenario_builder` is an empty `ScenarioBuilder`
-that passes MC scenario indices through unchanged.
+When the file is absent, `study.scenario_builder` is an empty `ScenarioBuilder`:
+components without a `scenario-group` use the default. A component with a
+`scenario-group` and scenario-dependent parameters raises a `ValueError` before
+the run, since its group is not in the file.
 
 ---
 
@@ -135,6 +162,10 @@ col_indices = sb.resolve_vectorized("wind", mc_scenarios)
 # Components without a group use None → identity mapping
 col_indices = sb.resolve_vectorized(None, mc_scenarios)
 # → array([0, 1, 2, 3])
+
+# Which scenarios have no line in each group, and use the default
+sb.scenarios_without_line([0, 1, 2, 3, 4, 5])
+# → {"wind": [4, 5], "demand": [4, 5]}
 ~~~
 
 !!! note

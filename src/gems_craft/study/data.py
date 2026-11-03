@@ -281,28 +281,27 @@ class DataBase:
         except IndexError:
             # Explained only on failure, so that valid reads cost nothing more.
             # Negative columns do not raise; validate_optim_config() reports them.
-            message = (
-                None if cols is None else self._missing_time_series(idx, mc_arr, cols)
+            messages = (
+                [] if cols is None else self._missing_time_series(idx, mc_arr, cols)
             )
-            if message is None:
+            if not messages:
                 raise
-            raise ValueError(message) from None
+            raise ValueError("\n".join(messages)) from None
 
     def check_time_series(
         self,
         component_id: str,
         parameter_name: str,
         mc_scenarios: Union[List[int], np.ndarray],
-    ) -> Optional[str]:
-        """Return the error ``get_values()`` would raise for a time series that
-        does not exist, None otherwise, so that it can be reported before the
-        problem is built.
-
-        Data that is missing, or whose scenarios the scenario builder refuses,
-        is left to the other checks."""
+    ) -> List[str]:
+        """Return the errors ``get_values()`` would raise for these scenarios,
+        none if it would not, so that they can be reported before the problem
+        is built: a time series that does not exist, or a scenario group that
+        is not in the scenario builder. Missing data is left to the other
+        checks."""
         idx = ComponentParameterIndex(component_id, parameter_name)
         if idx not in self._data:
-            return None
+            return []
         mc_arr = np.asarray(mc_scenarios, dtype=int)
         cols = mc_arr
         if self._scenario_builder:
@@ -310,45 +309,53 @@ class DataBase:
                 cols = self._scenario_builder.resolve_vectorized(
                     self._scenario_groups.get(idx), mc_arr
                 )
-            except ValueError:
-                return None
+            except ValueError as error:  # a group not in the scenario builder
+                return [str(error)]
         return self._missing_time_series(idx, mc_arr, cols)
 
     def _missing_time_series(
         self, idx: ComponentParameterIndex, mc_scenarios: np.ndarray, cols: np.ndarray
-    ) -> Optional[str]:
-        """The error for the columns of *cols* that are not in the data of
-        *idx*, None if they all are: numpy would raise an ``IndexError``
-        without context, or read a negative column from the end."""
+    ) -> List[str]:
+        """The errors for the columns of *cols* that are not in the data of
+        *idx*, one per source of the time series number (a line of the scenario
+        builder, or the default), none if they all are: numpy would raise an
+        ``IndexError`` without context, or read a negative column from the end."""
         count = self._data[idx].column_count()
         if count is None:
-            return None
+            return []
         missing = (cols < 0) | (cols >= count)
         if not missing.any():
-            return None
-        scenarios = _sorted_distinct(mc_scenarios[missing])
-        # Distinct and sorted: several scenarios can need the same one.
-        numbers = _sorted_distinct(cols[missing]) + 1  # 1-based, as in the files
-        series = self._series_names.get(idx)
+            return []
         group = self._scenario_groups.get(idx)
-        # A scenario without a line in its group is refused by the scenario
-        # builder, so with a group every column comes from the file.
-        source = (
-            f"set by modeler-scenariobuilder.dat, group '{group}'"
-            if group is not None and self._scenario_builder is not None
-            else "default: scenario n uses time series n+1"
+        from_file = np.zeros(int(missing.sum()), dtype=bool)
+        if group is not None and self._scenario_builder is not None:
+            from_file = self._scenario_builder.is_from_file(
+                group, mc_scenarios[missing]
+            )
+        sources = (
+            (from_file, f"set by modeler-scenariobuilder.dat, group '{group}'"),
+            (~from_file, "default: scenario n uses time series n+1"),
         )
-        what = (
-            f"{'scenario' if len(scenarios) == 1 else 'scenarios'} "
-            f"{_compact(scenarios, 'scenarios')}: time series "
-            f"{_compact(numbers, 'time series')} "
-            f"{'does' if len(numbers) == 1 else 'do'} not exist"
-        )
+        series = self._series_names.get(idx)
         where = f"in '{series}'" if series is not None else "in its data series"
-        return (
-            f"Component '{idx.component_id}', parameter '{idx.parameter_name}', "
-            f"{what} {where}, which has {count} time series ({source})."
-        )
+        messages = []
+        for selected, source in sources:
+            if not selected.any():
+                continue
+            scenarios = _sorted_distinct(mc_scenarios[missing][selected])
+            # Distinct and sorted: several scenarios can need the same one.
+            numbers = _sorted_distinct(cols[missing][selected]) + 1  # 1-based
+            what = (
+                f"{'scenario' if len(scenarios) == 1 else 'scenarios'} "
+                f"{compact_numbers(scenarios, 'scenarios')}: time series "
+                f"{compact_numbers(numbers, 'time series')} "
+                f"{'does' if len(numbers) == 1 else 'do'} not exist"
+            )
+            messages.append(
+                f"Component '{idx.component_id}', parameter '{idx.parameter_name}', "
+                f"{what} {where}, which has {count} time series ({source})."
+            )
+        return messages
 
     def get_value(
         self, index: ComponentParameterIndex, timestep: int, scenario: int
@@ -373,7 +380,7 @@ def _sorted_distinct(values: np.ndarray) -> np.ndarray:
     return np.unique(values)
 
 
-def _compact(values: np.ndarray, noun: str, limit: int = 10) -> str:
+def compact_numbers(values: np.ndarray, noun: str, limit: int = 10) -> str:
     """*values* (sorted, distinct) for a message: runs of 3 or more as ranges
     (``4–999``), at most *limit* items, then ``…`` and the count of *noun*.
     Loops over the runs, not the values."""

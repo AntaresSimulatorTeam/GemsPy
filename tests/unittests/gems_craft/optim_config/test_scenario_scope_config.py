@@ -12,6 +12,7 @@
 
 import warnings
 
+import numpy as np
 import pytest
 
 from gems_craft.optim_config.parsing import ScenarioScopeConfig
@@ -211,7 +212,7 @@ def test_scenario_ids_cached_inline() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
+def test_validate_optim_config_warns_for_scenarios_without_line() -> None:
     import numpy as np
 
     from gems_craft.optim_config.parsing import OptimConfig
@@ -222,12 +223,17 @@ def test_validate_optim_config_scenario_builder_rejects_out_of_bounds() -> None:
     config = OptimConfig.model_validate(
         {"scenario-scope": {"include": ["0-4"]}}  # scenarios 0,1,2,3,4
     )
-    # ScenarioBuilder defines only 3 scenarios (0,1,2) for group "load"
+    # ScenarioBuilder has lines for scenarios 0, 1, 2 of group "load"
     sb = ScenarioBuilder(_group_arrays={"load": np.array([0, 1, 0])})
     system = System(id="test")
 
-    with pytest.raises(ValueError, match="not defined for scenario group"):
+    with pytest.warns(UserWarning) as record:
         validate_optim_config(config, system, sb)
+    assert [str(w.message) for w in record] == [
+        "Scenario group 'load': scenarios 3, 4 have no line in "
+        "modeler-scenariobuilder.dat and use the default "
+        "(scenario n uses time series n+1)."
+    ]
 
 
 def test_validate_optim_config_scenario_builder_accepts_valid_scenario_ids() -> None:
@@ -244,7 +250,9 @@ def test_validate_optim_config_scenario_builder_accepts_valid_scenario_ids() -> 
     sb = ScenarioBuilder(_group_arrays={"load": np.array([0, 1, 0])})
     system = System(id="test")
 
-    validate_optim_config(config, system, sb)  # must not raise
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        validate_optim_config(config, system, sb)  # no error, no warning
 
 
 @pytest.mark.parametrize(
@@ -329,3 +337,39 @@ def test_validate_optim_config_accepts_existing_time_series() -> None:
     system, database = _wind_system_and_database()
 
     validate_optim_config(config, system, None, database)  # must not raise
+
+
+def test_validate_optim_config_rejects_a_group_not_in_the_scenario_builder() -> None:
+    """Reported once before the run, though two components use the group."""
+    import pandas as pd
+
+    from gems_craft.expression.indexing_structure import IndexingStructure
+    from gems_craft.model.model import model
+    from gems_craft.model.parameter import float_parameter
+    from gems_craft.optim_config.parsing import OptimConfig
+    from gems_craft.optim_config.validation import validate_optim_config
+    from gems_craft.study.data import DataBase, TimeScenarioSeriesData
+    from gems_craft.study.scenario_builder import ScenarioBuilder
+    from gems_craft.study.system import System, create_component
+
+    wind = model(
+        id="wind",
+        parameters=[
+            float_parameter("p_max", IndexingStructure(time=True, scenario=True))
+        ],
+    )
+    system = System(id="test")
+    database = DataBase(ScenarioBuilder(_group_arrays={"wind": np.array([0])}))
+    for component_id in ("north", "south"):
+        system.add_component(create_component(model=wind, id=component_id))
+        database.add_data(
+            component_id,
+            "p_max",
+            TimeScenarioSeriesData(pd.DataFrame(np.ones((2, 4)))),
+            scenario_group="wnd",
+        )
+    config = OptimConfig.model_validate({"scenario-scope": {"include": ["0-1"]}})
+
+    with pytest.raises(ValueError) as error:
+        validate_optim_config(config, system, None, database)
+    assert str(error.value).count("Scenario group 'wnd' is not defined") == 1

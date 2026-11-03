@@ -10,11 +10,15 @@
 #
 # This file is part of the Antares project.
 
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import numpy as np
+
+# In a group array, a scenario without a line in the file.
+_NO_LINE = -1
 
 
 @dataclass
@@ -30,12 +34,19 @@ class ScenarioBuilder:
     per group so that ``resolve_vectorized`` is a pure array index — no
     Python loop over scenarios.
 
-    When no file is present the builder is empty and ``resolve_vectorized``
-    returns the MC scenario indices unchanged (identity mapping) for parameters
-    whose ``scenario_group`` is ``None``.
+    A scenario without a line in its group, a gap or after the group's last
+    line, uses the default: MC scenario ``i`` → column ``i``, as do parameters
+    whose ``scenario_group`` is ``None``. A group that is not in the file is an
+    error. When no file is present the builder is empty.
     """
 
+    # What the file says: the column of each scenario, _NO_LINE for a gap.
     _group_arrays: Dict[str, np.ndarray] = field(default_factory=dict)
+    # Per group, the column of scenarios 0..n-1, the default filled in; grown
+    # on demand, so that resolve_vectorized() stays a single array index.
+    _resolved: Dict[str, np.ndarray] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
 
     def resolve_vectorized(
         self, scenario_group: Optional[str], mc_scenarios: np.ndarray
@@ -43,48 +54,73 @@ class ScenarioBuilder:
         """Return 0-based col_idx array for a vector of MC scenario indices.
 
         When ``scenario_group`` is ``None`` the parameter carries no group and
-        the identity mapping (col_idx == mc_scenario) is returned.
+        the identity mapping (col_idx == mc_scenario) is returned, as for the
+        scenarios without a line in their group.
 
         Raises ``ValueError`` when a non-None group is not present in the
         scenario builder — this is always a misconfiguration (e.g. a typo in
-        ``system.yml`` or a missing entry in ``modeler-scenariobuilder.dat``).
+        ``system.yml``).
 
         No Python loop — pure numpy array indexing.
         """
         if scenario_group is None:
             return mc_scenarios
+        resolved = self._resolved.get(scenario_group)
+        if resolved is not None:
+            try:
+                return resolved[mc_scenarios]
+            except IndexError:  # a scenario after the cached ones
+                pass
         if scenario_group not in self._group_arrays:
             raise ValueError(
                 f"Scenario group '{scenario_group}' is not defined in the scenario builder. "
                 f"Known groups: {list(self._group_arrays.keys())}."
             )
-        arr = self._group_arrays[scenario_group]
-        out_of_bounds = mc_scenarios[mc_scenarios >= len(arr)]
-        if len(out_of_bounds):
-            raise ValueError(
-                f"MC scenario indices {list(out_of_bounds)} are not defined for group "
-                f"'{scenario_group}' (defined range: 0–{len(arr) - 1})."
-            )
-        return arr[mc_scenarios]
+        size = int(mc_scenarios.max()) + 1 if len(mc_scenarios) else 0
+        return self._resolve_up_to(scenario_group, size)[mc_scenarios]
+
+    def _resolve_up_to(self, group: str, size: int) -> np.ndarray:
+        """The cached columns of *group*, for its first *size* scenarios: only
+        those asked for, so that a line with a very large scenario (a typo)
+        does not make the cache as large."""
+        lines = self._group_arrays[group][:size]
+        resolved = np.arange(size)
+        has_line = lines != _NO_LINE
+        resolved[: len(lines)][has_line] = lines[has_line]
+        self._resolved[group] = resolved
+        return resolved
+
+    def is_from_file(self, scenario_group: str, mc_scenarios: np.ndarray) -> np.ndarray:
+        """``True`` where the scenario has a line in the group, ``False`` where
+        it uses the default. Raises ``KeyError`` for a group not in the file."""
+        lines = self._group_arrays[scenario_group]
+        from_file = np.zeros(len(mc_scenarios), dtype=bool)
+        inside = mc_scenarios < len(lines)
+        from_file[inside] = lines[mc_scenarios[inside]] != _NO_LINE
+        return from_file
+
+    def scenarios_without_line(self, scenario_ids: List[int]) -> Dict[str, List[int]]:
+        """For each group, the scenarios of *scenario_ids* that have no line in
+        it and use the default; groups where all have a line are left out."""
+        mc = np.asarray(sorted(scenario_ids), dtype=int)
+        without_line: Dict[str, List[int]] = {}
+        for group in self._group_arrays:
+            missing = mc[~self.is_from_file(group, mc)]
+            if len(missing):
+                without_line[group] = missing.tolist()
+        return without_line
 
     def validate_mc_scenarios(self, scenario_ids: List[int]) -> List[str]:
-        """Return error messages for scenario indices out of range in any group.
-
-        For each scenario group, checks that every index in ``scenario_ids``
-        is within ``[0, len(group_array) - 1]``.  Returns a list of
-        human-readable error strings (one per offending group); an empty list
-        means all indices are valid.  Does not raise — callers collect errors
-        and raise at the end.
-        """
-        errors = []
-        for group, arr in self._group_arrays.items():
-            out_of_bounds = [idx for idx in scenario_ids if idx >= len(arr)]
-            if out_of_bounds:
-                errors.append(
-                    f"Scenario indices {out_of_bounds} are not defined "
-                    f"for scenario group '{group}' (defined range: 0–{len(arr) - 1})"
-                )
-        return errors
+        """Deprecated: a scenario without a line uses the default, so there is
+        nothing to report; see ``scenarios_without_line()``."""
+        warnings.warn(
+            "ScenarioBuilder.validate_mc_scenarios() is deprecated and will be "
+            "removed in a following release: scenarios without a line use the "
+            "default. Use scenarios_without_line().",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return []
 
     @classmethod
     def load(cls, path: Path) -> "ScenarioBuilder":
@@ -95,7 +131,8 @@ class ScenarioBuilder:
             group_name, mc_scenario = time_serie_number
 
         ``time_serie_number`` is 1-based; it is stored internally as a
-        0-based column index. Raises ``ValueError`` for a number below 1.
+        0-based column index. Raises ``ValueError`` for a number below 1 or a
+        negative MC scenario. Scenarios without a line are allowed.
         """
         raw: Dict[str, Dict[int, int]] = {}
         with path.open() as f:
@@ -106,6 +143,12 @@ class ScenarioBuilder:
                 left, _, right = line.partition("=")
                 parts = [p.strip() for p in left.split(",")]
                 group, mc_scenario = parts[0], int(parts[1])
+                if mc_scenario < 0:
+                    # It would overwrite the line of the last scenario.
+                    raise ValueError(
+                        f"Scenario group '{group}': MC scenarios start at 0, got "
+                        f"{mc_scenario} (line '{line}' of {path})."
+                    )
                 time_serie_number = int(right.strip())
                 if time_serie_number < 1:
                     # 0 would become column -1, which numpy reads as the last.
@@ -118,15 +161,7 @@ class ScenarioBuilder:
 
         group_arrays: Dict[str, np.ndarray] = {}
         for group, mapping in raw.items():
-            max_mc = max(mapping)
-            expected = set(range(max_mc + 1))
-            missing = sorted(expected - set(mapping.keys()))
-            if missing:
-                raise ValueError(
-                    f"Scenario group '{group}' has no mapping for MC scenarios {missing}. "
-                    f"All {max_mc + 1} MC scenarios (0..{max_mc}) must be explicitly mapped."
-                )
-            arr = np.empty(max_mc + 1, dtype=int)
+            arr = np.full(max(mapping) + 1, _NO_LINE, dtype=int)
             for mc, col in mapping.items():
                 arr[mc] = col
             group_arrays[group] = arr

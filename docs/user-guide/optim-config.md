@@ -150,14 +150,15 @@ runs scenario 0 only.
 ### ScenarioBuilder cross-validation
 
 If a [scenario builder](scenario-builder.md) file is present,
-`validate_optim_config()` checks that every selected scenario index is defined
-for every scenario group. Out-of-bounds indices raise a `ValueError` listing
-the affected groups.
+`validate_optim_config()` warns, once per scenario group, about the selected
+scenarios that have no line in it: they use the default (scenario `n` uses
+time series `n + 1`).
 
 It also checks that every selected scenario has a time series in the data of
-each scenario-dependent parameter, with or without a scenario builder. A
-missing time series raises a `ValueError` naming the component, the parameter,
-the scenarios and the data-series file.
+each scenario-dependent parameter, with or without a scenario builder, and
+that the scenario group of each of those parameters is in the scenario
+builder. Both raise a `ValueError`: a missing time series names the component,
+the parameter, the scenarios and the data-series file.
 
 ---
 

@@ -10,6 +10,7 @@
 #
 # This file is part of the Antares project.
 
+import warnings
 from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
@@ -32,6 +33,7 @@ from gems_craft.optim_config.parsing import (
     OutOfBoundsProcessingConfig,
     ResolutionMode,
 )
+from gems_craft.study.data import compact_numbers
 from gems_craft.study.parsing import IntegerStrategyId
 from gems_craft.study.system import Component
 
@@ -325,18 +327,39 @@ def _check_time_series_exist(
     errors: List[str],
 ) -> None:
     """Report the scenario-dependent parameters whose data has no time series
-    for some selected scenarios: the problem builder reads only those per
-    scenario."""
+    for some selected scenarios, or whose scenario group is not in the
+    scenario builder: the problem builder reads only those per scenario."""
     scenarios = np.asarray(scenario_ids, dtype=int)  # once, not per parameter
+    found: Dict[str, None] = {}  # in order, once: a group is shared
     for component in system.all_components:
         for parameter in component.model.parameters.values():
             if not parameter.structure.scenario:
                 continue
-            message = database.check_time_series(
+            for message in database.check_time_series(
                 component.id, parameter.name, scenarios
-            )
-            if message is not None:
-                errors.append(message)
+            ):
+                found[message] = None
+    errors.extend(found)
+
+
+def _warn_scenarios_without_line(
+    scenario_builder: "ScenarioBuilder", scenario_ids: List[int]
+) -> None:
+    """One warning per group for the selected scenarios that have no line in
+    it, so that a forgotten line does not go unnoticed."""
+    without_line = scenario_builder.scenarios_without_line(scenario_ids)
+    for group, scenarios in without_line.items():
+        plural = len(scenarios) > 1
+        warnings.warn(
+            f"Scenario group '{group}': "
+            f"{'scenarios' if plural else 'scenario'} "
+            f"{compact_numbers(np.asarray(scenarios), 'scenarios')} "
+            f"{'have' if plural else 'has'} no line in modeler-scenariobuilder.dat "
+            f"and {'use' if plural else 'uses'} the default "
+            "(scenario n uses time series n+1).",
+            UserWarning,
+            stacklevel=3,
+        )
 
 
 def validate_optim_config(
@@ -356,11 +379,11 @@ def validate_optim_config(
     - Heuristic inputs/outputs reference existing model parameters/variables with the
       time-dependence the heuristic function expects.
     - The scenario scope selects at least one scenario.
-    - If ``scenario_builder`` is provided, every scenario index in
-      ``config.scenario_scope.scenario_ids`` is defined for every scenario
-      group in the builder.
+    - If ``scenario_builder`` is provided, a ``UserWarning`` per group lists
+      the selected scenarios without a line in it, which use the default.
     - If ``database`` is provided, every selected scenario has a time series
-      in the data of each scenario-dependent parameter.
+      in the data of each scenario-dependent parameter, and every scenario
+      group of those parameters is in the scenario builder.
 
     Raises ``ValueError`` listing all violations found.
     """
@@ -372,8 +395,8 @@ def validate_optim_config(
             "The scenario scope selects no scenario: check 'include' and 'exclude'"
         )
     if scenario_builder is not None:
-        errors.extend(
-            scenario_builder.validate_mc_scenarios(config.scenario_scope.scenario_ids)
+        _warn_scenarios_without_line(
+            scenario_builder, config.scenario_scope.scenario_ids
         )
     if database is not None and config.scenario_scope.scenario_ids:
         _check_time_series_exist(
