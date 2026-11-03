@@ -11,7 +11,7 @@
 # This file is part of the Antares project.
 
 """
-E2E test: SimulationTable views on outputs with several blocks, and
+E2E test: SimulationTable results of outputs with several blocks, and
 objective_values() per resolution mode.
 
 - Sequential mode with overlap (the study of test_sequential_carry_over_length.py:
@@ -19,7 +19,7 @@ objective_values() per resolution mode.
 - Parallel mode on 13_1 (t=0..3, blocks of 2) solves the time-independent
   investment p_max once per block.
 
-In both cases the views raise unless ``block=`` says which block to read.
+In both cases reading the values raises unless ``block=`` says which block to read.
 """
 
 from pathlib import Path
@@ -68,17 +68,17 @@ def _run_13_1(
 
 def test_sequential_overlap_needs_block_only_in_the_overlap() -> None:
     st = _sequential_overlap()
-    view = st.component("gen").output("p")
+    p = st.component("gen").output("p")
 
     # t=3 is solved in blocks 0 and 1, t=0 only in block 0.
     with pytest.raises(ValueError, match=r"blocks \[0, 1\]"):
-        view.value(time_index=3, scenario_index=0)
-    view.value(time_index=0, scenario_index=0)
+        p.value(time_index=3, scenario_index=0)
+    p.value(time_index=0, scenario_index=0)
 
     rows = st.data[(st.data["component"] == "gen") & (st.data["output"] == "p")]
     for block in (0, 1):
         expected = rows[(rows["block"] == block) & (rows["absolute_time_index"] == 3)]
-        assert view.value(time_index=3, scenario_index=0, block=block) == (
+        assert p.value(time_index=3, scenario_index=0, block=block) == (
             pytest.approx(float(expected["value"].iloc[0]))
         )
     assert list(st.component("gen").output("p", block=1).data.index) == list(
@@ -88,13 +88,13 @@ def test_sequential_overlap_needs_block_only_in_the_overlap() -> None:
 
 def test_parallel_time_independent_output_needs_block() -> None:
     st = _run_13_1(ResolutionMode.PARALLEL_SUBPROBLEMS, [0], block_length=2)
-    view = st.component("continuous_generator_candidate").output("p_max")
+    p_max = st.component("continuous_generator_candidate").output("p_max")
 
     with pytest.raises(ValueError, match="block="):
-        view.value(scenario_index=0)
+        p_max.value(scenario_index=0)
     # Each block sizes its own capacity; any time index is accepted.
-    assert view.value(time_index=2, scenario_index=0, block=1) == pytest.approx(
-        view.value(time_index=0, scenario_index=0, block=1)
+    assert p_max.value(time_index=2, scenario_index=0, block=1) == pytest.approx(
+        p_max.value(time_index=0, scenario_index=0, block=1)
     )
 
 
