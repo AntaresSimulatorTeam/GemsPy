@@ -563,10 +563,10 @@ def test_rows_read_in_full_are_reused_on_disk(tmp_path: Path) -> None:
     stored = _stored(tmp_path)
     store = _CountingStore(stored._store, stored.path)  # type: ignore[arg-type]
     stored._store = store
-    view = stored.component("gen").output("p")
+    p = stored.component("gen").output("p")
 
-    view.data
-    view.value(time_index=0, scenario_index=1)
+    p.data
+    p.value(time_index=0, scenario_index=1)
 
     assert [f.scenarios for f in store.reads] == [None]
 

@@ -10,8 +10,9 @@
 #
 # This file is part of the Antares project.
 
-"""Storage behind a ``SimulationTable``: the table and its views read their
-rows through a ``_TableStore``, whatever the storage."""
+"""Storage behind a ``SimulationTable``: the table and the results of its
+components and outputs read their rows through a ``_TableStore``, whatever the
+storage."""
 
 import functools
 from dataclasses import dataclass, replace

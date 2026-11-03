@@ -4,6 +4,14 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Changed
+- `ComponentView` and `OutputView` are renamed `ComponentResults` and
+  `OutputResults`, so that they are not confused with GEMS views. The calls
+  `component(...).output(...)`, `value()` and `data` are unchanged.
+
+### Deprecated
+- `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
+
 ## [0.3.0] - 2026-10-29
 
 Simulation results are now written to disk as they are solved, as one file per

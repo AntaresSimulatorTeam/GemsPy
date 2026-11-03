@@ -60,7 +60,7 @@ def assert_same_tables(memory: SimulationTable, stored: SimulationTable) -> None
 
     outputs = data[data["component"].notna()][["component", "output", "block"]]
     for component, output, block in outputs.drop_duplicates().itertuples(index=False):
-        # A fresh view per call, so that on disk the scenario reads are used.
+        # Fresh results per call, so that on disk the scenario reads are used.
         pd.testing.assert_frame_equal(
             stored.component(component).output(output, block=block).data,
             memory.component(component).output(output, block=block).data,

@@ -10,8 +10,8 @@
 #
 # This file is part of the Antares project.
 
-"""Columns and schema of the simulation table, shared by the table, its views
-and its storages."""
+"""Columns and schema of the simulation table, shared by the table, the results
+of its outputs and its storages."""
 
 from enum import Enum
 from typing import Any, Dict, Literal
