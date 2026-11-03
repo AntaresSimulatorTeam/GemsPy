@@ -4,13 +4,26 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Added
+- `ScenarioBuilder.is_from_file()` and `scenarios_without_line()`: which
+  scenarios have a line in a group, and which use the default.
+
 ### Changed
 - `ComponentView` and `OutputView` are renamed `ComponentResults` and
   `OutputResults`, so that they are not confused with GEMS views. The calls
   `component(...).output(...)`, `value()` and `data` are unchanged.
+- **Scenario builder: scenarios without a line use the default** (scenario
+  `n` uses time series `n + 1`), in a gap and after a group's last line,
+  instead of raising a `ValueError`. Only the lines that differ from the
+  default are needed. Before the run, a `UserWarning` per group lists the
+  selected scenarios that use the default.
+- A `scenario-group` that is not in `modeler-scenariobuilder.dat` is reported
+  by `validate_optim_config(..., database=...)`, before any problem is built.
 
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
+- `ScenarioBuilder.validate_mc_scenarios()`: there is nothing to report, it
+  returns an empty list. Use `scenarios_without_line()`.
 
 ### Fixed
 - A scenario that needs a time series the data-series file does not have
@@ -20,6 +33,8 @@ All notable changes to GemsPy are documented here.
   problem, through `validate_optim_config(..., database=...)`.
 - `modeler-scenariobuilder.dat` refuses a time series number below 1. `0` used
   to read the last column of the file.
+- `modeler-scenariobuilder.dat` refuses a negative MC scenario. It used to
+  overwrite the line of the group's last scenario.
 
 ## [0.3.0] - 2026-10-29
 
