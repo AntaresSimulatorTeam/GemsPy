@@ -12,6 +12,14 @@ All notable changes to GemsPy are documented here.
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
 
+### Fixed
+- A scenario that needs a time series the data-series file does not have
+  raises a `ValueError` naming the component, the parameter, the scenarios,
+  the file and where the time series number came from, instead of a numpy
+  `IndexError`.
+- `modeler-scenariobuilder.dat` refuses a time series number below 1. `0` used
+  to read the last column of the file.
+
 ## [0.3.0] - 2026-10-29
 
 Simulation results are now written to disk as they are solved, as one file per
