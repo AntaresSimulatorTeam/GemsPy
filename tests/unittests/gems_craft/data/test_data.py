@@ -347,3 +347,12 @@ def test_database_time_only_data_ignores_the_scenarios() -> None:
 
     result = db.get_values("C", "param", timesteps=[0, 1], mc_scenarios=[0, 7])
     assert result.tolist() == [[1.0, 1.0], [2.0, 2.0]]
+
+
+def test_database_index_error_not_about_time_series_is_kept() -> None:
+    """A time step out of range is not explained as a missing time series."""
+    db = DataBase()
+    db.add_data("C", "param", TimeScenarioSeriesData(pd.DataFrame([[1.0, 2.0]])))
+
+    with pytest.raises(IndexError):
+        db.get_values("C", "param", timesteps=[5], mc_scenarios=[0])

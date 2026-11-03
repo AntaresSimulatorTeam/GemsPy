@@ -16,7 +16,8 @@ All notable changes to GemsPy are documented here.
 - A scenario that needs a time series the data-series file does not have
   raises a `ValueError` naming the component, the parameter, the scenarios,
   the file and where the time series number came from, instead of a numpy
-  `IndexError`.
+  `IndexError`. `SimulationSession.run()` reports it before building any
+  problem, through `validate_optim_config(..., database=...)`.
 - `modeler-scenariobuilder.dat` refuses a time series number below 1. `0` used
   to read the last column of the file.
 

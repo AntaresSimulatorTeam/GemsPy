@@ -61,7 +61,8 @@ demand, 3 = 4
     `validate_optim_config()` cross-checks the [scenario scope](optim-config.md#scenario-scope)
     against the scenario builder and reports any out-of-bounds indices.
     A scenario whose time series is not in the data-series file raises a
-    `ValueError` naming the component, the parameter and the file.
+    `ValueError` naming the component, the parameter and the file, before
+    the run starts.
 
 ---
 

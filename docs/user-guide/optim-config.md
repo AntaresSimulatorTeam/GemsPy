@@ -154,6 +154,11 @@ If a [scenario builder](scenario-builder.md) file is present,
 for every scenario group. Out-of-bounds indices raise a `ValueError` listing
 the affected groups.
 
+It also checks that every selected scenario has a time series in the data of
+each scenario-dependent parameter, with or without a scenario builder. A
+missing time series raises a `ValueError` naming the component, the parameter,
+the scenarios and the data-series file.
+
 ---
 
 ## `solver-options`

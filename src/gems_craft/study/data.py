@@ -275,22 +275,54 @@ class DataBase:
                 if self._scenario_builder
                 else mc_arr
             )
-            self._check_columns(idx, mc_arr, cols)
 
-        return raw_data.get_value(timesteps, cols)
+        try:
+            return raw_data.get_value(timesteps, cols)
+        except IndexError:
+            # Explained only on failure, so that valid reads cost nothing more.
+            # Negative columns do not raise; validate_optim_config() reports them.
+            message = (
+                None if cols is None else self._missing_time_series(idx, mc_arr, cols)
+            )
+            if message is None:
+                raise
+            raise ValueError(message) from None
 
-    def _check_columns(
+    def check_time_series(
+        self, component_id: str, parameter_name: str, mc_scenarios: List[int]
+    ) -> Optional[str]:
+        """Return the error ``get_values()`` would raise for a time series that
+        does not exist, None otherwise, so that it can be reported before the
+        problem is built.
+
+        Data that is missing, or whose scenarios the scenario builder refuses,
+        is left to the other checks."""
+        idx = ComponentParameterIndex(component_id, parameter_name)
+        if idx not in self._data:
+            return None
+        mc_arr = np.asarray(mc_scenarios, dtype=int)
+        cols = mc_arr
+        if self._scenario_builder:
+            try:
+                cols = self._scenario_builder.resolve_vectorized(
+                    self._scenario_groups.get(idx), mc_arr
+                )
+            except ValueError:
+                return None
+        return self._missing_time_series(idx, mc_arr, cols)
+
+    def _missing_time_series(
         self, idx: ComponentParameterIndex, mc_scenarios: np.ndarray, cols: np.ndarray
-    ) -> None:
-        """Raise if a column of *cols* is not in the data of *idx*: numpy would
-        raise an ``IndexError`` without context, or read a negative column
-        from the end."""
+    ) -> Optional[str]:
+        """The error for the columns of *cols* that are not in the data of
+        *idx*, None if they all are: numpy would raise an ``IndexError``
+        without context, or read a negative column from the end."""
         count = self._data[idx].column_count()
         if count is None:
-            return
+            return None
         missing = (cols < 0) | (cols >= count)
         if not missing.any():
-            return
+            return None
         scenarios = [int(s) for s in mc_scenarios[missing]]
         numbers = [int(c) + 1 for c in cols[missing]]  # 1-based, as in the files
         series = self._series_names.get(idx)
@@ -307,7 +339,7 @@ class DataBase:
         else:
             what = f"scenarios {scenarios}: time series {numbers} do not exist"
         where = f"in '{series}'" if series is not None else "in its data series"
-        raise ValueError(
+        return (
             f"Component '{idx.component_id}', parameter '{idx.parameter_name}', "
             f"{what} {where}, which has {count} time series ({source})."
         )
