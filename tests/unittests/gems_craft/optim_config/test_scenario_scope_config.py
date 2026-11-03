@@ -315,8 +315,8 @@ def test_validate_optim_config_rejects_missing_time_series() -> None:
 
     with pytest.raises(
         ValueError,
-        match=r"Component 'wind_farm', parameter 'p_max', scenarios \[4, 5\]: "
-        r"time series \[5, 6\] do not exist in 'wind_data'",
+        match=r"Component 'wind_farm', parameter 'p_max', scenarios 4, 5: "
+        r"time series 5, 6 do not exist in 'wind_data'",
     ):
         validate_optim_config(config, system, None, database)
 

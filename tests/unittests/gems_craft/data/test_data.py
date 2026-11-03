@@ -25,6 +25,7 @@ from gems_craft.study.data import (
     ScenarioSeriesData,
     TimeScenarioSeriesData,
     TimeSeriesData,
+    _compact,
     dataframe_to_scenario_series,
     dataframe_to_time_series,
     load_ts_from_file,
@@ -321,8 +322,8 @@ def test_database_missing_time_series_from_default_lists_every_scenario() -> Non
     with pytest.raises(ValueError) as error:
         db.get_values("wind_farm", "p_max", [0], [3, 4, 5])
     assert str(error.value) == (
-        "Component 'wind_farm', parameter 'p_max', scenarios [4, 5]: time series "
-        "[5, 6] do not exist in 'wind_data', which has 4 time series "
+        "Component 'wind_farm', parameter 'p_max', scenarios 4, 5: time series "
+        "5, 6 do not exist in 'wind_data', which has 4 time series "
         "(default: scenario n uses time series n+1)."
     )
 
@@ -356,3 +357,80 @@ def test_database_index_error_not_about_time_series_is_kept() -> None:
 
     with pytest.raises(IndexError):
         db.get_values("C", "param", timesteps=[5], mc_scenarios=[0])
+
+
+@pytest.mark.parametrize(
+    "values, expected",
+    [
+        pytest.param([4], "4", id="one"),
+        pytest.param([4, 5], "4, 5", id="two-in-a-row"),
+        pytest.param(list(range(4, 1000)), "4–999", id="range"),
+        pytest.param(
+            list(range(50, 100)) + list(range(200, 300)),
+            "50–99, 200–299",
+            id="two-ranges",
+        ),
+        pytest.param([1, 2, 3, 5, 6, 10], "1–3, 5, 6, 10", id="mixed"),
+        pytest.param(
+            list(range(1, 1000, 2)),
+            "1, 3, 5, 7, 9, 11, 13, 15, 17, 19, … (500 scenarios)",
+            id="capped",
+        ),
+    ],
+)
+def test_compact(values: list, expected: str) -> None:
+    assert _compact(values, "scenarios") == expected
+
+
+def test_database_missing_time_series_of_many_scenarios_as_a_range() -> None:
+    db = DataBase()
+    db.add_data(
+        "wind_farm",
+        "p_max",
+        ScenarioSeriesData(np.ones(4)),
+        series_name="wind_data",
+    )
+
+    with pytest.raises(ValueError) as error:
+        db.get_values("wind_farm", "p_max", None, list(range(1000)))
+    assert str(error.value) == (
+        "Component 'wind_farm', parameter 'p_max', scenarios 4–999: time series "
+        "5–1000 do not exist in 'wind_data', which has 4 time series "
+        "(default: scenario n uses time series n+1)."
+    )
+
+
+def test_database_missing_time_series_shared_by_scenarios_is_listed_once(
+    tmp_path: Path,
+) -> None:
+    db = _wind_database(
+        tmp_path, "wind, 0 = 1\nwind, 1 = 7\nwind, 2 = 12\nwind, 3 = 7\n"
+    )
+
+    with pytest.raises(ValueError) as error:
+        db.get_values("wind_farm", "p_max", [0], [0, 1, 2, 3])
+    assert str(error.value) == (
+        "Component 'wind_farm', parameter 'p_max', scenarios 1–3: time series "
+        "7, 12 do not exist in 'wind_data', which has 4 time series "
+        "(set by modeler-scenariobuilder.dat, group 'wind')."
+    )
+
+
+def test_database_one_missing_time_series_for_many_scenarios() -> None:
+    db = DataBase()
+    db.add_data("C", "param", ScenarioSeriesData(np.ones(4)), series_name="data")
+    sb_cols = np.array([8 if s % 2 else 0 for s in range(1000)])
+
+    class _Builder:
+        def resolve_vectorized(self, group: object, mc: np.ndarray) -> np.ndarray:
+            return sb_cols[mc]
+
+    db._scenario_builder = _Builder()  # type: ignore[assignment]
+    db._scenario_groups[next(iter(db._scenario_groups))] = "g"
+
+    with pytest.raises(ValueError) as error:
+        db.get_values("C", "param", None, list(range(1000)))
+    assert (
+        "scenarios 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, … (500 scenarios): "
+        "time series 9 does not exist in 'data'"
+    ) in str(error.value)

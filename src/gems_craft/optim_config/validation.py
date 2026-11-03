@@ -12,6 +12,8 @@
 
 from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
+import numpy as np
+
 from gems_craft.expression.expression import (
     AdditionNode,
     BinaryOperatorNode,
@@ -325,12 +327,13 @@ def _check_time_series_exist(
     """Report the scenario-dependent parameters whose data has no time series
     for some selected scenarios: the problem builder reads only those per
     scenario."""
+    scenarios = np.asarray(scenario_ids, dtype=int)  # once, not per parameter
     for component in system.all_components:
         for parameter in component.model.parameters.values():
             if not parameter.structure.scenario:
                 continue
             message = database.check_time_series(
-                component.id, parameter.name, scenario_ids
+                component.id, parameter.name, scenarios
             )
             if message is not None:
                 errors.append(message)

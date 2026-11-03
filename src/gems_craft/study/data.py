@@ -289,7 +289,10 @@ class DataBase:
             raise ValueError(message) from None
 
     def check_time_series(
-        self, component_id: str, parameter_name: str, mc_scenarios: List[int]
+        self,
+        component_id: str,
+        parameter_name: str,
+        mc_scenarios: Union[List[int], np.ndarray],
     ) -> Optional[str]:
         """Return the error ``get_values()`` would raise for a time series that
         does not exist, None otherwise, so that it can be reported before the
@@ -323,8 +326,9 @@ class DataBase:
         missing = (cols < 0) | (cols >= count)
         if not missing.any():
             return None
-        scenarios = [int(s) for s in mc_scenarios[missing]]
-        numbers = [int(c) + 1 for c in cols[missing]]  # 1-based, as in the files
+        scenarios = _sorted_distinct(mc_scenarios[missing])
+        # Distinct and sorted: several scenarios can need the same one.
+        numbers = _sorted_distinct(cols[missing]) + 1  # 1-based, as in the files
         series = self._series_names.get(idx)
         group = self._scenario_groups.get(idx)
         # A scenario without a line in its group is refused by the scenario
@@ -334,10 +338,12 @@ class DataBase:
             if group is not None and self._scenario_builder is not None
             else "default: scenario n uses time series n+1"
         )
-        if len(scenarios) == 1:
-            what = f"scenario {scenarios[0]}: time series {numbers[0]} does not exist"
-        else:
-            what = f"scenarios {scenarios}: time series {numbers} do not exist"
+        what = (
+            f"{'scenario' if len(scenarios) == 1 else 'scenarios'} "
+            f"{_compact(scenarios, 'scenarios')}: time series "
+            f"{_compact(numbers, 'time series')} "
+            f"{'does' if len(numbers) == 1 else 'do'} not exist"
+        )
         where = f"in '{series}'" if series is not None else "in its data series"
         return (
             f"Component '{idx.component_id}', parameter '{idx.parameter_name}', "
@@ -357,3 +363,32 @@ class DataBase:
         if isinstance(result, np.ndarray):
             return result.flat[0]
         return result
+
+
+def _sorted_distinct(values: np.ndarray) -> np.ndarray:
+    """*values* sorted and without duplicates; scenarios usually already are,
+    and checking it is much cheaper than ``np.unique``."""
+    if len(values) < 2 or bool(np.all(values[1:] > values[:-1])):
+        return values
+    return np.unique(values)
+
+
+def _compact(values: np.ndarray, noun: str, limit: int = 10) -> str:
+    """*values* (sorted, distinct) for a message: runs of 3 or more as ranges
+    (``4–999``), at most *limit* items, then ``…`` and the count of *noun*.
+    Loops over the runs, not the values."""
+    values = np.asarray(values)
+    ends = np.flatnonzero(np.diff(values) != 1)
+    starts = np.concatenate(([0], ends + 1))
+    stops = np.concatenate((ends, [len(values) - 1]))
+    items: List[str] = []
+    for start, stop in zip(starts, stops):
+        if len(items) > limit:
+            break
+        if stop - start >= 2:
+            items.append(f"{values[start]}–{values[stop]}")
+        else:
+            items.extend(str(v) for v in values[start : stop + 1])
+    if len(items) <= limit:
+        return ", ".join(items)
+    return ", ".join(items[:limit]) + f", … ({len(values)} {noun})"
