@@ -52,6 +52,11 @@ class AbstractDataStructure(ABC):
         """Check if the data structure meets certain requirements."""
         pass
 
+    def column_count(self) -> Optional[int]:
+        """Number of data-series columns (time series), None if the data does
+        not depend on the scenario."""
+        return None
+
 
 @dataclass(frozen=True)
 class ConstantData(AbstractDataStructure):
@@ -119,6 +124,9 @@ class ScenarioSeriesData(AbstractDataStructure):
             )
         return result
 
+    def column_count(self) -> int:
+        return len(self.scenario_series)
+
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, ScenarioSeriesData):
             raise ValueError("Invalid data type for ScenarioSeriesData")
@@ -141,6 +149,9 @@ class TimeScenarioSeriesData(AbstractDataStructure):
         if scenario is None:
             raise KeyError("Time scenario data requires a scenario index.")
         return self.time_scenario_series.values[np.ix_(np.asarray(timestep), scenario)]
+
+    def column_count(self) -> int:
+        return self.time_scenario_series.shape[1]
 
     def check_requirement(self, time: bool, scenario: bool) -> bool:
         if not isinstance(self, TimeScenarioSeriesData):
@@ -215,6 +226,7 @@ class DataBase:
     ) -> None:
         self._data: Dict[ComponentParameterIndex, AbstractDataStructure] = {}
         self._scenario_groups: Dict[ComponentParameterIndex, Optional[str]] = {}
+        self._series_names: Dict[ComponentParameterIndex, Optional[str]] = {}
         self._scenario_builder = scenario_builder
 
     def get_data(self, component_id: str, parameter_name: str) -> AbstractDataStructure:
@@ -226,10 +238,14 @@ class DataBase:
         parameter_name: str,
         data: AbstractDataStructure,
         scenario_group: Optional[str] = None,
+        series_name: Optional[str] = None,
     ) -> None:
+        """*series_name* is the data-series file the data was read from, named
+        in error messages."""
         idx = ComponentParameterIndex(component_id, parameter_name)
         self._data[idx] = data
         self._scenario_groups[idx] = scenario_group
+        self._series_names[idx] = series_name
 
     def get_values(
         self,
@@ -244,7 +260,8 @@ class DataBase:
         a single numpy array index, no Python loop over S.
 
         Returns shape ``(T, S)``, ``(T,)``, ``(S,)``, or scalar depending on
-        the underlying data type.
+        the underlying data type. Raises ``ValueError`` if a scenario needs a
+        time series that the data does not have.
         """
         idx = ComponentParameterIndex(component_id, parameter_name)
         raw_data = self._data[idx]
@@ -258,8 +275,42 @@ class DataBase:
                 if self._scenario_builder
                 else mc_arr
             )
+            self._check_columns(idx, mc_arr, cols)
 
         return raw_data.get_value(timesteps, cols)
+
+    def _check_columns(
+        self, idx: ComponentParameterIndex, mc_scenarios: np.ndarray, cols: np.ndarray
+    ) -> None:
+        """Raise if a column of *cols* is not in the data of *idx*: numpy would
+        raise an ``IndexError`` without context, or read a negative column
+        from the end."""
+        count = self._data[idx].column_count()
+        if count is None:
+            return
+        missing = (cols < 0) | (cols >= count)
+        if not missing.any():
+            return
+        scenarios = [int(s) for s in mc_scenarios[missing]]
+        numbers = [int(c) + 1 for c in cols[missing]]  # 1-based, as in the files
+        series = self._series_names.get(idx)
+        group = self._scenario_groups.get(idx)
+        # A scenario without a line in its group is refused by the scenario
+        # builder, so with a group every column comes from the file.
+        source = (
+            f"set by modeler-scenariobuilder.dat, group '{group}'"
+            if group is not None and self._scenario_builder is not None
+            else "default: scenario n uses time series n+1"
+        )
+        if len(scenarios) == 1:
+            what = f"scenario {scenarios[0]}: time series {numbers[0]} does not exist"
+        else:
+            what = f"scenarios {scenarios}: time series {numbers} do not exist"
+        where = f"in '{series}'" if series is not None else "in its data series"
+        raise ValueError(
+            f"Component '{idx.component_id}', parameter '{idx.parameter_name}', "
+            f"{what} {where}, which has {count} time series ({source})."
+        )
 
     def get_value(
         self, index: ComponentParameterIndex, timestep: int, scenario: int

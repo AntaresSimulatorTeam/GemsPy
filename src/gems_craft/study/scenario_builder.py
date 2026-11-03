@@ -95,7 +95,7 @@ class ScenarioBuilder:
             group_name, mc_scenario = time_serie_number
 
         ``time_serie_number`` is 1-based; it is stored internally as a
-        0-based column index.
+        0-based column index. Raises ``ValueError`` for a number below 1.
         """
         raw: Dict[str, Dict[int, int]] = {}
         with path.open() as f:
@@ -106,7 +106,15 @@ class ScenarioBuilder:
                 left, _, right = line.partition("=")
                 parts = [p.strip() for p in left.split(",")]
                 group, mc_scenario = parts[0], int(parts[1])
-                raw.setdefault(group, {})[mc_scenario] = int(right.strip()) - 1
+                time_serie_number = int(right.strip())
+                if time_serie_number < 1:
+                    # 0 would become column -1, which numpy reads as the last.
+                    raise ValueError(
+                        f"Scenario group '{group}', MC scenario {mc_scenario}: "
+                        f"time series numbers start at 1, got {time_serie_number} "
+                        f"(line '{line}' of {path})."
+                    )
+                raw.setdefault(group, {})[mc_scenario] = time_serie_number - 1
 
         group_arrays: Dict[str, np.ndarray] = {}
         for group, mapping in raw.items():

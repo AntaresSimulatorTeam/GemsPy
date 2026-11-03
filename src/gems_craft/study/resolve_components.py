@@ -152,7 +152,13 @@ def build_data_base(
                 param.value,
                 timeseries_dir,
             )
-            database.add_data(comp.id, param.id, param_value, scenario_group=group)
+            database.add_data(
+                comp.id,
+                param.id,
+                param_value,
+                scenario_group=group,
+                series_name=param.value if isinstance(param.value, str) else None,
+            )
 
     return database
 
