@@ -150,3 +150,12 @@ def test_validate_mc_scenarios_is_deprecated(
 ) -> None:
     with pytest.warns(DeprecationWarning, match="scenarios_without_line"):
         assert scenario_builder.validate_mc_scenarios([0, 99]) == []
+
+
+def test_cache_covers_only_the_scenarios_asked_for(tmp_path: Path) -> None:
+    """A line with a very large scenario (a typo) does not grow the cache."""
+    sb = _load(tmp_path, "wind, 1 = 3\nwind, 10000000 = 1\n")
+
+    assert sb.resolve_vectorized("wind", np.arange(4)).tolist() == [0, 2, 2, 3]
+    assert len(sb._resolved["wind"]) == 4
+    assert sb.resolve_vectorized("wind", np.array([10000000])).tolist() == [0]

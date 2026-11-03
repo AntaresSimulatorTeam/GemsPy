@@ -80,9 +80,11 @@ class ScenarioBuilder:
         return self._resolve_up_to(scenario_group, size)[mc_scenarios]
 
     def _resolve_up_to(self, group: str, size: int) -> np.ndarray:
-        """The cached columns of *group*, for at least *size* scenarios."""
-        lines = self._group_arrays[group]
-        resolved = np.arange(max(size, len(lines)))
+        """The cached columns of *group*, for its first *size* scenarios: only
+        those asked for, so that a line with a very large scenario (a typo)
+        does not make the cache as large."""
+        lines = self._group_arrays[group][:size]
+        resolved = np.arange(size)
         has_line = lines != _NO_LINE
         resolved[: len(lines)][has_line] = lines[has_line]
         self._resolved[group] = resolved
