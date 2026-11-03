@@ -261,7 +261,7 @@ class DataBase:
 
         Returns shape ``(T, S)``, ``(T,)``, ``(S,)``, or scalar depending on
         the underlying data type. Raises ``ValueError`` if a scenario needs a
-        time series that the data does not have.
+        time series past the end of the data.
         """
         idx = ComponentParameterIndex(component_id, parameter_name)
         raw_data = self._data[idx]

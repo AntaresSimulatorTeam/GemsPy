@@ -417,16 +417,16 @@ def test_database_missing_time_series_shared_by_scenarios_is_listed_once(
 
 
 def test_database_one_missing_time_series_for_many_scenarios() -> None:
-    db = DataBase()
-    db.add_data("C", "param", ScenarioSeriesData(np.ones(4)), series_name="data")
-    sb_cols = np.array([8 if s % 2 else 0 for s in range(1000)])
-
-    class _Builder:
-        def resolve_vectorized(self, group: object, mc: np.ndarray) -> np.ndarray:
-            return sb_cols[mc]
-
-    db._scenario_builder = _Builder()  # type: ignore[assignment]
-    db._scenario_groups[next(iter(db._scenario_groups))] = "g"
+    """Every odd scenario is set to time series 9, which does not exist."""
+    columns = np.array([8 if s % 2 else 0 for s in range(1000)])
+    db = DataBase(ScenarioBuilder(_group_arrays={"g": columns}))
+    db.add_data(
+        "C",
+        "param",
+        ScenarioSeriesData(np.ones(4)),
+        scenario_group="g",
+        series_name="data",
+    )
 
     with pytest.raises(ValueError) as error:
         db.get_values("C", "param", None, list(range(1000)))
