@@ -25,7 +25,7 @@ from gems_craft.study.data import (
     ScenarioSeriesData,
     TimeScenarioSeriesData,
     TimeSeriesData,
-    _compact,
+    compact_numbers,
     dataframe_to_scenario_series,
     dataframe_to_time_series,
     load_ts_from_file,
@@ -378,8 +378,8 @@ def test_database_index_error_not_about_time_series_is_kept() -> None:
         ),
     ],
 )
-def test_compact(values: list, expected: str) -> None:
-    assert _compact(values, "scenarios") == expected
+def test_compact_numbers(values: list, expected: str) -> None:
+    assert compact_numbers(values, "scenarios") == expected
 
 
 def test_database_missing_time_series_of_many_scenarios_as_a_range() -> None:
@@ -434,3 +434,36 @@ def test_database_one_missing_time_series_for_many_scenarios() -> None:
         "scenarios 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, … (500 scenarios): "
         "time series 9 does not exist in 'data'"
     ) in str(error.value)
+
+
+def test_database_missing_time_series_for_a_scenario_without_line(
+    tmp_path: Path,
+) -> None:
+    """A scenario without a line in its group uses the default, and says so."""
+    db = _wind_database(tmp_path, "wind, 0 = 1\nwind, 1 = 2\n")
+
+    with pytest.raises(ValueError) as error:
+        db.get_values("wind_farm", "p_max", [0], list(range(6)))
+    assert str(error.value) == (
+        "Component 'wind_farm', parameter 'p_max', scenarios 4, 5: time series "
+        "5, 6 do not exist in 'wind_data', which has 4 time series "
+        "(default: scenario n uses time series n+1)."
+    )
+
+
+def test_database_missing_time_series_from_the_file_and_the_default(
+    tmp_path: Path,
+) -> None:
+    """One message per source, so that each says what to fix."""
+    db = _wind_database(tmp_path, "wind, 0 = 7\n")
+
+    with pytest.raises(ValueError) as error:
+        db.get_values("wind_farm", "p_max", [0], list(range(6)))
+    assert str(error.value).splitlines() == [
+        "Component 'wind_farm', parameter 'p_max', scenario 0: time series 7 "
+        "does not exist in 'wind_data', which has 4 time series "
+        "(set by modeler-scenariobuilder.dat, group 'wind').",
+        "Component 'wind_farm', parameter 'p_max', scenarios 4, 5: time series "
+        "5, 6 do not exist in 'wind_data', which has 4 time series "
+        "(default: scenario n uses time series n+1).",
+    ]
