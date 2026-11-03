@@ -262,3 +262,88 @@ def test_database_get_data_missing_key_raises() -> None:
     db = DataBase()
     with pytest.raises(KeyError):
         db.get_data("unknown", "param")
+
+
+# ---------------------------------------------------------------------------
+# DataBase.get_values — time series that do not exist
+# ---------------------------------------------------------------------------
+
+_SYSTEM_WITH_WIND = """\
+system:
+  model-libraries: basic
+  components:
+    - id: wind_farm
+      model: basic.generator
+      scenario-group: wind
+      parameters:
+        - id: p_max
+          time-dependent: true
+          scenario-dependent: true
+          value: wind_data
+"""
+
+
+def _wind_database(tmp_path: Path, scenario_builder_lines: str) -> DataBase:
+    """wind_farm.p_max reads wind_data, which has 4 time series."""
+    (tmp_path / "wind_data.txt").write_text("1 2 3 4\n5 6 7 8\n")
+    sb_path = tmp_path / "modeler-scenariobuilder.dat"
+    sb_path.write_text(scenario_builder_lines)
+    return build_data_base(
+        parse_yaml_system(io.StringIO(_SYSTEM_WITH_WIND)),
+        tmp_path,
+        scenario_builder=ScenarioBuilder.load(sb_path),
+    )
+
+
+def test_database_missing_time_series_set_by_scenario_builder(
+    tmp_path: Path,
+) -> None:
+    db = _wind_database(tmp_path, "wind, 0 = 1\nwind, 1 = 5\n")
+
+    with pytest.raises(ValueError) as error:
+        db.get_values("wind_farm", "p_max", [0], [0, 1])
+    assert str(error.value) == (
+        "Component 'wind_farm', parameter 'p_max', scenario 1: time series 5 "
+        "does not exist in 'wind_data', which has 4 time series "
+        "(set by modeler-scenariobuilder.dat, group 'wind')."
+    )
+
+
+def test_database_missing_time_series_from_default_lists_every_scenario() -> None:
+    db = DataBase()
+    db.add_data(
+        "wind_farm",
+        "p_max",
+        TimeScenarioSeriesData(pd.DataFrame([[1.0, 2.0, 3.0, 4.0]])),
+        series_name="wind_data",
+    )
+
+    with pytest.raises(ValueError) as error:
+        db.get_values("wind_farm", "p_max", [0], [3, 4, 5])
+    assert str(error.value) == (
+        "Component 'wind_farm', parameter 'p_max', scenarios [4, 5]: time series "
+        "[5, 6] do not exist in 'wind_data', which has 4 time series "
+        "(default: scenario n uses time series n+1)."
+    )
+
+
+def test_database_missing_time_series_of_scenario_only_data() -> None:
+    db = DataBase()
+    db.add_data("C", "param", ScenarioSeriesData(np.array([10.0, 20.0])))
+
+    with pytest.raises(ValueError, match="scenario 2: time series 3 does not exist"):
+        db.get_values("C", "param", timesteps=None, mc_scenarios=[2])
+
+
+def test_database_last_time_series_is_read(tmp_path: Path) -> None:
+    db = _wind_database(tmp_path, "wind, 0 = 4\n")
+
+    assert db.get_values("wind_farm", "p_max", [0, 1], [0]).tolist() == [[4.0], [8.0]]
+
+
+def test_database_time_only_data_ignores_the_scenarios() -> None:
+    db = DataBase()
+    db.add_data("C", "param", TimeSeriesData(pd.Series([1.0, 2.0])))
+
+    result = db.get_values("C", "param", timesteps=[0, 1], mc_scenarios=[0, 7])
+    assert result.tolist() == [[1.0, 1.0], [2.0, 2.0]]
