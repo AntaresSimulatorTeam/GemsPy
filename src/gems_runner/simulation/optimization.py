@@ -195,7 +195,6 @@ def build_port_arrays(
         Called with an empty port_arrays context for master-field evaluation.
     """
     comp_ids = [c.id for c in components]
-    n = len(components)
     port_arrays: Dict[PortFieldId, Any] = {}
 
     for port_name, model_port in model.ports.items():
@@ -223,7 +222,6 @@ def build_port_arrays(
             else:
                 port_arrays[pf_id] = _build_slave_port_array(
                     comp_ids,
-                    n,
                     port_name,
                     field_name,
                     study,
@@ -233,9 +231,44 @@ def build_port_arrays(
     return port_arrays
 
 
+def _sparse_gather(
+    expr_master: Any,
+    conn_list: List[Tuple[int, Component]],
+    master_comp_ids: List[str],
+    comp_ids: List[str],
+) -> Any:
+    """Return ``out[i] = sum of expr_master[j]`` over the connections (i, j).
+
+    Equivalent to a dense ``(A * expr_master).sum("component_master")`` but
+    stacks only as many terms as the max number of masters per slave,
+    instead of one per master component.
+    """
+    master_index = {cid: j for j, cid in enumerate(master_comp_ids)}
+    by_slave: Dict[int, List[int]] = defaultdict(list)
+    for i, master_comp in conn_list:
+        by_slave[i].append(master_index[master_comp.id])
+
+    result: Optional[Any] = None
+    for t in range(max(len(js) for js in by_slave.values())):
+        slaves = [i for i, js in by_slave.items() if len(js) > t]
+        picked = expr_master.isel(
+            component_master=[by_slave[i][t] for i in slaves]
+        )
+        picked = picked.assign_coords(
+            component_master=[comp_ids[i] for i in slaves]
+        ).rename({"component_master": "component"})
+        if isinstance(picked, xr.DataArray):
+            picked = picked.reindex(component=comp_ids, fill_value=0.0)
+        else:
+            if isinstance(picked, linopy.Variable):
+                picked = 1 * picked
+            picked = picked.reindex(component=comp_ids)
+        result = picked if result is None else _linopy_add(result, picked)
+    return result
+
+
 def _build_slave_port_array(
     comp_ids: List[str],
-    n_components: int,
     port_name: str,
     field_name: str,
     study: Study,
@@ -243,9 +276,9 @@ def _build_slave_port_array(
 ) -> Any:
     """Build a slave port array by summing contributions from connected masters.
 
-    Groups connections by (master_model.id, master_port_field_id), builds an
-    incidence matrix A[i, j] for each group, and accumulates
-    ``sum_j A[i,j] * expr_master[j]`` into the result.
+    Groups connections by (master_model.id, master_port_field_id) and
+    accumulates ``sum_j A[i,j] * expr_master[j]`` into the result, using a
+    sparse gather (see :func:`_sparse_gather`) rather than a dense matrix A.
     """
     per_master: Dict[Tuple[str, PortFieldId], List[Tuple[int, Component]]] = (
         defaultdict(list)
@@ -276,18 +309,6 @@ def _build_slave_port_array(
     for (master_mk, master_pf_id), conn_list in per_master.items():
         master_comps = study.model_components[master_mk]
         master_comp_ids = [c.id for c in master_comps]
-        n_prime = len(master_comps)
-
-        A_data = np.zeros((n_components, n_prime))
-        for i, master_comp in conn_list:
-            j = master_comp_ids.index(master_comp.id)
-            A_data[i, j] += 1.0
-
-        A = xr.DataArray(
-            A_data,
-            dims=["component", "component_master"],
-            coords={"component": comp_ids, "component_master": master_comp_ids},
-        )
 
         master_model = study.models[master_mk]
         defn = master_model.port_fields_definitions[master_pf_id].definition
@@ -311,7 +332,9 @@ def _build_slave_port_array(
             # broadcast it so that each connection contributes it once.
             expr_master = expr_master.expand_dims(component=master_comp_ids)  # type: ignore[union-attr]
         expr_master_r = expr_master.rename({"component": "component_master"})  # type: ignore[union-attr]
-        contribution = (A * expr_master_r).sum("component_master")  # type: ignore[operator]
+        contribution = _sparse_gather(
+            expr_master_r, conn_list, master_comp_ids, comp_ids
+        )
 
         total = contribution if total is None else _linopy_add(total, contribution)
 
