@@ -12,6 +12,11 @@ All notable changes to GemsPy are documented here.
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
 
+### Fixed
+- A port field defined by a constant expression (e.g. `definition: 0`) no
+  longer makes `build_problem` fail when its component is connected; the
+  constant is contributed once per connection.
+
 ## [0.3.0] - 2026-10-29
 
 Simulation results are now written to disk as they are solved, as one file per
