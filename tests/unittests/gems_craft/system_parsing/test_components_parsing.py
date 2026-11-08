@@ -374,3 +374,36 @@ system:
         "technology": "nuclear",
         "company": "rhonepower",
     }
+
+
+def test_parse_yaml_system_rejects_key_outside_system() -> None:
+    system = """
+system:
+  id: s
+  components: []
+connections:
+  - component1: a
+    port1: p
+    component2: b
+    port2: p
+"""
+    with pytest.raises(
+        ValueError,
+        match="Unknown root key 'connections' in system file; did you mean to put it under 'system:'",
+    ):
+        parse_yaml_system(io.StringIO(system))
+
+
+def test_parse_yaml_system_lists_all_keys_outside_system() -> None:
+    system = "system:\n  id: s\nconnections: []\nmodel-libraries: lib\n"
+
+    with pytest.raises(
+        ValueError, match="Unknown root keys 'connections', 'model-libraries'"
+    ):
+        parse_yaml_system(io.StringIO(system))
+
+
+@pytest.mark.parametrize("system", ["id: s\ncomponents: []\n", ""])
+def test_parse_yaml_system_without_system_key_raises(system: str) -> None:
+    with pytest.raises(ValueError, match="Missing root key 'system' in system file"):
+        parse_yaml_system(io.StringIO(system))

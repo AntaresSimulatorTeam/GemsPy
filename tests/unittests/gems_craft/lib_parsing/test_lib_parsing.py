@@ -783,3 +783,18 @@ def test_plain_numbers_in_expression_fields() -> None:
     assert expressions_equal_if_present(model_.variables["x"].upper_bound, literal(1.5))
     assert model_.objective_contributions is not None
     assert expressions_equal(model_.objective_contributions["cost"], literal(2))
+
+
+def test_parse_yaml_library_rejects_key_outside_library() -> None:
+    library = "library:\n  id: lib\nmodels: []\n"
+
+    with pytest.raises(
+        ValueError,
+        match="Unknown root key 'models' in library file; did you mean to put it under 'library:'",
+    ):
+        parse_yaml_library(io.StringIO(library))
+
+
+def test_parse_yaml_library_without_library_key_raises() -> None:
+    with pytest.raises(ValueError, match="Missing root key 'library' in library file"):
+        parse_yaml_library(io.StringIO("id: lib\nmodels: []\n"))
