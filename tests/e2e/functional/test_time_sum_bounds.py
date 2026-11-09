@@ -24,6 +24,7 @@ from typing import Dict, List, Optional
 
 import pytest
 
+from gems_craft.expression.parsing.parse_expression import ParsingException
 from gems_craft.optim_config.parsing import load_optim_config
 from gems_craft.study.folder import load_study
 from gems_runner.session.session import SimulationSession
@@ -284,11 +285,6 @@ def test_absolute_index_refers_to_the_block(tmp_path: Path) -> None:
             "time-independent. Declare 'k' with `time-dependent: false`.",
             id="relative",
         ),
-        pytest.param(
-            "sum(0 .. y, x)",
-            "the time sum bound 'y' cannot contain a variable.",
-            id="variable",
-        ),
     ],
 )
 def test_bound_must_be_declared_time_independent(
@@ -309,6 +305,21 @@ def test_bound_must_be_declared_time_independent(
     with pytest.raises(
         ValueError, match=re.escape(f"Model 'lib.m', constraint 'c1': {error}")
     ):
+        _solve(study_dir)
+
+
+def test_bound_cannot_contain_a_variable(tmp_path: Path) -> None:
+    study_dir = _make_study(
+        tmp_path,
+        variables=["x", "y", "a"],
+        constraints=["x = d", "a = sum(0 .. y, x)"],
+        objective="sum(x)",
+        data={"d": [1, 2, 3, 4]},
+        constants={},
+        nb_time_steps=4,
+    )
+
+    with pytest.raises(ParsingException, match="Variable 'y' is not allowed"):
         _solve(study_dir)
 
 

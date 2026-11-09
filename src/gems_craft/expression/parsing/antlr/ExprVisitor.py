@@ -55,10 +55,6 @@ class ExprVisitor(ParseTreeVisitor):
     def visitTimeShiftExpr(self, ctx: ExprParser.TimeShiftExprContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#portField.
-    def visitPortField(self, ctx: ExprParser.PortFieldContext):
-        return self.visitChildren(ctx)
-
     # Visit a parse tree produced by ExprParser#muldiv.
     def visitMuldiv(self, ctx: ExprParser.MuldivContext):
         return self.visitChildren(ctx)
@@ -99,32 +95,36 @@ class ExprVisitor(ParseTreeVisitor):
     def visitShift(self, ctx: ExprParser.ShiftContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#signedAtom.
-    def visitSignedAtom(self, ctx: ExprParser.SignedAtomContext):
+    # Visit a parse tree produced by ExprParser#time_expr.
+    def visitTime_expr(self, ctx: ExprParser.Time_exprContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#signedExpression.
-    def visitSignedExpression(self, ctx: ExprParser.SignedExpressionContext):
+    # Visit a parse tree produced by ExprParser#time_term.
+    def visitTime_term(self, ctx: ExprParser.Time_termContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#shiftMuldiv.
-    def visitShiftMuldiv(self, ctx: ExprParser.ShiftMuldivContext):
+    # Visit a parse tree produced by ExprParser#timeNumber.
+    def visitTimeNumber(self, ctx: ExprParser.TimeNumberContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#shiftAddsub.
-    def visitShiftAddsub(self, ctx: ExprParser.ShiftAddsubContext):
+    # Visit a parse tree produced by ExprParser#timeIdentifier.
+    def visitTimeIdentifier(self, ctx: ExprParser.TimeIdentifierContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#rightExpression.
-    def visitRightExpression(self, ctx: ExprParser.RightExpressionContext):
+    # Visit a parse tree produced by ExprParser#timeFunction.
+    def visitTimeFunction(self, ctx: ExprParser.TimeFunctionContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#rightMuldiv.
-    def visitRightMuldiv(self, ctx: ExprParser.RightMuldivContext):
+    # Visit a parse tree produced by ExprParser#timeFactorIndex.
+    def visitTimeFactorIndex(self, ctx: ExprParser.TimeFactorIndexContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#rightAtom.
-    def visitRightAtom(self, ctx: ExprParser.RightAtomContext):
+    # Visit a parse tree produced by ExprParser#timeParenthesis.
+    def visitTimeParenthesis(self, ctx: ExprParser.TimeParenthesisContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#timeNegation.
+    def visitTimeNegation(self, ctx: ExprParser.TimeNegationContext):
         return self.visitChildren(ctx)
 
 

@@ -78,7 +78,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 
 **`gems_craft/expression/`** — Mathematical expression language and AST (structural/static analysis only — no numeric evaluation).
 - `ExpressionNode`: base frozen dataclass for all expression tree nodes
-- Grammar is defined in `grammar/Expr.g4` and parsed via ANTLR4 (generated files live in `expression/parsing/antlr/` — do not edit directly)
+- Grammar is defined in `grammar/Expr.g4` and parsed via ANTLR4 (generated files live in `expression/parsing/antlr/` — do not edit directly; regenerate with `uv run bash grammar/generate-parser.sh`, then `black`/`isort`)
 - `ExpressionVisitor` is the dominant pattern for traversing and transforming expression trees (linearization support, printing, degree analysis, indexing)
 - Numeric evaluation (`EvaluationVisitor`) lives in `gems_runner.expression.evaluate`, not here — several of its node handlers (`dual()`, `reduced_cost()`, `variable()`) are solver-output-shaped and only make sense at solve time.
 

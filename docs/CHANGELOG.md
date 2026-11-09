@@ -4,10 +4,30 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Expression language** - time shifts accept scalar functions without
+  enclosing parentheses (e.g. `x[t - ceil(d / 2)]`, `x[t + max(1, d)]`), and
+  `t + -1` is accepted.
+
 ### Changed
 - `ComponentView` and `OutputView` are renamed `ComponentResults` and
   `OutputResults`, so that they are not confused with GEMS views. The calls
   `component(...).output(...)`, `value()` and `data` are unchanged.
+- **Breaking** - **time shifts, time indices and time sum bounds only accept
+  arithmetic on parameters**: numbers, parameters, parameters at a fixed time
+  index (e.g. `d[0]`), the functions `floor`, `ceil`, `round`, `abs`, `max`,
+  `min` and `expec`, `+ - * /` and parentheses. Port fields, time shifts, time
+  sums, comparisons and `dual`, `reduced_cost`, `lower_bound`, `upper_bound`
+  are rejected when the library is parsed (e.g. `x[t + (p.f)]`,
+  `x[t - (y[t-1])]`, `x[t + (sum(y))]`), as are variables, with an explicit
+  message (e.g. `x[t - y]`, `sum(y .. 2, x)`). Previously most of them were
+  accepted by the parser and only failed, if at all, when the problem was
+  built.
+- **Breaking** - a port field outside `sum_connections` (e.g. `p.f <= 0`) is a
+  syntax error, in every expression including port field definitions, instead
+  of a "Bare port field" error raised when the library is resolved.
+- `sum(0 .. y, x)` with `y` a variable fails when the expression is parsed
+  (`ParsingException`), no longer when the model is built.
 
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
