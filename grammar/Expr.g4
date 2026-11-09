@@ -52,9 +52,10 @@ atom
 shift: TIME (ops+=('+' | '-') terms+=time_term)*;
 
 // Arithmetic of time shifts, time indices and sum bounds: numbers, parameters,
-// parameters at a fixed time index, scalar functions, + - * / and parentheses.
-// No variables, port fields, time shifts, sums or comparisons.
-time_expr: time_term (ops+=('+' | '-') terms+=time_term)*;
+// parameters at a time index or time shift (d[0], d[t-1]), scalar functions,
+// + - * / and parentheses. No variables, port fields, sums or comparisons.
+// A unary minus only starts an expression: "-1", "t + (-1)", not "t + -1".
+time_expr: neg='-'? time_term (ops+=('+' | '-') terms+=time_term)*;
 
 time_term: time_factor (ops+=('*' | '/') factors+=time_factor)*;
 
@@ -62,9 +63,9 @@ time_factor
     : NUMBER                                         # timeNumber
     | IDENTIFIER                                     # timeIdentifier
     | IDENTIFIER '(' time_expr (',' time_expr)* ')'  # timeFunction
+    | IDENTIFIER '[' shift ']'                       # timeFactorShift
     | IDENTIFIER '[' time_expr ']'                   # timeFactorIndex
     | '(' time_expr ')'                              # timeParenthesis
-    | '-' time_factor                                # timeNegation
     ;
 
 

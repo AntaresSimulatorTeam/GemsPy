@@ -16,7 +16,7 @@ def serializedATN():
         4,
         1,
         18,
-        168,
+        174,
         2,
         0,
         7,
@@ -277,20 +277,27 @@ def serializedATN():
         6,
         1,
         7,
+        3,
+        7,
+        126,
+        8,
+        7,
+        1,
+        7,
         1,
         7,
         1,
         7,
         5,
-        7,
-        128,
-        8,
-        7,
-        10,
-        7,
-        12,
         7,
         131,
+        8,
+        7,
+        10,
+        7,
+        12,
+        7,
+        134,
         9,
         7,
         1,
@@ -301,14 +308,14 @@ def serializedATN():
         8,
         5,
         8,
-        136,
+        139,
         8,
         8,
         10,
         8,
         12,
         8,
-        139,
+        142,
         9,
         8,
         1,
@@ -327,15 +334,21 @@ def serializedATN():
         9,
         5,
         9,
-        148,
+        151,
         8,
         9,
         10,
         9,
         12,
         9,
-        151,
+        154,
         9,
+        9,
+        1,
+        9,
+        1,
+        9,
+        1,
         9,
         1,
         9,
@@ -365,7 +378,7 @@ def serializedATN():
         9,
         3,
         9,
-        166,
+        172,
         8,
         9,
         1,
@@ -396,7 +409,7 @@ def serializedATN():
         2,
         7,
         7,
-        183,
+        190,
         0,
         20,
         1,
@@ -440,19 +453,19 @@ def serializedATN():
         0,
         0,
         14,
-        124,
+        125,
         1,
         0,
         0,
         0,
         16,
-        132,
+        135,
         1,
         0,
         0,
         0,
         18,
-        165,
+        171,
         1,
         0,
         0,
@@ -1190,312 +1203,354 @@ def serializedATN():
         0,
         0,
         124,
-        129,
+        126,
+        5,
+        2,
+        0,
+        0,
+        125,
+        124,
+        1,
+        0,
+        0,
+        0,
+        125,
+        126,
+        1,
+        0,
+        0,
+        0,
+        126,
+        127,
+        1,
+        0,
+        0,
+        0,
+        127,
+        132,
         3,
         16,
         8,
         0,
-        125,
-        126,
+        128,
+        129,
         7,
         1,
         0,
         0,
-        126,
-        128,
+        129,
+        131,
         3,
         16,
         8,
         0,
-        127,
-        125,
-        1,
-        0,
-        0,
-        0,
+        130,
         128,
-        131,
-        1,
-        0,
-        0,
-        0,
-        129,
-        127,
-        1,
-        0,
-        0,
-        0,
-        129,
-        130,
-        1,
-        0,
-        0,
-        0,
-        130,
-        15,
         1,
         0,
         0,
         0,
         131,
-        129,
+        134,
         1,
         0,
         0,
         0,
         132,
-        137,
+        130,
+        1,
+        0,
+        0,
+        0,
+        132,
+        133,
+        1,
+        0,
+        0,
+        0,
+        133,
+        15,
+        1,
+        0,
+        0,
+        0,
+        134,
+        132,
+        1,
+        0,
+        0,
+        0,
+        135,
+        140,
         3,
         18,
         9,
         0,
-        133,
-        134,
+        136,
+        137,
         7,
         0,
         0,
         0,
-        134,
-        136,
+        137,
+        139,
         3,
         18,
         9,
         0,
-        135,
-        133,
-        1,
-        0,
-        0,
-        0,
+        138,
         136,
+        1,
+        0,
+        0,
+        0,
         139,
+        142,
         1,
         0,
         0,
         0,
-        137,
-        135,
-        1,
-        0,
-        0,
-        0,
-        137,
+        140,
         138,
         1,
         0,
         0,
         0,
-        138,
+        140,
+        141,
+        1,
+        0,
+        0,
+        0,
+        141,
         17,
         1,
         0,
         0,
         0,
-        139,
-        137,
+        142,
+        140,
         1,
         0,
         0,
         0,
-        140,
-        166,
+        143,
+        172,
         5,
         14,
         0,
         0,
-        141,
-        166,
-        5,
-        16,
-        0,
-        0,
-        142,
-        143,
-        5,
-        16,
-        0,
-        0,
-        143,
         144,
+        172,
+        5,
+        16,
+        0,
+        0,
+        145,
+        146,
+        5,
+        16,
+        0,
+        0,
+        146,
+        147,
         5,
         3,
         0,
         0,
-        144,
-        149,
+        147,
+        152,
         3,
         14,
         7,
         0,
-        145,
-        146,
+        148,
+        149,
         5,
         11,
         0,
         0,
-        146,
-        148,
+        149,
+        151,
         3,
         14,
         7,
         0,
-        147,
+        150,
+        148,
+        1,
+        0,
+        0,
+        0,
+        151,
+        154,
+        1,
+        0,
+        0,
+        0,
+        152,
+        150,
+        1,
+        0,
+        0,
+        0,
+        152,
+        153,
+        1,
+        0,
+        0,
+        0,
+        153,
+        155,
+        1,
+        0,
+        0,
+        0,
+        154,
+        152,
+        1,
+        0,
+        0,
+        0,
+        155,
+        156,
+        5,
+        4,
+        0,
+        0,
+        156,
+        172,
+        1,
+        0,
+        0,
+        0,
+        157,
+        158,
+        5,
+        16,
+        0,
+        0,
+        158,
+        159,
+        5,
+        12,
+        0,
+        0,
+        159,
+        160,
+        3,
+        12,
+        6,
+        0,
+        160,
+        161,
+        5,
+        13,
+        0,
+        0,
+        161,
+        172,
+        1,
+        0,
+        0,
+        0,
+        162,
+        163,
+        5,
+        16,
+        0,
+        0,
+        163,
+        164,
+        5,
+        12,
+        0,
+        0,
+        164,
+        165,
+        3,
+        14,
+        7,
+        0,
+        165,
+        166,
+        5,
+        13,
+        0,
+        0,
+        166,
+        172,
+        1,
+        0,
+        0,
+        0,
+        167,
+        168,
+        5,
+        3,
+        0,
+        0,
+        168,
+        169,
+        3,
+        14,
+        7,
+        0,
+        169,
+        170,
+        5,
+        4,
+        0,
+        0,
+        170,
+        172,
+        1,
+        0,
+        0,
+        0,
+        171,
+        143,
+        1,
+        0,
+        0,
+        0,
+        171,
+        144,
+        1,
+        0,
+        0,
+        0,
+        171,
         145,
         1,
         0,
         0,
         0,
-        148,
-        151,
-        1,
-        0,
-        0,
-        0,
-        149,
-        147,
-        1,
-        0,
-        0,
-        0,
-        149,
-        150,
-        1,
-        0,
-        0,
-        0,
-        150,
-        152,
-        1,
-        0,
-        0,
-        0,
-        151,
-        149,
-        1,
-        0,
-        0,
-        0,
-        152,
-        153,
-        5,
-        4,
-        0,
-        0,
-        153,
-        166,
-        1,
-        0,
-        0,
-        0,
-        154,
-        155,
-        5,
-        16,
-        0,
-        0,
-        155,
-        156,
-        5,
-        12,
-        0,
-        0,
-        156,
+        171,
         157,
-        3,
-        14,
-        7,
-        0,
-        157,
-        158,
-        5,
-        13,
-        0,
-        0,
-        158,
-        166,
         1,
         0,
         0,
         0,
-        159,
-        160,
-        5,
-        3,
-        0,
-        0,
-        160,
-        161,
-        3,
-        14,
-        7,
-        0,
-        161,
+        171,
         162,
-        5,
-        4,
-        0,
-        0,
-        162,
-        166,
         1,
         0,
         0,
         0,
-        163,
-        164,
-        5,
-        2,
-        0,
-        0,
-        164,
-        166,
-        3,
-        18,
-        9,
-        0,
-        165,
-        140,
+        171,
+        167,
         1,
         0,
         0,
         0,
-        165,
-        141,
-        1,
-        0,
-        0,
-        0,
-        165,
-        142,
-        1,
-        0,
-        0,
-        0,
-        165,
-        154,
-        1,
-        0,
-        0,
-        0,
-        165,
-        159,
-        1,
-        0,
-        0,
-        0,
-        165,
-        163,
-        1,
-        0,
-        0,
-        0,
-        166,
+        172,
         19,
         1,
         0,
         0,
         0,
-        12,
+        13,
         57,
         84,
         95,
@@ -1504,10 +1559,11 @@ def serializedATN():
         110,
         114,
         121,
-        129,
-        137,
-        149,
-        165,
+        125,
+        132,
+        140,
+        152,
+        171,
     ]
 
 
@@ -2527,10 +2583,11 @@ class ExprParser(Parser):
         ):
             super().__init__(parent, invokingState)
             self.parser = parser
+            self.neg = None  # Token
             self.s7 = None  # Token
             self.ops = list()  # of Tokens
             self.s2 = None  # Token
-            self._tset337 = None  # Token
+            self._tset344 = None  # Token
             self._time_term = None  # Time_termContext
             self.terms = list()  # of Time_termContexts
 
@@ -2556,25 +2613,32 @@ class ExprParser(Parser):
         self._la = 0  # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 124
+            self.state = 125
+            self._errHandler.sync(self)
+            _la = self._input.LA(1)
+            if _la == 2:
+                self.state = 124
+                localctx.neg = self.match(ExprParser.T__1)
+
+            self.state = 127
             self.time_term()
-            self.state = 129
+            self.state = 132
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while _la == 2 or _la == 7:
-                self.state = 125
-                localctx._tset337 = self._input.LT(1)
+                self.state = 128
+                localctx._tset344 = self._input.LT(1)
                 _la = self._input.LA(1)
                 if not (_la == 2 or _la == 7):
-                    localctx._tset337 = self._errHandler.recoverInline(self)
+                    localctx._tset344 = self._errHandler.recoverInline(self)
                 else:
                     self._errHandler.reportMatch(self)
                     self.consume()
-                localctx.ops.append(localctx._tset337)
-                self.state = 126
+                localctx.ops.append(localctx._tset344)
+                self.state = 129
                 localctx._time_term = self.time_term()
                 localctx.terms.append(localctx._time_term)
-                self.state = 131
+                self.state = 134
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
 
@@ -2597,7 +2661,7 @@ class ExprParser(Parser):
             self.s6 = None  # Token
             self.ops = list()  # of Tokens
             self.s5 = None  # Token
-            self._tset360 = None  # Token
+            self._tset367 = None  # Token
             self._time_factor = None  # Time_factorContext
             self.factors = list()  # of Time_factorContexts
 
@@ -2623,25 +2687,25 @@ class ExprParser(Parser):
         self._la = 0  # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 132
+            self.state = 135
             self.time_factor()
-            self.state = 137
+            self.state = 140
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while _la == 5 or _la == 6:
-                self.state = 133
-                localctx._tset360 = self._input.LT(1)
+                self.state = 136
+                localctx._tset367 = self._input.LT(1)
                 _la = self._input.LA(1)
                 if not (_la == 5 or _la == 6):
-                    localctx._tset360 = self._errHandler.recoverInline(self)
+                    localctx._tset367 = self._errHandler.recoverInline(self)
                 else:
                     self._errHandler.reportMatch(self)
                     self.consume()
-                localctx.ops.append(localctx._tset360)
-                self.state = 134
+                localctx.ops.append(localctx._tset367)
+                self.state = 137
                 localctx._time_factor = self.time_factor()
                 localctx.factors.append(localctx._time_factor)
-                self.state = 139
+                self.state = 142
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
 
@@ -2667,23 +2731,6 @@ class ExprParser(Parser):
 
         def copyFrom(self, ctx: ParserRuleContext):
             super().copyFrom(ctx)
-
-    class TimeNegationContext(Time_factorContext):
-
-        def __init__(
-            self, parser, ctx: ParserRuleContext
-        ):  # actually a ExprParser.Time_factorContext
-            super().__init__(parser)
-            self.copyFrom(ctx)
-
-        def time_factor(self):
-            return self.getTypedRuleContext(ExprParser.Time_factorContext, 0)
-
-        def accept(self, visitor: ParseTreeVisitor):
-            if hasattr(visitor, "visitTimeNegation"):
-                return visitor.visitTimeNegation(self)
-            else:
-                return visitor.visitChildren(self)
 
     class TimeParenthesisContext(Time_factorContext):
 
@@ -2739,6 +2786,26 @@ class ExprParser(Parser):
             else:
                 return visitor.visitChildren(self)
 
+    class TimeFactorShiftContext(Time_factorContext):
+
+        def __init__(
+            self, parser, ctx: ParserRuleContext
+        ):  # actually a ExprParser.Time_factorContext
+            super().__init__(parser)
+            self.copyFrom(ctx)
+
+        def IDENTIFIER(self):
+            return self.getToken(ExprParser.IDENTIFIER, 0)
+
+        def shift(self):
+            return self.getTypedRuleContext(ExprParser.ShiftContext, 0)
+
+        def accept(self, visitor: ParseTreeVisitor):
+            if hasattr(visitor, "visitTimeFactorShift"):
+                return visitor.visitTimeFactorShift(self)
+            else:
+                return visitor.visitChildren(self)
+
     class TimeNumberContext(Time_factorContext):
 
         def __init__(
@@ -2785,79 +2852,83 @@ class ExprParser(Parser):
         self.enterRule(localctx, 18, self.RULE_time_factor)
         self._la = 0  # Token type
         try:
-            self.state = 165
+            self.state = 171
             self._errHandler.sync(self)
-            la_ = self._interp.adaptivePredict(self._input, 11, self._ctx)
+            la_ = self._interp.adaptivePredict(self._input, 12, self._ctx)
             if la_ == 1:
                 localctx = ExprParser.TimeNumberContext(self, localctx)
                 self.enterOuterAlt(localctx, 1)
-                self.state = 140
+                self.state = 143
                 self.match(ExprParser.NUMBER)
                 pass
 
             elif la_ == 2:
                 localctx = ExprParser.TimeIdentifierContext(self, localctx)
                 self.enterOuterAlt(localctx, 2)
-                self.state = 141
+                self.state = 144
                 self.match(ExprParser.IDENTIFIER)
                 pass
 
             elif la_ == 3:
                 localctx = ExprParser.TimeFunctionContext(self, localctx)
                 self.enterOuterAlt(localctx, 3)
-                self.state = 142
+                self.state = 145
                 self.match(ExprParser.IDENTIFIER)
-                self.state = 143
+                self.state = 146
                 self.match(ExprParser.T__2)
-                self.state = 144
+                self.state = 147
                 self.time_expr()
-                self.state = 149
+                self.state = 152
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 while _la == 11:
-                    self.state = 145
+                    self.state = 148
                     self.match(ExprParser.T__10)
-                    self.state = 146
+                    self.state = 149
                     self.time_expr()
-                    self.state = 151
+                    self.state = 154
                     self._errHandler.sync(self)
                     _la = self._input.LA(1)
 
-                self.state = 152
+                self.state = 155
                 self.match(ExprParser.T__3)
                 pass
 
             elif la_ == 4:
-                localctx = ExprParser.TimeFactorIndexContext(self, localctx)
+                localctx = ExprParser.TimeFactorShiftContext(self, localctx)
                 self.enterOuterAlt(localctx, 4)
-                self.state = 154
-                self.match(ExprParser.IDENTIFIER)
-                self.state = 155
-                self.match(ExprParser.T__11)
-                self.state = 156
-                self.time_expr()
                 self.state = 157
+                self.match(ExprParser.IDENTIFIER)
+                self.state = 158
+                self.match(ExprParser.T__11)
+                self.state = 159
+                self.shift()
+                self.state = 160
                 self.match(ExprParser.T__12)
                 pass
 
             elif la_ == 5:
-                localctx = ExprParser.TimeParenthesisContext(self, localctx)
+                localctx = ExprParser.TimeFactorIndexContext(self, localctx)
                 self.enterOuterAlt(localctx, 5)
-                self.state = 159
-                self.match(ExprParser.T__2)
-                self.state = 160
+                self.state = 162
+                self.match(ExprParser.IDENTIFIER)
+                self.state = 163
+                self.match(ExprParser.T__11)
+                self.state = 164
                 self.time_expr()
-                self.state = 161
-                self.match(ExprParser.T__3)
+                self.state = 165
+                self.match(ExprParser.T__12)
                 pass
 
             elif la_ == 6:
-                localctx = ExprParser.TimeNegationContext(self, localctx)
+                localctx = ExprParser.TimeParenthesisContext(self, localctx)
                 self.enterOuterAlt(localctx, 6)
-                self.state = 163
-                self.match(ExprParser.T__1)
-                self.state = 164
-                self.time_factor()
+                self.state = 167
+                self.match(ExprParser.T__2)
+                self.state = 168
+                self.time_expr()
+                self.state = 169
+                self.match(ExprParser.T__3)
                 pass
 
         except RecognitionException as re:

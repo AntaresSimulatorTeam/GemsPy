@@ -272,6 +272,9 @@ from gems_craft.expression.parsing.parse_expression import (
         ),
         ({"x"}, {"p"}, "x[ceil(p)]", var("x").eval(param("p").ceil())),
         ({"x"}, {"p"}, "x[t - p[0]]", var("x").shift(-param("p").eval(literal(0)))),
+        ({"x"}, {"p"}, "x[p[t]]", var("x").eval(param("p"))),
+        ({"x"}, {"p"}, "x[p[t-1]]", var("x").eval(param("p").shift(-literal(1)))),
+        ({"x"}, {"p"}, "x[t + p[t]]", var("x").shift(param("p"))),
         (
             {"x"},
             {"p"},
@@ -348,12 +351,14 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
         "x[t 4]",
         "sum(2*t .. t, x)",
         "x[t + (p.f)]",
-        "x[t - (x[t-1])]",
         "x[t + (sum(x))]",
         "x[t + (x = 1)]",
         "x[p.f]",
+        "x[t + -1]",
+        "x[2 * -1]",
+        "x[--1]",
+        "sum(t - -1 .. t, x)",
         "x.f <= 0",
-        "x[p[t]]",
         "x[t + sum_connections(p.f)]",
     ],
 )
@@ -381,6 +386,7 @@ def test_parse_cancellation_should_throw(expression_str: str) -> None:
         "x[t + max(1, y)]",
         "x[y[0]]",
         "sum(y[1] .. 2, x)",
+        "x[t - (y[t-1])]",
     ],
 )
 def test_variable_in_time_expression_should_throw(expression_str: str) -> None:

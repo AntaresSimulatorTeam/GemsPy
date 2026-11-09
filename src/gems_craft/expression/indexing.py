@@ -114,7 +114,9 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return visit(node.operand, self)
 
     def time_eval(self, node: TimeEvalNode) -> IndexingStructure:
-        return IndexingStructure(False, visit(node.operand, self).scenario)
+        # The time index removes the operand's time dimension, but brings its own.
+        index = visit(node.eval_time, self)
+        return IndexingStructure(False, visit(node.operand, self).scenario) | index
 
     def time_sum(self, node: TimeSumNode) -> IndexingStructure:
         # Bounds are time-independent (checked when the model is created), so

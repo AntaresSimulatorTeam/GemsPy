@@ -144,20 +144,12 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
 
     def visitTimeShift(self, ctx: ExprParser.TimeShiftContext) -> ExpressionNode:
         shifted_expr = self._convert_identifier(ctx.IDENTIFIER().getText())  # type: ignore
-        time_shift = ctx.shift().accept(self)  # type: ignore
-        # specifics for x[t] ...
-        if expressions_equal(time_shift, literal(0)):
-            return shifted_expr
-        return shifted_expr.shift(time_shift)
+        return _shift(shifted_expr, ctx.shift().accept(self))  # type: ignore
 
     def visitTimeShiftExpr(
         self, ctx: ExprParser.TimeShiftExprContext
     ) -> ExpressionNode:
-        shifted_expr = ctx.expr().accept(self)  # type: ignore
-        time_shift = ctx.shift().accept(self)  # type: ignore
-        if expressions_equal(time_shift, literal(0)):
-            return shifted_expr
-        return shifted_expr.shift(time_shift)
+        return _shift(ctx.expr().accept(self), ctx.shift().accept(self))  # type: ignore
 
     def visitTimeIndexExpr(
         self, ctx: ExprParser.TimeIndexExprContext
@@ -244,7 +236,8 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     # Visit a parse tree produced by ExprParser#time_expr.
     def visitTime_expr(self, ctx: ExprParser.Time_exprContext) -> ExpressionNode:
         terms = [term.accept(self) for term in ctx.time_term()]  # type: ignore
-        return _fold(terms[0], ctx.ops, terms[1:])  # type: ignore
+        first = -terms[0] if ctx.neg is not None else terms[0]  # type: ignore
+        return _fold(first, ctx.ops, terms[1:])  # type: ignore
 
     # Visit a parse tree produced by ExprParser#time_term.
     def visitTime_term(self, ctx: ExprParser.Time_termContext) -> ExpressionNode:
@@ -267,6 +260,13 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     ) -> ExpressionNode:
         expr = self._convert_time_identifier(ctx.IDENTIFIER().getText())  # type: ignore
         return expr.eval(ctx.time_expr().accept(self))  # type: ignore
+
+    # Visit a parse tree produced by ExprParser#timeFactorShift.
+    def visitTimeFactorShift(
+        self, ctx: ExprParser.TimeFactorShiftContext
+    ) -> ExpressionNode:
+        expr = self._convert_time_identifier(ctx.IDENTIFIER().getText())  # type: ignore
+        return _shift(expr, ctx.shift().accept(self))  # type: ignore
 
     def _convert_time_identifier(self, identifier: str) -> ExpressionNode:
         if self.identifiers.is_variable(identifier):
@@ -296,9 +296,12 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     ) -> ExpressionNode:
         return ctx.time_expr().accept(self)  # type: ignore
 
-    # Visit a parse tree produced by ExprParser#timeNegation.
-    def visitTimeNegation(self, ctx: ExprParser.TimeNegationContext) -> ExpressionNode:
-        return -ctx.time_factor().accept(self)  # type: ignore
+
+def _shift(expr: ExpressionNode, time_shift: ExpressionNode) -> ExpressionNode:
+    """expr shifted by time_shift; x[t] is x itself."""
+    if expressions_equal(time_shift, literal(0)):
+        return expr
+    return expr.shift(time_shift)
 
 
 def _fold(

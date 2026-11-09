@@ -215,37 +215,26 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         try:
             shift = self._eval_int(node.time_shift)
             return self._apply_time_shift(operand, shift)  # type: ignore[return-value]
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, NotImplementedError):
             pass
 
-        shift_result = visit(node.time_shift, self)
-        if not isinstance(shift_result, xr.DataArray):
-            raise ValueError(
-                f"Time shift expression must evaluate to a parameter (DataArray), "
-                f"got {type(shift_result).__name__!r}."
-            )
-        if not shift_result.dims:
-            return self._apply_time_shift(  # type: ignore[return-value]
-                operand, self._da_to_int(shift_result)
-            )
-
-        # Slow path: per-component shift — sum masked contributions.
-        shift_int = shift_result.astype(int)
-        unique_shifts = np.unique(shift_int.values)
-        acc: Optional[Any] = None
-        for s in unique_shifts:
-            mask: xr.DataArray = (shift_int == s).astype(float)
-            shifted = self._apply_time_shift(operand, int(s))
-            contrib = shifted * mask  # type: ignore[operator]
-            acc = contrib if acc is None else _linopy_add(acc, contrib)
-        return acc  # type: ignore[return-value]
+        # The shift depends on the data, possibly per component, time step or
+        # scenario: read the operand at t + shift.
+        shift_da = self._time_amount(node.time_shift, "Time shift")
+        t = xr.DataArray(np.arange(self.block_length), dims="time")
+        return self._take_time(operand, t + shift_da)  # type: ignore[return-value]
 
     def time_eval(self, node: TimeEvalNode) -> VectorizedExpr:
-        timestep = self._eval_int_expr(node.eval_time) % self.block_length
         operand = visit(node.operand, self)
         if not self._has_dim(operand, "time"):
             return operand  # type: ignore[return-value]
-        return operand.isel(time=timestep)  # type: ignore[union-attr,attr-defined,return-value]
+        try:
+            index: Any = self._eval_int(node.eval_time)
+        except (KeyError, NotImplementedError):
+            # The index depends on the data, possibly per component, time step
+            # or scenario (e.g. x[d], x[d[t-1]]).
+            index = self._time_amount(node.eval_time, "Time index")
+        return self._take_time(operand, index)  # type: ignore[return-value]
 
     def time_sum(self, node: TimeSumNode) -> VectorizedExpr:
         if not isinstance(node.from_time, RelativeTimeNode) or not isinstance(
@@ -489,21 +478,49 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     # ------------------------------------------------------------------ #
 
     def _apply_time_shift(self, operand: Any, shift: int) -> Any:
-        """Apply a cyclic (modulo ``self.block_length``) time shift to *operand*.
+        """Apply a cyclic (modulo ``self.block_length``) time shift to *operand*."""
+        positions = xr.DataArray(np.arange(self.block_length) + shift, dims="time")
+        return self._take_time(operand, positions)
 
+    def _take_time(self, operand: Any, positions: Any) -> Any:
+        """*operand* read at the time steps *positions*, wrapped into the block.
+
+        *positions* is an integer or an integer DataArray: along its dimensions
+        (component, time, scenario), each element reads its own time step.
         Works for both ``xr.DataArray`` and linopy Variable/LinearExpression.
-        Coordinates are reassigned after ``isel`` so that subsequent xarray
-        arithmetic aligns positionally rather than by the shifted values.
         """
         if not self._has_dim(operand, "time"):
             return operand
         T = self.block_length
-        positions = (np.arange(T) + shift) % T
-        indexer = xr.DataArray(positions, dims="time")
-        result = operand.isel(time=indexer)  # type: ignore[union-attr]
-        if "time" in result.coords:  # type: ignore[operator]
-            result = result.assign_coords(time=list(range(T)))  # type: ignore[union-attr]
-        return result
+        if not isinstance(positions, xr.DataArray):
+            return operand.isel(time=positions % T)
+        # The indexer's time coordinate would conflict with the operand's.
+        indexer = (positions % T).drop_vars("time", errors="ignore")
+        if not indexer.dims:
+            return operand.isel(time=int(indexer))
+        if "time" in indexer.dims:
+            # Align the result on the positions, not on the time steps read.
+            result = operand.isel(time=indexer)
+            return result.assign_coords(time=list(range(T)))
+        # Time-independent positions: drop the time steps read, left as a
+        # coordinate (linopy variables have no drop_vars).
+        if isinstance(operand, linopy.Variable):
+            operand = operand.to_linexpr()
+        return operand.isel(time=indexer).drop_vars("time")
+
+    def _time_amount(self, node: ExpressionNode, what: str) -> xr.DataArray:
+        """Integer values of a time shift or time index that depends on the data."""
+        value = visit(node, self)
+        if not isinstance(value, xr.DataArray):
+            raise ValueError(
+                f"{what} expression must evaluate to a parameter (DataArray), "
+                f"got {type(value).__name__!r}."
+            )
+        if not np.all(np.mod(value.values, 1) == 0):
+            raise ValueError(
+                f"{what} must take integer values, got {value.values!r} from {node!r}."
+            )
+        return value.astype(int)
 
     @staticmethod
     def _eval_int(node: ExpressionNode) -> int:
@@ -517,34 +534,6 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         raise ValueError(
             f"Expected an integer constant expression, got {value!r} from {node!r}."
         )
-
-    @staticmethod
-    def _da_to_int(da: xr.DataArray) -> int:
-        """Extract the first element of a DataArray as an integer."""
-        val = float(da.values.flat[0])
-        if not val.is_integer():
-            raise ValueError(
-                f"Expected integer DataArray value for time shift, got {val!r}."
-            )
-        return int(val)
-
-    def _eval_int_expr(self, node: ExpressionNode) -> int:
-        """Evaluate a constant integer expression, falling back to ``self`` if needed.
-
-        Tries the static evaluator first; if that fails (e.g. the expression
-        references a model parameter), evaluates it via ``self`` and extracts
-        the scalar integer.
-        """
-        try:
-            return self._eval_int(node)
-        except KeyError:
-            result = visit(node, self)
-            if isinstance(result, xr.DataArray):
-                return self._da_to_int(result)
-            raise ValueError(
-                f"Expected a constant integer expression for time operation, "
-                f"got {result!r} from {node!r}."
-            )
 
     @staticmethod
     def _has_dim(operand: Any, dim: str) -> bool:
