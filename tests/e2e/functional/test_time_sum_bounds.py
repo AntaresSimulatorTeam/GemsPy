@@ -148,15 +148,26 @@ _OUTSIDE_THE_BLOCK = {
 }
 
 
-@pytest.mark.parametrize("mode", ["cyclic", "drop"])
-def test_absolute_indices_outside_the_block_wrap(tmp_path: Path, mode: str) -> None:
-    """An absolute index outside the block wraps around it, as x[N], and never
-    causes the constraint to be dropped."""
+@pytest.mark.parametrize(
+    "mode, expected",
+    [
+        # An absolute index outside the block wraps around it, as x[N].
+        (
+            "cyclic",
+            {"n": [7] * 4, "p": [10] * 4, "w": [13] * 4, "m": [5, 7, 10, 14]},
+        ),
+        # x is read outside the block at every t: every instance is dropped.
+        ("drop", {v: [0] * 4 for v in _OUTSIDE_THE_BLOCK}),
+    ],
+)
+def test_absolute_indices_outside_the_block(
+    tmp_path: Path, mode: str, expected: Dict[str, List[float]]
+) -> None:
     study_dir = _make_study(
         tmp_path,
         variables=["x", *_OUTSIDE_THE_BLOCK],
         constraints=["x = d", *(f"{v} = {s}" for v, s in _OUTSIDE_THE_BLOCK.items())],
-        objective="sum(x)",
+        objective="sum(x) + " + " + ".join(f"sum({v})" for v in _OUTSIDE_THE_BLOCK),
         data={"d": [1, 2, 3, 4]},
         constants={},
         nb_time_steps=4,
@@ -165,10 +176,7 @@ def test_absolute_indices_outside_the_block_wrap(tmp_path: Path, mode: str) -> N
 
     results = _solve(study_dir)
 
-    assert results["n"] == [7, 7, 7, 7]
-    assert results["p"] == [10, 10, 10, 10]
-    assert results["w"] == [13, 13, 13, 13]
-    assert results["m"] == [5, 7, 10, 14]
+    assert {v: results[v] for v in _OUTSIDE_THE_BLOCK} == expected
 
 
 def test_absolute_bounds_in_extra_outputs(tmp_path: Path) -> None:

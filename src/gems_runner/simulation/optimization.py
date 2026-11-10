@@ -124,21 +124,19 @@ class DecompositionFilter:
 
 
 def _apply_validity_mask(expr: VectorizedExpr, mask: xr.DataArray) -> VectorizedExpr:
-    """Filter *expr* to valid (component, time) entries using *mask*.
+    """Mask *expr* where *mask* is False, element-wise.
 
-    When *expr* has both component and time dimensions the mask is applied
-    element-wise via ``where``.  When only the time dimension is present the
-    intersection across components is used (conservative fallback).
+    The mask is broadcast against *expr*: a dimension of the mask that *expr*
+    lacks (e.g. a time-only bound against a [component, time, scenario] mask)
+    is added, so that both sides of a constraint are masked at the same
+    component, time step and scenario.
     """
     if not hasattr(expr, "dims"):
         return expr
-    dims = expr.dims  # type: ignore[union-attr]
-    if "component" in dims and "time" in dims:
-        return expr.where(mask)  # type: ignore[union-attr,return-value]
-    if "time" in dims:
-        valid_times: List[int] = mask.all("component").values.nonzero()[0].tolist()
-        return expr.isel(time=valid_times)  # type: ignore[union-attr,return-value]
-    return expr
+    if "time" in mask.dims and "time" not in expr.dims:  # type: ignore[union-attr]
+        return expr  # a constant bound: the other side carries the mask
+    # A time-independent constraint (e.g. x[200] <= 5) is masked as a whole.
+    return expr.where(mask)  # type: ignore[union-attr,return-value]
 
 
 class OutOfBoundsFilter:
@@ -955,6 +953,11 @@ class _OptimizationProblemBuilder:
                                 model_id=model.id,
                                 param_arrays=self.param_arrays,
                                 block_length=self.block_length,
+                                time_independent_variables=frozenset(
+                                    name
+                                    for name, variable in model.variables.items()
+                                    if not variable.structure.time
+                                ),
                             ),
                         )
 

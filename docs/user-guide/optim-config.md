@@ -325,7 +325,7 @@ strategies are available:
 | Mode | Behaviour |
 |---|---|
 | `cyclic` (default) | Wrap around: time shift are defined modulo `block-length` |
-| `drop` | Skip the constraint entirely for out-of-bounds timesteps |
+| `drop` | Skip the constraint where it reads a variable out of the block |
 
 ~~~ yaml
 models:
@@ -336,10 +336,28 @@ models:
           mode: drop   # do not enforce at t=0 where previous state is unknown
 ~~~
 
-`drop` only applies to time indices relative to `t`. An absolute time index,
-as in `x[N]` or in a time sum bound without `t`, always wraps around the block,
-whatever the mode: in a block of 168 time steps, `sum(-1 .. 1, x)` sums the
-time steps 167, 0 and 1.
+In `drop` mode, the constraint is skipped for a component, time step and
+scenario as soon as it reads a **variable** at a time step outside the block,
+whether through a time shift, a time index or a time sum. **Parameters** are
+always read modulo the block, as in `cyclic` mode.
+
+Examples, in a block of 168 time steps (`t` from 0 to 167):
+
+| Expression | Skipped |
+|---|---|
+| `x[t-1]`, `sum(t-1 .. t, x)` | at `t = 0` |
+| `x[t + k[t]]`, `x[t - lag]` | where `t + k[t]` or `t - lag` is out of the block, per component and scenario |
+| `x[200]`, `sum(-1 .. 1, x)` | at every time step |
+| `x[d]`, `x[d[t-1]]` | where the value of `d` is out of the block (`d[t-1]` reads `d[167]` at `t = 0`) |
+| `x[t + d[t-1]]` | where `t + d[t-1]` is out of the block |
+| `p[t-1]`, `x[t] - p[t-1]` | never: `p[t-1]` reads `p[167]` at `t = 0` |
+| `(x[t-1])[t+2]` | at `t = 167`: shifts add up, so it reads `x[t+1]` |
+| `(x[t-1])[0]` | at every time step: it reads `x[-1]` |
+| `y[t-1]`, `y` a time-independent variable | never |
+
+A time sum that is empty at a time step reads nothing there. Port fields are
+not checked: a port field defined with a time shift in the connected model
+(e.g. `x[t-1]`) is read as in `cyclic` mode.
 
 ### `model-decomposition`
 

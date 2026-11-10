@@ -905,6 +905,25 @@ def test_time_eval_of_a_variable_at_an_index_given_by_a_parameter(
     assert result.labels.values.tolist() == expected
 
 
+def test_time_eval_of_a_variable_at_an_index_per_component(
+    comp_time_var: linopy.Variable, param_da: xr.DataArray
+) -> None:
+    """x[d] with d per component: one time step per component, no time left."""
+    index = xr.DataArray(
+        [2.0, 4.0], dims="component", coords={"component": ["c1", "c2"]}
+    )
+    builder = _builder_with_index(comp_time_var, param_da, index)
+    result = visit(var("x").eval(param("d")), builder)
+    labels = comp_time_var.labels
+    # 4 wraps to 1 in a block of 3
+    expected = [
+        labels.sel(component="c1", time=2).item(),
+        labels.sel(component="c2", time=1).item(),
+    ]
+    assert "time" not in result.dims
+    assert result.vars.squeeze("_term").values.tolist() == expected
+
+
 def test_time_eval_at_a_non_integer_index_raises(
     comp_time_var: linopy.Variable, param_da: xr.DataArray
 ) -> None:
@@ -912,3 +931,12 @@ def test_time_eval_at_a_non_integer_index_raises(
     builder = _builder_with_index(comp_time_var, param_da, index)
     with pytest.raises(ValueError, match="integer values"):
         visit(param("p").eval(param("d")), builder)
+
+
+def test_time_sum_bound_given_by_a_non_integer_parameter_raises(
+    comp_time_var: linopy.Variable, param_da: xr.DataArray
+) -> None:
+    """sum(t - k .. t, x) with k = 1.5 raises: k is not truncated."""
+    builder = _builder_with_index(comp_time_var, param_da, xr.DataArray(1.5))
+    with pytest.raises(ValueError, match="integer values"):
+        visit(var("x").time_sum(-param("d"), 0), builder)
