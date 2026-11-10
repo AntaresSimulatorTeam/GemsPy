@@ -355,9 +355,11 @@ Examples, in a block of 168 time steps (`t` from 0 to 167):
 | `(x[t-1])[0]` | at every time step: it reads `x[-1]` |
 | `y[t-1]`, `y` a time-independent variable | never |
 
-A time sum that is empty at a time step reads nothing there. Port fields are
-not checked: a port field defined with a time shift in the connected model
-(e.g. `x[t-1]`) is read as in `cyclic` mode.
+A time sum that is empty at a time step reads nothing there.
+
+**Port fields** are never checked: they are read as in `cyclic` mode, so
+`sum_connections(p.f)[t-1]` never skips the constraint, nor does a time shift
+in the definition of the port field in the connected model (e.g. `x[t-1]`).
 
 ### `model-decomposition`
 

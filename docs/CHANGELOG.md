@@ -26,7 +26,7 @@ All notable changes to GemsPy are documented here.
   time sum; parameters are read modulo the block, as in `cyclic`. So `x[200]`,
   `x[d]` and `sum(-1 .. 1, x)` are now skipped where they read `x` outside the
   block, instead of wrapping around it, and `p[t-1]` no longer skips the
-  constraint at `t = 0`.
+  constraint at `t = 0`. Port fields are never checked.
 
 ### Fixed
 - `x[d]` with `d` varying in time, per component or per scenario read `x` at

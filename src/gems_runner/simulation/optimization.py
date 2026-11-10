@@ -133,8 +133,10 @@ def _apply_validity_mask(expr: VectorizedExpr, mask: xr.DataArray) -> Vectorized
     """
     if not hasattr(expr, "dims"):
         return expr
+    # A time-independent side (e.g. a constant bound) is left as is: the
+    # time-dependent side of the constraint carries the mask.
     if "time" in mask.dims and "time" not in expr.dims:  # type: ignore[union-attr]
-        return expr  # a constant bound: the other side carries the mask
+        return expr
     # A time-independent constraint (e.g. x[200] <= 5) is masked as a whole.
     return expr.where(mask)  # type: ignore[union-attr,return-value]
 

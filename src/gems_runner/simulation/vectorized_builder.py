@@ -40,6 +40,7 @@ import linopy
 import numpy as np
 import xarray as xr
 
+from gems_craft.expression.degree import is_constant
 from gems_craft.expression.expression import (
     AbsNode,
     AdditionNode,
@@ -485,11 +486,21 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
                 f"{what} expression must evaluate to a parameter (DataArray), "
                 f"got {type(value).__name__!r}."
             )
-        if not np.all(np.mod(value.values, 1) == 0):
+        values = value.values
+        if np.isnan(values).any():
             raise ValueError(
-                f"{what} must take integer values, got {value.values!r} from {node!r}."
+                f"{what} '{print_expr(node)}' in model '{self.model_id}' has missing "
+                "values (NaN)."
             )
-        return value.astype(int)
+        rounded = np.round(values)
+        # A tolerance absorbs rounding errors, e.g. d / 3 * 3.
+        wrong = values[~np.isclose(values, rounded, rtol=0.0, atol=_INTEGER_TOLERANCE)]
+        if wrong.size:
+            raise ValueError(
+                f"{what} '{print_expr(node)}' in model '{self.model_id}' must take "
+                f"integer values, got {_preview(wrong)}."
+            )
+        return value.copy(data=rounded.astype(int))
 
     @staticmethod
     def _eval_int(node: ExpressionNode) -> int:
@@ -498,16 +509,28 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         value = visit(node, visitor)
         if isinstance(value, int):
             return value
-        if isinstance(value, float) and value.is_integer():
-            return int(value)
+        if isinstance(value, float) and abs(value - round(value)) <= _INTEGER_TOLERANCE:
+            return int(round(value))
         raise ValueError(
-            f"Expected an integer constant expression, got {value!r} from {node!r}."
+            f"Expected an integer constant expression, got {value!r} from "
+            f"'{print_expr(node)}'."
         )
 
     @staticmethod
     def _has_dim(operand: Any, dim: str) -> bool:
         """Return True if *operand* has a dimension named *dim*."""
         return dim in operand.dims
+
+
+# Gap to the nearest integer accepted for a time shift, time index or sum bound.
+_INTEGER_TOLERANCE = 1e-9
+
+
+def _preview(values: np.ndarray, count: int = 5) -> str:
+    """The first *count* distinct *values*, for an error message."""
+    unique = np.unique(values)
+    shown = ", ".join(f"{v:g}" for v in unique[:count])
+    return f"{shown}, ..." if unique.size > count else shown
 
 
 # ---------------------------------------------------------------------------
@@ -595,12 +618,16 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     # ------------------------------------------------------------------ #
 
     def time_shift(self, node: TimeShiftNode) -> Optional[xr.DataArray]:
+        if is_constant(node.operand):  # reads no variable: nothing to drop
+            return None
         amount = self._evaluator()._time_value(node.time_shift, "Time shift")
         return self._read_at(
             node.operand, self._positions() + self._at_positions(amount)
         )
 
     def time_eval(self, node: TimeEvalNode) -> Optional[xr.DataArray]:
+        if is_constant(node.operand):  # reads no variable: nothing to drop
+            return None
         index = self._evaluator()._time_value(node.eval_time, "Time index")
         return self._read_at(node.operand, xr.DataArray(self._at_positions(index)))
 
@@ -693,7 +720,7 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return visit(node.operand, self)
 
     # ------------------------------------------------------------------ #
-    # Leaf nodes — variables and port fields must be read in the block      #
+    # Leaf nodes — variables must be read in the block                      #
     # ------------------------------------------------------------------ #
 
     def literal(self, node: LiteralNode) -> Optional[xr.DataArray]:
@@ -708,8 +735,8 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return self._in_block()
 
     def port_field(self, node: PortFieldNode) -> Optional[xr.DataArray]:
-        # Shifts in the port field definition are not checked.
-        return self._in_block()
+        # Port fields are never checked: they are read as in cyclic mode.
+        return None
 
     def dual(self, node: DualNode) -> Optional[xr.DataArray]:
         return None

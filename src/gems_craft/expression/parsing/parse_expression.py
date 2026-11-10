@@ -10,10 +10,11 @@
 #
 # This file is part of the Antares project.
 from dataclasses import dataclass, field
-from typing import Set
+from typing import Sequence, Set
 
 from antlr4 import CommonTokenStream, InputStream
 from antlr4.error.ErrorStrategy import BailErrorStrategy
+from antlr4.Token import Token
 
 from gems_craft.expression import ExpressionNode, literal, param, relative_time, var
 from gems_craft.expression.equality import expressions_equal
@@ -231,7 +232,9 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         terms = [term.accept(self) for term in ctx.terms]  # type: ignore
         if not terms:
             return literal(0)
-        return _fold(-terms[0] if ctx.ops[0].text == "-" else terms[0], ctx.ops[1:], terms[1:])  # type: ignore
+        ops = ctx.ops  # type: ignore
+        first = -terms[0] if ops[0].text == "-" else terms[0]
+        return _fold(first, ops[1:], terms[1:])
 
     # Visit a parse tree produced by ExprParser#time_expr.
     def visitTime_expr(self, ctx: ExprParser.Time_exprContext) -> ExpressionNode:
@@ -305,7 +308,7 @@ def _shift(expr: ExpressionNode, time_shift: ExpressionNode) -> ExpressionNode:
 
 
 def _fold(
-    first: ExpressionNode, ops: list, operands: list[ExpressionNode]
+    first: ExpressionNode, ops: Sequence[Token], operands: Sequence[ExpressionNode]
 ) -> ExpressionNode:
     """Applies the binary operator tokens ops from left to right."""
     result = first

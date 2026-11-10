@@ -16,7 +16,13 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from gems_craft.expression.expression import literal, param, relative_time, var
+from gems_craft.expression.expression import (
+    literal,
+    param,
+    port_field,
+    relative_time,
+    var,
+)
 from gems_craft.expression.visitor import visit
 from gems_runner.simulation.vectorized_builder import ShiftValidityVisitor
 
@@ -298,6 +304,14 @@ def test_variable_read_out_of_the_block(expr, expected):
     d = xr.DataArray([1.0, 5.0, -1.0, 2.0], dims=["time"], coords={"time": range(4)})
     mask = visit(expr, _visitor({("m", "d"): d}))
     np.testing.assert_array_equal(_valid(mask), expected)
+
+
+def test_parameters_and_port_fields_are_never_dropped():
+    # The shift of a parameter is not evaluated: a non-integer one does not raise.
+    expr = param("d").shift(param("k")) + port_field("p", "f").sum_connections().shift(
+        -1
+    )
+    assert visit(expr, _visitor({("m", "k"): xr.DataArray(0.5)})) is None
 
 
 def test_time_independent_variable_is_never_dropped():

@@ -940,3 +940,33 @@ def test_time_sum_bound_given_by_a_non_integer_parameter_raises(
     builder = _builder_with_index(comp_time_var, param_da, xr.DataArray(1.5))
     with pytest.raises(ValueError, match="integer values"):
         visit(var("x").time_sum(-param("d"), 0), builder)
+
+
+def test_time_shift_tolerates_rounding_errors(
+    comp_time_var: linopy.Variable, param_da: xr.DataArray
+) -> None:
+    """d / 3 * 3 with d = 1 is 0.999..., read as 1."""
+    index = xr.DataArray(1.0)
+    builder = _builder_with_index(comp_time_var, param_da, index)
+    result = visit(param("p").shift(param("d") / 3 * 3), builder)
+    expected = visit(param("p").shift(1), builder)
+    xr.testing.assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "values, message",
+    [
+        (list(np.arange(100) + 0.5), r"got 0\.5, 1\.5, 2\.5, 3\.5, 4\.5, \.\.\.\.$"),
+        ([1.0, np.nan], "missing values"),
+    ],
+)
+def test_invalid_time_shift_raises(
+    comp_time_var: linopy.Variable,
+    param_da: xr.DataArray,
+    values: list[float],
+    message: str,
+) -> None:
+    index = xr.DataArray(values, dims="component")
+    builder = _builder_with_index(comp_time_var, param_da, index)
+    with pytest.raises(ValueError, match=message):
+        visit(param("p").shift(param("d")), builder)

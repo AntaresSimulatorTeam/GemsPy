@@ -360,6 +360,7 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
         "sum(t - -1 .. t, x)",
         "x.f <= 0",
         "x[t + sum_connections(p.f)]",
+        "x[t + (p + 1)[t-1]]",
     ],
 )
 def test_parse_cancellation_should_throw(expression_str: str) -> None:
