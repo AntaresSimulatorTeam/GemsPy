@@ -137,7 +137,9 @@ library:
         - id: p_min
         - id: p_max
         - id: d_min_up
+          time-dependent: false
         - id: d_min_down
+          time-dependent: false
         - id: nb_units_max
         - id: nb_failures
           time-dependent: true

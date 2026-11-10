@@ -15,7 +15,7 @@ from typing import Callable, Dict, Optional, Set, Tuple
 from antlr4 import CommonTokenStream, InputStream
 from antlr4.error.ErrorStrategy import BailErrorStrategy
 
-from gems_craft.expression import ExpressionNode, literal, param, var
+from gems_craft.expression import ExpressionNode, literal, param, relative_time, var
 from gems_craft.expression.equality import expressions_equal
 from gems_craft.expression.expression import (
     Comparator,
@@ -279,18 +279,26 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         return None, lambda expr: expr.eval(eval_time)
 
     def visitTimeSum(self, ctx: ExprParser.TimeSumContext) -> ExpressionNode:
-        # Bounds are time offsets: the leading token is dropped by `visitShift`,
-        # so anything other than 't' would be silently ignored.
-        for bound_ctx in (ctx.from_, ctx.to):  # type: ignore
-            if bound_ctx.TIME() is None:  # type: ignore
-                raise ValueError(
-                    f"Time-sum bounds must start with 't', got "
-                    f"'{bound_ctx.IDENTIFIER().getText()}'."  # type: ignore
-                )
-        shifted_expr = ctx.expr().accept(self)  # type: ignore
-        from_shift = ctx.from_.accept(self)  # type: ignore
-        to_shift = ctx.to.accept(self)  # type: ignore
-        return shifted_expr.time_sum(from_shift, to_shift)
+        summed_expr = ctx.expr().accept(self)  # type: ignore
+        from_bound = ctx.from_.accept(self)  # type: ignore
+        to_bound = ctx.to.accept(self)  # type: ignore
+        return summed_expr.time_sum_between(from_bound, to_bound)
+
+    def visitSum_bound(self, ctx: ExprParser.Sum_boundContext) -> ExpressionNode:
+        """A shift ("t", "t + ...") is relative to the current time step; any
+        other expression is an absolute time index."""
+        shift_ctx = ctx.shift()  # type: ignore
+        if shift_ctx is None:
+            return ctx.expr().accept(self)  # type: ignore
+        amount = shift_ctx.accept(self)  # type: ignore
+        if shift_ctx.TIME() is not None:  # type: ignore
+            return relative_time(amount)
+        # `p` / `p + ...` also matches `shift`, whose visitor drops the leading
+        # identifier: rebuild it as an absolute bound (a set id raises here).
+        base = self._convert_identifier(shift_ctx.IDENTIFIER().getText())  # type: ignore
+        if expressions_equal(amount, literal(0)):
+            return base
+        return base + amount
 
     def visitAllTimeSum(self, ctx: ExprParser.AllTimeSumContext) -> ExpressionNode:
         shifted_expr = ctx.expr().accept(self)  # type: ignore

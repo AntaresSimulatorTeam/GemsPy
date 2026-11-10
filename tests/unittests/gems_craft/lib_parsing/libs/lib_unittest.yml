@@ -104,11 +104,23 @@ library:
       description: A short term storage
       parameters:
         - id: efficiency
+          time-dependent: false
+          scenario-dependent: false
         - id: level_min
+          time-dependent: false
+          scenario-dependent: false
         - id: level_max
+          time-dependent: false
+          scenario-dependent: false
         - id: p_max_withdrawal
+          time-dependent: false
+          scenario-dependent: false
         - id: p_max_injection
+          time-dependent: false
+          scenario-dependent: false
         - id: inflows
+          time-dependent: false
+          scenario-dependent: false
       variables:
         - id: injection
           lower-bound: 0
@@ -134,11 +146,23 @@ library:
       description: DHD model for thermal cluster
       parameters:
         - id: cost
+          time-dependent: false
+          scenario-dependent: false
         - id: p_min
+          time-dependent: false
+          scenario-dependent: false
         - id: p_max
+          time-dependent: false
+          scenario-dependent: false
         - id: d_min_up
+          time-dependent: false
+          scenario-dependent: false
         - id: d_min_down
+          time-dependent: false
+          scenario-dependent: false
         - id: nb_units_max
+          time-dependent: false
+          scenario-dependent: false
         - id: nb_failures
           time-dependent: true
           scenario-dependent: true

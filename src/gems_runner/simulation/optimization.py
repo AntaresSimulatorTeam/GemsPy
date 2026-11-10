@@ -360,15 +360,18 @@ class OptimizationProblem:
         linopy_vars_by_component: Optional[
             Dict[Tuple[str, str, str], linopy.Variable]
         ] = None,
+        scenario_ids: Optional[List[int]] = None,
     ) -> None:
         self.name = name
         self.linopy_model = linopy_model
         self.study = study
         self.block = block
+        # MC scenarios the problem was built for (None if unknown).
+        self.scenario_ids = scenario_ids
         self._linopy_vars = linopy_vars
         self._linopy_vars_by_component = linopy_vars_by_component or {}
         self.param_arrays = param_arrays
-        # Constant term of the objective (linopy cannot represent pure-constant objectives).
+        # Constant term of the objective, kept outside linopy (which rejects constants in objectives).
         self._objective_constant: float = objective_constant
 
     @property
@@ -632,20 +635,28 @@ class _OptimizationProblemBuilder:
                 name=f"carry_over__{safe}",
             )
 
-        # Extract constant objective contribution (linopy cannot hold pure constants).
+        # Extract the constant part of the objective (whole objective or constant term of a mixed one), since linopy rejects constants.
         objective_constant = 0.0
+        has_objective = False
         if total_obj is not None and not isinstance(
             total_obj, (xr.DataArray, int, float)
         ):
+            # Move any constant term out of the expression (linopy rejects it).
+            if isinstance(total_obj, linopy.LinearExpression):
+                objective_constant = float(total_obj.const.sum())
+                total_obj = total_obj - objective_constant
             self.linopy_model.add_objective(total_obj)  # type: ignore[arg-type]
+            has_objective = True
         elif total_obj is not None:
             if isinstance(total_obj, xr.DataArray):
                 objective_constant = float(total_obj.sum())
             else:
                 objective_constant = float(total_obj)
 
-        # linopy requires at least one variable to solve; add a fixed dummy if needed.
-        if len(self.linopy_model.variables) == 0:
+        # linopy requires an objective (hence a variable) to solve; add a fixed dummy if needed.
+        if not has_objective and (
+            total_obj is not None or len(self.linopy_model.variables) == 0
+        ):
             dummy = self.linopy_model.add_variables(
                 lower=xr.DataArray([0.0], dims=["__dummy_dim"]),
                 upper=xr.DataArray([0.0], dims=["__dummy_dim"]),
@@ -662,6 +673,7 @@ class _OptimizationProblemBuilder:
             linopy_vars_by_component=self.linopy_vars_by_component,
             param_arrays=self.param_arrays,
             objective_constant=objective_constant,
+            scenario_ids=self.scenario_ids,
         )
 
     # ------------------------------------------------------------------

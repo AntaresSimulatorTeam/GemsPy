@@ -13,7 +13,14 @@ from typing import Set
 
 import pytest
 
-from gems_craft.expression import ExpressionNode, literal, param, print_expr, var
+from gems_craft.expression import (
+    ExpressionNode,
+    literal,
+    param,
+    print_expr,
+    relative_time,
+    var,
+)
 from gems_craft.expression.equality import expressions_equal
 from gems_craft.expression.expression import (
     DualNode,
@@ -101,6 +108,30 @@ from gems_craft.expression.parsing.parse_expression import (
             {},
             "sum(t..t+5, x)",
             var("x").time_sum(literal(0), literal(5)),
+        ),
+        (
+            {"x"},
+            {},
+            "sum(0 .. 2, x)",
+            var("x").time_sum_between(literal(0), literal(2)),
+        ),
+        (
+            {"x"},
+            {},
+            "sum(0 .. t, x)",
+            var("x").time_sum_between(literal(0), relative_time(literal(0))),
+        ),
+        (
+            {"x"},
+            {"p"},
+            "sum(t - 1 .. p, x)",
+            var("x").time_sum_between(relative_time(-literal(1)), param("p")),
+        ),
+        (
+            {"x"},
+            {"p", "d"},
+            "sum(p .. d + 1, x)",
+            var("x").time_sum_between(param("p"), param("d") + literal(1)),
         ),
         ({"x"}, {}, "x[t]", var("x")),
         ({"x"}, {"p"}, "x[t+p]", var("x").shift(param("p"))),
@@ -437,9 +468,9 @@ def test_parsing_equivalent_index_forms(lhs: str, rhs: str) -> None:
         ("x[2*fuel+1]", "'fuel' is a set"),
         ("x[fuel=2, fuel+1]", "indexed more than once"),
         ("x[nonexistent=2]", "neither 't' nor a declared set"),
-        ("sum(fuel-p..fuel, x)", "must start with 't'"),
-        ("sum(t-p..fuel, x)", "must start with 't'"),
-        ("sum(foo..t, x)", "must start with 't'"),
+        ("sum(fuel-p..fuel, x)", "'fuel' is a set"),
+        ("sum(t-p..fuel, x)", "'fuel' is a set"),
+        ("sum(foo..t, x)", "foo is not a valid variable or parameter"),
         ("sum_over(other, x)", "'other' is not a declared set"),
         ("sum_over(p, x)", "'p' is not a declared set"),
         ("x[p=2]", "neither 't' nor a declared set"),
@@ -483,6 +514,7 @@ def test_model_identifiers_reject_ambiguous_sets(
         "x[2*t]",
         "x[t 4]",
         "x[t<=2]",
+        "sum(2*t .. t, x)",
     ],
 )
 def test_parse_cancellation_should_throw(expression_str: str) -> None:

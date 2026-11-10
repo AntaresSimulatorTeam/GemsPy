@@ -95,6 +95,10 @@ class ExprVisitor(ParseTreeVisitor):
     def visitPositionTerm(self, ctx: ExprParser.PositionTermContext):
         return self.visitChildren(ctx)
 
+    # Visit a parse tree produced by ExprParser#sum_bound.
+    def visitSum_bound(self, ctx: ExprParser.Sum_boundContext):
+        return self.visitChildren(ctx)
+
     # Visit a parse tree produced by ExprParser#number.
     def visitNumber(self, ctx: ExprParser.NumberContext):
         return self.visitChildren(ctx)

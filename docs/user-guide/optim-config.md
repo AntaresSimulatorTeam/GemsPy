@@ -82,6 +82,8 @@ models:
 | `last-time-step` | int | `0` | Last timestep index (0-based, inclusive) |
 
 The total number of timesteps solved is `last-time-step − first-time-step + 1`.
+`first-time-step` must not be greater than `last-time-step`; such a
+configuration is rejected when `optim-config.yml` is loaded.
 
 ---
 
@@ -90,9 +92,8 @@ The total number of timesteps solved is `last-time-step − first-time-step + 1`
 Selects which Monte-Carlo scenarios to simulate.  Indices are **0-based**,
 consistent with the `modeler-scenariobuilder.dat` file convention.
 
-The base scenario set is defined by exactly one of two mutually exclusive
-keys: `include` (inline) or `playlist-file` (from a JSON file).  `exclude`
-is optional and applies to **either** form.
+The base scenario set is defined inline with `include`. `exclude` is optional
+and removes scenarios from the included set.
 
 ### Inline form (`include` / `exclude`)
 
@@ -139,63 +140,19 @@ scenario-scope:
 - Overlapping entries in `include` are deduplicated automatically.
 - Excludes that do not appear in the base set produce a warning and have no effect.
 - Output is always sorted in ascending order.
-- `exclude` cannot be used without `include` or `playlist-file`.
+- `exclude` cannot be used without `include`.
+- A scope that selects no scenario (e.g. everything excluded) is rejected
+  before anything is solved.
 
 **Default behaviour** (no `scenario-scope` key at all, or an empty block):
 runs scenario 0 only.
 
----
-
-### Playlist-file form (`playlist-file`)
-
-Point to a JSON file containing a flat array of 0-based integer scenario
-indices.  Useful when the list of scenarios is generated programmatically or
-is too large to embed in YAML.
-
-| Key | Type | Description |
-|---|---|---|
-| `playlist-file` | path | Path to a JSON playlist (relative to `optim-config.yml`) |
-
-~~~ yaml
-scenario-scope:
-  playlist-file: mc_playlist.json   # resolved relative to optim-config.yml
-~~~
-
-The referenced file must contain a flat JSON array of non-negative integers:
-
-~~~ json
-[0, 2, 4, 6, 8, 10, 12]
-~~~
-
-`exclude` can be combined with `playlist-file` to subtract specific scenarios
-at run time without modifying the file:
-
-~~~ yaml
-scenario-scope:
-  playlist-file: mc_playlist.json
-  exclude:
-    - 4
-    - "8-10"
-~~~
-
-GemsPy reads and validates the playlist eagerly when `load_optim_config()` is
-called, so any I/O or format errors surface immediately at load time.
-
-**Rules:**
-
-- The file must be a flat JSON array of integers (no booleans, strings, or objects).
-- All indices must be ≥ 0.
-- Duplicates are silently removed; the result is sorted ascending.
-- `include` and `playlist-file` are mutually exclusive.
-
----
-
 ### ScenarioBuilder cross-validation
 
 If a [scenario builder](scenario-builder.md) file is present,
-`validate_optim_config()` checks that every scenario index in the playlist is
-defined for every scenario group.  Out-of-bounds indices raise a `ValueError`
-listing the affected groups.
+`validate_optim_config()` checks that every selected scenario index is defined
+for every scenario group. Out-of-bounds indices raise a `ValueError` listing
+the affected groups.
 
 ---
 
@@ -379,6 +336,11 @@ models:
           mode: drop   # do not enforce at t=0 where previous state is unknown
 ~~~
 
+`drop` only applies to time indices relative to `t`. An absolute time index,
+as in `x[N]` or in a time sum bound without `t`, always wraps around the block,
+whatever the mode: in a block of 168 time steps, `sum(-1 .. 1, x)` sums the
+time steps 167, 0 and 1.
+
 ### `model-decomposition`
 
 The `model-decomposition` block assigns individual model elements to the master
@@ -493,20 +455,51 @@ models:
             type: variable-lower-bound
 ~~~
 
-Two heuristics are built in, each expecting a fixed set of
-`heuristic-element` names:
-
-| Heuristic | `inputs` elements | `outputs` elements |
-|---|---|---|
-| `fast` | `generation_power`, `cluster_max_generation`, `min_power_per_unit`, `max_power_per_unit`, `min_up_duration`, `min_down_duration` | `minimum_generation_power`, `maximum_generation_power` |
-| `accurate` | `num_units_on_opt`, `num_units_max`, `min_up_duration`, `min_down_duration` | `minimum_num_units_on` |
-
 !!! note
     The `heuristic` strategy triggers an automatic second solve in
     `SimulationSession` and is incompatible with `resolution.mode:
     benders-decomposition`. `validate_optim_config()` checks both the
     `heuristic-id` ↔ `heuristics` consistency and that every bound `id` exists
     on the model with the expected time-dependence.
+
+#### Available heuristics
+
+Two heuristics are available. Both derive, from the first solve, a commitment
+of the thermal units that respects the minimum up and down durations. Each one
+expects a fixed set of `heuristic-element` names, listed below; `inputs` and
+`outputs` must list exactly these elements.
+
+**`accurate`** computes the minimum number of units on at each time step by
+solving a small linear problem: it starts from the solved number of units on,
+rounded up, and enforces the minimum up and down durations.
+
+| Element | Direction | Time-dependent | Meaning |
+|---|---|---|---|
+| `num_units_on_opt` | input | Yes | Number of units on in the first solve |
+| `num_units_max` | input | Either | Maximum number of units on |
+| `min_up_duration` | input | No | Minimum up duration, in time steps |
+| `min_down_duration` | input | No | Minimum down duration, in time steps |
+| `minimum_num_units_on` | output | Yes | Minimum number of units on |
+
+**`fast`** computes the number of units needed at each time step from the
+solved generation and the maximum generation of one unit. It groups the time
+steps into windows as long as the longer of the minimum up and down durations,
+and keeps each window's largest number of units. The minimum and maximum
+generation are that number of units times the minimum and maximum generation
+of one unit, capped by the maximum generation of the cluster.
+
+| Element | Direction | Time-dependent | Meaning |
+|---|---|---|---|
+| `generation_power` | input | Yes | Generation in the first solve |
+| `cluster_max_generation` | input | Either | Maximum generation of the cluster |
+| `min_power_per_unit` | input | No | Minimum generation of one unit |
+| `max_power_per_unit` | input | No | Maximum generation of one unit |
+| `min_up_duration` | input | No | Minimum up duration, in time steps |
+| `min_down_duration` | input | No | Minimum down duration, in time steps |
+| `minimum_generation_power` | output | Yes | Minimum generation |
+| `maximum_generation_power` | output | Yes | Maximum generation |
+
+"Either" accepts a time-dependent or a constant element.
 
 ---
 
@@ -538,12 +531,6 @@ config = OptimConfig(
         mode=ResolutionMode.SEQUENTIAL_SUBPROBLEMS,
         block_length=168,
     ),
-)
-
-# Build programmatically — playlist-file form
-config_pf = OptimConfig(
-    time_scope=TimeScopeConfig(first_time_step=0, last_time_step=8759),
-    scenario_scope=ScenarioScopeConfig(playlist_file=Path("mc_playlist.json")),
 )
 
 # Pass to SimulationSession
