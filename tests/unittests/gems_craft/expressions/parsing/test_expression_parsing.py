@@ -51,12 +51,6 @@ from gems_craft.expression.parsing.parse_expression import (
             "1 + 2 * x = p",
             literal(1) + 2 * var("x") == param("p"),
         ),
-        (
-            {},
-            {},
-            "port.f <= 0",
-            port_field("port", "f") <= 0,
-        ),
         ({"x"}, {}, "sum(x)", var("x").time_sum()),
         ({"x"}, {}, "x[-1]", var("x").eval(-literal(1))),
         ({"x"}, {}, "x[1]", var("x").eval(1)),
@@ -77,7 +71,7 @@ from gems_craft.expression.parsing.parse_expression import (
             {"x"},
             {"d"},
             "x[t-2*d+1]",
-            var("x").shift(-literal(2) * param("d") + literal(1)),
+            var("x").shift(-(literal(2) * param("d")) + literal(1)),
         ),
         (
             {"x"},
@@ -149,8 +143,7 @@ from gems_craft.expression.parsing.parse_expression import (
             {"x"},
             {"p", "q"},
             "x[p - q*2]",
-            # leading signs bind first in a shift expression: p + (-q)*2
-            var("x").eval(param("p") + (-param("q")) * 2),
+            var("x").eval(param("p") - param("q") * 2),
         ),
         ({}, {}, "sum_connections(port.f)", port_field("port", "f").sum_connections()),
         (
@@ -281,6 +274,29 @@ from gems_craft.expression.parsing.parse_expression import (
             {},
             "(x + y)[1]",
             (var("x") + var("y")).eval(literal(1)),
+        ),
+        (
+            {"x"},
+            {"d"},
+            "x[t - ceil(d/2)]",
+            var("x").shift(-(param("d") / literal(2)).ceil()),
+        ),
+        (
+            {"x"},
+            {"d"},
+            "x[t + max(1, d)]",
+            var("x").shift(maximum(literal(1), param("d"))),
+        ),
+        ({"x"}, {"p"}, "x[ceil(p)]", var("x").eval(param("p").ceil())),
+        ({"x"}, {"p"}, "x[t - p[0]]", var("x").shift(-param("p").eval(literal(0)))),
+        ({"x"}, {"p"}, "x[p[t]]", var("x").eval(param("p"))),
+        ({"x"}, {"p"}, "x[p[t-1]]", var("x").eval(param("p").shift(-literal(1)))),
+        ({"x"}, {"p"}, "x[t + p[t]]", var("x").shift(param("p"))),
+        (
+            {"x"},
+            {"p"},
+            "sum(floor(p) .. p + 1, x)",
+            var("x").time_sum_between(param("p").floor(), param("p") + literal(1)),
         ),
     ],
 )
@@ -474,7 +490,8 @@ def test_parsing_equivalent_index_forms(lhs: str, rhs: str) -> None:
         ("sum_over(other, x)", "'other' is not a declared set"),
         ("sum_over(p, x)", "'p' is not a declared set"),
         ("x[p=2]", "neither 't' nor a declared set"),
-        ("x[fuel>=2]", "'fuel' is a set"),
+        # comparisons are not allowed in an index: syntax error
+        ("x[fuel>=2]", "ParseCancellationException"),
     ],
 )
 def test_parsing_custom_set_indexing_raises(expression_str: str, match: str) -> None:
@@ -515,6 +532,17 @@ def test_model_identifiers_reject_ambiguous_sets(
         "x[t 4]",
         "x[t<=2]",
         "sum(2*t .. t, x)",
+        "x[t + (p.f)]",
+        "x[t + (sum(x))]",
+        "x[t + (x = 1)]",
+        "x[p.f]",
+        "x[t + -1]",
+        "x[2 * -1]",
+        "x[--1]",
+        "sum(t - -1 .. t, x)",
+        "x.f <= 0",
+        "x[t + sum_connections(p.f)]",
+        "x[t + (p + 1)[t-1]]",
     ],
 )
 def test_parse_cancellation_should_throw(expression_str: str) -> None:
@@ -529,3 +557,28 @@ def test_parse_cancellation_should_throw(expression_str: str) -> None:
         match=r"An error occurred during parsing: ParseCancellationException",
     ):
         parse_expression(expression_str, identifiers)
+
+
+@pytest.mark.parametrize(
+    "expression_str",
+    [
+        "x[t + (y)]",
+        "x[t - y]",
+        "x[y]",
+        "sum(y .. 2, x)",
+        "x[t + max(1, y)]",
+        "x[y[0]]",
+        "sum(y[1] .. 2, x)",
+        "x[t - (y[t-1])]",
+    ],
+)
+def test_variable_in_time_expression_should_throw(expression_str: str) -> None:
+    identifiers = ModelIdentifiers(variables={"x", "y"}, parameters=set())
+    with pytest.raises(ParsingException, match="Variable 'y' is not allowed"):
+        parse_expression(expression_str, identifiers)
+
+
+def test_dual_in_time_shift_should_throw() -> None:
+    identifiers = ModelIdentifiers(variables={"x"}, parameters=set(), constraints={"c"})
+    with pytest.raises(ParsingException, match="Function dual is not allowed"):
+        parse_expression("x[t + (dual(c))]", identifiers)

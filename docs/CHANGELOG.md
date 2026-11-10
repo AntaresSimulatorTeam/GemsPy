@@ -4,17 +4,42 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Expression language**
+  - Time shifts accept functions without parentheses (e.g. `x[t - ceil(d / 2)]`).
+  - A time index or time shift may be given by a parameter varying in time,
+    per component or per scenario (e.g. `x[d[t]]`, `x[d[t-1]]`, `x[t + k[t]]`).
+
 ### Changed
 - `ComponentView` and `OutputView` are renamed `ComponentResults` and
   `OutputResults`, so that they are not confused with GEMS views. The calls
   `component(...).output(...)`, `value()` and `data` are unchanged.
-- **Breaking** - the legacy `X[param ± …]` index is now parsed as a shift
-  expression, where a leading sign binds first: `x[p - q*2]` parses to
-  `p + (-q)*2` instead of `p - (q*2)`. Same value, but a structurally different
-  AST.
 - **Breaking** - `x[p = 2]` (where `p` is neither `t` nor a set) now raises a
   parsing error instead of being accepted as a time index and failing later,
   when the problem is built.
+- **Breaking** - time shifts, time indices and time sum bounds only accept
+  numbers, parameters, `+ - * /`, parentheses and the functions `floor`,
+  `ceil`, `round`, `abs`, `max`, `min`, `expec`. Variables, port fields, sums
+  and comparisons are rejected when the library is parsed. A unary minus must
+  start the expression or a parenthesis: write `x[a * (-1)]`, not `x[a * -1]`.
+- **Breaking** - a port field outside `sum_connections` (e.g. `p.f <= 0`) is a
+  syntax error.
+- **Breaking** - **`drop` out-of-bounds mode** skips a constraint where it
+  reads a variable outside the block, through a time shift, a time index or a
+  time sum; parameters are read modulo the block, as in `cyclic`. So `x[200]`,
+  `x[d]` and `sum(-1 .. 1, x)` are now skipped where they read `x` outside the
+  block, instead of wrapping around it, and `p[t-1]` no longer skips the
+  constraint at `t = 0`. Port fields are never checked.
+
+### Fixed
+- `x[d]` with `d` varying in time, per component or per scenario read `x` at
+  the first value of `d` only.
+- In `drop` mode, a time shift or index of a shifted expression (e.g.
+  `(x[t-1])[0]`) skipped the constraint at the wrong time steps.
+- In `drop` mode, a bound without a component dimension was masked differently
+  from the other side of the constraint.
+- A non-integer time sum bound given by a parameter was truncated. It now
+  raises an error.
 
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
