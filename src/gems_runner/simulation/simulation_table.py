@@ -1,12 +1,14 @@
+import functools
+import warnings
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import (
     Any,
     Callable,
     Dict,
+    Iterable,
+    Iterator,
     List,
-    Literal,
     Optional,
     Sequence,
     Tuple,
@@ -16,101 +18,237 @@ from typing import (
 
 import numpy as np
 import pandas as pd
+import pyarrow.dataset as ds
 import xarray as xr
 
+from gems_craft.study.parsing import OutputFormat
+from gems_runner.simulation.table_folder import _FolderStore, _Manifest, _TableWriter
+
+# The schema names are also re-exported from here, where they used to live.
+from gems_runner.simulation.table_schema import (
+    _BLOCK,
+    _SCENARIO,
+    _SET_INDEX,
+    _TIME,
+    _VALUE,
+    OBJECTIVE_VALUE_OUTPUT,
+    PARQUET_COMPRESSION,
+    PARQUET_COMPRESSION_LEVEL,
+    PARQUET_ROW_GROUP_SIZE,
+    SIMULATION_TABLE_DTYPES,
+    SIMULATION_TABLE_SCHEMA,
+    SimulationColumns,
+    _apply_schema,
+    _empty_frame,
+    _equals,
+    _same_key,
+    _with_schema,
+)
+from gems_runner.simulation.table_store import _MemoryStore, _RowFilter, _TableStore
+
 _BASE_DIMS = ("component", "time", "scenario")
-PARQUET_COMPRESSION: Literal["zstd"] = "zstd"
-PARQUET_COMPRESSION_LEVEL = 3
-PARQUET_ROW_GROUP_SIZE = 64_000
+_RESULT_COLUMNS = [_BLOCK, _TIME, _SCENARIO, _SET_INDEX, _VALUE]
 
 
-class OutputView:
-    """A Time × Scenario pivot for one (component, output) combination.
+def _filter_values(values: Optional[Sequence[Any]]) -> Optional[frozenset]:
+    if values is None:
+        return None
+    # A single name, not the set of its characters.
+    if isinstance(values, str):
+        return frozenset({values})
+    return frozenset(values)
+
+
+class OutputResults:
+    """Time × Scenario values of one (component, output).
 
     Obtain via ``SimulationTable.component(...).output(...)``.
+
+    - Rows are read from the table's storage on first access, then kept. On a
+      table stored on disk, ``value(scenario_index=s)`` before any other access
+      reads only the rows of scenario ``s`` and the rows shared by all
+      scenarios.
+    - An output without a time (or scenario) dimension has a single row (or
+      column), labelled ``<NA>``, and ``value()`` accepts any index for that
+      dimension.
+    - Several blocks can hold a value for the same (time, scenario):
+      overlapping sequential blocks, or the per-block rows of an output without
+      a time dimension. A call whose requested values include such a
+      (time, scenario) raises unless ``block=`` says which block to read.
     """
 
-    def __init__(self, df: pd.DataFrame) -> None:
-        # df: index = absolute_time_index, columns = scenario_index
-        self._df = df
+    def __init__(
+        self,
+        store: _TableStore,
+        row_filter: _RowFilter,
+        name: str,
+        block: Optional[int] = None,
+    ) -> None:
+        self._store = store
+        self._filter = row_filter
+        self._name = name
+        self._block = block
+        self._scenario_rows: Dict[int, pd.DataFrame] = {}
+
+    @functools.cached_property
+    def _rows(self) -> pd.DataFrame:
+        """All rows of the output, long format, one row per (block, time, scenario)."""
+        return self._store.read(self._filter)[_RESULT_COLUMNS]
+
+    def _rows_for(self, scenario_index: Optional[int]) -> pd.DataFrame:
+        """The rows needed for *scenario_index*: all rows if already read,
+        otherwise the rows of that scenario and the shared ones, kept per
+        scenario.
+
+        Reading one scenario only saves work when the table is stored on disk
+        (one file per scenario): in memory, each read starts from all the rows
+        of the component, so all the rows of the output are read once instead."""
+        if (
+            scenario_index is None
+            or self._store.path is None
+            or "_rows" in self.__dict__
+        ):
+            return self._rows
+        if scenario_index not in self._scenario_rows:
+            narrowed = self._filter.narrow(scenarios=frozenset({scenario_index}))
+            self._scenario_rows[scenario_index] = self._store.read(narrowed)[
+                _RESULT_COLUMNS
+            ]
+        return self._scenario_rows[scenario_index]
 
     @property
     def data(self) -> pd.DataFrame:
-        """Return the underlying Time × Scenario DataFrame (Time × (Scenario, set_index) if set-indexed)."""
-        return self._df
+        """Return the Time × Scenario DataFrame (Time × (Scenario, set_index)
+        if set-indexed).
+
+        Raises ``ValueError`` if a (time, scenario) has values from several
+        blocks: select one with ``output(name, block=...)``.
+        """
+        return self._frame(self._select(self._rows, None, None, self._block))
 
     def value(
         self,
         time_index: Optional[int] = None,
         scenario_index: Optional[int] = None,
+        block: Optional[int] = None,
     ) -> Union[pd.DataFrame, "pd.Series[Any]", float]:
         """Return results filtered by time and/or scenario index.
 
-        Called with no arguments returns the full Time × Scenario DataFrame.
-        Called with one argument returns a ``pd.Series``:
+        Called with no index returns the full Time × Scenario DataFrame.
+        Called with one index returns a ``pd.Series``:
         - ``value(scenario_index=s)`` → Series indexed by absolute_time_index
         - ``value(time_index=t)``     → Series indexed by scenario_index
-        Called with both arguments returns a scalar ``float``.
+        Called with both indices returns a scalar ``float``.
         For a set-indexed output the columns are a (scenario_index, set_index)
         MultiIndex: the results are DataFrames/Series keyed by ``set_index`` instead.
+
+        An index of a dimension the output does not have is accepted and
+        ignored. ``block`` selects the block, and is required when a requested
+        (time, scenario) has values from several blocks.
         """
+        rows = self._select(
+            self._rows_for(scenario_index),
+            time_index,
+            scenario_index,
+            self._block if block is None else block,
+        )
         if time_index is None and scenario_index is None:
-            return self._df
+            return self._frame(rows)
+        if rows.empty:
+            raise KeyError(
+                f"{self._name}: no value for time_index={time_index}, "
+                f"scenario_index={scenario_index}"
+            )
         if time_index is not None and scenario_index is not None:
-            res = self._df.loc[time_index, scenario_index]
-            # Series over set_index for a set-indexed output
-            return res if isinstance(res, pd.Series) else float(cast(Any, res))
+            if self._is_set_indexed(rows):  # Series over set_index
+                return rows.set_index(_SET_INDEX)[_VALUE].sort_index()
+            return float(rows[_VALUE].iloc[0])
+        frame = self._frame(rows)
         if time_index is not None:
-            return self._df.loc[time_index]  # Series over scenarios
-        return self._df[scenario_index]  # Series over time
+            return frame.iloc[0]  # Series over scenarios
+        if self._is_set_indexed(rows):  # Time × set_index
+            return frame.droplevel(_SCENARIO, axis=1)
+        return frame.iloc[:, 0]  # Series over time
+
+    @staticmethod
+    def _is_set_indexed(rows: pd.DataFrame) -> bool:
+        return bool(rows[_SET_INDEX].notna().any())
+
+    def _select(
+        self,
+        rows: pd.DataFrame,
+        time_index: Optional[int],
+        scenario_index: Optional[int],
+        block: Optional[int],
+    ) -> pd.DataFrame:
+        """Rows matching the request; raises if a (time, scenario) of the
+        result has values from several blocks."""
+        time_missing = bool(rows[_TIME].isna().all())
+        scenario_missing = bool(rows[_SCENARIO].isna().all())
+        if block is not None:
+            rows = rows[_equals(rows[_BLOCK], block)]
+        if time_index is not None and not time_missing:
+            rows = rows[_equals(rows[_TIME], time_index)]
+        if scenario_index is not None and not scenario_missing:
+            rows = rows[_equals(rows[_SCENARIO], scenario_index)]
+
+        shared = rows[
+            rows.duplicated(subset=[_TIME, _SCENARIO, _SET_INDEX], keep=False)
+        ]
+        if not shared.empty:
+            time, scenario = shared[_TIME].iloc[0], shared[_SCENARIO].iloc[0]
+            same_key = _same_key(shared[_TIME], time) & _same_key(
+                shared[_SCENARIO], scenario
+            )
+            blocks = sorted(int(b) for b in shared[same_key][_BLOCK].unique())
+            raise ValueError(
+                f"{self._name}: absolute_time_index={time}, "
+                f"scenario_index={scenario} has values from blocks {blocks}; "
+                "pass block= to choose one"
+            )
+        return rows
+
+    @classmethod
+    def _frame(cls, rows: pd.DataFrame) -> pd.DataFrame:
+        columns = [_SCENARIO, _SET_INDEX] if cls._is_set_indexed(rows) else _SCENARIO
+        frame = rows.pivot(index=_TIME, columns=columns, values=_VALUE)
+        return frame.sort_index(axis=0).sort_index(axis=1)
 
     def __repr__(self) -> str:
-        return repr(self._df)
+        return repr(self._rows)
 
 
-class ComponentView:
-    """Filtered view of simulation results for one component.
+class ComponentResults:
+    """Simulation results of one component.
 
-    Obtain via ``SimulationTable.component(...)``.
+    Obtain via ``SimulationTable.component(...)``. It reads nothing itself: its
+    outputs read their rows when accessed.
     """
 
-    def __init__(self, df: pd.DataFrame) -> None:
-        self._df = df
+    def __init__(
+        self, store: _TableStore, row_filter: _RowFilter, component_id: str
+    ) -> None:
+        self._store = store
+        self._filter = row_filter
+        self._component_id = component_id
 
-    def output(self, output_id: str) -> OutputView:
-        """Return an OutputView for the given output name.
+    def output(self, output_id: str, block: Optional[int] = None) -> OutputResults:
+        """Return the results of the given output.
 
-        For a set-indexed output, the columns are a (scenario_index, set_index)
-        MultiIndex.
+        ``block`` restricts them to one block, for outputs that have values
+        from several blocks for the same (time, scenario). For a set-indexed
+        output, the columns are a (scenario_index, set_index) MultiIndex.
         """
-        col_output = SimulationColumns.OUTPUT.value
-        col_time = SimulationColumns.ABSOLUTE_TIME_INDEX.value
-        col_scenario = SimulationColumns.SCENARIO_INDEX.value
-        col_value = SimulationColumns.VALUE.value
-
-        col_set = SimulationColumns.SET_INDEX.value
-
-        filtered = self._df[self._df[col_output] == output_id].copy()
-        # Dimension-independent outputs store None for the missing index.
-        # Fill with 0 so the pivot is always well-formed and the accessor
-        # API (value(time_index=t, scenario_index=s)) keeps working.
-        filtered[col_time] = filtered[col_time].fillna(0)
-        filtered[col_scenario] = filtered[col_scenario].fillna(0)
-        columns = (
-            [col_scenario, col_set] if filtered[col_set].notna().any() else col_scenario
+        return OutputResults(
+            self._store,
+            self._filter.narrow(outputs=frozenset({output_id})),
+            name=f"{self._component_id}.{output_id}",
+            block=block,
         )
-        pivot = filtered.pivot_table(
-            index=col_time,
-            columns=columns,
-            values=col_value,
-            aggfunc="first",
-        )
-        pivot.index.name = col_time
-        return OutputView(pivot)
 
 
 class SimulationTable:
-    """Wrapper around the raw simulation results DataFrame.
+    """The results of a simulation run, over all its scenarios.
 
     Provides a fluent accessor API::
 
@@ -128,35 +266,192 @@ class SimulationTable:
         # Scenario distribution at time step 3
         st.component("gen_1").output("p").value(time_index=3)
 
-    The underlying long-format DataFrame is accessible via the ``data`` property.
+    The rows are read through a storage: in memory (``SimulationTable(df)``),
+    or a folder on disk (``SimulationTable.open(path)``), with the same API. The
+    long-format DataFrame is accessible via the ``data`` property (in memory
+    only), and parts of it via ``to_pandas()``, ``iter_scenario_frames()`` and
+    ``scan()``.
     """
 
-    def __init__(self, df: pd.DataFrame, table_id: str = "") -> None:
-        self._df = df
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        table_id: str = "",
+        scenarios: Optional[Sequence[int]] = None,
+    ) -> None:
+        """*scenarios* are the scenarios of the run, when known: they are kept
+        even if no row names them, and a ``ValueError`` is raised if a row has
+        another scenario, or if a scenario has no rows while others do. Without
+        them, the scenarios are those of the rows."""
+        self._store: _TableStore = _MemoryStore(df, table_id, scenarios)
         self.table_id = table_id
+
+    @classmethod
+    def _from_store(cls, store: _TableStore) -> "SimulationTable":
+        table = cls.__new__(cls)
+        table._store = store
+        table.table_id = store.table_id
+        return table
+
+    @classmethod
+    def open(cls, path: Path) -> "SimulationTable":
+        """Open a simulation table folder written by ``save()`` or by a run.
+
+        Raises ``FileNotFoundError`` for a folder without a manifest, e.g. an
+        interrupted run. Nothing else is read until rows are asked for.
+        """
+        # Absolute, so that the table still reads after a chdir or when it is
+        # unpickled in another working directory, and so that pyarrow never
+        # reads the path as a URI (a relative folder named "s3:x").
+        path = Path(path).resolve()
+        return cls._from_store(_FolderStore(path, _Manifest.read(path)))
+
+    def save(self, path: Path, format: OutputFormat = OutputFormat.PARQUET) -> Path:
+        """Write the table as a simulation table folder at *path*, from either
+        storage, and return *path*. *path* is created if missing and must be
+        empty otherwise. ``SimulationTable.open(path)`` reads it back. If the
+        write fails, the files written so far are removed, so it can be retried.
+        """
+        path = Path(path)
+        writer = _TableWriter(path, self.table_id, format)
+        try:
+            for scenario, rows in self._store.iter_scenario_frames(_RowFilter()):
+                if scenario is None:
+                    writer.write_common(rows)
+                else:  # also a scenario without rows, so that it stays listed
+                    writer.write_scenario(rows, scenario)
+            writer.finalize()
+        except BaseException:  # Ctrl-C too
+            writer.abort()
+            raise
+        return path
 
     @property
     def data(self) -> pd.DataFrame:
-        """Return the underlying long-format DataFrame."""
-        return self._df
+        """Return the underlying long-format DataFrame.
 
-    def component(self, component_id: str) -> ComponentView:
-        """Return a ComponentView filtered to the given component ID."""
-        mask = self._df[SimulationColumns.COMPONENT.value] == component_id
-        return ComponentView(self._df[mask])
+        Raises ``ValueError`` on a table stored on disk: use
+        ``to_pandas(load_all=True)``, the filters of ``to_pandas()``, or
+        ``iter_scenario_frames()``.
+        """
+        if self.path is not None:
+            raise ValueError(
+                f"This simulation table is stored on disk ({self.path}): .data "
+                "would load it entirely. Use to_pandas(load_all=True), "
+                "to_pandas() with filters, or iter_scenario_frames()."
+            )
+        return self._store.read(_RowFilter())
+
+    @property
+    def scenarios(self) -> List[int]:
+        """The scenarios of the run, sorted."""
+        return self._store.scenarios
+
+    @property
+    def path(self) -> Optional[Path]:
+        """Where the table is stored, None in memory."""
+        return self._store.path
+
+    def component(self, component_id: str) -> ComponentResults:
+        """Return the results of the given component."""
+        return ComponentResults(
+            self._store, _RowFilter(components=frozenset({component_id})), component_id
+        )
+
+    def objective_values(self) -> pd.DataFrame:
+        """Return the objective value of every solved problem, with columns
+        ``block``, ``scenario_index`` and ``value``.
+
+        Sequential/parallel modes give one row per block and scenario. Frontal
+        mode gives one row, whose ``scenario_index`` is empty when the run has
+        several scenarios.
+        """
+        rows = self._store.read(_RowFilter(outputs=frozenset({OBJECTIVE_VALUE_OUTPUT})))
+        return rows[[_BLOCK, _SCENARIO, _VALUE]].reset_index(drop=True)
+
+    def to_pandas(
+        self,
+        components: Optional[Sequence[str]] = None,
+        outputs: Optional[Sequence[str]] = None,
+        scenarios: Optional[Sequence[int]] = None,
+        load_all: bool = False,
+    ) -> pd.DataFrame:
+        """Return the rows of the given components, outputs and scenarios as a
+        new DataFrame, all rows by default.
+
+        A scenario filter keeps the rows shared by all scenarios (empty
+        ``scenario_index``), which hold the value of every scenario.
+
+        On a table stored on disk, loading all rows must be asked for with
+        ``load_all=True``; it has no effect on a table in memory.
+        """
+        row_filter = _RowFilter(
+            _filter_values(components),
+            _filter_values(outputs),
+            _filter_values(scenarios),
+        )
+        if row_filter.is_unrestricted and self.path is not None and not load_all:
+            raise ValueError(
+                f"This simulation table is stored on disk ({self.path}): "
+                "to_pandas() without filter would load it entirely. Pass "
+                "load_all=True, or filter by components, outputs or scenarios."
+            )
+        rows = self._store.read(row_filter)
+        # In memory, every row is the store's own frame: copy it. On disk, the
+        # rows are a new frame already.
+        if row_filter.is_unrestricted and self.path is None:
+            return rows.copy()
+        return rows
+
+    def iter_scenario_frames(
+        self,
+        components: Optional[Sequence[str]] = None,
+        outputs: Optional[Sequence[str]] = None,
+    ) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
+        """Yield the rows of the given components and outputs one scenario at
+        a time, as ``(scenario_index, DataFrame)``.
+
+        The rows shared by all scenarios come first, once, as ``(None, rows)``,
+        and only if there are any; then every scenario of the run, in order.
+        """
+        yield from self._store.iter_scenario_frames(
+            _RowFilter(_filter_values(components), _filter_values(outputs))
+        )
+
+    def scan(self) -> ds.Dataset:
+        """Return the whole table as a ``pyarrow.dataset.Dataset``, e.g. to read
+        it with polars or duckdb."""
+        return self._store.scan()
+
+    def _deprecated(self, name: str, replacement: str) -> None:
+        if self.path is not None:
+            raise TypeError(
+                f"{name}() is not available on a simulation table stored on disk: "
+                "use save() to write it elsewhere, or to_pandas() to read it."
+            )
+        warnings.warn(
+            f"SimulationTable.{name}() is deprecated and will be removed in a "
+            f"following release; use {replacement}.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
 
     def to_csv(self, output_dir: Path) -> Path:
+        """Deprecated: use ``save(path, OutputFormat.CSV)``."""
+        self._deprecated("to_csv", "save(path, OutputFormat.CSV)")
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         path = output_dir / f"simulation_table_{self.table_id}.csv"
-        self._df.to_csv(path, index=False)
+        self.data.to_csv(path, index=False)
         return path
 
     def to_parquet(self, output_dir: Path) -> Path:
+        """Deprecated: use ``save(path)``."""
+        self._deprecated("to_parquet", "save(path)")
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         path = output_dir / f"simulation_table_{self.table_id}.parquet"
-        self._df.to_parquet(
+        self.data.to_parquet(
             path,
             engine="pyarrow",
             index=False,
@@ -167,13 +462,20 @@ class SimulationTable:
         return path
 
     def to_netcdf(self, output_dir: Path) -> Path:
+        """Deprecated: build the xarray object from ``to_pandas()``."""
+        self._deprecated("to_netcdf", "to_pandas() to build an xarray object")
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         path = output_dir / f"simulation_table_{self.table_id}.nc"
-        self.to_dataset().to_netcdf(path)
+        self._to_dataset().to_netcdf(path)
         return path
 
     def to_dataset(self) -> xr.Dataset:
+        """Deprecated: build the xarray object from ``to_pandas()``."""
+        self._deprecated("to_dataset", "to_pandas() to build an xarray object")
+        return self._to_dataset()
+
+    def _to_dataset(self) -> xr.Dataset:
         """Return simulation results as an xr.Dataset.
 
         Each output variable becomes a DataArray with dimensions
@@ -183,7 +485,7 @@ class SimulationTable:
         Scalar rows without component/time/scenario (e.g. objective-value)
         are stored as zero-dimensional variables.
         """
-        df = self._df
+        df = self.data
         col_comp = SimulationColumns.COMPONENT.value
         col_out = SimulationColumns.OUTPUT.value
         col_time = SimulationColumns.ABSOLUTE_TIME_INDEX.value
@@ -194,6 +496,17 @@ class SimulationTable:
         col_set_idx = SimulationColumns.SET_INDEX.value
 
         main = df.dropna(subset=[col_comp, col_time, col_scen])
+        # xarray needs numpy dtypes; these columns have no empty cell left.
+        main = main.astype(
+            {
+                col_comp: object,
+                col_out: object,
+                col_time: "int64",
+                col_scen: "int64",
+                col_set_id: object,
+                col_set_idx: object,
+            }
+        )
         plain = main[main[col_set_id].isna()]
         indexed = plain.set_index([col_comp, col_time, col_scen, col_out])[col_val]
         unstacked = indexed.unstack(col_out)
@@ -218,17 +531,21 @@ from gems_runner.simulation.extra_output import VectorizedExtraOutputBuilder
 from gems_runner.simulation.optimization import OptimizationProblem, build_port_arrays
 
 
-class SimulationColumns(str, Enum):
-    BLOCK = "block"
-    COMPONENT = "component"
-    OUTPUT = "output"
-    ABSOLUTE_TIME_INDEX = "absolute_time_index"
-    BLOCK_TIME_INDEX = "block_time_index"
-    SCENARIO_INDEX = "scenario_index"
-    SET_ID = "set_id"
-    SET_INDEX = "set_index"
-    VALUE = "value"
-    BASIS_STATUS = "basis_status"
+def _tag_single_scenario(df: pd.DataFrame, scenario_id: int) -> pd.DataFrame:
+    """Tag every row of a problem solved for a single MC scenario with it.
+
+    This is always the case in sequential/parallel modes, and in frontal mode
+    with one scenario: every row belongs to that scenario, including
+    scenario-independent outputs and the objective value, whose empty scenario
+    index would wrongly mean "shared by all scenarios".
+    """
+    scenario_col = SimulationColumns.SCENARIO_INDEX.value
+    column = df[scenario_col]
+    # where() + infer_objects() gives an int64 column on every pandas version:
+    # fillna() downcasts with a FutureWarning on pandas 2.x, and no longer
+    # downcasts on pandas 3.
+    df[scenario_col] = column.where(column.notna(), scenario_id).infer_objects()
+    return df
 
 
 class SimulationTableBuilder:
@@ -246,41 +563,136 @@ class SimulationTableBuilder:
         scenario_ids_remap: Optional[List[int]] = None,
         table_id: str = "",
     ) -> SimulationTable:
-        block = problem.block.id
-        block_size = problem.block_length
+        return SimulationTable(
+            self._build_frame(problem, absolute_time_offset, scenario_ids_remap),
+            table_id=table_id,
+            scenarios=self._run_scenarios(problem, scenario_ids_remap),
+        )
 
+    @staticmethod
+    def _run_scenarios(
+        problem: OptimizationProblem, scenario_ids_remap: Optional[List[int]]
+    ) -> Optional[Sequence[int]]:
+        """The scenario labels of the rows: the remapped ids, or the positions."""
+        if scenario_ids_remap is not None:
+            return scenario_ids_remap
+        if problem.scenario_ids is not None:
+            return range(len(problem.scenario_ids))
+        return None
+
+    def _build_frame(
+        self,
+        problem: OptimizationProblem,
+        absolute_time_offset: Optional[int] = None,
+        scenario_ids_remap: Optional[List[int]] = None,
+    ) -> pd.DataFrame:
+        """All the rows of *problem*, with the schema's dtypes."""
+        block = problem.block.id
         if absolute_time_offset is None:
             # Use the first element of the block's absolute timestep list so that
             # the offset is correct for all modes, including blocks with overlap and
             # block ids that are not 1-based.
             absolute_time_offset = problem.block.timesteps[0]
 
-        dfs: list[pd.DataFrame] = []
-        dfs += self._collect_vars_outputs(
-            problem, block, absolute_time_offset, scenario_ids_remap
-        )
-        dfs += self._collect_extra_outputs(
-            problem, block, absolute_time_offset, scenario_ids_remap
-        )
+        set_elements = self._set_elements_lookup(problem)
+        dfs = [
+            self._da_to_df(
+                da,
+                name,
+                block,
+                absolute_time_offset,
+                None,
+                scenario_ids_remap,
+                set_elements,
+            )
+            for name, da in self._collect_output_arrays(problem)
+        ]
         dfs.append(self._collect_objective_value(problem, block))
 
-        return SimulationTable(pd.concat(dfs, ignore_index=True), table_id=table_id)
+        df = pd.concat(dfs, ignore_index=True)
+        scenario_ids = (
+            scenario_ids_remap
+            if scenario_ids_remap is not None
+            else problem.scenario_ids
+        )
+        if scenario_ids is not None and len(scenario_ids) == 1:
+            # Same label as the rows that have a scenario dimension: the
+            # remapped id, or the scenario position 0 without a remap.
+            label = scenario_ids_remap[0] if scenario_ids_remap is not None else 0
+            df = _tag_single_scenario(df, label)
+        return _apply_schema(df)
+
+    def _iter_scenario_frames(
+        self, problem: OptimizationProblem, scenario_ids_remap: List[int]
+    ) -> Iterator[Tuple[Optional[int], pd.DataFrame]]:
+        """Yield the rows of *problem* one scenario at a time, so that no table
+        holding all scenarios is built.
+
+        With several scenarios, the rows shared by all of them (outputs without
+        a scenario dimension and the objective value) come first, as
+        ``(None, rows)``; then ``(scenario, rows)`` for every scenario, even one
+        without rows of its own. With a single scenario, every row belongs to
+        it: one frame is yielded, as built by ``_build_frame()``.
+        """
+        if len(scenario_ids_remap) == 1:
+            yield scenario_ids_remap[0], self._build_frame(
+                problem, scenario_ids_remap=scenario_ids_remap
+            )
+            return
+
+        block = problem.block.id
+        offset = problem.block.timesteps[0]
+        arrays = self._collect_output_arrays(problem)
+        set_elements = self._set_elements_lookup(problem)
+
+        shared = [
+            self._da_to_df(da, name, block, offset, None, set_elements=set_elements)
+            for name, da in arrays
+            if "scenario" not in da.dims
+        ]
+        shared.append(self._collect_objective_value(problem, block))
+        yield None, _apply_schema(pd.concat(shared, ignore_index=True))
+
+        for position, scenario in enumerate(scenario_ids_remap):
+            frames = [
+                self._da_to_df(
+                    da.isel(scenario=[position]),
+                    name,
+                    block,
+                    offset,
+                    None,
+                    [scenario],
+                    set_elements,
+                )
+                for name, da in arrays
+                if "scenario" in da.dims
+            ]
+            rows = _concat_frames(frames)
+            del frames  # the pieces are not held while the next scenario is built
+            yield scenario, rows
+            del rows
+
+    def _collect_output_arrays(
+        self, problem: OptimizationProblem
+    ) -> List[Tuple[str, xr.DataArray]]:
+        """(output name, array) for every variable, then every extra output, in
+        table row order. Arrays keep their component, time and scenario
+        dimensions; ``_da_to_df`` turns them into rows."""
+        return self._collect_vars_outputs(problem) + self._collect_extra_outputs(
+            problem
+        )
 
     # -------------------------------------------------------------------------
     # Solver outputs
     # -------------------------------------------------------------------------
 
     def _collect_vars_outputs(
-        self,
-        problem: OptimizationProblem,
-        block: int,
-        abs_offset: int,
-        scenario_ids_remap: Optional[List[int]] = None,
-    ) -> list[pd.DataFrame]:
-        dfs: list[pd.DataFrame] = []
+        self, problem: OptimizationProblem
+    ) -> List[Tuple[str, xr.DataArray]]:
+        arrays: List[Tuple[str, xr.DataArray]] = []
         solution = problem.linopy_model.solution
         if solution is None:
-            return dfs
+            return arrays
 
         for (mk, var_name), lv in problem._linopy_vars.items():
             sol_da = problem.get_variable_solution(mk, var_name)
@@ -288,21 +700,9 @@ class SimulationTableBuilder:
                 continue
 
             own_components = list(lv.coords["component"].values)
-            sol_da = sol_da.sel(component=own_components)
+            arrays.append((var_name, sol_da.sel(component=own_components)))
 
-            dfs.append(
-                self._da_to_df(
-                    sol_da,
-                    var_name,
-                    block,
-                    abs_offset,
-                    basis_status=None,
-                    scenario_ids_remap=scenario_ids_remap,
-                    set_elements=self._set_elements_lookup(problem),
-                )
-            )
-
-        return dfs
+        return arrays
 
     @staticmethod
     def _set_elements_lookup(
@@ -325,13 +725,9 @@ class SimulationTableBuilder:
     # -------------------------------------------------------------------------
 
     def _collect_extra_outputs(
-        self,
-        problem: OptimizationProblem,
-        block: int,
-        abs_offset: int,
-        scenario_ids_remap: Optional[List[int]] = None,
-    ) -> list[pd.DataFrame]:
-        dfs: list[pd.DataFrame] = []
+        self, problem: OptimizationProblem
+    ) -> List[Tuple[str, xr.DataArray]]:
+        arrays: List[Tuple[str, xr.DataArray]] = []
 
         var_solution_arrays: Dict[Tuple[str, str], xr.DataArray] = {}
         if problem.linopy_model.solution is not None:
@@ -394,19 +790,9 @@ class SimulationTableBuilder:
                     ]
                     result_da = result_da.sel(component=present)
 
-                dfs.append(
-                    self._da_to_df(
-                        result_da,
-                        out_id,
-                        block,
-                        abs_offset,
-                        basis_status=None,
-                        scenario_ids_remap=scenario_ids_remap,
-                        set_elements=self._set_elements_lookup(problem),
-                    )
-                )
+                arrays.append((out_id, result_da))
 
-        return dfs
+        return arrays
 
     # -------------------------------------------------------------------------
     # Dual / reduced-cost arrays (helpers for _collect_extra_outputs)
@@ -523,7 +909,7 @@ class SimulationTableBuilder:
                 {
                     SimulationColumns.BLOCK.value: block,
                     SimulationColumns.COMPONENT.value: None,
-                    SimulationColumns.OUTPUT.value: "objective-value",
+                    SimulationColumns.OUTPUT.value: OBJECTIVE_VALUE_OUTPUT,
                     SimulationColumns.ABSOLUTE_TIME_INDEX.value: None,
                     SimulationColumns.BLOCK_TIME_INDEX.value: None,
                     SimulationColumns.SCENARIO_INDEX.value: None,
@@ -621,10 +1007,30 @@ class SimulationTableBuilder:
         )
 
 
-def merge_simulation_tables(
-    tables: List[SimulationTable], table_id: str = ""
-) -> SimulationTable:
-    """Concatenate multiple SimulationTables into one."""
-    return SimulationTable(
-        pd.concat([t.data for t in tables], ignore_index=True), table_id=table_id
-    )
+def _concat_frames(frames: Iterable[pd.DataFrame]) -> pd.DataFrame:
+    """Concatenate pieces of a run into one DataFrame with the schema's dtypes,
+    or an empty one for no piece."""
+    frames = list(frames)
+    if not frames:
+        return _empty_frame()
+    return _with_schema(pd.concat(frames, ignore_index=True))
+
+
+# The former names, kept for one release.
+_DEPRECATED_NAMES = {
+    "ComponentView": ComponentResults,
+    "OutputView": OutputResults,
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DEPRECATED_NAMES:
+        new = _DEPRECATED_NAMES[name]
+        warnings.warn(
+            f"{name} is deprecated and will be removed in a following release; "
+            f"use {new.__name__}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return new
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

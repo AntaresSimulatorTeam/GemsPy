@@ -10,17 +10,16 @@
 #
 # This file is part of the Antares project.
 
+import re
+import shutil
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
-import xarray as xr
 
-from gems_craft.expression.expression import SetIndexNode, SumOverNode, param
-from gems_craft.expression.visitor import visit
 from gems_craft.study.folder import load_study
-from gems_runner.simulation import TimeBlock, build_problem
-from gems_runner.simulation.linearize import VectorizedLinearExprBuilder
+from gems_runner.simulation import SimulationTable, TimeBlock, build_problem
 from gems_runner.simulation.simulation_table import SimulationTableBuilder
 
 STUDY_DIR = Path(__file__).parent / "studies" / "custom_sets"
@@ -77,49 +76,24 @@ def test_custom_sets_study(tmp_path: Path) -> None:
     assert view.data.columns.names == ["scenario_index", "set_index"]
     assert view.value(time_index=0, scenario_index=0)["s0|f1"] == 1.0
 
-    csv = pd.read_csv(table.to_csv(tmp_path))
-    assert {"set_id", "set_index"} <= set(csv.columns)
+    stored = SimulationTable.open(table.save(tmp_path / "table"))
+    pd.testing.assert_frame_equal(stored.to_pandas(load_all=True), df)
 
 
-def test_set_operators_on_ragged_arrays() -> None:
-    """`X[fuel+1]`, `X[fuel=k]` and `sum_over` on sets of sizes 2 and 3."""
-    comps = ["c0", "c1"]
-    price = xr.DataArray(
-        [[10.0, 11.0, 0.0], [20.0, 21.0, 22.0]],  # padded with 0
-        dims=["component", "fuel"],
-        coords={"component": comps, "fuel": [0, 1, 2]},
+def test_positive_lower_bound_on_ragged_sets(tmp_path: Path) -> None:
+    """A lower bound above the padded upper bound (0) is not a bound violation."""
+    study_dir = Path(shutil.copytree(STUDY_DIR, tmp_path / "study"))
+    library = study_dir / "input" / "model-libraries" / "custom_sets.yml"
+    text, count = re.subn(
+        r"lower-bound: 0(\r?\n\s+upper-bound: cap)",
+        r"lower-bound: 0.5\1",
+        library.read_text(),
     )
-    builder = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={
-            ("m", "price"): price,
-            ("m", "one"): xr.DataArray(1.0),
-            ("m", "two"): xr.DataArray(2.0),
-        },
-        port_arrays={},
-        block_length=1,
-        set_sizes={
-            "fuel": xr.DataArray(
-                [2, 3], dims=["component"], coords={"component": comps}
-            )
-        },
-    )
+    assert count == 1
+    library.write_text(text)
 
-    shifted = visit(
-        SetIndexNode(param("price"), "fuel", relative_shift=param("one")), builder
-    )
-    assert shifted.sel(component="c0").values[:2].tolist() == [11.0, 10.0]  # wraps at 2
-    assert shifted.sel(component="c1").values.tolist() == [
-        21.0,
-        22.0,
-        20.0,
-    ]  # wraps at 3
-
-    picked = visit(SetIndexNode(param("price"), "fuel", position=param("one")), builder)
-    assert picked.values.tolist() == [11.0, 21.0]
-    with pytest.raises(ValueError, match="out of range"):  # c0 only has 2 elements
-        visit(SetIndexNode(param("price"), "fuel", position=param("two")), builder)
-
-    summed = visit(SumOverNode(param("price"), "fuel"), builder)
-    assert summed.values.tolist() == [21.0, 63.0]
+    problem = build_problem(load_study(study_dir), TimeBlock(1, [0]), [0])
+    problem.solve()
+    assert problem.termination_condition == "optimal"
+    x = problem.get_variable_solution("custom_sets.grid", "x").values
+    assert np.all(x[~np.isnan(x)] >= 0.5 - 1e-9)

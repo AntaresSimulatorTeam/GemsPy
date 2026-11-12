@@ -20,5 +20,5 @@ from .optimization import (
     build_problem,
 )
 from .runner import BendersRunner
-from .simulation_table import SimulationColumns, SimulationTableBuilder
+from .simulation_table import SimulationColumns, SimulationTable, SimulationTableBuilder
 from .time_block import TimeBlock

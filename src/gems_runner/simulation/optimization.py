@@ -136,21 +136,21 @@ class DecompositionFilter:
 
 
 def _apply_validity_mask(expr: VectorizedExpr, mask: xr.DataArray) -> VectorizedExpr:
-    """Filter *expr* to valid (component, time) entries using *mask*.
+    """Mask *expr* where *mask* is False, element-wise.
 
-    When *expr* has both component and time dimensions the mask is applied
-    element-wise via ``where``.  When only the time dimension is present the
-    intersection across components is used (conservative fallback).
+    The mask is broadcast against *expr*: a dimension of the mask that *expr*
+    lacks (e.g. a time-only bound against a [component, time, scenario] mask)
+    is added, so that both sides of a constraint are masked at the same
+    component, time step and scenario.
     """
     if not hasattr(expr, "dims"):
         return expr
-    dims = expr.dims  # type: ignore[union-attr]
-    if "component" in dims and "time" in dims:
-        return expr.where(mask)  # type: ignore[union-attr,return-value]
-    if "time" in dims:
-        valid_times: List[int] = mask.all("component").values.nonzero()[0].tolist()
-        return expr.isel(time=valid_times)  # type: ignore[union-attr,return-value]
-    return expr
+    # A time-independent side (e.g. a constant bound) is left as is: the
+    # time-dependent side of the constraint carries the mask.
+    if "time" in mask.dims and "time" not in expr.dims:  # type: ignore[union-attr]
+        return expr
+    # A time-independent constraint (e.g. x[200] <= 5) is masked as a whole.
+    return expr.where(mask)  # type: ignore[union-attr,return-value]
 
 
 class OutOfBoundsFilter:
@@ -373,6 +373,7 @@ class OptimizationProblem:
             Dict[Tuple[str, str, str], linopy.Variable]
         ] = None,
         set_sizes: Optional[Dict[str, Dict[str, xr.DataArray]]] = None,
+        scenario_ids: Optional[List[int]] = None,
     ) -> None:
         self.name = name
         # model_id -> set_id -> per-component element count (see VectorizedBuilderBase).
@@ -380,10 +381,12 @@ class OptimizationProblem:
         self.linopy_model = linopy_model
         self.study = study
         self.block = block
+        # MC scenarios the problem was built for (None if unknown).
+        self.scenario_ids = scenario_ids
         self._linopy_vars = linopy_vars
         self._linopy_vars_by_component = linopy_vars_by_component or {}
         self.param_arrays = param_arrays
-        # Constant term of the objective (linopy cannot represent pure-constant objectives).
+        # Constant term of the objective, kept outside linopy (which rejects constants in objectives).
         self._objective_constant: float = objective_constant
 
     @property
@@ -680,20 +683,28 @@ class _OptimizationProblemBuilder:
                 name=f"carry_over__{safe}",
             )
 
-        # Extract constant objective contribution (linopy cannot hold pure constants).
+        # Extract the constant part of the objective (whole objective or constant term of a mixed one), since linopy rejects constants.
         objective_constant = 0.0
+        has_objective = False
         if total_obj is not None and not isinstance(
             total_obj, (xr.DataArray, int, float)
         ):
+            # Move any constant term out of the expression (linopy rejects it).
+            if isinstance(total_obj, linopy.LinearExpression):
+                objective_constant = float(total_obj.const.sum())
+                total_obj = total_obj - objective_constant
             self.linopy_model.add_objective(total_obj)  # type: ignore[arg-type]
+            has_objective = True
         elif total_obj is not None:
             if isinstance(total_obj, xr.DataArray):
                 objective_constant = float(total_obj.sum())
             else:
                 objective_constant = float(total_obj)
 
-        # linopy requires at least one variable to solve; add a fixed dummy if needed.
-        if len(self.linopy_model.variables) == 0:
+        # linopy requires an objective (hence a variable) to solve; add a fixed dummy if needed.
+        if not has_objective and (
+            total_obj is not None or len(self.linopy_model.variables) == 0
+        ):
             dummy = self.linopy_model.add_variables(
                 lower=xr.DataArray([0.0], dims=["__dummy_dim"]),
                 upper=xr.DataArray([0.0], dims=["__dummy_dim"]),
@@ -711,6 +722,7 @@ class _OptimizationProblemBuilder:
             param_arrays=self.param_arrays,
             objective_constant=objective_constant,
             set_sizes=self.set_sizes,
+            scenario_ids=self.scenario_ids,
         )
 
     # ------------------------------------------------------------------
@@ -720,8 +732,6 @@ class _OptimizationProblemBuilder:
     def _build_param_arrays_for_model(
         self, model: Model, components: List[Component]
     ) -> None:
-        comp_ids = [c.id for c in components]
-
         set_ids = _model_set_ids(model)
         if set_ids:
             self.set_sizes[model.id] = {
@@ -731,7 +741,7 @@ class _OptimizationProblemBuilder:
                         for c in components
                     ],
                     dims=["component"],
-                    coords={"component": comp_ids},
+                    coords={"component": [c.id for c in components]},
                 )
                 for set_id in set_ids
             }
@@ -911,22 +921,7 @@ class _OptimizationProblemBuilder:
             coords[s] = list(range(dim_sizes[s]))
             dims.append(s)
 
-        var_shape = tuple(
-            (
-                len(comp_ids)
-                if d == "component"
-                else (
-                    len(self.time_coord)
-                    if d == "time"
-                    else (
-                        len(self.local_scenario_coord)
-                        if d == "scenario"
-                        else dim_sizes[d]
-                    )
-                )
-            )
-            for d in dims
-        )
+        var_shape = tuple(len(coords[d]) for d in dims)  # type: ignore[arg-type]
 
         bound_builder = VectorizedLinearExprBuilder(
             model_id=model.id,
@@ -953,13 +948,24 @@ class _OptimizationProblemBuilder:
             )
         )
 
+        # Positions padded beyond a component's own set size are masked out.
+        mask: Optional[xr.DataArray] = None
+        validity = _set_validity(
+            self._set_sizes_for_components(model.id, comp_ids), dim_sizes
+        )
+        if validity is not None:
+            mask = validity.expand_dims(
+                {d: coords[d] for d in dims if d not in validity.dims}  # type: ignore[misc]
+            ).transpose(*dims)
+
         lower_arr = lower if isinstance(lower, np.ndarray) else np.array(lower)
         upper_arr = upper if isinstance(upper, np.ndarray) else np.array(upper)
         for ci, comp_id in enumerate(comp_ids):
             lo = np.asarray(lower_arr[ci] if lower_arr.ndim > 0 else lower_arr)
             up = np.asarray(upper_arr[ci] if upper_arr.ndim > 0 else upper_arr)
-            finite = np.isfinite(lo) & np.isfinite(up)
-            violation = finite & (up < lo)
+            violation = np.isfinite(lo) & np.isfinite(up) & (up < lo)
+            if mask is not None:
+                violation &= mask.values[ci]
             if np.any(violation):
                 idx = int(np.argmax(violation))
                 raise ValueError(
@@ -967,16 +973,6 @@ class _OptimizationProblemBuilder:
                     f"greater than lower bound ({float(lo.flat[idx]):g}) "
                     f"for variable {comp_id}.{var.name}"
                 )
-
-        mask: Optional[xr.DataArray] = None
-        validity = _set_validity(
-            self._set_sizes_for_components(model.id, comp_ids), dim_sizes
-        )
-        if validity is not None:
-            full = xr.DataArray(
-                np.ones(var_shape, dtype=bool), dims=dims, coords=coords
-            )
-            mask = (validity & full).transpose(*dims)
 
         prefix = model.id.replace("-", "_")
         name = f"{prefix}__{var.name}{name_suffix}"
@@ -1043,6 +1039,11 @@ class _OptimizationProblemBuilder:
                                 model_id=model.id,
                                 param_arrays=self.param_arrays,
                                 block_length=self.block_length,
+                                time_independent_variables=frozenset(
+                                    name
+                                    for name, variable in model.variables.items()
+                                    if not variable.structure.time
+                                ),
                             ),
                         )
 
@@ -1124,19 +1125,10 @@ class _OptimizationProblemBuilder:
         and raw numpy arrays.
         """
         if isinstance(val, xr.DataArray):
-            if val.dims == ():
-                return np.full(var_shape, float(val.item()))
-            if set(dims) - {"component", "time", "scenario"}:
-                # Custom-set dimensions: align by name rather than by position.
-                missing = {d: n for d, n in zip(dims, var_shape) if d not in val.dims}
-                if missing:
-                    val = val.expand_dims(missing)
-                return np.broadcast_to(val.transpose(*dims).values, var_shape).copy()  # type: ignore[return-value]
-            arr = val.values  # shape may be a subset of var_shape dims
-            for ax, d in enumerate(dims):
-                if d not in val.dims:
-                    arr = np.expand_dims(arr, axis=ax)
-            return np.broadcast_to(arr, var_shape).copy()  # type: ignore[return-value]
+            # Align by dimension name; scalar coordinates (e.g. left by d[0]) are dropped.
+            missing = {d: n for d, n in zip(dims, var_shape) if d not in val.dims}
+            val = val.reset_coords(drop=True).expand_dims(missing).transpose(*dims)
+            return np.array(val.values, dtype=float)
         if isinstance(val, (int, float)):
             return np.full(var_shape, float(val))
         return val  # type: ignore[return-value]

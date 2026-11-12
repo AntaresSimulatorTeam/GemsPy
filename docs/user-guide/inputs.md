@@ -66,7 +66,8 @@ database = build_data_base(input_system, Path(series_dir))
 ~~~
 
 `build_data_base()` reads all timeseries files referenced by the system
-(`.txt`, `.tsv` or `.csv`) from `series_dir`.
+(`.txt`, `.tsv` or `.csv`) from `series_dir`. Several files with the same name
+but different extensions are rejected.
 
 ### Loading set-indexed data
 
@@ -87,6 +88,10 @@ is `scenario-dependent`. There is one column per set listed in the component's
 own `indexed-by`; any other column is rejected. Set columns must hold exactly the
 elements instantiated in `system.yml`, and `time`/`scenario` values must be
 `0..n-1`. Empty or non-numeric `value` cells are rejected.
+
+A `time-dependent` and/or `scenario-dependent` parameter without `indexed-by`
+may also use this format (columns `time`, `scenario`, `value`): a file whose
+first row contains a `value` column is read as tidy, otherwise as a matrix.
 
 A parameter that depends on sets only (neither `time-dependent` nor
 `scenario-dependent`) may instead give its values inline in `system.yml`, as a
@@ -134,18 +139,23 @@ interoperate with [Antares Simulator](https://antares-simulator.org/).
 
 For the YAML fields in library and system files associated with the hybrid mode, see [this page](https://gems-energy.readthedocs.io/en/latest/interoperability/hybrid/hybrid-connections/) of the GEMS documentation website.
 
-Libraries are "cold" files: the same library YAML is often reused unchanged between a full GEMS study and a hybrid study of the same system. Hybrid-format libraries therefore load with the standard `parse_yaml_library` / `write_yaml_library` from `gems_craft` — the hybrid-only `area-connection` and `thermal-capacity-connection` port-type fields are recognized directly by `gems_craft`'s own schema (and simply ignored outside the hybrid workflow), so no separate hybrid library function is needed, and the same file works for either kind of study without a format change:
+Libraries are "cold" files: the same library YAML is often reused unchanged between a "full GEMS" study and a hybrid study of the same system. Both are read with `parse_yaml_library` from `gems_craft`. The hybrid-only `area-connection` and `thermal-capacity-connection` port-type fields live on `gems_craft`'s own schema and are ignored outside the hybrid workflow.
+
+Writing is split, because the two files do not keep the same empty keys. `write_yaml_library` writes a "full GEMS" library and omits empty keys. It raises `ValueError` when a port type has `area-connection`, and the message names `write_yaml_hybrid_library`. That function writes a hybrid library and keeps `injection-to-balance`, `spillage-bound` and `unsupplied-energy-bound` (as `null` when empty). `price` is omitted when empty.
 
 ~~~ python
-from gems_craft.model.parsing import parse_yaml_library, write_yaml_library
+from pathlib import Path
+
+from gems_craft.model.parsing import parse_yaml_library
+from gems_craft_hybrid.model.parsing import write_yaml_hybrid_library
 
 with open("hybrid_lib.yml") as f:
     library = parse_yaml_library(f)
-write_yaml_library(library, Path("output/hybrid_lib.yml"))
+write_yaml_hybrid_library(library, Path("output/hybrid_lib.yml"))
 ~~~
 
 
-System files, by contrast, are necessarily different between a full GEMS study and a hybrid study of the same setup — a hybrid system file describes area/thermal-capacity connections a full GEMS system wouldn't have. Since there's no cross-format file to keep compatible, parsing can afford to stay strict: hybrid systems still require the dedicated `gems_craft_hybrid` functions — load and write them with `parse_yaml_hybrid_system` / `write_yaml_system` — and `parse_yaml_system` (standard) rejects hybrid-only fields outright.
+ contrast, are necessarily different between a "full GEMS" study and a hybrid study of the same setup — a hybrid system file describes area/thermal-capacity connections a "full GEMS" system wouldn't have. Since there's no cross-format file to keep compatible, parsing can afford to stay strict: hybrid systems still require the dedicated `gems_craft_hybrid` functions — load and write them with `parse_yaml_hybrid_system` / `write_yaml_system` — and `parse_yaml_system` (standard) rejects hybrid-only fields outright.System files, by
 
 ~~~ python
 from gems_craft.study.parsing import write_yaml_system

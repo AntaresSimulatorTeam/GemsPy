@@ -72,7 +72,9 @@ library:
         - id: startup_cost
         - id: fixed_cost
         - id: d_min_up
+          time-dependent: false
         - id: d_min_down
+          time-dependent: false
         - id: unit_count
       variables:
         - id: generation

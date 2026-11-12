@@ -69,6 +69,7 @@ class FakeProblem:
     model_components: dict = field(default_factory=dict)
     study: FakeStudy = field(default_factory=FakeStudy)
     scenarios: int = 1
+    scenario_ids: Optional[list] = None
 
     def get_variable_solution(
         self, model_id: object, var_name: str

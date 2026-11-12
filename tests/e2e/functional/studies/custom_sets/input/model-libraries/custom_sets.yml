@@ -9,6 +9,8 @@ library:
       parameters:
         - id: cost
           indexed-by: [fuel]
+          time-dependent: false
+          scenario-dependent: false
       variables:
         - id: gen
           time-dependent: false
@@ -38,9 +40,15 @@ library:
       parameters:
         - id: cost
           indexed-by: [seg, slot]
+          time-dependent: false
+          scenario-dependent: false
         - id: cap
           indexed-by: [seg, slot]
+          time-dependent: false
+          scenario-dependent: false
         - id: ramp
+          time-dependent: false
+          scenario-dependent: false
       variables:
         - id: x
           time-dependent: false

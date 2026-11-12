@@ -61,9 +61,7 @@ def test_milp_version() -> None:
     config = optim_config_for("milp")
     st = SimulationSession(study, config).run()
 
-    assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
-        0
-    ] == pytest.approx(16805387)
+    assert st.objective_values()["value"].iloc[0] == pytest.approx(16805387)
     check_output(st, "G", "non_prop_cost", [2 if t != 12 else 53 for t in range(168)])
     check_output(
         st, "G", "generation_power", [2000 if t != 12 else 2100 for t in range(168)]
@@ -91,9 +89,7 @@ def test_lp_version() -> None:
     config = optim_config_for("lp")
     st = SimulationSession(study, config).run()
 
-    assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
-        0
-    ] == pytest.approx(16802838.55)
+    assert st.objective_values()["value"].iloc[0] == pytest.approx(16802838.55)
     check_output(st, "G", "non_prop_cost", [2 if t != 12 else 4.55 for t in range(168)])
     check_output(
         st, "G", "generation_power", [2000 if t != 12 else 2050 for t in range(168)]
@@ -115,9 +111,7 @@ def test_accurate_heuristic() -> None:
     config = optim_config_for("accurate")
     st = SimulationSession(study, config).run()
 
-    assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
-        0
-    ] == pytest.approx(16805387)
+    assert st.objective_values()["value"].iloc[0] == pytest.approx(16805387)
     check_output(st, "G", "non_prop_cost", [2 if t != 12 else 53 for t in range(168)])
     check_output(
         st, "G", "generation_power", [2000 if t != 12 else 2100 for t in range(168)]
@@ -145,9 +139,7 @@ def test_fast_heuristic() -> None:
     config = optim_config_for("fast")
     st = SimulationSession(study, config).run()
 
-    assert st.data.loc[st.data["output"] == "objective-value", "value"].iloc[
-        0
-    ] == pytest.approx(16850000)
+    assert st.objective_values()["value"].iloc[0] == pytest.approx(16850000)
     check_output(
         st,
         "G",

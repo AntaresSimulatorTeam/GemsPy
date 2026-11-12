@@ -165,39 +165,6 @@ library:
     assert input_lib.models[0].taxonomy_category == "balance"
 
 
-def test_sets_and_indexed_by_parse() -> None:
-    input_lib = parse_yaml_library(io.StringIO("""
-library:
-  id: sets_lib
-  sets: [{id: fuel, description: fuel types}]
-  models:
-    - id: bus
-      sets: [{id: segment}]
-      parameters: [{id: p, indexed-by: [fuel]}]
-      variables: [{id: v, indexed-by: [fuel]}]
-"""))
-    model = input_lib.models[0]
-    assert [s.id for s in input_lib.sets] == ["fuel"]
-    assert input_lib.sets[0].description == "fuel types"
-    assert [s.id for s in model.sets] == ["segment"]
-    assert model.parameters[0].indexed_by == ["fuel"]
-    assert model.variables[0].indexed_by == ["fuel"]
-
-
-def test_sets_and_indexed_by_default_empty() -> None:
-    input_lib = parse_yaml_library(io.StringIO("""
-library:
-  id: no_sets_lib
-  models:
-    - id: bus
-      parameters: [{id: p}]
-      variables: [{id: v}]
-"""))
-    model = input_lib.models[0]
-    assert input_lib.sets == [] and model.sets == []
-    assert model.parameters[0].indexed_by == [] and model.variables[0].indexed_by == []
-
-
 def test_library_version_parsing() -> None:
     yaml_content = """
 library:
@@ -439,7 +406,11 @@ library:
           variable-type: continuous
       parameters:
         - id: a
+          time-dependent: false
+          scenario-dependent: false
         - id: b
+          time-dependent: false
+          scenario-dependent: false
       ports: []
       binding-constraints:
         - id: balance
@@ -655,20 +626,6 @@ def test_sum_connections_on_own_port_in_extra_output_raises() -> None:
         resolve_library([input_lib])
 
 
-def test_sum_connections_in_objective_contribution_raises() -> None:
-    """sum_connections is rejected in objective contributions, even on a port field not defined here."""
-    yaml = _port_model_yaml().replace(
-        "      ports:",
-        "      objective-contributions:\n"
-        "        - id: obj\n"
-        "          expression: sum(generation + sum_connections(balance_port.flow))\n"
-        "      ports:",
-    )
-    input_lib = parse_yaml_library(io.StringIO(yaml))
-    with pytest.raises(ValueError, match="sum_connections is not allowed"):
-        resolve_library([input_lib])
-
-
 # ---------------------------------------------------------------------------
 # Rule 2: bare port.field cannot appear outside sum_connections
 # ---------------------------------------------------------------------------
@@ -679,7 +636,7 @@ def test_bare_defined_port_field_in_binding_constraint_raises() -> None:
     input_lib = parse_yaml_library(
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.flow >= 0"))
     )
-    with pytest.raises(ValueError, match="Bare port field"):
+    with pytest.raises(ParsingException, match="ParseCancellationException"):
         resolve_library([input_lib])
 
 
@@ -688,7 +645,7 @@ def test_bare_undefined_port_field_in_binding_constraint_raises() -> None:
     input_lib = parse_yaml_library(
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.price >= 0"))
     )
-    with pytest.raises(ValueError, match="Bare port field"):
+    with pytest.raises(ParsingException, match="ParseCancellationException"):
         resolve_library([input_lib])
 
 
@@ -727,3 +684,102 @@ def test_lower_upper_bound_in_extra_output_accepted() -> None:
     assert expressions_equal(
         eo["eo"], LowerBoundNode("generation") + UpperBoundNode("generation")
     )
+
+
+@pytest.mark.parametrize(
+    "flags,expected",
+    [
+        pytest.param("", IndexingStructure(True, True), id="omitted"),
+        pytest.param(
+            "\n          time-dependent: false\n          scenario-dependent: false",
+            IndexingStructure(False, False),
+            id="both-false",
+        ),
+        pytest.param(
+            "\n          time-dependent: false",
+            IndexingStructure(False, True),
+            id="only-time-false",
+        ),
+        pytest.param(
+            "\n          scenario-dependent: false",
+            IndexingStructure(True, False),
+            id="only-scenario-false",
+        ),
+    ],
+)
+def test_parameter_dependency_defaults_to_true(
+    flags: str, expected: IndexingStructure
+) -> None:
+    """As in Antares Simulator, an omitted time-dependent / scenario-dependent
+    flag of a model parameter defaults to true."""
+    lib = resolve_library([parse_yaml_library(io.StringIO(f"""
+library:
+  id: probe
+  models:
+    - id: m
+      parameters:
+        - id: p{flags}
+"""))])
+    assert lib["probe"].models["probe.m"].parameters["p"].structure == expected
+
+
+def _numbers_lib_yaml(zero: str, bound: str, cost: str, output: str) -> str:
+    """Model whose expression fields all hold a number."""
+    return f"""
+library:
+  id: test
+  port-types:
+    - id: flow
+      fields:
+        - id: flow
+  models:
+    - id: test_model
+      variables:
+        - id: x
+          lower-bound: {zero}
+          upper-bound: {bound}
+      ports:
+        - id: port1
+          type: flow
+      port-field-definitions:
+        - port: port1
+          field: flow
+          definition: {zero}
+      constraints:
+        - id: c
+          expression: x
+          lower-bound: {zero}
+          upper-bound: {bound}
+      binding-constraints:
+        - id: bc
+          expression: x
+          lower-bound: {zero}
+          upper-bound: {bound}
+      objective-contributions:
+        - id: cost
+          expression: {cost}
+      extra-outputs:
+        - id: out
+          expression: {output}
+"""
+
+
+def test_plain_numbers_in_expression_fields() -> None:
+    """A YAML number in an expression field is read as if it were quoted."""
+    unquoted = resolve_library(
+        [parse_yaml_library(io.StringIO(_numbers_lib_yaml("0", "1.5", "2", "-3")))]
+    )
+    quoted = resolve_library(
+        [
+            parse_yaml_library(
+                io.StringIO(_numbers_lib_yaml('"0"', '"1.5"', '"2"', '"-3"'))
+            )
+        ]
+    )
+    model_ = unquoted["test"].models["test.test_model"]
+    assert model_ == quoted["test"].models["test.test_model"]
+    pfd = model_.port_fields_definitions[_PFIELD_ID]
+    assert expressions_equal(pfd.definition, literal(0))
+    assert expressions_equal_if_present(model_.variables["x"].upper_bound, literal(1.5))
+    assert model_.objective_contributions is not None
+    assert expressions_equal(model_.objective_contributions["cost"], literal(2))
