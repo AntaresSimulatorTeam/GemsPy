@@ -31,6 +31,8 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     literal,
     maximum,
     minimum,
@@ -970,3 +972,92 @@ def test_invalid_time_shift_raises(
     builder = _builder_with_index(comp_time_var, param_da, index)
     with pytest.raises(ValueError, match=message):
         visit(param("p").shift(param("d")), builder)
+
+
+# ---------------------------------------------------------------------------
+# Custom-set operators on a ragged set (c0 has 2 elements, c1 has 3)
+# ---------------------------------------------------------------------------
+
+_SET_COMPS = ["c0", "c1"]
+
+
+def _per_component(values: list) -> xr.DataArray:
+    return xr.DataArray(values, dims="component", coords={"component": _SET_COMPS})
+
+
+@pytest.fixture
+def set_builder(lp_model: linopy.Model) -> VectorizedLinearExprBuilder:
+    fuel_var = lp_model.add_variables(
+        coords={"component": _SET_COMPS, "fuel": [0, 1, 2]}, name="g"
+    )
+    return VectorizedLinearExprBuilder(
+        model_id="m",
+        linopy_vars={("m", "g"): fuel_var},
+        param_arrays={
+            ("m", "price"): xr.DataArray(
+                [[10.0, 11.0, 0.0], [20.0, 21.0, 22.0]],  # padded with 0
+                dims=["component", "fuel"],
+                coords={"component": _SET_COMPS, "fuel": [0, 1, 2]},
+            ),
+            ("m", "k"): _per_component([1.0, 2.0]),
+            ("m", "d"): xr.DataArray(
+                [[1.0, 0.0], [2.0, 0.0]],
+                dims=["component", "time"],
+                coords={"component": _SET_COMPS, "time": [0, 1]},
+            ),
+        },
+        port_arrays={},
+        block_length=2,
+        set_sizes={"fuel": _per_component([2, 3])},
+    )
+
+
+@pytest.mark.parametrize(
+    "index, expected",
+    [
+        # X[fuel+k] wraps at each component's own size (padding is masked anyway).
+        pytest.param(
+            {"relative_shift": param("k")},
+            [[11.0, 10.0, 11.0], [22.0, 20.0, 21.0]],
+            id="shift-per-component",
+        ),
+        pytest.param({"position": literal(1)}, [11.0, 21.0], id="position-constant"),
+        pytest.param(
+            {"position": param("k")}, [11.0, 22.0], id="position-per-component"
+        ),
+        pytest.param(
+            {"position": param("d").eval(0)}, [11.0, 22.0], id="position-time-eval"
+        ),
+    ],
+)
+def test_set_index(
+    set_builder: VectorizedLinearExprBuilder, index: dict, expected: list
+) -> None:
+    result = visit(SetIndexNode(param("price"), "fuel", **index), set_builder)
+    assert result.values.tolist() == expected
+
+
+def test_set_position_of_a_variable_per_component(
+    set_builder: VectorizedLinearExprBuilder,
+) -> None:
+    result = visit(SetIndexNode(var("g"), "fuel", position=param("k")), set_builder)
+    labels = set_builder.linopy_vars[("m", "g")].labels
+    assert "fuel" not in result.dims
+    assert result.vars.squeeze("_term").values.tolist() == [
+        labels.sel(component="c0", fuel=1).item(),
+        labels.sel(component="c1", fuel=2).item(),
+    ]
+
+
+def test_set_position_out_of_range_names_the_component(
+    set_builder: VectorizedLinearExprBuilder,
+) -> None:
+    with pytest.raises(ValueError, match=r"out of range .* component\(s\) c0\."):
+        visit(SetIndexNode(param("price"), "fuel", position=literal(2)), set_builder)
+
+
+def test_sum_over_of_a_constant_counts_each_component_elements(
+    set_builder: VectorizedLinearExprBuilder,
+) -> None:
+    constant = visit(SumOverNode(literal(1), "fuel"), set_builder)
+    assert constant.values.tolist() == [2, 3]
