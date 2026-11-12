@@ -142,9 +142,11 @@ def test_dual_reduced_cost_indexing() -> None:
             var("x").set_index("fuel", relative_shift=param("p")),
             IndexingStructure(False, True),
         ),
+        (param("p").set_index("fuel"), IndexingStructure(False, True)),
+        (param("p").sum_over("fuel"), IndexingStructure(False, True)),
     ],
 )
-def test_set_index_brings_index_dependency(
+def test_set_index_sum_over_indexing(
     expr: ExpressionNode, expected: IndexingStructure
 ) -> None:
     class ScenarioParameterProvider(StructureProvider):

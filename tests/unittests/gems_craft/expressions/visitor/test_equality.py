@@ -144,6 +144,11 @@ def test_lower_upper_bound_equality() -> None:
             var("x").set_index("fuel", position=2),
             var("x").set_index("fuel", position=3),
         ),
+        (var("x").set_index("fuel"), var("x").set_index("fuel", relative_shift=1)),
+        (
+            var("x").set_index("fuel", relative_shift=1),
+            var("x").set_index("fuel", relative_shift=2),
+        ),
         (var("x").sum_over("fuel"), var("x").sum_over("segment")),
     ],
 )

@@ -382,6 +382,25 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
             var("x").set_index("fuel").sum_over("fuel"),
             id="sum-over-set-index",
         ),
+        pytest.param(
+            {"fuel", "segment"},
+            "sum_over(fuel, sum_over(segment, x[fuel, segment]))",
+            var("x")
+            .set_index("fuel")
+            .set_index("segment")
+            .sum_over("segment")
+            .sum_over("fuel"),
+            id="nested-sum-over",
+        ),
+        pytest.param(
+            {"fuel"},
+            "sum(t-1..t+1, sum_over(fuel, x[fuel]))",
+            var("x")
+            .set_index("fuel")
+            .sum_over("fuel")
+            .time_sum(-literal(1), literal(1)),
+            id="sum-over-in-time-sum",
+        ),
         (
             {"fuel"},
             "(x + p)[fuel]",
