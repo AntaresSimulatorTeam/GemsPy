@@ -35,20 +35,15 @@ expr
 
 argList : expr (',' expr)* ;
 
-// An index list is one or more comma-separated terms, in any order.
-// ANTLR only distinguishes the shapes below; it cannot tell whether a
-// bare/signed identifier is a declared set, "t", or an ordinary
-// parameter (e.g. a set shift `X[fuel + 1]` is a positionTerm) -- that's
-// resolved by ExpressionNodeBuilderVisitor via ModelIdentifiers. Term order
-// not mattering (`X[fuel=3, 2]` == `X[2, fuel=3]`) and rejecting more than
-// one term denoting the time dimension (`X[2, 3]`) are also builder-level
-// checks, not grammar-level ones.
+// Comma-separated index terms, in any order. Whether a bareTerm is a set shift
+// (`X[fuel + 1]`) or a time index (`X[p + 1]`) is decided by
+// ExpressionNodeBuilderVisitor, which also checks the term combinations.
 indexList : indexTerm (',' indexTerm)* ;
 
 indexTerm
     : shift                                # timeShiftTerm
     | (TIME | IDENTIFIER) EQ time_expr     # keywordTerm
-    | time_expr                            # positionTerm
+    | time_expr                            # bareTerm
     ;
 
 // A time sum bound is either relative to the current time step ("t", "t + ...",

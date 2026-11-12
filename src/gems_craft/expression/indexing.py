@@ -149,15 +149,17 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return IndexingStructure(False, visit(node.operand, self).scenario)
 
     def set_index(self, node: SetIndexNode) -> IndexingStructure:
-        # TODO(custom sets, phase 2): once IndexingStructure carries a `sets`
-        # dimension, indexing into `node.set_id` should remove it from the
-        # combined structure (mirroring how time_shift keeps time, but a
-        # concrete position/relative-shift resolves that one set dimension).
-        return visit(node.operand, self)
+        # TODO(custom sets): resolve the `node.set_id` dimension once
+        # IndexingStructure tracks sets.
+        result = visit(node.operand, self)
+        # The position or shift brings its own time/scenario dependency.
+        for index in (node.position, node.relative_shift):
+            if index is not None:
+                result = result | visit(index, self)
+        return result
 
     def sum_over(self, node: SumOverNode) -> IndexingStructure:
-        # TODO(custom sets, phase 2): should remove `node.set_id` from the
-        # combined structure's `sets`, mirroring all_time_sum's collapsing of time.
+        # TODO(custom sets): remove `node.set_id` once IndexingStructure tracks sets.
         return visit(node.operand, self)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> IndexingStructure:

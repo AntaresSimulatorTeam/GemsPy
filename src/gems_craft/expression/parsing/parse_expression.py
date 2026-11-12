@@ -23,6 +23,7 @@ from gems_craft.expression.expression import (
     ComparisonNode,
     DualNode,
     LowerBoundNode,
+    NegationNode,
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
@@ -47,7 +48,7 @@ class ModelIdentifiers:
     sets: Set[str] = field(default_factory=set)
 
     def __post_init__(self) -> None:
-        clashes = set(self.sets) & (set(self.variables) | set(self.parameters))
+        clashes = {s for s in self.sets if s in self.variables or s in self.parameters}
         if clashes:
             raise ValueError(
                 f"Set ids clash with variable/parameter ids: {sorted(clashes)}"
@@ -185,12 +186,10 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         self, base: ExpressionNode, index_list_ctx: "ExprParser.IndexListContext"
     ) -> ExpressionNode:
         """
-        Applies every term of an index list (custom sets and indexing
-        extension) to `base`. Term order in the *source syntax* must not
-        affect the resulting AST (`X[fuel=3, 2]` == `X[2, fuel=3]`), so terms
-        are first classified independently of one another, then applied in a
-        canonical order: the (at most one) implicit time term first, then set
-        terms sorted by set id.
+        Applies every term of an index list to `base`, in a canonical order
+        (the time term first, then set terms sorted by set id), so that term
+        order within one bracket does not matter: `X[fuel=3, 2]` == `X[2, fuel=3]`.
+        Separate brackets are applied as written: `(X[fuel])[t+1]` != `X[t+1, fuel]`.
         """
         time_applier: Optional[Callable[[ExpressionNode], ExpressionNode]] = None
         time_term_text = ""
@@ -232,10 +231,10 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         self, ctx: ExprParser.KeywordTermContext
     ) -> Tuple[Optional[str], Callable[[ExpressionNode], ExpressionNode]]:
         """Returns (set_id, apply) -- set_id is None for a time-denoting term."""
-        identifier: str = "t" if ctx.TIME() is not None else ctx.IDENTIFIER().getText()  # type: ignore
         position = ctx.time_expr().accept(self)  # type: ignore
-        if identifier == "t":
+        if ctx.TIME() is not None:  # type: ignore
             return None, lambda expr: expr.eval(position)
+        identifier: str = ctx.IDENTIFIER().getText()  # type: ignore
         if self.identifiers.is_set(identifier):
             return identifier, lambda expr: expr.set_index(
                 identifier, position=position
@@ -245,9 +244,9 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             f"index form ('{identifier}=...') is only valid for those."
         )
 
-    # Visit a parse tree produced by ExprParser#positionTerm.
-    def visitPositionTerm(
-        self, ctx: ExprParser.PositionTermContext
+    # Visit a parse tree produced by ExprParser#bareTerm.
+    def visitBareTerm(
+        self, ctx: ExprParser.BareTermContext
     ) -> Tuple[Optional[str], Callable[[ExpressionNode], ExpressionNode]]:
         """Returns (set_id, apply) -- set_id is None for a time-denoting term.
 
@@ -261,12 +260,8 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             return None, lambda expr: expr.eval(eval_time)
 
         terms = [term.accept(self) for term in time_expr.time_term()[1:]]
-        ops = time_expr.ops
-        amount: ExpressionNode = literal(0)
-        if terms:
-            first = -terms[0] if ops[0].text == "-" else terms[0]
-            amount = _fold(first, ops[1:], terms[1:])
-        if expressions_equal(amount, literal(0)):
+        amount = _offset(time_expr.ops, terms)
+        if _is_zero(amount):
             return set_id, lambda expr: expr.set_index(set_id)
         return set_id, lambda expr: expr.set_index(set_id, relative_shift=amount)
 
@@ -353,11 +348,7 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     def visitShift(self, ctx: ExprParser.ShiftContext) -> ExpressionNode:
         """Offset of "t + ...": the terms folded from left to right."""
         terms = [term.accept(self) for term in ctx.terms]  # type: ignore
-        if not terms:
-            return literal(0)
-        ops = ctx.ops  # type: ignore
-        first = -terms[0] if ops[0].text == "-" else terms[0]
-        return _fold(first, ops[1:], terms[1:])
+        return _offset(ctx.ops, terms)  # type: ignore
 
     # Visit a parse tree produced by ExprParser#time_expr.
     def visitTime_expr(self, ctx: ExprParser.Time_exprContext) -> ExpressionNode:
@@ -425,9 +416,24 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
 
 def _shift(expr: ExpressionNode, time_shift: ExpressionNode) -> ExpressionNode:
     """expr shifted by time_shift; x[t] is x itself."""
-    if expressions_equal(time_shift, literal(0)):
+    if _is_zero(time_shift):
         return expr
     return expr.shift(time_shift)
+
+
+def _is_zero(amount: ExpressionNode) -> bool:
+    """Whether amount is the literal 0 (`+0` or `-0`)."""
+    if isinstance(amount, NegationNode):
+        amount = amount.operand
+    return expressions_equal(amount, literal(0))
+
+
+def _offset(ops: Sequence[Token], terms: Sequence[ExpressionNode]) -> ExpressionNode:
+    """Offset of `<origin> op0 term0 op1 term1 ...`, folded from left to right."""
+    if not terms:
+        return literal(0)
+    first = -terms[0] if ops[0].text == "-" else terms[0]
+    return _fold(first, ops[1:], terms[1:])
 
 
 def _fold(

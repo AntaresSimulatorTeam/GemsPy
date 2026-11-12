@@ -13,7 +13,7 @@
 
 import pytest
 
-from gems_craft.expression import param, relative_time, var
+from gems_craft.expression import ExpressionNode, param, relative_time, var
 from gems_craft.expression.expression import (
     DualNode,
     LowerBoundNode,
@@ -131,21 +131,30 @@ def test_dual_reduced_cost_indexing() -> None:
     )
 
 
-def test_set_index_sum_over_indexing_placeholder() -> None:
-    """SetIndexNode/SumOverNode don't yet affect IndexingStructure (no `sets`
-    dimension exists there yet -- see indexing.py TODOs); for now they just
-    propagate the operand's time/scenario structure unchanged. This test
-    documents today's placeholder behavior and should be revisited once
-    IndexingStructure grows a `sets` dimension (custom sets, phase 2)."""
-    x = var("x")
-    provider = StructureProvider()
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        (
+            var("x").set_index("fuel", position=param("p")),
+            IndexingStructure(False, True),
+        ),
+        (
+            var("x").set_index("fuel", relative_shift=param("p")),
+            IndexingStructure(False, True),
+        ),
+    ],
+)
+def test_set_index_brings_index_dependency(
+    expr: ExpressionNode, expected: IndexingStructure
+) -> None:
+    class ScenarioParameterProvider(StructureProvider):
+        def get_parameter_structure(self, name: str) -> IndexingStructure:
+            return IndexingStructure(False, True)
 
-    assert compute_indexation(x.set_index("fuel"), provider) == IndexingStructure(
-        True, True
-    )
-    assert compute_indexation(x.sum_over("fuel"), provider) == IndexingStructure(
-        True, True
-    )
+        def get_variable_structure(self, name: str) -> IndexingStructure:
+            return IndexingStructure(False, False)
+
+    assert compute_indexation(expr, ScenarioParameterProvider()) == expected
 
 
 def test_lower_upper_bound_indexing() -> None:

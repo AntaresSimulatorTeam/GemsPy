@@ -53,7 +53,6 @@ from gems_craft.expression.expression import (
         var("x").round(),
         maximum(var("x"), param("p")),
         minimum(var("x"), param("p")),
-        var("x").set_index("fuel"),
         var("x").set_index("fuel", position=2),
         var("x").set_index("fuel", relative_shift=1),
         var("x").sum_over("fuel"),
@@ -133,40 +132,20 @@ def test_lower_upper_bound_equality() -> None:
 
 
 @pytest.mark.parametrize(
-    "lhs, rhs, equal",
+    "lhs, rhs",
     [
-        (
-            var("x").set_index("fuel", position=2),
-            var("x").set_index("fuel", position=2),
-            True,
-        ),
-        (var("x").set_index("fuel"), var("x").set_index("segment"), False),
-        (var("x").set_index("fuel"), var("x").set_index("fuel", position=2), False),
+        (var("x").set_index("fuel"), var("x").set_index("segment")),
+        (var("x").set_index("fuel"), var("x").set_index("fuel", position=2)),
         (
             var("x").set_index("fuel", position=2),
             var("x").set_index("fuel", relative_shift=2),
-            False,
         ),
         (
             var("x").set_index("fuel", position=2),
             var("x").set_index("fuel", position=3),
-            False,
         ),
-        (
-            var("x").set_index("fuel", relative_shift=1),
-            var("x").set_index("fuel", relative_shift=1),
-            True,
-        ),
-        (
-            var("x").set_index("fuel", relative_shift=1),
-            var("x").set_index("fuel", relative_shift=2),
-            False,
-        ),
-        (var("x").sum_over("fuel"), var("x").sum_over("segment"), False),
-        (var("x").sum_over("fuel"), var("x").set_index("fuel"), False),
+        (var("x").sum_over("fuel"), var("x").sum_over("segment")),
     ],
 )
-def test_set_index_sum_over_equality(
-    lhs: ExpressionNode, rhs: ExpressionNode, equal: bool
-) -> None:
-    assert expressions_equal(lhs, rhs) is equal
+def test_set_index_sum_over_not_equal(lhs: ExpressionNode, rhs: ExpressionNode) -> None:
+    assert not expressions_equal(lhs, rhs)

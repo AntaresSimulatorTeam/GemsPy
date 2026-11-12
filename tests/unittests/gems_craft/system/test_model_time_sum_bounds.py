@@ -90,13 +90,13 @@ def test_time_independent_bounds_are_accepted(time_sum: ExpressionNode) -> None:
         ),
         pytest.param(
             var("x").time_sum_between(0, param("k").eval(0) + param("j")),
-            "the time sum bound '((k[t=0.0]) + j)' depends on time, but must be "
+            "the time sum bound '((k.eval(0.0)) + j)' depends on time, but must be "
             "time-independent. Declare 'j' with `time-dependent: false`.",
             id="names-only-the-time-dependent-parameter",
         ),
         pytest.param(
             var("x").time_sum_between(0, param("k").shift(-1)),
-            "the time sum bound '(k[t-1.0])' depends on time, but must be "
+            "the time sum bound '(k.shift(-1.0))' depends on time, but must be "
             "time-independent. Declare 'k' with `time-dependent: false`.",
             id="time-shift-moves-with-t",
         ),

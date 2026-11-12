@@ -87,8 +87,8 @@ class ExprVisitor(ParseTreeVisitor):
     def visitKeywordTerm(self, ctx: ExprParser.KeywordTermContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#positionTerm.
-    def visitPositionTerm(self, ctx: ExprParser.PositionTermContext):
+    # Visit a parse tree produced by ExprParser#bareTerm.
+    def visitBareTerm(self, ctx: ExprParser.BareTermContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#sum_bound.

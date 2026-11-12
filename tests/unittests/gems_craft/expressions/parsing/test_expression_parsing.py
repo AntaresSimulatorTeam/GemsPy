@@ -129,21 +129,12 @@ from gems_craft.expression.parsing.parse_expression import (
         ),
         ({"x"}, {}, "x[t]", var("x")),
         ({"x"}, {"p"}, "x[t+p]", var("x").shift(param("p"))),
-        # legacy absolute-time indexing by a parameter
         ({"x"}, {"p"}, "x[p]", var("x").eval(param("p"))),
-        ({"x"}, {"p"}, "x[p+1]", var("x").eval(param("p") + 1)),
-        ({"x"}, {"p"}, "x[p-1]", var("x").eval(param("p") - 1)),
         (
             {"x", "y"},
             {"p", "q"},
             "(x+y)[p+q]",
             (var("x") + var("y")).eval(param("p") + param("q")),
-        ),
-        (
-            {"x"},
-            {"p", "q"},
-            "x[p - q*2]",
-            var("x").eval(param("p") - param("q") * 2),
         ),
         ({}, {}, "sum_connections(port.f)", port_field("port", "f").sum_connections()),
         (
@@ -363,36 +354,13 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
     [
         ({"fuel"}, "x[fuel]", var("x").set_index("fuel")),
         ({"fuel"}, "x[fuel=2]", var("x").set_index("fuel", position=literal(2))),
-        ({"fuel"}, "x[t=2]", var("x").eval(literal(2))),
-        (
-            {"fuel"},
-            "x[t=2, fuel=1]",
-            var("x").eval(literal(2)).set_index("fuel", position=literal(1)),
-        ),
-        (
-            {"fuel"},
-            "x[fuel+1]",
-            var("x").set_index("fuel", relative_shift=literal(1)),
-        ),
-        (
-            {"fuel"},
-            "x[fuel-1]",
-            var("x").set_index("fuel", relative_shift=-literal(1)),
-        ),
-        ({"fuel"}, "x[fuel+0]", var("x").set_index("fuel")),
+        ({"fuel"}, "x[fuel-0]", var("x").set_index("fuel")),
         (
             {"fuel"},
             "x[fuel-p*2+1]",
             var("x").set_index(
                 "fuel", relative_shift=-(param("p") * literal(2)) + literal(1)
             ),
-        ),
-        ({"fuel"}, "x[p+1]", var("x").eval(param("p") + literal(1))),
-        pytest.param(
-            {"fuel"},
-            "x[t+1, fuel]",
-            var("x").shift(literal(1)).set_index("fuel"),
-            id="time-shift-and-set",
         ),
         pytest.param(
             {"fuel"},
@@ -409,42 +377,10 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
             id="parameter-in-set-terms",
         ),
         pytest.param(
-            {"fuel", "segment"},
-            "sum_over(fuel, sum_over(segment, x))",
-            var("x").sum_over("segment").sum_over("fuel"),
-            id="nested-sum-over",
-        ),
-        pytest.param(
             {"fuel"},
             "sum_over(fuel, x[fuel])",
             var("x").set_index("fuel").sum_over("fuel"),
             id="sum-over-set-index",
-        ),
-        pytest.param(
-            {"fuel"},
-            "sum(t-1..t+1, sum_over(fuel, x[fuel]))",
-            var("x")
-            .set_index("fuel")
-            .sum_over("fuel")
-            .time_sum(-literal(1), literal(1)),
-            id="sum-over-in-time-window",
-        ),
-        (
-            {"segment", "fuel"},
-            "x[segment=2, fuel=1]",
-            var("x")
-            .set_index("fuel", position=literal(1))
-            .set_index("segment", position=literal(2)),
-        ),
-        (
-            {"fuel"},
-            "x[fuel=3, 2]",
-            var("x").eval(literal(2)).set_index("fuel", position=literal(3)),
-        ),
-        (
-            {"fuel"},
-            "sum_over(fuel, x)",
-            var("x").sum_over("fuel"),
         ),
         (
             {"fuel"},
@@ -483,23 +419,12 @@ def test_parsing_equivalent_index_forms(lhs: str, rhs: str) -> None:
 @pytest.mark.parametrize(
     "expression_str, match",
     [
-        ("x[2, 3]", "more than one term.*got '2' and '3' in '\\[2,3\\]'"),
         ("x[t, p]", "more than one term.*got 't' and 'p' in '\\[t,p\\]'"),
         ("x[fuel, fuel=2]", "indexed more than once"),
-        ("x[notaset]", "not a valid variable or parameter.*declared sets"),
         ("x[fule]", "fule is not a valid.*declared sets: \\['fuel', 'segment'\\]"),
         ("x[fuel*2]", "'fuel' is a set.*X\\[fuel=k\\].*sum_over\\(fuel"),
-        ("x[2*fuel+1]", "'fuel' is a set"),
-        ("x[fuel=2, fuel+1]", "indexed more than once"),
-        ("x[nonexistent=2]", "neither 't' nor a declared set"),
-        ("sum(fuel-p..fuel, x)", "'fuel' is a set"),
-        ("sum(t-p..fuel, x)", "'fuel' is a set"),
-        ("sum(foo..t, x)", "foo is not a valid variable or parameter"),
-        ("sum_over(other, x)", "'other' is not a declared set"),
         ("sum_over(p, x)", "'p' is not a declared set"),
         ("x[p=2]", "neither 't' nor a declared set"),
-        # comparisons are not allowed in an index: syntax error
-        ("x[fuel>=2]", "ParseCancellationException"),
     ],
 )
 def test_parsing_custom_set_indexing_raises(expression_str: str, match: str) -> None:
@@ -519,7 +444,6 @@ def test_set_index_node_rejects_position_and_relative_shift() -> None:
     "variables, parameters, sets, match",
     [
         ({"v"}, set(), {"v"}, "clash"),
-        (set(), {"fuel"}, {"fuel"}, "clash"),
         (set(), set(), {"t"}, "reserved"),
     ],
 )

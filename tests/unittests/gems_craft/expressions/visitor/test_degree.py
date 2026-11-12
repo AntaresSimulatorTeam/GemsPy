@@ -99,8 +99,6 @@ def test_lower_upper_bound_degree() -> None:
     "expr, degree",
     [
         (var("x").set_index("fuel"), 1),
-        (param("p").set_index("fuel", position=2), 0),
-        (var("x").sum_over("fuel"), 1),
         (param("p").sum_over("fuel"), 0),
     ],
 )

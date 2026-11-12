@@ -328,9 +328,7 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         return operand * self.block_length  # type: ignore[operator,return-value]
 
     # ------------------------------------------------------------------ #
-    # Custom-set operators (not yet supported — see custom sets & indexing #
-    # design; implementing these requires threading a per-set dim through  #
-    # param_arrays/port_arrays first)                                      #
+    # Custom-set operators (not yet supported)                            #
     # ------------------------------------------------------------------ #
 
     def set_index(self, node: SetIndexNode) -> VectorizedExpr:

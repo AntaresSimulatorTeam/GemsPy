@@ -385,8 +385,7 @@ class AllTimeSumNode(UnaryOperatorNode):
 class SetIndexNode(UnaryOperatorNode):
     """
     References one element of a custom index set (local or global) that the
-    operand is indexed by (custom sets are not yet tracked by
-    ``IndexingStructure``; see phase 2).
+    operand is indexed by.
 
     At most one of ``position`` and ``relative_shift`` may be set:
       - bare form ``X[fuel]``      -> position=None, relative_shift=None (current element)

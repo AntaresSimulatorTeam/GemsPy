@@ -2554,7 +2554,7 @@ class ExprParser(Parser):
         def copyFrom(self, ctx: ParserRuleContext):
             super().copyFrom(ctx)
 
-    class PositionTermContext(IndexTermContext):
+    class BareTermContext(IndexTermContext):
 
         def __init__(
             self, parser, ctx: ParserRuleContext
@@ -2566,8 +2566,8 @@ class ExprParser(Parser):
             return self.getTypedRuleContext(ExprParser.Time_exprContext, 0)
 
         def accept(self, visitor: ParseTreeVisitor):
-            if hasattr(visitor, "visitPositionTerm"):
-                return visitor.visitPositionTerm(self)
+            if hasattr(visitor, "visitBareTerm"):
+                return visitor.visitBareTerm(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -2647,7 +2647,7 @@ class ExprParser(Parser):
                 pass
 
             elif la_ == 3:
-                localctx = ExprParser.PositionTermContext(self, localctx)
+                localctx = ExprParser.BareTermContext(self, localctx)
                 self.enterOuterAlt(localctx, 3)
                 self.state = 119
                 self.time_expr()
@@ -2805,7 +2805,7 @@ class ExprParser(Parser):
             self.s7 = None  # Token
             self.ops = list()  # of Tokens
             self.s2 = None  # Token
-            self._tset373 = None  # Token
+            self._tset361 = None  # Token
             self._time_term = None  # Time_termContext
             self.terms = list()  # of Time_termContexts
 
@@ -2841,14 +2841,14 @@ class ExprParser(Parser):
             _la = self._input.LA(1)
             while _la == 2 or _la == 7:
                 self.state = 131
-                localctx._tset373 = self._input.LT(1)
+                localctx._tset361 = self._input.LT(1)
                 _la = self._input.LA(1)
                 if not (_la == 2 or _la == 7):
-                    localctx._tset373 = self._errHandler.recoverInline(self)
+                    localctx._tset361 = self._errHandler.recoverInline(self)
                 else:
                     self._errHandler.reportMatch(self)
                     self.consume()
-                localctx.ops.append(localctx._tset373)
+                localctx.ops.append(localctx._tset361)
                 self.state = 132
                 localctx._time_term = self.time_term()
                 localctx.terms.append(localctx._time_term)
@@ -2876,7 +2876,7 @@ class ExprParser(Parser):
             self.s7 = None  # Token
             self.ops = list()  # of Tokens
             self.s2 = None  # Token
-            self._tset409 = None  # Token
+            self._tset397 = None  # Token
             self._time_term = None  # Time_termContext
             self.terms = list()  # of Time_termContexts
 
@@ -2916,14 +2916,14 @@ class ExprParser(Parser):
             _la = self._input.LA(1)
             while _la == 2 or _la == 7:
                 self.state = 142
-                localctx._tset409 = self._input.LT(1)
+                localctx._tset397 = self._input.LT(1)
                 _la = self._input.LA(1)
                 if not (_la == 2 or _la == 7):
-                    localctx._tset409 = self._errHandler.recoverInline(self)
+                    localctx._tset397 = self._errHandler.recoverInline(self)
                 else:
                     self._errHandler.reportMatch(self)
                     self.consume()
-                localctx.ops.append(localctx._tset409)
+                localctx.ops.append(localctx._tset397)
                 self.state = 143
                 localctx._time_term = self.time_term()
                 localctx.terms.append(localctx._time_term)
@@ -2950,7 +2950,7 @@ class ExprParser(Parser):
             self.s6 = None  # Token
             self.ops = list()  # of Tokens
             self.s5 = None  # Token
-            self._tset432 = None  # Token
+            self._tset420 = None  # Token
             self._time_factor = None  # Time_factorContext
             self.factors = list()  # of Time_factorContexts
 
@@ -2983,14 +2983,14 @@ class ExprParser(Parser):
             _la = self._input.LA(1)
             while _la == 5 or _la == 6:
                 self.state = 150
-                localctx._tset432 = self._input.LT(1)
+                localctx._tset420 = self._input.LT(1)
                 _la = self._input.LA(1)
                 if not (_la == 5 or _la == 6):
-                    localctx._tset432 = self._errHandler.recoverInline(self)
+                    localctx._tset420 = self._errHandler.recoverInline(self)
                 else:
                     self._errHandler.reportMatch(self)
                     self.consume()
-                localctx.ops.append(localctx._tset432)
+                localctx.ops.append(localctx._tset420)
                 self.state = 151
                 localctx._time_factor = self.time_factor()
                 localctx.factors.append(localctx._time_factor)

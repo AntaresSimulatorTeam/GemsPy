@@ -14,9 +14,6 @@ All notable changes to GemsPy are documented here.
 - `ComponentView` and `OutputView` are renamed `ComponentResults` and
   `OutputResults`, so that they are not confused with GEMS views. The calls
   `component(...).output(...)`, `value()` and `data` are unchanged.
-- **Breaking** - `x[p = 2]` (where `p` is neither `t` nor a set) now raises a
-  parsing error instead of being accepted as a time index and failing later,
-  when the problem is built.
 - **Breaking** - time shifts, time indices and time sum bounds only accept
   numbers, parameters, `+ - * /`, parentheses and the functions `floor`,
   `ceil`, `round`, `abs`, `max`, `min`, `expec`. Variables, port fields, sums
