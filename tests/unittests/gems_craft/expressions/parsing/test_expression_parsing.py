@@ -380,6 +380,14 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
             var("x").set_index("fuel", relative_shift=-literal(1)),
         ),
         ({"fuel"}, "x[fuel+0]", var("x").set_index("fuel")),
+        (
+            {"fuel"},
+            "x[fuel-p*2+1]",
+            var("x").set_index(
+                "fuel", relative_shift=-(param("p") * literal(2)) + literal(1)
+            ),
+        ),
+        ({"fuel"}, "x[p+1]", var("x").eval(param("p") + literal(1))),
         pytest.param(
             {"fuel"},
             "x[t+1, fuel]",

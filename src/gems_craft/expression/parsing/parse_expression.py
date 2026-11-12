@@ -227,30 +227,6 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         amount = ctx.shift().accept(self)  # type: ignore
         return None, lambda expr: _shift(expr, amount)
 
-    # Visit a parse tree produced by ExprParser#namedShiftTerm.
-    def visitNamedShiftTerm(
-        self, ctx: ExprParser.NamedShiftTermContext
-    ) -> Tuple[Optional[str], Callable[[ExpressionNode], ExpressionNode]]:
-        """Returns (set_id, apply) -- set_id is None for a time-denoting term."""
-        identifier: str = ctx.IDENTIFIER().getText()  # type: ignore
-        terms = [term.accept(self) for term in ctx.terms]  # type: ignore
-        ops = ctx.ops  # type: ignore
-
-        if self.identifiers.is_set(identifier):
-            amount: ExpressionNode = literal(0)
-            if terms:
-                first = -terms[0] if ops[0].text == "-" else terms[0]
-                amount = _fold(first, ops[1:], terms[1:])
-            if expressions_equal(amount, literal(0)):
-                return identifier, lambda expr: expr.set_index(identifier)
-            return identifier, lambda expr: expr.set_index(
-                identifier, relative_shift=amount
-            )
-
-        # Not a set: an absolute time index, as positionTerm would parse it.
-        eval_time = _fold(self._convert_time_identifier(identifier), ops, terms)
-        return None, lambda expr: expr.eval(eval_time)
-
     # Visit a parse tree produced by ExprParser#keywordTerm.
     def visitKeywordTerm(
         self, ctx: ExprParser.KeywordTermContext
@@ -273,9 +249,38 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     def visitPositionTerm(
         self, ctx: ExprParser.PositionTermContext
     ) -> Tuple[Optional[str], Callable[[ExpressionNode], ExpressionNode]]:
-        """Returns (set_id, apply) -- set_id is None for a time-denoting term."""
-        eval_time = ctx.time_expr().accept(self)  # type: ignore
-        return None, lambda expr: expr.eval(eval_time)
+        """Returns (set_id, apply) -- set_id is None for a time-denoting term.
+
+        `set`, `set + ...` or `set - ...` (with `set` a declared set) is a set
+        shift; any other expression is an absolute time index.
+        """
+        time_expr = ctx.time_expr()  # type: ignore
+        set_id = self._leading_set_id(time_expr)
+        if set_id is None:
+            eval_time = time_expr.accept(self)
+            return None, lambda expr: expr.eval(eval_time)
+
+        terms = [term.accept(self) for term in time_expr.time_term()[1:]]
+        ops = time_expr.ops
+        amount: ExpressionNode = literal(0)
+        if terms:
+            first = -terms[0] if ops[0].text == "-" else terms[0]
+            amount = _fold(first, ops[1:], terms[1:])
+        if expressions_equal(amount, literal(0)):
+            return set_id, lambda expr: expr.set_index(set_id)
+        return set_id, lambda expr: expr.set_index(set_id, relative_shift=amount)
+
+    def _leading_set_id(self, ctx: ExprParser.Time_exprContext) -> Optional[str]:
+        """The set id if ctx starts with a bare declared set id, else None."""
+        if ctx.neg is not None:  # type: ignore
+            return None
+        factors = ctx.time_term(0).time_factor()  # type: ignore
+        if len(factors) != 1 or not isinstance(
+            factors[0], ExprParser.TimeIdentifierContext
+        ):
+            return None
+        identifier: str = factors[0].IDENTIFIER().getText()  # type: ignore
+        return identifier if self.identifiers.is_set(identifier) else None
 
     def visitTimeSum(self, ctx: ExprParser.TimeSumContext) -> ExpressionNode:
         summed_expr = ctx.expr().accept(self)  # type: ignore

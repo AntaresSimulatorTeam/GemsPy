@@ -38,19 +38,17 @@ argList : expr (',' expr)* ;
 // An index list is one or more comma-separated terms, in any order.
 // ANTLR only distinguishes the shapes below; it cannot tell whether a
 // bare/signed identifier is a declared set, "t", or an ordinary
-// parameter -- that's resolved by ExpressionNodeBuilderVisitor via
-// ModelIdentifiers. Term order not mattering (`X[fuel=3, 2]` == `X[2,
-// fuel=3]`) and rejecting more than one term denoting the time dimension
-// (`X[2, 3]`) are also builder-level checks, not grammar-level ones.
+// parameter (e.g. a set shift `X[fuel + 1]` is a positionTerm) -- that's
+// resolved by ExpressionNodeBuilderVisitor via ModelIdentifiers. Term order
+// not mattering (`X[fuel=3, 2]` == `X[2, fuel=3]`) and rejecting more than
+// one term denoting the time dimension (`X[2, 3]`) are also builder-level
+// checks, not grammar-level ones.
 indexList : indexTerm (',' indexTerm)* ;
 
-// `X[p]` and `X[p + 1]` match both namedShiftTerm and positionTerm; ANTLR
-// picks the first alternative, so namedShiftTerm must stay before positionTerm.
 indexTerm
-    : shift                                                # timeShiftTerm
-    | IDENTIFIER (ops+=('+' | '-') terms+=time_term)*      # namedShiftTerm
-    | (TIME | IDENTIFIER) EQ time_expr                     # keywordTerm
-    | time_expr                                            # positionTerm
+    : shift                                # timeShiftTerm
+    | (TIME | IDENTIFIER) EQ time_expr     # keywordTerm
+    | time_expr                            # positionTerm
     ;
 
 // A time sum bound is either relative to the current time step ("t", "t + ...",

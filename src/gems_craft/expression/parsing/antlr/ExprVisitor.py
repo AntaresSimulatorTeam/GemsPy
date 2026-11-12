@@ -83,10 +83,6 @@ class ExprVisitor(ParseTreeVisitor):
     def visitTimeShiftTerm(self, ctx: ExprParser.TimeShiftTermContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#namedShiftTerm.
-    def visitNamedShiftTerm(self, ctx: ExprParser.NamedShiftTermContext):
-        return self.visitChildren(ctx)
-
     # Visit a parse tree produced by ExprParser#keywordTerm.
     def visitKeywordTerm(self, ctx: ExprParser.KeywordTermContext):
         return self.visitChildren(ctx)
