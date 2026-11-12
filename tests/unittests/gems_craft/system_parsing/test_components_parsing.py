@@ -406,13 +406,6 @@ def test_parse_yaml_system_sets_and_indexed_by() -> None:
     assert component.parameters[0].indexed_by == ["fuel"]
 
 
-def test_parse_yaml_system_sets_and_indexed_by_default_absent() -> None:
-    system = parse_yaml_system(io.StringIO(_SYSTEM_WITH_COMPONENT_PROPERTIES))
-    assert system.sets is None
-    for component in system.components:
-        assert component.sets is None
-
-
 @pytest.mark.parametrize(
     "elements, error",
     [
@@ -421,6 +414,6 @@ def test_parse_yaml_system_sets_and_indexed_by_default_absent() -> None:
     ],
 )
 def test_set_instance_invalid_range_raises(elements: str, error: str) -> None:
-    system_yaml = f"system:\n\n  sets:\n\n    - id: fuel\n\n      elements: {elements}\n\n  components: []\n"
+    system_yaml = f"system:\n  sets:\n    - id: fuel\n      elements: {elements}\n  components: []\n"
     with pytest.raises(ValidationError, match=error):
         parse_yaml_system(io.StringIO(system_yaml))

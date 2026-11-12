@@ -53,57 +53,68 @@ def _check(system, lib_yaml: str = _LIB) -> None:
     check_custom_sets(system, model_dict, lib_dict)
 
 
-def test_valid_global_and_local_set_instantiation_ok() -> None:
-    _check(_system())
+def _fuel_lib(model: str) -> str:
+    """A library declaring the global set 'fuel' and a single model `m`."""
+    return (
+        f"library: {{id: setlib, sets: [{{id: fuel}}], models: [{{id: m, {model}}}]}}"
+    )
 
 
-@pytest.mark.parametrize(
-    "system_args, error",
-    [
-        ({"global_sets": None}, "not instantiated"),
-        ({"local_sets": None}, "missing instantiation"),
-        (
-            {"global_sets": "[{id: fuel, elements: [gas, gas]}]"},
-            "duplicate elements",
-        ),
-        (
-            {"global_sets": "[{id: fuel, elements: [gas, 'co|al']}]"},
-            r"containing '\|'",
-        ),
-        (
-            {
-                "global_sets": "[{id: fuel, elements: [gas]}, {id: ghost, elements: [a]}]"
-            },
-            "not declared by any library",
-        ),
-        (
-            {
-                "local_sets": "[{id: segment, elements: 0..2}, {id: ghost, elements: [a]}]"
-            },
-            "not local sets of its model",
-        ),
-    ],
-    ids=[
-        "missing global set",
-        "missing local set",
+_NO_SETS = {"global_sets": None, "local_sets": None}
+
+# (system_args, library yaml, expected error regex or None when the check passes)
+_CASES = {
+    "valid instantiation": ({}, _LIB, None),
+    "missing global set": ({"global_sets": None}, _LIB, "not instantiated"),
+    "missing local set": ({"local_sets": None}, _LIB, "missing instantiation"),
+    "duplicate elements": (
+        {"global_sets": "[{id: fuel, elements: [gas, gas]}]"},
+        _LIB,
         "duplicate elements",
-        "pipe in element",
-        "undeclared global set",
-        "non-local set on component",
-    ],
-)
-def test_invalid_set_instantiation_raises(system_args: dict, error: str) -> None:
-    with pytest.raises(ValueError, match=error):
-        _check(_system(**system_args))
+    ),
+    "duplicate elements as text": (
+        {"global_sets": "[{id: fuel, elements: [1, '1']}]"},
+        _LIB,
+        "duplicate elements",
+    ),
+    "pipe in element": (
+        {"global_sets": "[{id: fuel, elements: [gas, 'co|al']}]"},
+        _LIB,
+        r"containing '\|'",
+    ),
+    "undeclared global set": (
+        {"global_sets": "[{id: fuel, elements: [gas]}, {id: ghost, elements: [a]}]"},
+        _LIB,
+        "not declared by any library",
+    ),
+    "non-local set on component": (
+        {"local_sets": "[{id: segment, elements: 0..2}, {id: ghost, elements: [a]}]"},
+        _LIB,
+        "not local sets of its model",
+    ),
+    # like a time-dependent parameter needn't actually vary
+    "unused global set not instantiated": (
+        _NO_SETS,
+        _fuel_lib("parameters: [{id: p}]"),
+        None,
+    ),
+    "set used only by sum_over not instantiated": (
+        _NO_SETS,
+        _fuel_lib(
+            "parameters: [{id: p}], "
+            "extra-outputs: [{id: o, expression: 'sum_over(fuel, p)'}]"
+        ),
+        "not instantiated",
+    ),
+}
 
 
-def test_unused_global_set_not_required_to_be_instantiated() -> None:
-    """A declared global set that no model references via indexed_by needn't be
-    instantiated (like a time-dependent parameter needn't actually vary)."""
-    lib = """
-library:
-  id: setlib
-  sets: [{id: fuel}]
-  models: [{id: m, parameters: [{id: p}]}]
-"""
-    _check(_system(global_sets=None, local_sets=None), lib)
+@pytest.mark.filterwarnings("ignore:sum_over")
+@pytest.mark.parametrize("system_args, lib, error", _CASES.values(), ids=_CASES.keys())
+def test_check_custom_sets(system_args: dict, lib: str, error: Optional[str]) -> None:
+    system = _system(**system_args)
+    if error is None:
+        _check(system, lib)
+    else:
+        with pytest.raises(ValueError, match=error):
+            _check(system, lib)

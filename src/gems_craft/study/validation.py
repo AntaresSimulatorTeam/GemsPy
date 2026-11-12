@@ -21,6 +21,7 @@ from typing import Dict, Set
 
 from gems_craft.model import Model
 from gems_craft.model.library import Library
+from gems_craft.model.model import sets_used_by_model
 from gems_craft.study.parsing import SetInstanceSchema, SystemSchema
 from gems_craft.study.study import Study
 from gems_craft.study.system import System
@@ -42,23 +43,13 @@ def check_component_models(system: System, input_models: Dict[str, Model]) -> bo
 
 
 def _check_set_elements(instance: SetInstanceSchema) -> None:
-    elements = instance.elements
-    if len(set(elements)) != len(elements):
+    # Compared as strings: elements are written as text in output tables
+    names = [str(e) for e in instance.elements]
+    if len(set(names)) != len(names):
         raise ValueError(f"Set '{instance.id}' has duplicate elements.")
     # '|' joins element names in output tables' `set_index` column
-    if any("|" in str(e) for e in elements):
+    if any("|" in name for name in names):
         raise ValueError(f"Set '{instance.id}' has an element containing '|'.")
-
-
-def _sets_used_by_model(model: Model) -> Set[str]:
-    """Every set id actually referenced via `indexed_by` by some parameter or
-    variable of this model (local or global -- not distinguished here)."""
-    used: Set[str] = set()
-    for p in model.parameters.values():
-        used |= p.structure.sets
-    for v in model.variables.values():
-        used |= v.structure.sets
-    return used
 
 
 def check_custom_sets(
@@ -69,8 +60,8 @@ def check_custom_sets(
     """
     Cross-validates declared global/local custom sets against their
     instantiation in system.yml:
-      - every global set actually used by some component's model is
-        instantiated at the system level;
+      - every global set actually used by some component's model (see
+        `sets_used_by_model`) is instantiated at the system level;
       - every local set actually used by a component's model is instantiated
         by that component;
       - every instantiated set's element list is duplicate-free (an empty
@@ -85,13 +76,13 @@ def check_custom_sets(
 
     used_global_sets: Set[str] = set()
     for model in used_models:
-        used_global_sets |= _sets_used_by_model(model) - model.local_sets
+        used_global_sets |= sets_used_by_model(model) - model.local_sets
 
     instantiated_global = {s.id: s for s in (input_study.sets or [])}
     missing_global = used_global_sets - instantiated_global.keys()
     if missing_global:
         raise ValueError(
-            f"Global set(s) {sorted(missing_global)} are used (via indexed_by) "
+            f"Global set(s) {sorted(missing_global)} are used "
             "by a component's model but not instantiated in system.yml's "
             "system-level 'sets:'."
         )
@@ -110,7 +101,7 @@ def check_custom_sets(
         if component_model is None:
             continue  # reported by check_component_models
         used_local_sets = (
-            _sets_used_by_model(component_model) & component_model.local_sets
+            sets_used_by_model(component_model) & component_model.local_sets
         )
         instantiated_local = {s.id: s for s in (component.sets or [])}
         unknown_local = instantiated_local.keys() - component_model.local_sets
@@ -123,7 +114,7 @@ def check_custom_sets(
         if missing_local:
             raise ValueError(
                 f"Component '{component.id}' is missing instantiation for local "
-                f"set(s) {sorted(missing_local)} used (via indexed_by) by its model."
+                f"set(s) {sorted(missing_local)} used by its model."
             )
         for s in instantiated_local.values():
             _check_set_elements(s)

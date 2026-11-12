@@ -74,7 +74,9 @@ class IndexingStructureProvider(ABC):
 @dataclass(frozen=True)
 class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
     """
-    Determines if the expression represents a single expression or an expression that should be instantiated for all time steps.
+    Computes the time, scenario and custom-set dimensions an expression varies over.
+    Raises IndexingUsageError when a set index targets a set the operand is not
+    indexed by.
     """
 
     context: IndexingStructureProvider

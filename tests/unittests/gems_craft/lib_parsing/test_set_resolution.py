@@ -29,14 +29,14 @@ def _model_lib(model: str, *top: str) -> str:
     return _lib(*top, "models:", f"  - {{id: m, {model}}}")
 
 
-def _port_lib(definition: str, *top: str) -> str:
+def _port_lib(definition: str) -> str:
     return _lib(
         _FLOW_PORT_TYPE,
-        *top,
+        "sets: [{id: fuel}]",
         "models:",
         "  - id: m",
         "    sets: [{id: segment}]",
-        "    parameters: [{id: gen, indexed-by: [segment]}]",
+        "    parameters: [{id: gen, indexed-by: [segment]}, {id: cap, indexed-by: [fuel]}]",
         "    ports: [{id: injection_port, type: flow}]",
         "    port-field-definitions:",
         f"      - {{port: injection_port, field: flow, definition: '{definition}'}}",
@@ -76,31 +76,27 @@ _CASES = {
         ),
         None,
     ),
-    "time index on non time-dependent parameter": (
+    "constraint bound with an invalid set index": (
         _model_lib(
-            "parameters: [{id: p, time-dependent: false}], variables: [{id: x}], "
-            "constraints: [{id: c, expression: 'p[5] <= x'}]"
+            "parameters: [{id: p}], variables: [{id: x}], "
+            "constraints: [{id: c, expression: x, lower-bound: 'p[fuel]'}]",
+            _FUEL,
         ),
-        None,
+        "not indexed by 'fuel'",
     ),
-    "time index on time-dependent parameter": (
+    "constraint bound indexed by a set the expression lacks": (
         _model_lib(
-            "parameters: [{id: p, time-dependent: true}], variables: [{id: x}], "
-            "constraints: [{id: c, expression: 'p[5] <= x'}]"
+            f"{_P_FUEL}, variables: [{{id: x}}], "
+            "constraints: [{id: c, expression: x, upper-bound: 'cap[fuel]'}]",
+            _FUEL,
         ),
-        None,
+        "that constraint 'c' is not indexed by",
     ),
-    "relative shift on non time-dependent parameter": (
+    "constraint bound indexed by a set the expression has": (
         _model_lib(
-            "parameters: [{id: p, time-dependent: false}], variables: [{id: x}], "
-            "constraints: [{id: c, expression: 'p[t+1] <= x'}]"
-        ),
-        None,
-    ),
-    "relative shift on time-dependent parameter": (
-        _model_lib(
-            "parameters: [{id: p, time-dependent: true}], variables: [{id: x}], "
-            "constraints: [{id: c, expression: 'p[t+1] <= x'}]"
+            f"{_P_FUEL}, variables: [{{id: x, indexed-by: [fuel]}}], "
+            "constraints: [{id: c, expression: 'x[fuel]', upper-bound: 'cap[fuel]'}]",
+            _FUEL,
         ),
         None,
     ),
@@ -108,7 +104,7 @@ _CASES = {
         _model_lib(
             f"{_P_FUEL}, variables: [{{id: x, upper-bound: 'cap[fuel]'}}]", _FUEL
         ),
-        "not declared in 'x'",
+        "that variable 'x' is not indexed by",
     ),
     "bound summed over a set the variable lacks": (
         _model_lib(
@@ -133,6 +129,8 @@ _CASES = {
         _port_lib("sum_over(segment, gen[segment])"),
         None,
     ),
+    # global sets, unlike local ones, may cross a port
+    "port field indexed by global set": (_port_lib("cap[fuel]"), None),
     "set index on dual of constraint with sum_connections": (
         _lib(
             _FLOW_PORT_TYPE,
@@ -159,21 +157,6 @@ def test_set_resolution(yaml: str, error: "str | None") -> None:
     else:
         with pytest.raises(ValueError, match=error):
             resolve_library([lib])
-
-
-def test_port_field_indexed_by_global_set_is_exempt() -> None:
-    """Global sets, unlike local ones, may cross a port."""
-    lib = _lib(
-        _FLOW_PORT_TYPE,
-        _FUEL,
-        "models:",
-        "  - id: m",
-        f"    {_P_FUEL}",
-        "    ports: [{id: injection_port, type: flow}]",
-        "    port-field-definitions:",
-        "      - {port: injection_port, field: flow, definition: 'cap[fuel]'}",
-    )
-    resolve_library([parse_yaml_library(io.StringIO(lib))])
 
 
 def test_duplicate_global_set_across_dependency_raises() -> None:

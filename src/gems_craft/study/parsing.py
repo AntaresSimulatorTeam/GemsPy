@@ -34,6 +34,7 @@ class ComponentParameterSchema(ModifiedBaseModel):
     id: str
     time_dependent: bool = False
     scenario_dependent: bool = False
+    # TODO(custom sets, phase 3): not yet checked against the model's indexed_by.
     indexed_by: List[str] = Field(default_factory=list)
     value: Union[float, str]
     scenario_group: Optional[str] = None

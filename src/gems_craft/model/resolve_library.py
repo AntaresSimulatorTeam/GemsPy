@@ -85,7 +85,6 @@ def resolve_library(
                 port_types={},
                 models={},
                 taxonomy=cur_yaml_lib.taxonomy,
-                sets=set(),
             )
 
             # Add already parsed port types from dependencies in current lib

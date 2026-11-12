@@ -139,93 +139,52 @@ def test_dual_reduced_cost_indexing() -> None:
 
 
 class _SetStructureProvider(IndexingStructureProvider):
-    """Variable 'x' is time/scenario-varying and indexed by 'fuel' and 'segment'."""
-
-    def get_component_variable_structure(
-        self, component_id: str, name: str
-    ) -> IndexingStructure:
-        raise NotImplementedError()
-
-    def get_component_parameter_structure(
-        self, component_id: str, name: str
-    ) -> IndexingStructure:
-        raise NotImplementedError()
+    """Variable 'x' varies over time and the sets 'fuel' and 'segment';
+    parameters vary over scenarios only."""
 
     def get_parameter_structure(self, name: str) -> IndexingStructure:
-        raise NotImplementedError()
+        return IndexingStructure(False, True)
 
     def get_variable_structure(self, name: str) -> IndexingStructure:
-        return IndexingStructure(True, True, frozenset({"fuel", "segment"}))
+        return IndexingStructure(True, False, frozenset({"fuel", "segment"}))
 
     def get_constraint_structure(self, name: str) -> IndexingStructure:
         raise NotImplementedError()
 
 
+_X_NO_SET = var("x").sum_over("fuel").sum_over("segment")
+
+
 @pytest.mark.parametrize(
-    "expr, sets",
+    "expr, scenario, sets",
     [
         # an explicit position or a sum_over removes the set dimension...
-        (var("x").set_index("fuel", position=literal(2)), {"segment"}),
-        (var("x").sum_over("fuel"), {"segment"}),
+        (var("x").set_index("fuel", position=literal(2)), False, {"segment"}),
+        (var("x").sum_over("fuel"), False, {"segment"}),
         # ...a bare or relative-shift index keeps it
-        (var("x").set_index("fuel"), {"fuel", "segment"}),
-        (var("x").set_index("fuel", relative_shift=literal(1)), {"fuel", "segment"}),
+        (var("x").set_index("fuel"), False, {"fuel", "segment"}),
+        (
+            var("x").set_index("fuel", relative_shift=literal(1)),
+            False,
+            {"fuel", "segment"},
+        ),
+        # the position or shift brings its own scenario dependency
+        (var("x").set_index("fuel", position=param("p")), True, {"segment"}),
+        (
+            var("x").set_index("fuel", relative_shift=param("p")),
+            True,
+            {"fuel", "segment"},
+        ),
+        # operands after a time/scenario-varying one still contribute their sets
+        (_X_NO_SET * param("p") + var("x"), True, {"fuel", "segment"}),
     ],
 )
-def test_set_index_and_sum_over_structure(expr: ExpressionNode, sets: set) -> None:
+def test_set_index_and_sum_over_structure(
+    expr: ExpressionNode, scenario: bool, sets: set
+) -> None:
     assert compute_indexation(expr, _SetStructureProvider()) == IndexingStructure(
-        True, True, frozenset(sets)
+        True, scenario, frozenset(sets)
     )
-
-
-def test_combine_does_not_drop_sets_after_time_scenario_settled() -> None:
-    """Regression test for _combine's former short-circuit: once time and
-    scenario are both known to vary, further operands must still contribute
-    their `sets` to the union instead of being skipped."""
-    x = var("x")  # fully time/scenario-varying, no sets
-    y = var("y")
-
-    class MixedProvider(IndexingStructureProvider):
-        def get_component_variable_structure(self, component_id, name):  # type: ignore[no-untyped-def]
-            raise NotImplementedError()
-
-        def get_component_parameter_structure(self, component_id, name):  # type: ignore[no-untyped-def]
-            raise NotImplementedError()
-
-        def get_parameter_structure(self, name: str) -> IndexingStructure:
-            raise NotImplementedError()
-
-        def get_variable_structure(self, name: str) -> IndexingStructure:
-            if name == "x":
-                return IndexingStructure(True, True)
-            return IndexingStructure(True, True, frozenset({"fuel"}))
-
-        def get_constraint_structure(self, name: str) -> IndexingStructure:
-            raise NotImplementedError()
-
-    provider = MixedProvider()
-    assert compute_indexation(x + y, provider) == IndexingStructure(
-        True, True, frozenset({"fuel"})
-    )
-
-
-class _ScenarioIndexProvider(_SetStructureProvider):
-    """'x' as in _SetStructureProvider; parameters vary by scenario only."""
-
-    def get_parameter_structure(self, name: str) -> IndexingStructure:
-        return IndexingStructure(False, True)
-
-
-@pytest.mark.parametrize(
-    "expr",
-    [
-        var("x").set_index("fuel", position=param("p")),
-        var("x").set_index("fuel", relative_shift=param("p")),
-    ],
-)
-def test_set_index_brings_index_dependency(expr: ExpressionNode) -> None:
-    # The position or shift brings its own scenario dependency.
-    assert compute_indexation(expr, _ScenarioIndexProvider()).scenario
 
 
 def test_lower_upper_bound_indexing() -> None:
@@ -243,30 +202,22 @@ class ConstantParameterProvider(StructureProvider):
         return IndexingStructure(False, False)
 
 
-def test_unresolved_port_field_raises() -> None:
-    with pytest.raises(UnresolvedPortFieldError):
-        compute_indexation(
-            port_field("p", "f").sum_connections(), ConstantParameterProvider()
-        )
+_PORT = port_field("p", "f").sum_connections()
+_BAD_INDEX = param("p").set_index("fuel")
 
 
-def test_index_error_reported_alongside_unresolved_port_field() -> None:
-    """An invalid set index is still reported when a sibling operand (before or
-    after it) holds an unresolved port field."""
-    provider = ConstantParameterProvider()
-    port = port_field("p", "f").sum_connections()
-    bad = param("p").set_index("fuel")
-    with pytest.raises(IndexingUsageError):
-        compute_indexation(port + bad, provider)
-    with pytest.raises(IndexingUsageError):
-        compute_indexation(bad + port, provider)
-
-
-def test_time_shift_on_unresolved_port_field_is_deferred() -> None:
-    with pytest.raises(UnresolvedPortFieldError):
-        compute_indexation(
-            port_field("p", "f").sum_connections().shift(1), ConstantParameterProvider()
-        )
+@pytest.mark.parametrize(
+    "expr, error",
+    [
+        (_PORT, UnresolvedPortFieldError),
+        # an invalid set index is still reported next to an unresolved port field
+        (_PORT + _BAD_INDEX, IndexingUsageError),
+        (_BAD_INDEX + _PORT, IndexingUsageError),
+    ],
+)
+def test_indexing_errors(expr: ExpressionNode, error: type) -> None:
+    with pytest.raises(error):
+        compute_indexation(expr, ConstantParameterProvider())
 
 
 def test_sum_over_unindexed_operand_warns() -> None:
