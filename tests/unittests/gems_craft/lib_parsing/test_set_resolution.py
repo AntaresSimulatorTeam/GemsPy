@@ -78,10 +78,10 @@ _CASES = {
     ),
     "time index on non time-dependent parameter": (
         _model_lib(
-            "parameters: [{id: p}], variables: [{id: x}], "
+            "parameters: [{id: p, time-dependent: false}], variables: [{id: x}], "
             "constraints: [{id: c, expression: 'p[5] <= x'}]"
         ),
-        "not time-dependent",
+        None,
     ),
     "time index on time-dependent parameter": (
         _model_lib(
@@ -92,10 +92,10 @@ _CASES = {
     ),
     "relative shift on non time-dependent parameter": (
         _model_lib(
-            "parameters: [{id: p}], variables: [{id: x}], "
+            "parameters: [{id: p, time-dependent: false}], variables: [{id: x}], "
             "constraints: [{id: c, expression: 'p[t+1] <= x'}]"
         ),
-        "not time-dependent",
+        None,
     ),
     "relative shift on time-dependent parameter": (
         _model_lib(

@@ -16,8 +16,9 @@ uv sync --group dev
 **Test:**
 ```bash
 uv run pytest                                          # run all tests
+uv run pytest -n auto                                  # run all tests in parallel
 uv run pytest tests/path/to/test_file.py::test_name   # run a single test
-uv run pytest --cov gems_craft --cov gems_craft_hybrid --cov gems_runner --cov-report xml  # with coverage
+uv run pytest -n auto --cov gems_craft --cov gems_craft_hybrid --cov gems_runner --cov-report xml  # with coverage
 ```
 
 **Lint & Format:**
@@ -42,7 +43,7 @@ from gems_craft.study.folder import load_study
 from gems_runner.study.runner import run_study
 
 study = load_study(Path("path/to/study_dir"))   # reads input/, model-libraries/, data-series/
-run_study(Path("path/to/study_dir"))            # loads study, solves, writes CSV to output/
+run_study(Path("path/to/study_dir"))            # loads study, solves, writes output/<run_id>/simulation_table/ (Parquet)
 
 # Python API — programmatic study
 from gems_craft.study import Study
@@ -64,7 +65,7 @@ An optional `optim-config.yml` activates decomposition: variables and constraint
 The codebase is split into three packages along a solver-dependency boundary:
 
 - **`gems_craft`** (`src/gems_craft/`) — the domain model and all YAML I/O. No solver dependency at the module level; importable on its own for building, editing, validating, and querying systems (e.g. an API layer) without touching solve-time code. Deps: `numpy`, `pandas`, `PyYAML`, `pydantic`, `anytree`, `antlr4-python3-runtime`.
-- **`gems_craft_hybrid`** (`src/gems_craft_hybrid/`) — read/write support for *hybrid* GEMS studies, an extended format used to interoperate with Antares Simulator. No solver dependency; depends only on `gems_craft`. Hybrid studies cannot be simulated by GemsPy. The hybrid-only port-type fields (`area-connection`, `thermal-capacity-connection`) are declared directly on `gems_craft`'s own `PortTypeSchema` and are parsed (but otherwise ignored) for every library, hybrid or not; `gems_craft_hybrid` only adds the system-level extension (`HybridSystemSchema`, adding `area-connections`, `thermal-capacity-connections` on systems), reusing `gems_craft`'s schema-parameterized `load_input_system`/`parse_yaml_system`/`write_yaml_system`.
+- **`gems_craft_hybrid`** (`src/gems_craft_hybrid/`) — read/write support for *hybrid* GEMS studies, an extended format used to interoperate with Antares Simulator. No solver dependency, depends only on `gems_craft`. Hybrid studies cannot be simulated by GemsPy. The hybrid-only port-type fields (`area-connection`, `thermal-capacity-connection`) are declared directly on `gems_craft`'s own `PortTypeSchema` and are parsed (but otherwise ignored) for every library, hybrid or not. `write_yaml_library` omits empty keys and raises when a port type has `area-connection`, naming `write_yaml_hybrid_library` (`gems_craft_hybrid/model/parsing.py`), which keeps the mandatory empty `area-connection` keys. `gems_craft_hybrid` also adds the system-level extension (`HybridSystemSchema`, adding `area-connections`, `thermal-capacity-connections` on systems), reusing `gems_craft`'s schema-parameterized `load_input_system`/`parse_yaml_system`/`write_yaml_system`.
 - **`gems_runner`** (`src/gems_runner/`) — solve-time execution. Depends on `gems_craft` plus `linopy`, `xarray`, `highspy`, all installed as part of the base `gemspy` package (`pip install gemspy` installs the full solver stack, not just `gems_craft`'s dependencies).
 
 ### Core Modules
@@ -77,7 +78,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 
 **`gems_craft/expression/`** — Mathematical expression language and AST (structural/static analysis only — no numeric evaluation).
 - `ExpressionNode`: base frozen dataclass for all expression tree nodes
-- Grammar is defined in `grammar/Expr.g4` and parsed via ANTLR4 (generated files live in `expression/parsing/antlr/` — do not edit directly). Regenerate with `cd grammar && ./generate-parser.sh` after any grammar change; it needs Java (the `antlr4-tools` pip package auto-installs a JRE on first run, prompting unless piped `yes`) — set `ANTLR4_TOOLS_ANTLR_VERSION` to the installed `antlr4-python3-runtime` version (currently 4.13.2, see `uv.lock`; check with `uv pip show antlr4-python3-runtime`) to match the runtime and skip a network lookup. Reformat the regenerated files with `black`/`isort` afterwards to match the committed style.
+- Grammar is defined in `grammar/Expr.g4` and parsed via ANTLR4 (generated files live in `expression/parsing/antlr/` — do not edit directly; regenerate with `uv run bash grammar/generate-parser.sh`, then `black`/`isort`)
 - `ExpressionVisitor` is the dominant pattern for traversing and transforming expression trees (linearization support, printing, degree analysis, indexing)
 - Custom-set indexing (`SetIndexNode`, `SumOverNode` — `X[fuel]`, `X[fuel=2]`, `X[fuel+1]`, `X[segment=2, fuel=1]`, `sum_over(fuel, expr)`) is wired through the grammar/AST/visitor layer, `IndexingStructure` (`sets: FrozenSet[str]`), and the model/`system.yml` schemas (`sets:`, `indexed-by:`), with resolution-time validation in `resolve_library.py`/`model.py`. Solve-time execution in `gems_runner` and the set-indexed data-series format are still unimplemented — `EvaluationVisitor` and `VectorizedBuilderBase` raise `NotImplementedError` for these two node types, so a set-indexed model can be declared and validated but not yet solved.
 - Numeric evaluation (`EvaluationVisitor`) lives in `gems_runner.expression.evaluate`, not here — several of its node handlers (`dual()`, `reduced_cost()`, `variable()`) are solver-output-shaped and only make sense at solve time.
@@ -97,6 +98,8 @@ The codebase is split into three packages along a solver-dependency boundary:
 
 **`gems_craft/libs/`** — Resolves the path to bundled YAML model libraries shipped with the package.
 
+**`gems_craft_hybrid/model/`** — `write_yaml_hybrid_library`: writes a hybrid library and keeps the mandatory empty `area-connection` keys. `write_yaml_library` remains the "full GEMS" writer: it omits empty keys and raises when a port type has `area-connection`.
+
 **`gems_craft_hybrid/study/`** — `HybridSystemSchema(SystemSchema)`: adds `area-connections` (`AreaConnectionsSchema`) and `thermal-capacity-connections` (`ThermalCapacityConnectionSchema`, referencing a `ThermalComponentSchema`).
 
 **`gems_runner/simulation/`** — Optimization problem construction and solving.
@@ -105,11 +108,14 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `VectorizedLinearExprBuilder` (`linearize.py`): `ExpressionVisitor` subclass that converts an expression AST into a `VectorizedExpr`
 - `VectorizedBuilderBase` (`vectorized_builder.py`): shared base for all vectorized visitors (used by both `linearize.py` and `extra_output.py`)
 - `TimeBlock` (`time_block.py`): defines the temporal window for one solve
-- `SimulationTableBuilder` / `SimulationTableWriter` (`simulation_table.py`): result extraction as a flat pandas `DataFrame`
+- `SimulationTableBuilder` (`simulation_table.py`): result extraction as a flat pandas `DataFrame`
+- `SimulationTable` (`simulation_table.py`): the results of a run, in memory or stored on disk (`open` / `save`); reads its rows through an internal `_TableStore` (`table_store.py`: `_MemoryStore`; `table_folder.py`: `_FolderStore`) and exposes the results of a component and of its outputs (`component(...).output(...)` → `ComponentResults` / `OutputResults`) and `to_pandas` / `iter_scenario_frames` / `scan`
+- `_TableWriter`, `_Manifest` (`table_folder.py`): write a simulation table folder (one file per scenario, `scenario-common`, `manifest.json` written last)
+- `SimulationColumns`, `SIMULATION_TABLE_SCHEMA` (`table_schema.py`): columns and fixed schema of the simulation table
 - `apply_thermal_heuristics` (`heuristic_runner.py`): injects heuristic-derived bounds into a solved problem
 - `find_min_generation_fast` / `find_num_units_accurate` (`thermal_heuristic.py`): the `fast`/`accurate` heuristic functions
 
-**`gems_runner/session/`** — `SimulationSession`, the stateful entry point wrapping a loaded study for interactive solving.
+**`gems_runner/session/`** — `SimulationSession`, the stateful entry point wrapping a loaded study for interactive solving. With an `output_dir`, it writes the results to one file per scenario in `output_dir/simulation_table/` (`output_format`, Parquet by default, written in row groups of up to 64,000 rows) and returns the stored table: in sequential and parallel modes, the rows of each block as soon as the block is solved; in frontal mode, which solves once, one scenario at a time. Without an `output_dir`, results stay in memory. `run_study` and the `gemspy` CLI always store them, in `<study>/output/<run_id>/simulation_table/`. Benders mode writes no table folder and returns an empty table.
 
 **`gems_runner/main/`** — the `gemspy` CLI entry point (`main_cli`).
 

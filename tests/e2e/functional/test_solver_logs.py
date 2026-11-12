@@ -40,7 +40,7 @@ def _solve_and_capture(capfd: pytest.CaptureFixture[str], logs: bool) -> str:
 
     table = SimulationSession(load_study(_STUDY_DIR), optim_config).run()
 
-    objective = table.data.loc[table.data["output"] == "objective-value", "value"]
+    objective = table.objective_values()["value"]
     assert objective.iloc[0] == pytest.approx(91_000)
     captured = capfd.readouterr()
     return captured.out + captured.err

@@ -37,6 +37,7 @@ from .expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
     SetIndexNode,
@@ -56,7 +57,7 @@ class UnresolvedPortFieldError(ValueError):
 
 
 class IndexingUsageError(ValueError):
-    """Raised when a time or set index/shift targets a dimension the expression doesn't vary over."""
+    """Raised when a set index/shift targets a set the expression isn't indexed by."""
 
 
 class IndexingStructureProvider(ABC):
@@ -116,27 +117,41 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
     def parameter(self, node: ParameterNode) -> IndexingStructure:
         return self.context.get_parameter_structure(node.name)
 
-    def _check_time_dependent(
-        self, operand: ExpressionNode, inner: IndexingStructure, kind: str
-    ) -> None:
-        if not inner.time:
-            raise IndexingUsageError(
-                f"Time {kind} applied to '{print_expr(operand)}', "
-                "which is not time-dependent."
-            )
-
     def time_shift(self, node: TimeShiftNode) -> IndexingStructure:
-        inner = visit(node.operand, self)
-        self._check_time_dependent(node.operand, inner, "shift")
-        return inner
+        operand = visit(node.operand, self)
+        if not operand.time:  # the same value at every time step
+            return operand
+        # The operand is read at t + shift: the shift brings its scenario dependency.
+        return operand | IndexingStructure(False, visit(node.time_shift, self).scenario)
 
     def time_eval(self, node: TimeEvalNode) -> IndexingStructure:
-        inner = visit(node.operand, self)
-        self._check_time_dependent(node.operand, inner, "index")
-        return IndexingStructure(False, inner.scenario, inner.sets)
+        operand = visit(node.operand, self)
+        if not operand.time:  # the same value at every time step
+            return operand
+        # The time index removes the operand's time dimension, but brings its own.
+        index = visit(node.eval_time, self)
+        return IndexingStructure(False, operand.scenario, operand.sets) | index
 
     def time_sum(self, node: TimeSumNode) -> IndexingStructure:
-        return visit(node.operand, self)
+        # Bounds are time-independent (checked when the model is created), so
+        # they can only add a scenario dependency.
+        bounds = (node.from_time, node.to_time)
+        relative = [isinstance(bound, RelativeTimeNode) for bound in bounds]
+        operand = visit(node.operand, self)
+        scenario = operand.scenario or any(
+            visit(
+                bound.offset if isinstance(bound, RelativeTimeNode) else bound, self
+            ).scenario
+            for bound in bounds
+        )
+        sets = operand.sets
+        if all(relative):
+            return IndexingStructure(
+                operand.time, scenario, sets
+            )  # window moves with t
+        if any(relative):
+            return IndexingStructure(True, scenario, sets)  # terms change with t
+        return IndexingStructure(False, scenario, sets)  # fixed window
 
     def all_time_sum(self, node: AllTimeSumNode) -> IndexingStructure:
         inner = visit(node.operand, self)
@@ -149,15 +164,20 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
                 f"'{node.set_id}' index applied to '{print_expr(node.operand)}', "
                 f"which is not indexed by '{node.set_id}'."
             )
+        result = inner
         if node.position is not None:
             # Explicit position resolves to a single element: collapses the
             # dimension, mirroring how time_eval collapses time.
-            return IndexingStructure(
+            result = IndexingStructure(
                 inner.time, inner.scenario, inner.sets - {node.set_id}
             )
         # Bare (`X[fuel]`) or relative-shift (`X[fuel+1]`) forms still vary
         # over the set, mirroring how time_shift keeps time.
-        return inner
+        # The position or shift brings its own time/scenario dependency.
+        for index in (node.position, node.relative_shift):
+            if index is not None:
+                result = result | visit(index, self)
+        return result
 
     def sum_over(self, node: SumOverNode) -> IndexingStructure:
         inner = visit(node.operand, self)

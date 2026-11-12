@@ -13,7 +13,7 @@
 
 import pytest
 
-from gems_craft.expression import literal, param, var
+from gems_craft.expression import literal, param, relative_time, var
 from gems_craft.expression.expression import (
     DualNode,
     ExpressionNode,
@@ -209,6 +209,25 @@ def test_combine_does_not_drop_sets_after_time_scenario_settled() -> None:
     )
 
 
+class _ScenarioIndexProvider(_SetStructureProvider):
+    """'x' as in _SetStructureProvider; parameters vary by scenario only."""
+
+    def get_parameter_structure(self, name: str) -> IndexingStructure:
+        return IndexingStructure(False, True)
+
+
+@pytest.mark.parametrize(
+    "expr",
+    [
+        var("x").set_index("fuel", position=param("p")),
+        var("x").set_index("fuel", relative_shift=param("p")),
+    ],
+)
+def test_set_index_brings_index_dependency(expr: ExpressionNode) -> None:
+    # The position or shift brings its own scenario dependency.
+    assert compute_indexation(expr, _ScenarioIndexProvider()).scenario
+
+
 def test_lower_upper_bound_indexing() -> None:
     provider = StructureProvider()
     assert compute_indexation(LowerBoundNode("x"), provider) == IndexingStructure(
@@ -219,30 +238,24 @@ def test_lower_upper_bound_indexing() -> None:
     )
 
 
-class _ConstantParamProvider(StructureProvider):
+class ConstantParameterProvider(StructureProvider):
     def get_parameter_structure(self, name: str) -> IndexingStructure:
         return IndexingStructure(False, False)
-
-
-@pytest.mark.parametrize("expr", [param("p").shift(1), param("p").eval(1)])
-def test_time_shift_or_eval_on_non_time_dependent_raises(expr: ExpressionNode) -> None:
-    with pytest.raises(IndexingUsageError, match="not time-dependent"):
-        compute_indexation(expr, _ConstantParamProvider())
 
 
 def test_unresolved_port_field_raises() -> None:
     with pytest.raises(UnresolvedPortFieldError):
         compute_indexation(
-            port_field("p", "f").sum_connections(), _ConstantParamProvider()
+            port_field("p", "f").sum_connections(), ConstantParameterProvider()
         )
 
 
 def test_index_error_reported_alongside_unresolved_port_field() -> None:
-    """An invalid time shift is still reported when a sibling operand (before or
+    """An invalid set index is still reported when a sibling operand (before or
     after it) holds an unresolved port field."""
-    provider = _ConstantParamProvider()
+    provider = ConstantParameterProvider()
     port = port_field("p", "f").sum_connections()
-    bad = param("p").shift(1)
+    bad = param("p").set_index("fuel")
     with pytest.raises(IndexingUsageError):
         compute_indexation(port + bad, provider)
     with pytest.raises(IndexingUsageError):
@@ -252,7 +265,7 @@ def test_index_error_reported_alongside_unresolved_port_field() -> None:
 def test_time_shift_on_unresolved_port_field_is_deferred() -> None:
     with pytest.raises(UnresolvedPortFieldError):
         compute_indexation(
-            port_field("p", "f").sum_connections().shift(1), _ConstantParamProvider()
+            port_field("p", "f").sum_connections().shift(1), ConstantParameterProvider()
         )
 
 
@@ -261,3 +274,68 @@ def test_sum_over_unindexed_operand_warns() -> None:
     provider = _SetStructureProvider()
     with pytest.warns(UserWarning, match="not indexed by .other."):
         compute_indexation(x.sum_over("other"), provider)
+
+
+def test_time_sum_with_mixed_bounds_of_a_constant_depends_on_time() -> None:
+    # sum(0 .. t, k) = (t + 1) * k: the number of terms changes with t.
+    expr = param("k").time_sum_between(0, relative_time(0))
+
+    assert compute_indexation(expr, ConstantParameterProvider()) == IndexingStructure(
+        True, False
+    )
+
+
+class NamedParameterProvider(StructureProvider):
+    """d varies in time only, p in scenario only."""
+
+    def get_parameter_structure(self, name: str) -> IndexingStructure:
+        return {
+            "d": IndexingStructure(True, False),
+            "p": IndexingStructure(False, True),
+        }[name]
+
+
+@pytest.mark.parametrize(
+    "start, end, expected",
+    [
+        pytest.param(0, param("p"), IndexingStructure(False, True), id="absolute"),
+        pytest.param(
+            0, relative_time(param("p")), IndexingStructure(True, True), id="mixed"
+        ),
+        pytest.param(
+            relative_time(-param("p")),
+            relative_time(0),
+            IndexingStructure(True, True),
+            id="relative",
+        ),
+    ],
+)
+def test_time_sum_with_scenario_dependent_bound_depends_on_scenario(
+    start, end, expected
+) -> None:
+    expr = param("d").time_sum_between(start, end)
+
+    assert compute_indexation(expr, NamedParameterProvider()) == expected
+
+
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        # d read at t + p: a time step per scenario
+        pytest.param(
+            param("d").shift(param("p")), IndexingStructure(True, True), id="shift"
+        ),
+        # d read at time p: one value per scenario
+        pytest.param(
+            param("d").eval(param("p")), IndexingStructure(False, True), id="index"
+        ),
+        # p does not depend on time: reading it elsewhere changes nothing
+        pytest.param(
+            param("p").eval(param("d")),
+            IndexingStructure(False, True),
+            id="index-of-constant",
+        ),
+    ],
+)
+def test_time_operator_given_by_a_parameter(expr, expected) -> None:
+    assert compute_indexation(expr, NamedParameterProvider()) == expected

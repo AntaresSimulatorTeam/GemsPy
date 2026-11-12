@@ -103,6 +103,7 @@ def test_simtable_on_partial_timeblock(lib_dict_unittest: dict[str, Library]) ->
         data=[float(t) for t in range(BLOCK_START, BLOCK_END)],
         index=pd.Index(
             range(BLOCK_START, BLOCK_END),
+            dtype="Int64",
             name=SimulationColumns.ABSOLUTE_TIME_INDEX.value,
         ),
         name=0,
