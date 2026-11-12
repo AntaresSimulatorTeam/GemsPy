@@ -19,7 +19,7 @@ from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
 from pydantic import Field, ValidationError, model_validator
 from yaml import safe_dump, safe_load
 
-from gems_craft.utils import ModifiedBaseModel
+from gems_craft.utils import ModifiedBaseModel, get_root_section
 
 
 class PortConnectionsSchema(ModifiedBaseModel):
@@ -117,7 +117,8 @@ def parse_yaml_system(
     input_study: TextIO, schema: Type[SystemSchema] = SystemSchema
 ) -> SystemSchema:
     tree = safe_load(input_study)
-    return schema.model_validate(tree["system"])
+    system = get_root_section(tree, "system", getattr(input_study, "name", None))
+    return schema.model_validate(system)
 
 
 def write_yaml_system(system: SystemSchema, path: Path) -> None:

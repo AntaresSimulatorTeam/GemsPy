@@ -48,6 +48,31 @@ def get_or_add(dictionary: Dict[K, V], key: K, default_factory: Supplier[V]) -> 
     return value
 
 
+def get_root_section(tree: Any, root_key: str, source: Optional[str] = None) -> Any:
+    """
+    Returns tree[root_key], the content of a YAML document with a single root key.
+
+    Raises a ValueError if root_key is missing, if the root holds other keys,
+    which would otherwise be silently ignored, or if the content of root_key
+    is empty or not a mapping. source, the file name, is added to the message.
+    """
+    where = f"{root_key} file '{source}'" if source else f"{root_key} file"
+    if not isinstance(tree, dict) or root_key not in tree:
+        raise ValueError(f"Missing root key '{root_key}' in {where}.")
+    unknown_keys = [key for key in tree if key != root_key]
+    if unknown_keys:
+        plural = "s" if len(unknown_keys) > 1 else ""
+        keys = ", ".join(f"'{key}'" for key in unknown_keys)
+        raise ValueError(
+            f"Unknown root key{plural} {keys} in {where};"
+            f" did you mean to put {'them' if plural else 'it'} under '{root_key}:'?"
+        )
+    section = tree[root_key]
+    if not isinstance(section, dict):
+        raise ValueError(f"'{root_key}:' in {where} is empty or not a mapping.")
+    return section
+
+
 def serialize(filename: str, message: str, path: pathlib.Path) -> None:
     """
     Write message to path/filename

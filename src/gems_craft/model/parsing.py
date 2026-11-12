@@ -17,7 +17,7 @@ from typing import List, Optional
 from pydantic import ConfigDict, Field, ValidationError
 from yaml import safe_dump, safe_load
 
-from gems_craft.utils import ModifiedBaseModel
+from gems_craft.utils import ModifiedBaseModel, get_root_section
 
 
 class ParameterSchema(ModifiedBaseModel):
@@ -135,8 +135,9 @@ class LibrarySchema(ModifiedBaseModel):
 
 def parse_yaml_library(input: typing.TextIO) -> LibrarySchema:
     tree = safe_load(input)
+    library = get_root_section(tree, "library", getattr(input, "name", None))
     try:
-        return LibrarySchema.model_validate(tree["library"])
+        return LibrarySchema.model_validate(library)
     except ValidationError as e:
         raise ValueError(f"An error occurred during parsing: {e}")
 

@@ -13,6 +13,7 @@
 """Tests for gems_craft_hybrid parsing: HybridSystemSchema, and the hybrid-only
 area-connection / thermal-capacity-connection fields on the base PortTypeSchema."""
 
+import io
 from pathlib import Path
 from typing import Any, Dict
 
@@ -344,3 +345,23 @@ def test_load_hybrid_system_parses_thermal_capacity_connections() -> None:
     assert conn.thermal_component == ThermalComponentSchema(
         area="fr", cluster_id="nuclear1"
     )
+
+
+def test_parse_yaml_hybrid_system_rejects_area_connections_outside_system() -> None:
+    system = """
+system:
+  id: my_system
+  components:
+    - id: gen
+      model: lib.generator
+  connections: []
+area-connections:
+  - component: gen
+    port: balance_port
+    area: area1
+"""
+    with pytest.raises(
+        ValueError,
+        match="Unknown root key 'area-connections' in system file; did you mean to put it under 'system:'",
+    ):
+        parse_yaml_hybrid_system(io.StringIO(system))
