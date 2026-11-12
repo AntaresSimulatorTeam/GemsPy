@@ -216,13 +216,6 @@ def _forbid_sum_connections_on_own_port(
             )
 
 
-def _forbid_sum_connections(
-    expr: ExpressionNode, port_fields: Set[tuple], context: str
-) -> None:
-    if any(uses_sum_connections_on(expr, p, f) for p, f in port_fields):
-        raise ValueError(f"sum_connections is not allowed in {context}.")
-
-
 def _resolve_model(
     input_model: ModelSchema,
     port_types: Dict[str, PortType],
@@ -266,15 +259,10 @@ def _resolve_model(
             contrib.id: parse_expression(contrib.expression, identifiers)
             for contrib in input_model.objective_contributions
         }
-        all_port_fields = {
-            (port.id, f.name)
-            for port in input_model.ports
-            for f in port_types[port.type].fields
-        }
         for oid, expr in objective_contributions.items():
             _forbid_nonlinear(expr, f"objective contribution '{oid}'")
-            _forbid_sum_connections(
-                expr, all_port_fields, f"objective contribution '{oid}'"
+            _forbid_sum_connections_on_own_port(
+                expr, own_port_fields, f"objective contribution '{oid}'"
             )
 
     extra_outputs = (

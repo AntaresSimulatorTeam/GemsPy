@@ -141,8 +141,9 @@ library:
         - id: d_min_down
           time-dependent: false
         - id: nb_units_max
+        - id: nb_failures
           time-dependent: true
-          scenario-dependent: false
+          scenario-dependent: true
       variables:
         - id: generation
           lower-bound: 0
