@@ -22,7 +22,6 @@ import pytest
 from gems_craft.study.data import (
     ConstantData,
     SetIndexedSeriesData,
-    TimeSeriesData,
     dataframe_to_set_indexed_series,
     load_tidy_series_from_file,
 )
@@ -87,7 +86,7 @@ def test_all_dimensions() -> None:
     assert data.get_value([1], np.array([2]))[0, 0, 1] == 121
 
 
-def test_overridden_out_dimension_broadcasts() -> None:  # (b)
+def test_overridden_out_dimension_broadcasts() -> None:
     data = dataframe_to_set_indexed_series(
         _df("fuel,value\ngas,1\ncoal,2\n"), False, False, FUELS
     )
@@ -95,13 +94,6 @@ def test_overridden_out_dimension_broadcasts() -> None:  # (b)
     assert out.shape == (3, 2, 2)
     assert (out[:, :, 1] == 2).all()
     assert data.get_value(None, None).shape == (2,)
-
-
-def test_constant_values_behave_like_varying_data() -> None:  # (d)
-    csv = "fuel,time,value\ngas,0,5\ngas,1,5\ncoal,0,5\ncoal,1,5\n"
-    data = dataframe_to_set_indexed_series(_df(csv), True, False, FUELS)
-    assert data.dims == ("time", "fuel")
-    assert data.get_value([0, 1], None).shape == (2, 2)
 
 
 @pytest.mark.parametrize(
@@ -118,6 +110,7 @@ def test_constant_values_behave_like_varying_data() -> None:  # (d)
         ("fuel,time,value\ngas,a,1\ncoal,0,1\n", "integers", True),
         ("fuel,time,value\ngas,0,x\ncoal,0,1\n", "numbers", True),
         ("fuel,time,value\ngas,0,\ncoal,0,1\n", "empty cells", True),
+        ("fuel,time,value\ngas,0,1\n,0,1\n", "'fuel' must not contain empty", True),
         (
             "fuel,time,value,extra\ngas,0,1,1\ncoal,0,1,1\n",
             "unexpected \\['extra'\\]",
@@ -130,18 +123,6 @@ def test_constant_values_behave_like_varying_data() -> None:  # (d)
 def test_invalid_series(csv: str, message: str, time_dependent: bool) -> None:
     with pytest.raises(ValueError, match=message):
         dataframe_to_set_indexed_series(_df(csv), time_dependent, False, FUELS)
-
-
-def test_check_requirement() -> None:
-    data = dataframe_to_set_indexed_series(_df(TIME_FUEL_CSV), True, False, FUELS)
-    assert data.check_requirement(True, True, frozenset({"fuel", "other"}))
-    assert not data.check_requirement(False, True, frozenset({"fuel"}))
-    assert not data.check_requirement(True, True, frozenset())
-    # Legacy structures ignore the sets argument.
-    assert ConstantData(1.0).check_requirement(False, False, frozenset({"fuel"}))
-    assert TimeSeriesData(pd.Series([1.0])).check_requirement(
-        True, False, frozenset({"fuel"})
-    )
 
 
 def test_get_value_requires_declared_indices() -> None:

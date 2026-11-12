@@ -34,7 +34,6 @@ class ComponentParameterSchema(ModifiedBaseModel):
     id: str
     time_dependent: bool = False
     scenario_dependent: bool = False
-    # TODO(custom sets, phase 3): not yet checked against the model's indexed_by.
     indexed_by: List[str] = Field(default_factory=list)
     # float: constant; str: series name; dict: inline set-indexed values (nested per set)
     value: Union[float, str, Dict[Union[str, int], Any]]

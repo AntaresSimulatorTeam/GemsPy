@@ -66,7 +66,8 @@ database = build_data_base(input_system, Path(series_dir))
 ~~~
 
 `build_data_base()` reads all timeseries files referenced by the system
-(`.txt`, `.tsv` or `.csv`) from `series_dir`.
+(`.txt`, `.tsv` or `.csv`) from `series_dir`. Several files with the same name
+but different extensions are rejected.
 
 ### Loading set-indexed data
 
@@ -87,6 +88,10 @@ is `scenario-dependent`. There is one column per set listed in the component's
 own `indexed-by`; any other column is rejected. Set columns must hold exactly the
 elements instantiated in `system.yml`, and `time`/`scenario` values must be
 `0..n-1`. Empty or non-numeric `value` cells are rejected.
+
+A `time-dependent` and/or `scenario-dependent` parameter without `indexed-by`
+may also use this format (columns `time`, `scenario`, `value`): a file whose
+first row contains a `value` column is read as tidy, otherwise as a matrix.
 
 A parameter that depends on sets only (neither `time-dependent` nor
 `scenario-dependent`) may instead give its values inline in `system.yml`, as a

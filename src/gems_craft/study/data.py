@@ -49,7 +49,7 @@ class AbstractDataStructure(ABC):
 
     @abstractmethod
     def check_requirement(
-        self, time: bool, scenario: bool, sets: FrozenSet[str] = frozenset()
+        self, time: bool, scenario: bool, sets: FrozenSet[str]
     ) -> bool:
         """Check if the data structure meets certain requirements."""
         pass
@@ -67,7 +67,7 @@ class ConstantData(AbstractDataStructure):
         return self.value
 
     def check_requirement(
-        self, time: bool, scenario: bool, sets: FrozenSet[str] = frozenset()
+        self, time: bool, scenario: bool, sets: FrozenSet[str]
     ) -> bool:
         if not isinstance(self, ConstantData):
             raise ValueError("Invalid data type for ConstantData")
@@ -95,7 +95,7 @@ class TimeSeriesData(AbstractDataStructure):
         return result
 
     def check_requirement(
-        self, time: bool, scenario: bool, sets: FrozenSet[str] = frozenset()
+        self, time: bool, scenario: bool, sets: FrozenSet[str]
     ) -> bool:
         if not isinstance(self, TimeSeriesData):
             raise ValueError("Invalid data type for TimeSeriesData")
@@ -126,7 +126,7 @@ class ScenarioSeriesData(AbstractDataStructure):
         return result
 
     def check_requirement(
-        self, time: bool, scenario: bool, sets: FrozenSet[str] = frozenset()
+        self, time: bool, scenario: bool, sets: FrozenSet[str]
     ) -> bool:
         if not isinstance(self, ScenarioSeriesData):
             raise ValueError("Invalid data type for ScenarioSeriesData")
@@ -151,7 +151,7 @@ class TimeScenarioSeriesData(AbstractDataStructure):
         return self.time_scenario_series.values[np.ix_(np.asarray(timestep), scenario)]
 
     def check_requirement(
-        self, time: bool, scenario: bool, sets: FrozenSet[str] = frozenset()
+        self, time: bool, scenario: bool, sets: FrozenSet[str]
     ) -> bool:
         if not isinstance(self, TimeScenarioSeriesData):
             raise ValueError("Invalid data type for TimeScenarioSeriesData")
@@ -199,7 +199,7 @@ class SetIndexedSeriesData(AbstractDataStructure):
         return arr
 
     def check_requirement(
-        self, time: bool, scenario: bool, sets: FrozenSet[str] = frozenset()
+        self, time: bool, scenario: bool, sets: FrozenSet[str]
     ) -> bool:
         if "time" in self.dims and not time:
             return False
@@ -214,20 +214,28 @@ _SERIES_SEPARATORS = {".txt": r"\s+", ".tsv": "\t", ".csv": ","}
 def _read_series_file(
     name: Optional[str], directory: Optional[Path], **read_kwargs: Any
 ) -> pd.DataFrame:
-    """Read ``<name>.txt``, ``.tsv`` or ``.csv`` (first one found) from ``directory``."""
+    """Read the single ``<name>.txt``, ``.tsv`` or ``.csv`` file in ``directory``."""
     if directory is None or name is None:
         raise FileNotFoundError(f"File '{name}' does not exist")
-    for suffix, sep in _SERIES_SEPARATORS.items():
-        candidate = (directory / name).with_suffix(suffix)
-        if not candidate.exists():
-            continue
-        try:
-            return pd.read_csv(candidate, sep=sep, **read_kwargs)
-        except Exception as e:
-            raise Exception(f"An error has arrived when processing '{candidate}': {e}")
-    raise FileNotFoundError(
-        f"File '{name}' ({', '.join(_SERIES_SEPARATORS)}) does not exist"
-    )
+    candidates = [
+        (directory / name).with_suffix(suffix) for suffix in _SERIES_SEPARATORS
+    ]
+    found = [c for c in candidates if c.exists()]
+    if not found:
+        raise FileNotFoundError(
+            f"File '{name}' ({', '.join(_SERIES_SEPARATORS)}) does not exist"
+        )
+    if len(found) > 1:
+        raise ValueError(
+            f"Several files match '{name}': {', '.join(c.name for c in found)}"
+        )
+    candidate = found[0]
+    try:
+        return pd.read_csv(
+            candidate, sep=_SERIES_SEPARATORS[candidate.suffix], **read_kwargs
+        )
+    except Exception as e:
+        raise Exception(f"An error has arrived when processing '{candidate}': {e}")
 
 
 def load_ts_from_file(
@@ -251,6 +259,26 @@ def dataframe_to_scenario_series(ts_dataframe: pd.DataFrame) -> np.ndarray:
             f"Could not convert input data to scenario series data. Expect data series with exactly one line, got shape {ts_dataframe.shape}"
         )
     return ts_dataframe.iloc[0, :].to_numpy(dtype=float)
+
+
+def is_tidy_series(ts_dataframe: pd.DataFrame) -> bool:
+    """Whether the first row of a headerless read is a tidy header (has ``value``)."""
+    return "value" in ts_dataframe.iloc[0].astype(str).str.strip().tolist()
+
+
+def tidy_dataframe_to_series_data(
+    ts_dataframe: pd.DataFrame, time_dependent: bool, scenario_dependent: bool
+) -> AbstractDataStructure:
+    """Tidy series without sets (``[time], [scenario], value``) as the matching
+    time and/or scenario structure."""
+    values = dataframe_to_set_indexed_series(
+        ts_dataframe, time_dependent, scenario_dependent, {}
+    ).values
+    if time_dependent and scenario_dependent:
+        return TimeScenarioSeriesData(pd.DataFrame(values))
+    if time_dependent:
+        return TimeSeriesData(pd.Series(values))
+    return ScenarioSeriesData(values)
 
 
 def load_tidy_series_from_file(
@@ -304,6 +332,8 @@ def dataframe_to_set_indexed_series(
     for col in key_cols:
         if col in set_elements:
             labels = tuple(str(e) for e in set_elements[col])
+            if ts_dataframe[col].isna().any():
+                raise ValueError(f"Column '{col}' must not contain empty cells.")
             got = set(ts_dataframe[col])
             if got != set(labels):
                 raise ValueError(
@@ -408,7 +438,7 @@ class DataBase:
         a single numpy array index, no Python loop over S.
 
         Returns shape ``(T, S)``, ``(T,)``, ``(S,)``, or scalar depending on
-        the underlying data type.
+        the underlying data type; set-indexed data appends one axis per set.
         """
         idx = ComponentParameterIndex(component_id, parameter_name)
         raw_data = self._data[idx]
