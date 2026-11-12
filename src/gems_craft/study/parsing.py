@@ -117,7 +117,8 @@ def parse_yaml_system(
     input_study: TextIO, schema: Type[SystemSchema] = SystemSchema
 ) -> SystemSchema:
     tree = safe_load(input_study)
-    return schema.model_validate(get_root_section(tree, "system"))
+    system = get_root_section(tree, "system", getattr(input_study, "name", None))
+    return schema.model_validate(system)
 
 
 def write_yaml_system(system: SystemSchema, path: Path) -> None:

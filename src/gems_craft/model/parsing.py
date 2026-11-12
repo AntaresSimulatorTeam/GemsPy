@@ -135,7 +135,7 @@ class LibrarySchema(ModifiedBaseModel):
 
 def parse_yaml_library(input: typing.TextIO) -> LibrarySchema:
     tree = safe_load(input)
-    library = get_root_section(tree, "library")
+    library = get_root_section(tree, "library", getattr(input, "name", None))
     try:
         return LibrarySchema.model_validate(library)
     except ValidationError as e:

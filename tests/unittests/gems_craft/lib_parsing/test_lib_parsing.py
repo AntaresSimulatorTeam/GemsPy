@@ -795,6 +795,25 @@ def test_parse_yaml_library_rejects_key_outside_library() -> None:
         parse_yaml_library(io.StringIO(library))
 
 
-def test_parse_yaml_library_without_library_key_raises() -> None:
+@pytest.mark.parametrize("library", ["id: lib\nmodels: []\n", ""])
+def test_parse_yaml_library_without_library_key_raises(library: str) -> None:
     with pytest.raises(ValueError, match="Missing root key 'library' in library file"):
-        parse_yaml_library(io.StringIO("id: lib\nmodels: []\n"))
+        parse_yaml_library(io.StringIO(library))
+
+
+@pytest.mark.parametrize("library", ["library:\n", "library: [1, 2]\n"])
+def test_parse_yaml_library_with_empty_section_raises(library: str) -> None:
+    with pytest.raises(
+        ValueError, match="'library:' in library file is empty or not a mapping"
+    ):
+        parse_yaml_library(io.StringIO(library))
+
+
+def test_parse_yaml_library_error_names_the_file(tmp_path: Path) -> None:
+    library_file = tmp_path / "bad_lib.yml"
+    library_file.write_text("library:\n  id: lib\nmodels: []\n")
+
+    with library_file.open() as f:
+        with pytest.raises(ValueError) as error:
+            parse_yaml_library(f)
+    assert f"in library file '{library_file}'" in str(error.value)

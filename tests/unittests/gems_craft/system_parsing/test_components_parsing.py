@@ -407,3 +407,21 @@ def test_parse_yaml_system_lists_all_keys_outside_system() -> None:
 def test_parse_yaml_system_without_system_key_raises(system: str) -> None:
     with pytest.raises(ValueError, match="Missing root key 'system' in system file"):
         parse_yaml_system(io.StringIO(system))
+
+
+@pytest.mark.parametrize("system", ["system:\n", "system: [1, 2]\n"])
+def test_parse_yaml_system_with_empty_section_raises(system: str) -> None:
+    with pytest.raises(
+        ValueError, match="'system:' in system file is empty or not a mapping"
+    ):
+        parse_yaml_system(io.StringIO(system))
+
+
+def test_parse_yaml_system_error_names_the_file(tmp_path: Path) -> None:
+    system_file = tmp_path / "system.yml"
+    system_file.write_text("system:\n  id: s\nconnections: []\n")
+
+    with system_file.open() as f:
+        with pytest.raises(ValueError) as error:
+            parse_yaml_system(f)
+    assert f"in system file '{system_file}'" in str(error.value)

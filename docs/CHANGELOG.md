@@ -16,8 +16,9 @@ All notable changes to GemsPy are documented here.
 - `parse_yaml_system` and `parse_yaml_library` now reject a key placed at the
   root of the file instead of under `system:` or `library:` (e.g.
   `connections` or `area-connections` at the wrong indentation level); such
-  a key was silently ignored. A file without the `system:` or `library:` key
-  now raises a `ValueError` instead of a `KeyError`.
+  a key was silently ignored. A file without the `system:` or `library:` key,
+  or with nothing under it, now raises a `ValueError` instead of a `KeyError`
+  or a pydantic error. These errors name the file that was read.
 
 ## [0.3.0] - 2026-10-29
 
