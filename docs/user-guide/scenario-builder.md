@@ -55,11 +55,10 @@ demand, 3 = 4
 ```
 
 !!! note
-    Every MC scenario index that appears in the simulation playlist must be
-    listed for every group in the file.  Missing entries raise a `ValueError`
-    at load time.  `validate_optim_config()` cross-checks the
-    [scenario-scope playlist](optim-config.md#scenario-scope) against the
-    scenario builder and reports any out-of-bounds indices.
+    Every selected MC scenario index must be listed for every group in the
+    file. Missing entries raise a `ValueError` at load time.
+    `validate_optim_config()` cross-checks the [scenario scope](optim-config.md#scenario-scope)
+    against the scenario builder and reports any out-of-bounds indices.
 
 ---
 

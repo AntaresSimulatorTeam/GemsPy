@@ -16,13 +16,35 @@ A model allows to define the behaviour for components, by
 defining parameters, variables, and equations.
 """
 
+import dataclasses
 import itertools
 import warnings
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, FrozenSet, Iterable, List, Optional
+from typing import (
+    Any,
+    Dict,
+    FrozenSet,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+)
 
 from gems_craft.expression import ExpressionNode
-from gems_craft.expression.degree import is_linear
+from gems_craft.expression.degree import is_constant, is_linear
+from gems_craft.expression.expression import (
+    AllTimeSumNode,
+    ParameterNode,
+    PortFieldAggregatorNode,
+    PortFieldNode,
+    RelativeTimeNode,
+    SumOverNode,
+    TimeEvalNode,
+    TimeSumNode,
+)
 from gems_craft.expression.indexing import (
     IndexingStructureProvider,
     IndexingUsageError,
@@ -30,6 +52,7 @@ from gems_craft.expression.indexing import (
     compute_indexation,
 )
 from gems_craft.expression.indexing_structure import IndexingStructure
+from gems_craft.expression.print import print_expr
 from gems_craft.model.constraint import Constraint
 from gems_craft.model.parameter import Parameter
 from gems_craft.model.port import PortFieldDefinition, PortFieldId, PortType
@@ -42,8 +65,8 @@ def _safe_indexation(
     """
     Computes the indexation of `expr`, which also validates time and set index
     usage (errors name `context`). Returns None if `expr` still contains an
-    unresolved port field (sum_connections): the check is then deferred until
-    ports are resolved.
+    unresolved port field (sum_connections), or the dual() of a constraint that
+    contains one: the check is then deferred until ports are resolved.
     """
     try:
         return compute_indexation(expr, provider)
@@ -62,7 +85,8 @@ def _make_structure_provider(
     # Pre-compute constraint structures using a params/vars-only base provider.
     # Constraint expressions cannot contain dual()/reduced_cost(), so the base
     # provider's get_constraint_structure is never invoked during this step.
-    constraint_structures: Dict[str, IndexingStructure] = {}
+    # None: the constraint contains unresolved port fields (sum_connections).
+    constraint_structures: Dict[str, Optional[IndexingStructure]] = {}
     if constraints:
 
         class _BaseProvider(IndexingStructureProvider):
@@ -79,12 +103,8 @@ def _make_structure_provider(
 
         base = _BaseProvider()
         for cname, c in constraints.items():
-            structure = _safe_indexation(c.expression, base, f"constraint '{cname}'")
-            # Constraints containing unresolved port fields (sum_connections)
-            # cannot be indexed before port resolution; fall back to the most
-            # general structure so callers can still proceed.
-            constraint_structures[cname] = structure or IndexingStructure(
-                time=True, scenario=True
+            constraint_structures[cname] = _safe_indexation(
+                c.expression, base, f"constraint '{cname}'"
             )
 
     class Provider(IndexingStructureProvider):
@@ -95,7 +115,13 @@ def _make_structure_provider(
             return variables[name].structure
 
         def get_constraint_structure(self, name: str) -> IndexingStructure:
-            return constraint_structures[name]
+            structure = constraint_structures[name]
+            if structure is None:
+                # dual() of such a constraint is checked once ports are resolved.
+                raise UnresolvedPortFieldError(
+                    f"Constraint '{name}' contains unresolved port fields."
+                )
+            return structure
 
     return Provider()
 
@@ -116,11 +142,11 @@ def _normalize_objective_contributions(
     Contributions that are already fully scalar, or already wrapped in expec(),
     are returned unchanged with no warning.
 
-    This implements the iso-format behaviour of Antares Simulator v10.0.0 (Issue #76).
+    This implements the iso-format behaviour of the GEMS format (Issue #76).
 
-    TODO: This auto-wrapping is a temporary compatibility shim. Once Antares Simulator
-    natively supports the expec() operator in objective contributions, this function
-    should be removed and authors should be required to write expec() explicitly.
+    TODO: This auto-wrapping is a temporary compatibility shim. Once the expec()
+    operator is required in objective contributions, this function should be
+    removed and authors should be required to write expec() explicitly.
     """
 
     provider = _make_structure_provider(parameters, variables)
@@ -168,22 +194,23 @@ def _is_objective_contribution_valid(
     return True
 
 
-def _check_bound_set_consistency(
+def _check_bound_sets(
     bound_expr: ExpressionNode,
-    var: Variable,
-    provider: IndexingStructureProvider,
+    owner_sets: Optional[FrozenSet[str]],
+    owner: str,
     kind: str,
+    provider: IndexingStructureProvider,
 ) -> None:
-    structure = _safe_indexation(
-        bound_expr, provider, f"{kind.lower()} of variable '{var.name}'"
-    )
-    if structure is None:
+    """A bound may not be indexed by a set its owner is not indexed by.
+    `owner_sets` is None when the owner's structure is not known yet."""
+    structure = _safe_indexation(bound_expr, provider, f"{kind.lower()} of {owner}")
+    if structure is None or owner_sets is None:
         return
-    stray = structure.sets - var.structure.sets
+    stray = structure.sets - owner_sets
     if stray:
         raise ValueError(
-            f"{kind} of variable '{var.name}' is indexed by set(s) "
-            f"{sorted(stray)} not declared in '{var.name}''s own indexed_by."
+            f"{kind} of {owner} is indexed by set(s) {sorted(stray)} "
+            f"that {owner} is not indexed by."
         )
 
 
@@ -215,7 +242,11 @@ def _check_model_set_indexing(model: "Model") -> None:
     )
 
     for c in model.get_all_constraints():
-        _safe_indexation(c.expression, provider, f"constraint '{c.name}'")
+        owner = f"constraint '{c.name}'"
+        expr_structure = _safe_indexation(c.expression, provider, owner)
+        expr_sets = expr_structure.sets if expr_structure is not None else None
+        _check_bound_sets(c.lower_bound, expr_sets, owner, "Lower bound", provider)
+        _check_bound_sets(c.upper_bound, expr_sets, owner, "Upper bound", provider)
 
     for oid, expr in (model.objective_contributions or {}).items():
         _safe_indexation(expr, provider, f"objective contribution '{oid}'")
@@ -224,13 +255,116 @@ def _check_model_set_indexing(model: "Model") -> None:
         _safe_indexation(eo_expr, provider, f"extra-output '{eo_id}'")
 
     for var in model.variables.values():
-        if var.lower_bound is not None:
-            _check_bound_set_consistency(var.lower_bound, var, provider, "Lower bound")
-        if var.upper_bound is not None:
-            _check_bound_set_consistency(var.upper_bound, var, provider, "Upper bound")
+        owner = f"variable '{var.name}'"
+        for kind, bound in (
+            ("Lower bound", var.lower_bound),
+            ("Upper bound", var.upper_bound),
+        ):
+            if bound is not None:
+                _check_bound_sets(bound, var.structure.sets, owner, kind, provider)
 
     for definition in model.port_fields_definitions.values():
         _check_local_set_crosses_port(definition, model.local_sets, provider)
+
+
+def _iter_nodes(
+    node: ExpressionNode, skip: Tuple[Type[ExpressionNode], ...] = ()
+) -> Iterator[ExpressionNode]:
+    """*node* and every node below it, without going below a *skip* node."""
+    yield node
+    if isinstance(node, skip):
+        return
+    for f in dataclasses.fields(node):
+        value = getattr(node, f.name)
+        for child in value if isinstance(value, list) else [value]:
+            if isinstance(child, ExpressionNode):
+                yield from _iter_nodes(child, skip)
+
+
+def _model_expressions(model: "Model") -> Iterator[Tuple[str, ExpressionNode]]:
+    """Every expression of *model*, with a description of where it is."""
+    for c in model.get_all_constraints():
+        for expr in (c.expression, c.lower_bound, c.upper_bound):
+            yield f"constraint '{c.name}'", expr
+    for name, expr in (model.objective_contributions or {}).items():
+        yield f"objective contribution '{name}'", expr
+    for name, expr in (model.extra_outputs or {}).items():
+        yield f"extra output '{name}'", expr
+    for port_field, definition in model.port_fields_definitions.items():
+        yield (
+            f"port field definition '{port_field.port_name}.{port_field.field_name}'",
+            definition.definition,
+        )
+
+
+def sets_used_by_model(model: "Model") -> Set[str]:
+    """Sets indexing some parameter or variable of *model*, or summed over by a
+    sum_over (whose operand may not be indexed by it)."""
+    used: Set[str] = set()
+    for p in model.parameters.values():
+        used |= p.structure.sets
+    for v in model.variables.values():
+        used |= v.structure.sets
+    expressions = [expr for _, expr in _model_expressions(model)] + [
+        bound
+        for v in model.variables.values()
+        for bound in (v.lower_bound, v.upper_bound)
+        if bound is not None
+    ]
+    for expr in expressions:
+        used |= {n.set_id for n in _iter_nodes(expr) if isinstance(n, SumOverNode)}
+    return used
+
+
+def _check_time_sum_bounds(model: "Model") -> None:
+    """A time sum bound (an absolute bound, or the offset of a bound relative
+    to ``t``) must be time-independent and contain no variable. This depends on
+    the declared structure only, not on the data."""
+    provider = _make_structure_provider(model.parameters, model.variables)
+    for where, expr in _model_expressions(model):
+        for node in _iter_nodes(expr):
+            if not isinstance(node, TimeSumNode):
+                continue
+            for bound in (node.from_time, node.to_time):
+                value = bound.offset if isinstance(bound, RelativeTimeNode) else bound
+                _check_time_sum_bound(model.id, where, bound, value, provider)
+
+
+def _check_time_sum_bound(
+    model_id: str,
+    where: str,
+    bound: ExpressionNode,
+    value: ExpressionNode,
+    provider: IndexingStructureProvider,
+) -> None:
+    """Check *value*: the bound itself, or the offset of a relative *bound*."""
+    prefix = f"Model '{model_id}', {where}: the time sum bound '{print_expr(bound)}'"
+    port_field_types = (PortFieldNode, PortFieldAggregatorNode)
+    if any(isinstance(n, port_field_types) for n in _iter_nodes(value)):
+        raise ValueError(f"{prefix} cannot contain a port field.")
+    if not is_constant(value):
+        raise ValueError(f"{prefix} cannot contain a variable.")
+    if not compute_indexation(value, provider).time:
+        return
+    # Parameters that make the bound time-dependent: those outside an operator
+    # that removes the time dimension (e.g. d[0] or sum(d)).
+    names = sorted(
+        {
+            n.name
+            for n in _iter_nodes(
+                value, skip=(TimeEvalNode, AllTimeSumNode, TimeSumNode)
+            )
+            if isinstance(n, ParameterNode)
+            and provider.get_parameter_structure(n.name).time
+        }
+    )
+    hint = (
+        " Declare " + ", ".join(f"'{name}'" for name in names) + " with "
+        "`time-dependent: false`."
+        if names
+        else ""
+    )
+    raise ValueError(f"{prefix} depends on time, but must be time-independent.{hint}")
 
 
 @dataclass(frozen=True)
@@ -272,6 +406,7 @@ class Model:
     local_sets: FrozenSet[str] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
+        _check_time_sum_bounds(self)
         # Validate each contribution if present
         if self.objective_contributions:
             for expr in self.objective_contributions.values():
@@ -325,7 +460,7 @@ def model(
     vars_dict = {v.name: v for v in variables} if variables else {}
 
     # Auto-wrap any objective contribution that has a residual scenario dimension
-    # without an explicit expec() (Issue #76 / Antares Simulator v10.0.0 iso-format).
+    # without an explicit expec() (Issue #76, iso-format behaviour).
     if objective_contributions:
         objective_contributions = _normalize_objective_contributions(
             objective_contributions, params_dict, vars_dict

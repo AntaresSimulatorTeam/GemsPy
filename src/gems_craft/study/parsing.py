@@ -34,6 +34,7 @@ class ComponentParameterSchema(ModifiedBaseModel):
     id: str
     time_dependent: bool = False
     scenario_dependent: bool = False
+    # TODO(custom sets, phase 3): not yet checked against the model's indexed_by.
     indexed_by: List[str] = Field(default_factory=list)
     # float: constant; str: series name; dict: inline set-indexed values (nested per set)
     value: Union[float, str, Dict[Union[str, int], Any]]
@@ -158,7 +159,7 @@ def write_yaml_system(system: SystemSchema, path: Path) -> None:
 class ParsedArguments:
     study_dir: Path
     optim_config_path: Optional[Path] = None
-    output_format: OutputFormat = OutputFormat.CSV
+    output_format: OutputFormat = OutputFormat.PARQUET
 
 
 def parse_cli() -> ParsedArguments:
@@ -179,9 +180,9 @@ def parse_cli() -> ParsedArguments:
     parser.add_argument(
         "--output-format",
         choices=[output_format.value for output_format in OutputFormat],
-        default=OutputFormat.CSV.value,
+        default=OutputFormat.PARQUET.value,
         dest="output_format",
-        help="format of the simulation table file (default: csv)",
+        help="format of the simulation table files (default: parquet)",
     )
 
     args = parser.parse_args()

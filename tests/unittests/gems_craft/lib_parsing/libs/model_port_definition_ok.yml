@@ -13,7 +13,11 @@ library:
       description: A short term storage
       parameters:
         - id: p_max_withdrawal
+          time-dependent: false
+          scenario-dependent: false
         - id: p_max_injection
+          time-dependent: false
+          scenario-dependent: false
       variables:
         - id: injection
           lower-bound: 0
