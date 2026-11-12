@@ -72,23 +72,13 @@ def test_lower_upper_bound_printer() -> None:
 @pytest.mark.parametrize(
     "expr, printed",
     [
-        (var("x").set_index("fuel", position=2), "(x[fuel=2.0])"),
-        (var("x").set_index("fuel", relative_shift=-1), "(x[fuel-1.0])"),
-        (var("x").sum_over("fuel"), "sum_over(fuel, x)"),
-        # multi-set indexing: nested SetIndexNodes collapse into one bracket
+        (var("x").set_index("fuel"), "(x.set_index(fuel))"),
+        (var("x").set_index("fuel", position=2), "(x.set_index(fuel, position=2.0))"),
         (
-            var("x").set_index("fuel").set_index("segment", relative_shift=1),
-            "(x[fuel, segment+1.0])",
+            var("x").set_index("fuel", relative_shift=1),
+            "(x.set_index(fuel, relative_shift=1.0))",
         ),
-        # a time shift is a TimeShiftNode, printed apart from the set bracket
-        (var("x").shift(1).set_index("fuel"), "((x.shift(1.0))[fuel])"),
-        # negative set shifts print with a minus sign, never "+-"
-        (var("x").set_index("fuel", relative_shift=-param("p")), "(x[fuel-p])"),
-        # a doubly negated shift is parenthesized, never "--"
-        (
-            var("x").set_index("fuel", relative_shift=-(-param("p"))),
-            "(x[fuel-(-(p))])",
-        ),
+        (var("x").sum_over("fuel"), "(x.sum_over(fuel))"),
     ],
 )
 def test_set_index_sum_over_printer(expr: ExpressionNode, printed: str) -> None:

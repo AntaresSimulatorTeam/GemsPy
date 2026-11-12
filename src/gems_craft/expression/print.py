@@ -128,38 +128,15 @@ class PrinterVisitor(ExpressionVisitor[str]):
         return f"({visit(node.operand, self)}.time_sum())"
 
     def set_index(self, node: SetIndexNode) -> str:
-        # Multi-set indexing (x[fuel=1, segment=2]) is nested single-set
-        # SetIndexNodes in the AST; collapse a directly-nested chain of them
-        # into one bracket rather than printing one pair of brackets per set.
-        terms = []
-        current: ExpressionNode = node
-        while isinstance(current, SetIndexNode):
-            terms.append(self._set_index_term(current))
-            current = current.operand
-        terms.reverse()
-        return f"({visit(current, self)}[{', '.join(terms)}])"
-
-    def _set_index_term(self, node: SetIndexNode) -> str:
+        args = node.set_id
         if node.position is not None:
-            return f"{node.set_id}={visit(node.position, self)}"
-        if node.relative_shift is not None:
-            return f"{node.set_id}{self._signed_offset(node.relative_shift)}"
-        return node.set_id
-
-    def _signed_offset(self, offset: ExpressionNode) -> str:
-        """Prints a shift amount with its sign (`+1.0`, `-1.0`), never `+-`."""
-        if isinstance(offset, LiteralNode) and offset.value < 0:
-            return f"-{-offset.value}"
-        if isinstance(offset, NegationNode):
-            text = visit(offset.operand, self)
-            # a nested negation prints as "-(...)": parenthesize to avoid "--"
-            if isinstance(offset.operand, NegationNode):
-                text = f"({text})"
-            return f"-{text}"
-        return f"+{visit(offset, self)}"
+            args += f", position={visit(node.position, self)}"
+        elif node.relative_shift is not None:
+            args += f", relative_shift={visit(node.relative_shift, self)}"
+        return f"({visit(node.operand, self)}.set_index({args}))"
 
     def sum_over(self, node: SumOverNode) -> str:
-        return f"sum_over({node.set_id}, {visit(node.operand, self)})"
+        return f"({visit(node.operand, self)}.sum_over({node.set_id}))"
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> str:
         return f"({visit(node.operand, self)}.{str(node.name)})"
