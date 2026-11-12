@@ -33,13 +33,14 @@ behaviour (operand-swap in addition, type guards in nonlinear functions).
 
 import functools
 from abc import abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Dict, Generic, Optional, Tuple, TypeVar, Union
+from dataclasses import dataclass, field, replace
+from typing import Any, Dict, FrozenSet, Generic, Optional, Tuple, TypeVar, Union
 
 import linopy
 import numpy as np
 import xarray as xr
 
+from gems_craft.expression.degree import is_constant
 from gems_craft.expression.expression import (
     AbsNode,
     AdditionNode,
@@ -60,6 +61,7 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
     SetIndexNode,
@@ -70,9 +72,9 @@ from gems_craft.expression.expression import (
     UpperBoundNode,
     VariableNode,
 )
+from gems_craft.expression.print import print_expr
 from gems_craft.expression.visitor import (
     ExpressionVisitor,
-    ExpressionVisitorOperations,
     visit,
 )
 from gems_craft.model.port import PortFieldId
@@ -215,87 +217,41 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
 
     def time_shift(self, node: TimeShiftNode) -> VectorizedExpr:
         operand = visit(node.operand, self)
-
-        # Fast path: compile-time integer constant.
-        try:
-            shift = self._eval_int(node.time_shift)
-            return self._apply_time_shift(operand, shift)  # type: ignore[return-value]
-        except (ValueError, KeyError):
-            pass
-
-        shift_result = visit(node.time_shift, self)
-        if not isinstance(shift_result, xr.DataArray):
-            raise ValueError(
-                f"Time shift expression must evaluate to a parameter (DataArray), "
-                f"got {type(shift_result).__name__!r}."
-            )
-        if not shift_result.dims:
-            return self._apply_time_shift(  # type: ignore[return-value]
-                operand, self._da_to_int(shift_result)
-            )
-
-        # Slow path: per-component shift — sum masked contributions.
-        shift_int = shift_result.astype(int)
-        unique_shifts = np.unique(shift_int.values)
-        acc: Optional[Any] = None
-        for s in unique_shifts:
-            mask: xr.DataArray = (shift_int == s).astype(float)
-            shifted = self._apply_time_shift(operand, int(s))
-            contrib = shifted * mask  # type: ignore[operator]
-            acc = contrib if acc is None else _linopy_add(acc, contrib)
-        return acc  # type: ignore[return-value]
+        shift = self._time_value(node.time_shift, "Time shift")
+        return self._apply_time_shift(operand, shift)  # type: ignore[return-value]
 
     def time_eval(self, node: TimeEvalNode) -> VectorizedExpr:
-        timestep = self._eval_int_expr(node.eval_time) % self.block_length
         operand = visit(node.operand, self)
         if not self._has_dim(operand, "time"):
             return operand  # type: ignore[return-value]
-        return operand.isel(time=timestep)  # type: ignore[union-attr,attr-defined,return-value]
+        index = self._time_value(node.eval_time, "Time index")
+        return self._take_time(operand, index)  # type: ignore[return-value]
 
     def time_sum(self, node: TimeSumNode) -> VectorizedExpr:
-        try:
-            from_shift_scalar: Optional[int] = self._eval_int(node.from_time)
-        except (ValueError, KeyError):
-            from_shift_scalar = None
-        try:
-            to_shift_scalar: Optional[int] = self._eval_int(node.to_time)
-        except (ValueError, KeyError):
-            to_shift_scalar = None
+        if not isinstance(node.from_time, RelativeTimeNode) or not isinstance(
+            node.to_time, RelativeTimeNode
+        ):
+            return self._time_sum_with_absolute_bound(node)
+        from_int = self._bound_value(node.from_time.offset)
+        to_int = self._bound_value(node.to_time.offset)
 
         operand = visit(node.operand, self)
 
-        # Fast path: both bounds are compile-time integer constants.
-        if from_shift_scalar is not None and to_shift_scalar is not None:
-            result = self._apply_time_shift(operand, from_shift_scalar)
-            for shift in range(from_shift_scalar + 1, to_shift_scalar + 1):
+        # Fast path: both bounds are the same for every component and scenario.
+        if not from_int.dims and not to_int.dims:
+            start, end = int(from_int), int(to_int)
+            if end < start:  # empty sum
+                return operand * 0.0  # type: ignore[operator,return-value]
+            result = self._apply_time_shift(operand, start)
+            for shift in range(start + 1, end + 1):
                 result = _linopy_add(result, self._apply_time_shift(operand, shift))
             return result  # type: ignore[return-value]
 
-        # Slow path: at least one bound depends on a parameter (per-component).
-        from_da = (
-            xr.DataArray(float(from_shift_scalar))
-            if from_shift_scalar is not None
-            else visit(node.from_time, self)
-        )
-        to_da = (
-            xr.DataArray(float(to_shift_scalar))
-            if to_shift_scalar is not None
-            else visit(node.to_time, self)
-        )
-        if not isinstance(from_da, xr.DataArray):
-            raise ValueError(
-                f"time_sum from_time must be a parameter expression (DataArray), "
-                f"got {type(from_da).__name__!r}."
-            )
-        if not isinstance(to_da, xr.DataArray):
-            raise ValueError(
-                f"time_sum to_time must be a parameter expression (DataArray), "
-                f"got {type(to_da).__name__!r}."
-            )
-        from_int = from_da.astype(int)
-        to_int = to_da.astype(int)
+        # Slow path: at least one bound varies per component or scenario.
         min_from = int(from_int.values.min())
         max_to = int(to_int.values.max())
+        if max_to < min_from:  # empty sum for every component
+            return operand * 0.0  # type: ignore[operator,return-value]
 
         acc: Optional[Any] = None
         for shift in range(min_from, max_to + 1):
@@ -314,6 +270,61 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
             contrib = shifted * mask  # type: ignore[operator]
             acc = contrib if acc is None else _linopy_add(acc, contrib)
         return acc  # type: ignore[return-value]
+
+    def _bound_value(self, node: ExpressionNode) -> xr.DataArray:
+        """Integer value of a time sum bound (an absolute bound or a relative
+        offset). It is time-independent: this is checked when the model is
+        created."""
+        result = self._time_value(node, "Time sum bound")
+        if isinstance(result, int):
+            return xr.DataArray(result)
+        if "time" in result.dims:  # cannot happen in a model that passed the check
+            raise ValueError(
+                f"Model '{self.model_id}': the time sum bound '{print_expr(node)}' "
+                "depends on time, but must be time-independent."
+            )
+        # A time operator such as d[0] leaves a scalar time coordinate.
+        return result.drop_vars("time", errors="ignore")
+
+    def _time_sum_bound(self, bound: ExpressionNode, t: xr.DataArray) -> xr.DataArray:
+        """Time index of a time sum bound at each time step: ``t + offset`` for a
+        relative bound, the bound itself for an absolute one."""
+        relative = isinstance(bound, RelativeTimeNode)
+        value_node = bound.offset if isinstance(bound, RelativeTimeNode) else bound
+        value = self._bound_value(value_node)
+        return value + t if relative else value
+
+    def _time_sum_with_absolute_bound(self, node: TimeSumNode) -> VectorizedExpr:
+        """Time sum with at least one absolute bound (a time index of the block).
+
+        At time step ``t``, the operand is summed over the positions from the
+        start to the end bound, wrapped cyclically into the block, as ``x[N]``.
+        With two absolute bounds the result is time-independent. A start after
+        the end gives an empty sum.
+        """
+        T = self.block_length
+        t = xr.DataArray(np.arange(T), dims="time")
+        start = self._time_sum_bound(node.from_time, t)
+        end = self._time_sum_bound(node.to_time, t)
+        operand = visit(node.operand, self)
+
+        first, last = int(start.min()), int(end.max())
+        if last < first:  # empty sum at every time step
+            return operand * 0.0  # type: ignore[operator,return-value]
+        if not self._has_dim(operand, "time"):
+            # The same value at every position: multiply by their number.
+            count = (end - start + 1).clip(min=0).astype(float)
+            return operand * count  # type: ignore[operator,return-value]
+
+        # Time steps of the block reached by the positions first..last.
+        sources = np.unique(np.arange(first, last + 1) % T)
+        source = xr.DataArray(sources, dims="time_src", coords={"time_src": sources})
+        # Number of positions start..end that wrap onto each source time step
+        # (0 outside the range, more than 1 if the range wraps past it).
+        weight = ((end - source) // T - (start - 1 - source) // T).clip(min=0)
+        selected = operand.isel(time=sources).rename(time="time_src")  # type: ignore[union-attr]
+        # One vectorized product instead of one operation per position.
+        return (selected * weight.astype(float)).sum("time_src")  # type: ignore[no-any-return]
 
     def all_time_sum(self, node: AllTimeSumNode) -> VectorizedExpr:
         operand = visit(node.operand, self)
@@ -473,16 +484,38 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     # Private helpers                                                       #
     # ------------------------------------------------------------------ #
 
-    def _apply_time_shift(self, operand: Any, shift: int) -> Any:
+    def _apply_time_shift(self, operand: Any, shift: Union[int, xr.DataArray]) -> Any:
         """Apply a cyclic (modulo ``self.block_length``) time shift to *operand*.
 
+        *shift* may vary per component, time step or scenario."""
+        t = xr.DataArray(np.arange(self.block_length), dims="time")
+        return self._take_time(operand, t + shift)
+
+    def _take_time(self, operand: Any, positions: Any) -> Any:
+        """*operand* read at the time steps *positions*, wrapped into the block.
+
+        *positions* is an integer or an integer DataArray: along its dimensions
+        (component, time, scenario), each element reads its own time step.
         Works for both ``xr.DataArray`` and linopy Variable/LinearExpression.
-        Coordinates are reassigned after ``isel`` so that subsequent xarray
-        arithmetic aligns positionally rather than by the shifted values.
         """
         if not self._has_dim(operand, "time"):
             return operand
-        return self._shift_along(operand, "time", shift, self.block_length)
+        T = self.block_length
+        if not isinstance(positions, xr.DataArray):
+            return operand.isel(time=positions % T)
+        # The indexer's time coordinate would conflict with the operand's.
+        indexer = (positions % T).drop_vars("time", errors="ignore")
+        if not indexer.dims:
+            return operand.isel(time=int(indexer))
+        if "time" in indexer.dims:
+            # Align the result on the positions, not on the time steps read.
+            result = operand.isel(time=indexer)
+            return result.assign_coords(time=list(range(T)))
+        # Time-independent positions: drop the time steps read, left as a
+        # coordinate (linopy variables have no drop_vars).
+        if isinstance(operand, linopy.Variable):
+            operand = operand.to_linexpr()
+        return operand.isel(time=indexer).drop_vars("time")
 
     def _apply_set_shift(self, operand: Any, set_id: str, shift: int) -> Any:
         """Apply a cyclic shift along *set_id* to *operand*.
@@ -525,6 +558,40 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
             result = result.assign_coords({dim: list(range(length))})
         return result
 
+    def _time_value(self, node: ExpressionNode, what: str) -> Union[int, xr.DataArray]:
+        """Integer value of a time shift, time index or time sum bound: an int
+        when it is a constant, else an integer DataArray computed from the data.
+        A non-integer value raises, whether it is a constant or not."""
+        try:
+            return self._eval_int(node)
+        except (KeyError, NotImplementedError):  # depends on the data
+            return self._time_amount(node, what)
+
+    def _time_amount(self, node: ExpressionNode, what: str) -> xr.DataArray:
+        """Integer values of a time shift, time index or time sum bound that
+        depends on the data."""
+        value = visit(node, self)
+        if not isinstance(value, xr.DataArray):
+            raise ValueError(
+                f"{what} expression must evaluate to a parameter (DataArray), "
+                f"got {type(value).__name__!r}."
+            )
+        values = value.values
+        if np.isnan(values).any():
+            raise ValueError(
+                f"{what} '{print_expr(node)}' in model '{self.model_id}' has missing "
+                "values (NaN)."
+            )
+        rounded = np.round(values)
+        # A tolerance absorbs rounding errors, e.g. d / 3 * 3.
+        wrong = values[~np.isclose(values, rounded, rtol=0.0, atol=_INTEGER_TOLERANCE)]
+        if wrong.size:
+            raise ValueError(
+                f"{what} '{print_expr(node)}' in model '{self.model_id}' must take "
+                f"integer values, got {_preview(wrong)}."
+            )
+        return value.copy(data=rounded.astype(int))
+
     @staticmethod
     def _eval_int(node: ExpressionNode) -> int:
         """Evaluate a constant expression node to an integer (e.g. a time shift)."""
@@ -532,10 +599,11 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         value = visit(node, visitor)
         if isinstance(value, int):
             return value
-        if isinstance(value, float) and value.is_integer():
-            return int(value)
+        if isinstance(value, float) and abs(value - round(value)) <= _INTEGER_TOLERANCE:
+            return int(round(value))
         raise ValueError(
-            f"Expected an integer constant expression, got {value!r} from {node!r}."
+            f"Expected an integer constant expression, got {value!r} from "
+            f"'{print_expr(node)}'."
         )
 
     @staticmethod
@@ -572,121 +640,20 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         return dim in operand.dims
 
 
+# Gap to the nearest integer accepted for a time shift, time index or sum bound.
+_INTEGER_TOLERANCE = 1e-9
+
+
+def _preview(values: np.ndarray, count: int = 5) -> str:
+    """The first *count* distinct *values*, for an error message."""
+    unique = np.unique(values)
+    shown = ", ".join(f"{v:g}" for v in unique[:count])
+    return f"{shown}, ..." if unique.size > count else shown
+
+
 # ---------------------------------------------------------------------------
 # Shift validity helpers — used for OutOfBoundsMode.DROP
 # ---------------------------------------------------------------------------
-
-
-class _TimeDependentShiftError(ValueError):
-    """Raised when a shift amount resolves to a time-dependent parameter."""
-
-
-class _ScenarioDependentShiftError(ValueError):
-    """Raised when a shift amount resolves to a scenario-dependent parameter."""
-
-
-@dataclass(kw_only=True)
-class _ShiftAmountEvaluator(ExpressionVisitorOperations[xr.DataArray]):
-    """Evaluate a shift-amount sub-expression to an xr.DataArray.
-
-    Handles literals, parameter references, and arithmetic over them.
-    All time/scenario/port/variable nodes raise so that callers can catch
-    and treat the shift as unevaluable.
-    """
-
-    model_id: str
-    param_arrays: Dict[Tuple[str, str], xr.DataArray]
-
-    def literal(self, node: LiteralNode) -> xr.DataArray:
-        return xr.DataArray(node.value)
-
-    def parameter(self, node: ParameterNode) -> xr.DataArray:
-        da = self.param_arrays[(self.model_id, node.name)]
-        if "time" in da.dims:
-            raise _TimeDependentShiftError(
-                f"Parameter '{node.name}' depends on time and cannot be used as a"
-                " shift amount."
-            )
-        if "scenario" in da.dims:
-            raise _ScenarioDependentShiftError(
-                f"Parameter '{node.name}' depends on scenario and cannot be used as a"
-                " shift amount."
-            )
-        if set(da.dims) - {"component"}:
-            raise ValueError(
-                f"Parameter '{node.name}' is set-indexed and cannot be used as a"
-                " shift amount."
-            )
-        return da
-
-    def variable(self, node: VariableNode) -> xr.DataArray:
-        raise ValueError("VariableNode cannot appear in a time-shift amount")
-
-    def comparison(self, node: ComparisonNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def time_shift(self, node: TimeShiftNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def time_eval(self, node: TimeEvalNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def time_sum(self, node: TimeSumNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def all_time_sum(self, node: AllTimeSumNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def set_index(self, node: SetIndexNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def sum_over(self, node: SumOverNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def scenario_operator(self, node: ScenarioOperatorNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def port_field(self, node: PortFieldNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def port_field_aggregator(self, node: PortFieldAggregatorNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def floor(self, node: FloorNode) -> xr.DataArray:
-        return np.floor(visit(node.operand, self))  # type: ignore[return-value]
-
-    def ceil(self, node: CeilNode) -> xr.DataArray:
-        return np.ceil(visit(node.operand, self))  # type: ignore[return-value]
-
-    def abs(self, node: AbsNode) -> xr.DataArray:
-        return np.abs(visit(node.operand, self))  # type: ignore[return-value]
-
-    def round(self, node: RoundNode) -> xr.DataArray:
-        return np.round(visit(node.operand, self))  # type: ignore[return-value]
-
-    def maximum(self, node: MaxNode) -> xr.DataArray:
-        ops = [visit(op, self) for op in node.operands]
-        return functools.reduce(
-            lambda a, b: xr.where(a >= b, a, b), ops  # type: ignore[return-value,no-untyped-call]
-        )
-
-    def minimum(self, node: MinNode) -> xr.DataArray:
-        ops = [visit(op, self) for op in node.operands]
-        return functools.reduce(
-            lambda a, b: xr.where(a <= b, a, b), ops  # type: ignore[return-value,no-untyped-call]
-        )
-
-    def dual(self, node: DualNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def reduced_cost(self, node: ReducedCostNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def lower_bound(self, node: LowerBoundNode) -> xr.DataArray:
-        raise NotImplementedError
-
-    def upper_bound(self, node: UpperBoundNode) -> xr.DataArray:
-        raise NotImplementedError
 
 
 def _and_mask(
@@ -701,82 +668,120 @@ def _and_mask(
 
 
 @dataclass(kw_only=True)
+class _TimeAmountEvaluator(VectorizedBuilderBase[xr.DataArray]):
+    """Evaluates time shifts, time indices and time sum bounds with the
+    component data, as the builders do."""
+
+    def variable(self, node: VariableNode) -> xr.DataArray:
+        raise ValueError(
+            f"A time shift, time index or time sum bound cannot contain the "
+            f"variable {node.name!r}."
+        )
+
+
+@dataclass(kw_only=True)
 class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
-    """Walk an expression AST and compute a boolean [component, time] validity mask.
+    """Validity mask of an expression for ``OutOfBoundsMode.DROP``.
 
-    Returns ``None`` when no time-shifting nodes are encountered (all instances
-    are valid).  Otherwise returns a boolean DataArray with at least a ``time``
-    dimension (and a ``component`` dimension when shift amounts vary per
-    component) where ``True`` marks valid constraint instances.
+    An instance (component, time step, scenario) is valid iff the expression
+    reads no variable at a time step outside ``[0, block_length)``. Time
+    operators compose: ``(x[t-1])[t+1]`` reads ``x[t]``. Parameters, including
+    those of shift amounts and time indices, are read modulo the block, as in
+    cyclic mode.
 
-    Used for ``OutOfBoundsMode.DROP``: a ``(component, time)`` entry is
-    ``True`` iff every time-shifted access in the expression falls within
-    ``[0, block_length)``.
+    Returns ``None`` when every instance is valid, else a boolean DataArray
+    where ``True`` marks the valid instances.
     """
 
     model_id: str
     param_arrays: Dict[Tuple[str, str], xr.DataArray]
     block_length: int
+    time_independent_variables: FrozenSet[str] = frozenset()
+    # Time steps at which the expression is read, not wrapped into the block;
+    # None for t itself.
+    positions: Optional[xr.DataArray] = None
 
-    def _eval_as_da(self, expr: ExpressionNode) -> Optional[xr.DataArray]:
-        """Evaluate *expr* as a DataArray shift amount.
+    def _evaluator(self) -> _TimeAmountEvaluator:
+        return _TimeAmountEvaluator(
+            model_id=self.model_id,
+            param_arrays=self.param_arrays,
+            port_arrays={},
+            block_length=self.block_length,
+        )
 
-        Tries a pure-constant evaluation first; falls back to a parameter-
-        aware DataArray evaluation.  Returns ``None`` if neither succeeds so
-        that the caller can skip the validity check for that shift.
-        """
-        try:
-            val = visit(expr, EvaluationVisitor(EvaluationContext()))
-            if isinstance(val, (int, float)):
-                return xr.DataArray(float(val))
-        except (KeyError, NotImplementedError):
-            pass
-        try:
-            return visit(
-                expr,
-                _ShiftAmountEvaluator(
-                    model_id=self.model_id, param_arrays=self.param_arrays
-                ),
-            )
-        except (_TimeDependentShiftError, _ScenarioDependentShiftError):
-            raise
-        except (KeyError, ValueError, NotImplementedError):
-            return None
+    def _positions(self) -> xr.DataArray:
+        if self.positions is None:
+            return xr.DataArray(np.arange(self.block_length), dims="time")
+        return self.positions
+
+    def _read_at(
+        self, operand: ExpressionNode, positions: xr.DataArray
+    ) -> Optional[xr.DataArray]:
+        return visit(operand, replace(self, positions=positions))
+
+    def _at_positions(self, value: Union[int, xr.DataArray]) -> Any:
+        """*value*, computed over the block, at the positions read (modulo the
+        block, as parameters are read)."""
+        if isinstance(value, int):
+            return value
+        return self._evaluator()._take_time(value, self._positions())
+
+    def _in_block(self) -> Optional[xr.DataArray]:
+        positions = self._positions()
+        mask = (positions >= 0) & (positions < self.block_length)
+        return None if bool(mask.all()) else mask
 
     # ------------------------------------------------------------------ #
-    # Time operators — produce validity conditions                          #
+    # Time operators — move the positions read                              #
     # ------------------------------------------------------------------ #
 
     def time_shift(self, node: TimeShiftNode) -> Optional[xr.DataArray]:
-        operand_mask = visit(node.operand, self)
-        shift_da = self._eval_as_da(node.time_shift)
-        if shift_da is None:
-            raise ValueError(
-                f"Time-shift amount is not evaluable to a literal or parameter: "
-                f"{node.time_shift!r}. Only literals and parameter references are "
-                f"supported as shift amounts in OutOfBoundsMode.DROP constraints."
-            )
-        T = self.block_length
-        t = xr.DataArray(np.arange(T), dims="time")
-        own_mask = (t + shift_da >= 0) & (t + shift_da < T)
-        return _and_mask(operand_mask, own_mask)
+        if is_constant(node.operand):  # reads no variable: nothing to drop
+            return None
+        amount = self._evaluator()._time_value(node.time_shift, "Time shift")
+        return self._read_at(
+            node.operand, self._positions() + self._at_positions(amount)
+        )
+
+    def time_eval(self, node: TimeEvalNode) -> Optional[xr.DataArray]:
+        if is_constant(node.operand):  # reads no variable: nothing to drop
+            return None
+        index = self._evaluator()._time_value(node.eval_time, "Time index")
+        return self._read_at(node.operand, xr.DataArray(self._at_positions(index)))
 
     def time_sum(self, node: TimeSumNode) -> Optional[xr.DataArray]:
-        operand_mask = visit(node.operand, self)
-        from_da = self._eval_as_da(node.from_time)
-        to_da = self._eval_as_da(node.to_time)
-        if from_da is None or to_da is None:
-            unevaluable = node.from_time if from_da is None else node.to_time
-            raise ValueError(
-                f"Time-sum bound is not evaluable to a literal or parameter: "
-                f"{unevaluable!r}. Only literals and parameter references are "
-                f"supported as bounds in OutOfBoundsMode.DROP constraints."
-            )
-        T = self.block_length
-        t = xr.DataArray(np.arange(T), dims="time")
-        # Every offset in [from, to] must be in bounds; the extreme values are binding.
-        own_mask = (t + from_da >= 0) & (t + to_da < T)
-        return _and_mask(operand_mask, own_mask)
+        start = self._time_sum_position(node.from_time)
+        end = self._time_sum_position(node.to_time)
+        first, last = int(start.min()), int(end.max())
+        if last < first:  # empty sum: the operand is never read
+            return None
+
+        # The operand is read at every position first..last, along its own dim.
+        dim = f"summed_{id(node)}"
+        summed = xr.DataArray(np.arange(first, last + 1), dims=dim)
+        operand_mask = self._read_at(node.operand, summed)
+        if operand_mask is None:
+            return None
+        operand_mask, _ = xr.broadcast(operand_mask, summed)
+
+        # Running count of the invalid positions: the count over start..end is
+        # the difference of two entries, 0 when every position is valid.
+        invalid = (~operand_mask).astype(int)  # type: ignore[operator]
+        counted = xr.concat(
+            [invalid.isel({dim: [0]}) * 0, invalid.cumsum(dim)], dim=dim
+        )
+        size = last - first + 1
+        upper = (end - first + 1).clip(0, size)
+        lower = (start - first).clip(0, size)
+        valid = counted.isel({dim: upper}) - counted.isel({dim: lower}) <= 0
+        return None if bool(valid.all()) else valid
+
+    def _time_sum_position(self, bound: ExpressionNode) -> xr.DataArray:
+        """Position of a time sum bound: offset from the positions read for a
+        relative bound, the bound itself for an absolute one."""
+        if isinstance(bound, RelativeTimeNode):
+            return self._positions() + self._evaluator()._bound_value(bound.offset)
+        return self._evaluator()._bound_value(bound)
 
     # ------------------------------------------------------------------ #
     # Structural nodes — AND-propagate children                             #
@@ -830,9 +835,6 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     def sum_over(self, node: SumOverNode) -> Optional[xr.DataArray]:
         return visit(node.operand, self)
 
-    def time_eval(self, node: TimeEvalNode) -> Optional[xr.DataArray]:
-        return visit(node.operand, self)
-
     def scenario_operator(self, node: ScenarioOperatorNode) -> Optional[xr.DataArray]:
         return visit(node.operand, self)
 
@@ -842,7 +844,7 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return visit(node.operand, self)
 
     # ------------------------------------------------------------------ #
-    # Leaf nodes — no time-shift constraints                                #
+    # Leaf nodes — variables must be read in the block                      #
     # ------------------------------------------------------------------ #
 
     def literal(self, node: LiteralNode) -> Optional[xr.DataArray]:
@@ -852,9 +854,12 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return None
 
     def variable(self, node: VariableNode) -> Optional[xr.DataArray]:
-        return None
+        if node.name in self.time_independent_variables:
+            return None
+        return self._in_block()
 
     def port_field(self, node: PortFieldNode) -> Optional[xr.DataArray]:
+        # Port fields are never checked: they are read as in cyclic mode.
         return None
 
     def dual(self, node: DualNode) -> Optional[xr.DataArray]:

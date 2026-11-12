@@ -10,6 +10,16 @@ library:
         injection-to-balance: flow
         spillage-bound: flow
         unsupplied-energy-bound:
+    - id: flow_with_price
+      description: A port which transfers power flow and reads the price of the area
+      fields:
+        - id: flow
+        - id: price
+      area-connection:
+        injection-to-balance: flow
+        spillage-bound:
+        unsupplied-energy-bound:
+        price: price
     - id: antares_thermal_cluster_capacity
       description: A port which represents the capacity of a thermal cluster
       fields:

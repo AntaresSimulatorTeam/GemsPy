@@ -68,7 +68,7 @@ def test_milp_version() -> None:
     config = optim_config_for("milp")
     st = SimulationSession(study, config).run()
 
-    objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
+    objective = st.objective_values()["value"].iloc[0]
     assert objective == pytest.approx(36036414)
 
     check_output(st, "G1", "generation_power", _G1_GEN_MILP)
@@ -92,7 +92,7 @@ def test_accurate_heuristic() -> None:
     config = optim_config_for("accurate")
     st = SimulationSession(study, config).run()
 
-    objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
+    objective = st.objective_values()["value"].iloc[0]
     assert objective == pytest.approx(36060641)
 
     check_output(st, "G1", "generation_power", _G1_GEN_ACCURATE)
@@ -115,7 +115,7 @@ def test_fast_heuristic() -> None:
     config = optim_config_for("fast")
     st = SimulationSession(study, config).run()
 
-    objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
+    objective = st.objective_values()["value"].iloc[0]
     assert objective == pytest.approx(35774633)
 
     check_output(st, "G1", "generation_power", _G1_GEN_FAST)

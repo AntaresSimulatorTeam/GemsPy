@@ -136,21 +136,21 @@ class DecompositionFilter:
 
 
 def _apply_validity_mask(expr: VectorizedExpr, mask: xr.DataArray) -> VectorizedExpr:
-    """Filter *expr* to valid (component, time) entries using *mask*.
+    """Mask *expr* where *mask* is False, element-wise.
 
-    When *expr* has both component and time dimensions the mask is applied
-    element-wise via ``where``.  When only the time dimension is present the
-    intersection across components is used (conservative fallback).
+    The mask is broadcast against *expr*: a dimension of the mask that *expr*
+    lacks (e.g. a time-only bound against a [component, time, scenario] mask)
+    is added, so that both sides of a constraint are masked at the same
+    component, time step and scenario.
     """
     if not hasattr(expr, "dims"):
         return expr
-    dims = expr.dims  # type: ignore[union-attr]
-    if "component" in dims and "time" in dims:
-        return expr.where(mask)  # type: ignore[union-attr,return-value]
-    if "time" in dims:
-        valid_times: List[int] = mask.all("component").values.nonzero()[0].tolist()
-        return expr.isel(time=valid_times)  # type: ignore[union-attr,return-value]
-    return expr
+    # A time-independent side (e.g. a constant bound) is left as is: the
+    # time-dependent side of the constraint carries the mask.
+    if "time" in mask.dims and "time" not in expr.dims:  # type: ignore[union-attr]
+        return expr
+    # A time-independent constraint (e.g. x[200] <= 5) is masked as a whole.
+    return expr.where(mask)  # type: ignore[union-attr,return-value]
 
 
 class OutOfBoundsFilter:
@@ -373,6 +373,7 @@ class OptimizationProblem:
             Dict[Tuple[str, str, str], linopy.Variable]
         ] = None,
         set_sizes: Optional[Dict[str, Dict[str, xr.DataArray]]] = None,
+        scenario_ids: Optional[List[int]] = None,
     ) -> None:
         self.name = name
         # model_id -> set_id -> per-component element count (see VectorizedBuilderBase).
@@ -380,10 +381,12 @@ class OptimizationProblem:
         self.linopy_model = linopy_model
         self.study = study
         self.block = block
+        # MC scenarios the problem was built for (None if unknown).
+        self.scenario_ids = scenario_ids
         self._linopy_vars = linopy_vars
         self._linopy_vars_by_component = linopy_vars_by_component or {}
         self.param_arrays = param_arrays
-        # Constant term of the objective (linopy cannot represent pure-constant objectives).
+        # Constant term of the objective, kept outside linopy (which rejects constants in objectives).
         self._objective_constant: float = objective_constant
 
     @property
@@ -680,20 +683,28 @@ class _OptimizationProblemBuilder:
                 name=f"carry_over__{safe}",
             )
 
-        # Extract constant objective contribution (linopy cannot hold pure constants).
+        # Extract the constant part of the objective (whole objective or constant term of a mixed one), since linopy rejects constants.
         objective_constant = 0.0
+        has_objective = False
         if total_obj is not None and not isinstance(
             total_obj, (xr.DataArray, int, float)
         ):
+            # Move any constant term out of the expression (linopy rejects it).
+            if isinstance(total_obj, linopy.LinearExpression):
+                objective_constant = float(total_obj.const.sum())
+                total_obj = total_obj - objective_constant
             self.linopy_model.add_objective(total_obj)  # type: ignore[arg-type]
+            has_objective = True
         elif total_obj is not None:
             if isinstance(total_obj, xr.DataArray):
                 objective_constant = float(total_obj.sum())
             else:
                 objective_constant = float(total_obj)
 
-        # linopy requires at least one variable to solve; add a fixed dummy if needed.
-        if len(self.linopy_model.variables) == 0:
+        # linopy requires an objective (hence a variable) to solve; add a fixed dummy if needed.
+        if not has_objective and (
+            total_obj is not None or len(self.linopy_model.variables) == 0
+        ):
             dummy = self.linopy_model.add_variables(
                 lower=xr.DataArray([0.0], dims=["__dummy_dim"]),
                 upper=xr.DataArray([0.0], dims=["__dummy_dim"]),
@@ -711,6 +722,7 @@ class _OptimizationProblemBuilder:
             param_arrays=self.param_arrays,
             objective_constant=objective_constant,
             set_sizes=self.set_sizes,
+            scenario_ids=self.scenario_ids,
         )
 
     # ------------------------------------------------------------------
@@ -1043,6 +1055,11 @@ class _OptimizationProblemBuilder:
                                 model_id=model.id,
                                 param_arrays=self.param_arrays,
                                 block_length=self.block_length,
+                                time_independent_variables=frozenset(
+                                    name
+                                    for name, variable in model.variables.items()
+                                    if not variable.structure.time
+                                ),
                             ),
                         )
 

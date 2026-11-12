@@ -57,8 +57,8 @@ def test_data_base_with_scenario_builder(database: DataBase) -> None:
     assert database.get_value(load_index, 0, 3) == 100
 
 
-def test_resolve_vectorized_subset_playlist(scenario_builder: ScenarioBuilder) -> None:
-    """A subset (playlist) of MC scenarios resolves to the correct columns."""
+def test_resolve_vectorized_scenario_subset(scenario_builder: ScenarioBuilder) -> None:
+    """A subset of MC scenarios resolves to the correct columns."""
     mc = np.array([0, 2], dtype=int)  # skip scenarios 1 and 3
     assert list(scenario_builder.resolve_vectorized("load", mc)) == [0, 0]
     assert list(scenario_builder.resolve_vectorized("cost-group", mc)) == [0, 1]

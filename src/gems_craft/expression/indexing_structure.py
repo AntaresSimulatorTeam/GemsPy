@@ -37,9 +37,6 @@ class IndexingStructure:
     def is_scenario_varying(self) -> bool:
         return self.scenario
 
-    def is_set_varying(self) -> bool:
-        return bool(self.sets)
-
     def is_time_scenario_varying(self) -> bool:
         return self.is_time_varying() and self.is_scenario_varying()
 
@@ -47,5 +44,5 @@ class IndexingStructure:
         return (
             (not self.is_time_varying())
             and (not self.is_scenario_varying())
-            and (not self.is_set_varying())
+            and (not self.sets)
         )

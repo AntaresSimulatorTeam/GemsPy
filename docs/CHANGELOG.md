@@ -5,41 +5,133 @@ All notable changes to GemsPy are documented here.
 ## [Unreleased]
 
 ### Added
-- **Taxonomy conformance checked when a study is loaded** - `load_study` reads
-  the optional `input/taxonomy.yml` and calls
-  `validate_libraries_against_taxonomy` on every library declaring a `taxonomy`
-  field. `parse_yaml_library` is unchanged and performs no validation.
+- **Expression language**
+  - Time shifts accept functions without parentheses (e.g. `x[t - ceil(d / 2)]`).
+  - A time index or time shift may be given by a parameter varying in time,
+    per component or per scenario (e.g. `x[d[t]]`, `x[d[t-1]]`, `x[t + k[t]]`).
 
 ### Changed
-- **Breaking** - loading a study whose library declares a `taxonomy` raises
-  `ValueError` if no taxonomy is supplied, or if its id differs from the declared
-  one.
-- **Breaking** - `TaxonomyData` renamed to `TaxonomySchema`; no alias kept.
-- **Breaking** - `check_library_against_taxonomy` moved from
-  `gems_craft.model.taxonomy` to the new `gems_craft.model.validation`, and
-  `consistency_check` from `gems_craft.study.resolve_components` to the new
-  `gems_craft.study.validation`, where it is renamed
-  `check_component_models`. The `Study.check_consistency()` method moved to
-  that same module as the function `check_data_requirements(study)` — the two
-  checks are disjoint (component model ids vs. database coverage) and their
-  near-identical old names invited confusion. Reading and validating are now
-  separate modules, as in `optim_config/`. No behavior change; names and
-  import paths only.
-- **Breaking** - the legacy `X[param ± …]` index is now parsed as a shift
-  expression, where a leading sign binds first: `x[p - q*2]` parses to
-  `p + (-q)*2` instead of `p - (q*2)`. Same value, but a structurally different
-  AST.
-- **Breaking** - `x[p = 2]` (where `p` is neither `t` nor a set) now raises a
-  parsing error instead of being accepted as a time index and failing later,
-  when the problem is built.
+- `ComponentView` and `OutputView` are renamed `ComponentResults` and
+  `OutputResults`, so that they are not confused with GEMS views. The calls
+  `component(...).output(...)`, `value()` and `data` are unchanged.
+- **Breaking** - time shifts, time indices and time sum bounds only accept
+  numbers, parameters, `+ - * /`, parentheses and the functions `floor`,
+  `ceil`, `round`, `abs`, `max`, `min`, `expec`. Variables, port fields, sums
+  and comparisons are rejected when the library is parsed. A unary minus must
+  start the expression or a parenthesis: write `x[a * (-1)]`, not `x[a * -1]`.
+- **Breaking** - a port field outside `sum_connections` (e.g. `p.f <= 0`) is a
+  syntax error.
+- **Breaking** - **`drop` out-of-bounds mode** skips a constraint where it
+  reads a variable outside the block, through a time shift, a time index or a
+  time sum; parameters are read modulo the block, as in `cyclic`. So `x[200]`,
+  `x[d]` and `sum(-1 .. 1, x)` are now skipped where they read `x` outside the
+  block, instead of wrapping around it, and `p[t-1]` no longer skips the
+  constraint at `t = 0`. Port fields are never checked.
 
 ### Fixed
-- **`solver-options.logs` now controls solver output** - it was passed to the
-  solver as an unknown `solver_logs` option (HiGHS printed
-  `getOptionIndex: Option "solver_logs" is unknown` on every solve) and had no
-  effect. It is now translated into the solver's own output option
-  (`output_flag` for HiGHS, `OutputFlag` for Gurobi, `outputlog` for Xpress);
-  with `logs: false` HiGHS only prints its startup banner.
+- `x[d]` with `d` varying in time, per component or per scenario read `x` at
+  the first value of `d` only.
+- In `drop` mode, a time shift or index of a shifted expression (e.g.
+  `(x[t-1])[0]`) skipped the constraint at the wrong time steps.
+- In `drop` mode, a bound without a component dimension was masked differently
+  from the other side of the constraint.
+- A non-integer time sum bound given by a parameter was truncated. It now
+  raises an error.
+
+### Deprecated
+- `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
+
+## [0.3.0] - 2026-10-29
+
+Simulation results are now written to disk as they are solved, as one file per
+scenario; model semantics move closer to Antares Simulator; hybrid libraries
+can be written in the form Antares Simulator expects. This release contains
+breaking changes, marked **Breaking** below.
+
+### Added
+- **Simulation tables stored on disk** - `SimulationTable.save(path, format)`
+  writes a folder with one file per scenario, a `scenario-common` file for the
+  rows shared by all scenarios and a `manifest.json` written last.
+  `SimulationTable.open(path)` reads it back lazily, opening only the files a
+  call needs. `SimulationTable` is exported from `gems_runner.simulation`.
+- **Simulation table read API** - `to_pandas(components, outputs, scenarios)`,
+  `iter_scenario_frames()`, `scan()` (a `pyarrow.dataset.Dataset`),
+  `scenarios`, `objective_values()`, and `block=` on `component(...).output(...)`
+  and `OutputView.value()` to select one block.
+- **Parquet output** - zstd-compressed Parquet, chosen with `--output-format` /
+  `output_format`. `pyarrow` is now a runtime dependency.
+- **Expression language**
+  - Time sums accept absolute bounds (e.g. `sum(0 .. 2, x)`, `sum(0 .. t, x)`)
+    as well as bounds relative to `t`.
+  - Objective contributions may contain constant terms (e.g.
+    `sum(cost * generation + 1)`); `objective_value` includes them, the
+    linopy objective and the LP export do not.
+  - Every expression field of a model library accepts a plain YAML number
+    (e.g. `definition: 0`), not only variable bounds.
+- **Taxonomy conformance** - `load_study` reads the optional
+  `input/taxonomy.yml` and checks every library declaring a `taxonomy` against
+  it.
+- **Hybrid libraries**
+  - `write_yaml_hybrid_library` writes a hybrid library with the three
+    mandatory `area-connection` keys (`null` when unused), as Antares Simulator
+    requires.
+  - Port types accept the optional `price` key in `area-connection` (Antares
+    Simulator 10.2).
+
+### Changed
+- **Breaking** - **results written to disk as they are solved.** `run_study`
+  and the `gemspy` CLI write `output/<run_id>/simulation_table/` (see above),
+  in Parquet by default, instead of a single CSV file. Sequential and parallel
+  modes write each block as soon as it is solved, so the whole table is never
+  held in memory. `SimulationSession(..., output_dir=...)` does the same and
+  returns the stored table, on which `data` raises (use `to_pandas()` or
+  `iter_scenario_frames()`). Benders mode writes no table.
+- **Breaking** - **one fixed simulation table schema**: nullable `Int64`
+  indices, `string` labels, `float64` values (`SIMULATION_TABLE_SCHEMA`).
+  `OutputView.value()` and `data` raise when the requested values span several
+  blocks, unless `block=` is given.
+- **Breaking** - **model parameters are time- and scenario-dependent by
+  default**, as in Antares Simulator. Declare `time-dependent: false` /
+  `scenario-dependent: false` for parameters that must stay constant.
+- **Breaking** - **time-sum bounds** must be time-independent and contain no
+  variable, which is checked when the model is created.
+- **Breaking** - **taxonomy**: loading a study whose library declares a
+  `taxonomy` fails if no matching taxonomy is supplied. `TaxonomyData` is
+  renamed `TaxonomySchema`.
+- **Breaking** - **validation moved to dedicated modules**:
+  `check_library_against_taxonomy` to `gems_craft.model.validation`;
+  `consistency_check` and `Study.check_consistency()` to
+  `gems_craft.study.validation`, as `check_component_models` and
+  `check_data_requirements(study)`. No behavior change.
+- **Breaking** - `write_yaml_library` raises on a library whose port types have
+  `area-connection` or `thermal-capacity-connection`; use
+  `write_yaml_hybrid_library`.
+- **Unique output folder per run** - run ids now include seconds and a random
+  suffix (e.g. `20261009T143502-3f9a1c`), and an existing folder is never
+  reused.
+
+### Deprecated
+- `SimulationTable.to_csv()`, `to_parquet()`, `to_dataset()` and `to_netcdf()`:
+  use `save()`, or build an xarray object from `to_pandas()`.
+
+### Removed
+- **Breaking** - the `playlist-file` option of `scenario-scope`; list the
+  scenarios inline.
+- **Breaking** - `merge_simulation_tables`.
+
+### Fixed
+- `solver-options.logs` now controls solver output; it was passed to the
+  solver as an unknown option and had no effect.
+- Rows of single-scenario solves (every sequential/parallel block) now carry
+  their `scenario_index`, so scenarios can be told apart.
+- `OutputView.value()` works on outputs without a time or scenario dimension
+  for any index of the missing dimension.
+- Time sums with bounds relative to `t`: a start after the end gives an empty
+  sum, bounds may contain time operators, and scenario-dependent bounds make
+  the sum scenario-dependent.
+- Invalid time or scenario scopes (`first-time-step` after `last-time-step`,
+  an empty scenario selection, a single-time-step sequential run) are rejected
+  before solving, with an explicit message.
 
 ---
 
@@ -75,7 +167,7 @@ All notable changes to GemsPy are documented here.
 - **Standard library parsing now accepts hybrid port-type fields** -
   `parse_yaml_library` (the standard, non-hybrid parser) no longer rejects
   `area-connection` / `thermal-capacity-connection` on port-types, so a
-  library YAML file can be used as-is in both full GEMS and hybrid studies.
+  library YAML file can be used as-is in both "full GEMS" and hybrid studies.
   `AreaConnectionSchema` and `PortThermalCapacitySchema` moved from the
   deleted `gems_craft_hybrid/model/` (`HybridLibrarySchema` /
   `HybridPortTypeSchema`) directly onto `gems_craft`'s own `PortTypeSchema`;

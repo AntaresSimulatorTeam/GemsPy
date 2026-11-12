@@ -38,6 +38,7 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
     SetIndexNode,
@@ -91,6 +92,8 @@ class EqualityVisitor:
             return self.time_eval(left, right)
         if isinstance(left, TimeSumNode) and isinstance(right, TimeSumNode):
             return self.time_sum(left, right)
+        if isinstance(left, RelativeTimeNode) and isinstance(right, RelativeTimeNode):
+            return self.visit(left.offset, right.offset)
         if isinstance(left, AllTimeSumNode) and isinstance(right, AllTimeSumNode):
             return self.all_time_sum(left, right)
         if isinstance(left, SetIndexNode) and isinstance(right, SetIndexNode):
@@ -187,19 +190,19 @@ class EqualityVisitor:
         return self.visit(left.operand, right.operand)
 
     def set_index(self, left: SetIndexNode, right: SetIndexNode) -> bool:
-        if left.set_id != right.set_id:
-            return False
-        if (left.position is None) != (right.position is None):
-            return False
-        if (left.relative_shift is None) != (right.relative_shift is None):
-            return False
-        if left.position is not None and right.position is not None:
-            if not self.visit(left.position, right.position):
-                return False
-        if left.relative_shift is not None and right.relative_shift is not None:
-            if not self.visit(left.relative_shift, right.relative_shift):
-                return False
-        return self.visit(left.operand, right.operand)
+        return (
+            left.set_id == right.set_id
+            and self._optional(left.position, right.position)
+            and self._optional(left.relative_shift, right.relative_shift)
+            and self.visit(left.operand, right.operand)
+        )
+
+    def _optional(
+        self, left: Optional[ExpressionNode], right: Optional[ExpressionNode]
+    ) -> bool:
+        if left is None or right is None:
+            return left is right
+        return self.visit(left, right)
 
     def sum_over(self, left: SumOverNode, right: SumOverNode) -> bool:
         return left.set_id == right.set_id and self.visit(left.operand, right.operand)

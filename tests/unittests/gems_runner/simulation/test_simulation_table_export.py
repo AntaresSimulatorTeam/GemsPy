@@ -1,9 +1,11 @@
 # Copyright (c) 2024, RTE (https://www.rte-france.com)
 # SPDX-License-Identifier: MPL-2.0
 
-"""Tests for SimulationTable.to_dataset(), write_parquet(), and write_netcdf()."""
+"""Tests for the deprecated SimulationTable.to_dataset(), to_parquet() and
+to_netcdf(): they warn, and behave as before on a table in memory."""
 
 from pathlib import Path
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -23,6 +25,11 @@ from gems_runner.simulation.simulation_table import (
     SimulationTable,
     SimulationTableBuilder,
 )
+
+
+def _deprecated(call: Callable[[], Any]) -> Any:
+    with pytest.warns(DeprecationWarning):
+        return call()
 
 
 def _make_problem(n_scenarios: int = 1) -> FakeProblem:
@@ -59,19 +66,19 @@ def _make_problem(n_scenarios: int = 1) -> FakeProblem:
 
 def test_to_dataset_returns_xr_dataset() -> None:
     st = SimulationTableBuilder().build(_make_problem())  # type: ignore[arg-type]
-    ds = st.to_dataset()
+    ds = _deprecated(st.to_dataset)
     assert isinstance(ds, xr.Dataset)
 
 
 def test_to_dataset_contains_expected_variable() -> None:
     st = SimulationTableBuilder().build(_make_problem())  # type: ignore[arg-type]
-    ds = st.to_dataset()
+    ds = _deprecated(st.to_dataset)
     assert "p" in ds.data_vars
 
 
 def test_to_dataset_values_match_data_single_scenario() -> None:
     st = SimulationTableBuilder().build(_make_problem(n_scenarios=1))  # type: ignore[arg-type]
-    ds = st.to_dataset()
+    ds = _deprecated(st.to_dataset)
 
     # Check that values in the Dataset match those in the flat DataFrame
     for _, row in st.data.dropna(subset=[SimulationColumns.COMPONENT.value]).iterrows():
@@ -90,7 +97,7 @@ def test_to_dataset_values_match_data_single_scenario() -> None:
 
 def test_to_dataset_values_match_data_multi_scenario() -> None:
     st = SimulationTableBuilder().build(_make_problem(n_scenarios=3))  # type: ignore[arg-type]
-    ds = st.to_dataset()
+    ds = _deprecated(st.to_dataset)
 
     for _, row in st.data.dropna(subset=[SimulationColumns.COMPONENT.value]).iterrows():
         output = row[SimulationColumns.OUTPUT.value]
@@ -108,7 +115,7 @@ def test_to_dataset_values_match_data_multi_scenario() -> None:
 
 def test_to_dataset_includes_objective_value_scalar() -> None:
     st = SimulationTableBuilder().build(_make_problem())  # type: ignore[arg-type]
-    ds = st.to_dataset()
+    ds = _deprecated(st.to_dataset)
     assert "objective-value" in ds.data_vars
     assert ds["objective-value"].shape == ()  # scalar (no dims)
     assert float(ds["objective-value"]) == pytest.approx(99.0)
@@ -122,7 +129,7 @@ def test_to_dataset_includes_objective_value_scalar() -> None:
 def test_write_parquet_creates_file(tmp_path: Path) -> None:
     pytest.importorskip("pyarrow")
     st = SimulationTableBuilder().build(_make_problem(), table_id="test")  # type: ignore[arg-type]
-    path = st.to_parquet(tmp_path)
+    path = _deprecated(lambda: st.to_parquet(tmp_path))
     assert path.exists()
     assert path.suffix == ".parquet"
 
@@ -130,7 +137,7 @@ def test_write_parquet_creates_file(tmp_path: Path) -> None:
 def test_write_parquet_content_matches_original(tmp_path: Path) -> None:
     pytest.importorskip("pyarrow")
     st = SimulationTableBuilder().build(_make_problem(), table_id="test")  # type: ignore[arg-type]
-    path = st.to_parquet(tmp_path)
+    path = _deprecated(lambda: st.to_parquet(tmp_path))
 
     loaded = pd.read_parquet(path)
     pd.testing.assert_frame_equal(
@@ -143,7 +150,7 @@ def test_write_parquet_content_matches_original(tmp_path: Path) -> None:
 def test_write_parquet_uses_zstd_compression(tmp_path: Path) -> None:
     pq = pytest.importorskip("pyarrow.parquet")
     st = SimulationTableBuilder().build(_make_problem(), table_id="test")  # type: ignore[arg-type]
-    path = st.to_parquet(tmp_path)
+    path = _deprecated(lambda: st.to_parquet(tmp_path))
 
     metadata = pq.ParquetFile(path).metadata
     for column_index in range(metadata.num_columns):
@@ -157,14 +164,14 @@ def test_write_parquet_uses_zstd_compression(tmp_path: Path) -> None:
 
 def test_write_netcdf_creates_file(tmp_path: Path) -> None:
     st = SimulationTableBuilder().build(_make_problem(), table_id="test")  # type: ignore[arg-type]
-    path = st.to_netcdf(tmp_path)
+    path = _deprecated(lambda: st.to_netcdf(tmp_path))
     assert path.exists()
     assert path.suffix == ".nc"
 
 
 def test_write_netcdf_readable_as_dataset(tmp_path: Path) -> None:
     st = SimulationTableBuilder().build(_make_problem(), table_id="test")  # type: ignore[arg-type]
-    path = st.to_netcdf(tmp_path)
+    path = _deprecated(lambda: st.to_netcdf(tmp_path))
 
     ds = xr.open_dataset(path)
     assert isinstance(ds, xr.Dataset)

@@ -70,7 +70,7 @@ def test_mixed_integer_strategies() -> None:
     config = optim_config_all_models()
     st = SimulationSession(study, config).run()
 
-    objective = st.data.loc[st.data["output"] == "objective-value", "value"].iloc[0]
+    objective = st.objective_values()["value"].iloc[0]
     assert objective == pytest.approx(537680)
 
     check_output(st, "G1", "generation_power", _G1_GEN)

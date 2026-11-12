@@ -29,6 +29,7 @@ import pandas as pd
 import pytest
 
 from gems_runner.study.runner import run_study
+from tests.e2e.functional.simulation_table_output import read_run_table
 
 _STUDY_SRC = Path(__file__).parent / "studies" / "dsr_3_blocks"
 
@@ -88,18 +89,12 @@ _KEY_COLS = [
 ]
 
 
-def _load_csv(study_dir: Path) -> pd.DataFrame:
-    output_files = list((study_dir / "output").glob("**/simulation_table_*.csv"))
-    assert len(output_files) == 1, f"Expected 1 output file, got {len(output_files)}"
-    return pd.read_csv(output_files[0])
-
-
 def _run_with_config(study_dir: Path, config_yaml: str) -> pd.DataFrame:
     """Write optim-config.yml, run the study, return the raw simulation table."""
     config_path = study_dir / "input" / "optim-config.yml"
     config_path.write_text(config_yaml)
     run_study(study_dir)
-    return _load_csv(study_dir)
+    return read_run_table(study_dir)
 
 
 def _per_timestep_df(raw: pd.DataFrame) -> pd.DataFrame:

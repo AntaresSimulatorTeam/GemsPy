@@ -28,9 +28,11 @@ from gems_craft.study.data import (
     dataframe_to_scenario_series,
     dataframe_to_set_indexed_series,
     dataframe_to_time_series,
+    is_tidy_series,
     load_tidy_series_from_file,
     load_ts_from_file,
     nested_dict_to_set_indexed_series,
+    tidy_dataframe_to_series_data,
 )
 from gems_craft.study.parsing import (
     ComponentPropertySchema,
@@ -213,6 +215,12 @@ def _build_data(
         )
     if isinstance(param_value, str):
         ts_data = load_ts_from_file(param_value, timeseries_dir)
+        if (time_dependent or scenario_dependent) and is_tidy_series(ts_data):
+            return tidy_dataframe_to_series_data(
+                load_tidy_series_from_file(param_value, timeseries_dir),
+                time_dependent,
+                scenario_dependent,
+            )
         if time_dependent and scenario_dependent:
             return TimeScenarioSeriesData(ts_data)
         elif time_dependent:
