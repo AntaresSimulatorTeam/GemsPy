@@ -63,8 +63,8 @@ def _safe_indexation(
     """
     Computes the indexation of `expr`, which also validates time and set index
     usage (errors name `context`). Returns None if `expr` still contains an
-    unresolved port field (sum_connections): the check is then deferred until
-    ports are resolved.
+    unresolved port field (sum_connections), or the dual() of a constraint that
+    contains one: the check is then deferred until ports are resolved.
     """
     try:
         return compute_indexation(expr, provider)
@@ -83,7 +83,8 @@ def _make_structure_provider(
     # Pre-compute constraint structures using a params/vars-only base provider.
     # Constraint expressions cannot contain dual()/reduced_cost(), so the base
     # provider's get_constraint_structure is never invoked during this step.
-    constraint_structures: Dict[str, IndexingStructure] = {}
+    # None: the constraint contains unresolved port fields (sum_connections).
+    constraint_structures: Dict[str, Optional[IndexingStructure]] = {}
     if constraints:
 
         class _BaseProvider(IndexingStructureProvider):
@@ -100,12 +101,8 @@ def _make_structure_provider(
 
         base = _BaseProvider()
         for cname, c in constraints.items():
-            structure = _safe_indexation(c.expression, base, f"constraint '{cname}'")
-            # Constraints containing unresolved port fields (sum_connections)
-            # cannot be indexed before port resolution; fall back to the most
-            # general structure so callers can still proceed.
-            constraint_structures[cname] = structure or IndexingStructure(
-                time=True, scenario=True
+            constraint_structures[cname] = _safe_indexation(
+                c.expression, base, f"constraint '{cname}'"
             )
 
     class Provider(IndexingStructureProvider):
@@ -116,7 +113,13 @@ def _make_structure_provider(
             return variables[name].structure
 
         def get_constraint_structure(self, name: str) -> IndexingStructure:
-            return constraint_structures[name]
+            structure = constraint_structures[name]
+            if structure is None:
+                # dual() of such a constraint is checked once ports are resolved.
+                raise UnresolvedPortFieldError(
+                    f"Constraint '{name}' contains unresolved port fields."
+                )
+            return structure
 
     return Provider()
 

@@ -133,6 +133,21 @@ _CASES = {
         _port_lib("sum_over(segment, gen[segment])"),
         None,
     ),
+    "set index on dual of constraint with sum_connections": (
+        _lib(
+            _FLOW_PORT_TYPE,
+            "models:",
+            "  - id: m",
+            "    sets: [{id: segment}]",
+            "    parameters: [{id: p, indexed-by: [segment]}]",
+            "    variables: [{id: x}]",
+            "    ports: [{id: in_port, type: flow}]",
+            "    constraints:",
+            "      - {id: c, expression: 'x + sum_connections(in_port.flow) <= p'}",
+            "    extra-outputs: [{id: o, expression: '(dual(c))[segment=0]'}]",
+        ),
+        None,
+    ),
 }
 
 
