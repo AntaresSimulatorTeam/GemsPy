@@ -15,6 +15,7 @@ from .data import (
     DataBase,
     ScenarioIndex,
     ScenarioSeriesData,
+    SetIndexedSeriesData,
     TimeIndex,
     TimeScenarioIndex,
     TimeScenarioSeriesData,

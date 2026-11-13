@@ -56,10 +56,30 @@ def test_load_ts_from_file_tsv(tmp_path: Path) -> None:
     assert df.iloc[1, 2] == 60
 
 
+def test_load_ts_from_file_csv(tmp_path: Path) -> None:
+    """Reads a comma-separated .csv file when no .txt/.tsv exists."""
+    (tmp_path / "series.csv").write_text("1,2\n3,4\n")
+    assert load_ts_from_file("series", tmp_path).shape == (2, 2)
+
+
 def test_load_ts_from_file_not_found_raises(tmp_path: Path) -> None:
-    """Raises FileNotFoundError when neither .txt nor .tsv exists."""
+    """Raises FileNotFoundError when no .txt, .tsv or .csv exists."""
     with pytest.raises(FileNotFoundError):
         load_ts_from_file("missing", tmp_path)
+
+
+def test_load_ts_from_file_ambiguous_raises(tmp_path: Path) -> None:
+    """Raises when several extensions exist for the same series name."""
+    (tmp_path / "series.tsv").write_text("1\t2\n")
+    (tmp_path / "series.csv").write_text("1,2\n")
+    with pytest.raises(ValueError, match="series.tsv, series.csv"):
+        load_ts_from_file("series", tmp_path)
+
+
+def test_legacy_structures_ignore_sets_requirement() -> None:
+    sets = frozenset({"fuel"})
+    assert ConstantData(1.0).check_requirement(False, False, sets)
+    assert TimeSeriesData(pd.Series([1.0])).check_requirement(True, False, sets)
 
 
 def test_load_ts_from_file_none_inputs_raises() -> None:
@@ -176,6 +196,33 @@ def test_build_data_float_scenario_dependent_raises() -> None:
             param_value=5.0,
             timeseries_dir=None,
         )
+
+
+@pytest.mark.parametrize(
+    "csv, time, scenario, expected",
+    [
+        ("time,value\n1,20\n0,10\n", True, False, TimeSeriesData),
+        ("value,scenario\n10,0\n20,1\n", False, True, ScenarioSeriesData),
+        (
+            "time,scenario,value\n0,0,1\n0,1,2\n1,0,3\n1,1,4\n",
+            True,
+            True,
+            TimeScenarioSeriesData,
+        ),
+    ],
+    ids=["time", "scenario", "time and scenario"],
+)
+def test_build_data_tidy_without_sets(
+    tmp_path: Path, csv: str, time: bool, scenario: bool, expected: type
+) -> None:
+    """A tidy file (header with 'value') gives the matching legacy structure."""
+    (tmp_path / "series.csv").write_text(csv)
+    data = _build_data(time, scenario, "series", tmp_path)
+    assert isinstance(data, expected)
+    t = [0, 1] if time else None
+    s = np.array([0, 1]) if scenario else None
+    expected_values = [[1, 2], [3, 4]] if time and scenario else [10, 20]
+    np.testing.assert_array_equal(data.get_value(t, s), expected_values)
 
 
 # ---------------------------------------------------------------------------
