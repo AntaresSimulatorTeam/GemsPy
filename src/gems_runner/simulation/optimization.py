@@ -330,7 +330,8 @@ def _build_slave_port_array(
     if not per_master:
         return xr.DataArray(0.0)
 
-    total: Optional[Any] = None
+    linopy_terms: List[Any] = []
+    constant: Optional[xr.DataArray] = None
 
     for (master_mk, master_pf_id), conn_list in per_master.items():
         master_comps = study.model_components[master_mk]
@@ -362,8 +363,15 @@ def _build_slave_port_array(
             expr_master_r, conn_list, master_comp_ids, comp_ids
         )
 
-        total = contribution if total is None else _linopy_add(total, contribution)
+        if isinstance(contribution, xr.DataArray):
+            constant = contribution if constant is None else constant + contribution
+        else:
+            linopy_terms.append(contribution)
 
+    # Single merge along _term: pairwise `+` would recopy the accumulator each time.
+    total: Optional[Any] = linopy.merge(linopy_terms) if linopy_terms else None
+    if constant is not None:
+        total = constant if total is None else _linopy_add(total, constant)
     return total if total is not None else xr.DataArray(0.0)
 
 
