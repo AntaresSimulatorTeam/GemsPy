@@ -23,7 +23,7 @@ from gems_craft.study.resolve_components import (
 )
 from gems_craft.study.scenario_builder import ScenarioBuilder
 from gems_craft.study.study import Study
-from gems_craft.study.validation import check_component_models
+from gems_craft.study.validation import check_component_models, check_custom_sets
 
 
 def load_study(study_dir: Path) -> Study:
@@ -62,6 +62,7 @@ def load_study(study_dir: Path) -> Study:
     for library in lib_dict.values():
         model_dict |= library.models
     check_component_models(system, model_dict)
+    check_custom_sets(input_study, model_dict, lib_dict)
 
     scenario_builder_path = (
         study_dir / "input" / "data-series" / "modeler-scenariobuilder.dat"

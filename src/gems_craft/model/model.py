@@ -20,7 +20,18 @@ import dataclasses
 import itertools
 import warnings
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, Type
+from typing import (
+    Any,
+    Dict,
+    FrozenSet,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+)
 
 from gems_craft.expression import ExpressionNode
 from gems_craft.expression.degree import is_constant, is_linear
@@ -30,16 +41,39 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     RelativeTimeNode,
+    SumOverNode,
     TimeEvalNode,
     TimeSumNode,
 )
-from gems_craft.expression.indexing import IndexingStructureProvider, compute_indexation
+from gems_craft.expression.indexing import (
+    IndexingStructureProvider,
+    IndexingUsageError,
+    UnresolvedPortFieldError,
+    compute_indexation,
+)
 from gems_craft.expression.indexing_structure import IndexingStructure
 from gems_craft.expression.print import print_expr
 from gems_craft.model.constraint import Constraint
 from gems_craft.model.parameter import Parameter
 from gems_craft.model.port import PortFieldDefinition, PortFieldId, PortType
 from gems_craft.model.variable import Variable
+
+
+def _safe_indexation(
+    expr: ExpressionNode, provider: IndexingStructureProvider, context: str
+) -> Optional[IndexingStructure]:
+    """
+    Computes the indexation of `expr`, which also validates time and set index
+    usage (errors name `context`). Returns None if `expr` still contains an
+    unresolved port field (sum_connections), or the dual() of a constraint that
+    contains one: the check is then deferred until ports are resolved.
+    """
+    try:
+        return compute_indexation(expr, provider)
+    except IndexingUsageError as e:
+        raise ValueError(f"{e} (in {context})") from e
+    except UnresolvedPortFieldError:
+        return None
 
 
 # TODO: Introduce bool_variable ?
@@ -51,7 +85,8 @@ def _make_structure_provider(
     # Pre-compute constraint structures using a params/vars-only base provider.
     # Constraint expressions cannot contain dual()/reduced_cost(), so the base
     # provider's get_constraint_structure is never invoked during this step.
-    constraint_structures: Dict[str, IndexingStructure] = {}
+    # None: the constraint contains unresolved port fields (sum_connections).
+    constraint_structures: Dict[str, Optional[IndexingStructure]] = {}
     if constraints:
 
         class _BaseProvider(IndexingStructureProvider):
@@ -68,15 +103,9 @@ def _make_structure_provider(
 
         base = _BaseProvider()
         for cname, c in constraints.items():
-            try:
-                constraint_structures[cname] = compute_indexation(c.expression, base)
-            except ValueError:
-                # Constraints containing unresolved port fields (sum_connections)
-                # cannot be indexed before port resolution; fall back to the most
-                # general structure so callers can still proceed.
-                constraint_structures[cname] = IndexingStructure(
-                    time=True, scenario=True
-                )
+            constraint_structures[cname] = _safe_indexation(
+                c.expression, base, f"constraint '{cname}'"
+            )
 
     class Provider(IndexingStructureProvider):
         def get_parameter_structure(self, name: str) -> IndexingStructure:
@@ -86,7 +115,13 @@ def _make_structure_provider(
             return variables[name].structure
 
         def get_constraint_structure(self, name: str) -> IndexingStructure:
-            return constraint_structures[name]
+            structure = constraint_structures[name]
+            if structure is None:
+                # dual() of such a constraint is checked once ports are resolved.
+                raise UnresolvedPortFieldError(
+                    f"Constraint '{name}' contains unresolved port fields."
+                )
+            return structure
 
     return Provider()
 
@@ -117,7 +152,13 @@ def _normalize_objective_contributions(
     provider = _make_structure_provider(parameters, variables)
     result: Dict[str, ExpressionNode] = {}
     for contrib_id, expr in contributions.items():
-        structure = compute_indexation(expr, provider)
+        structure = _safe_indexation(
+            expr, provider, f"objective contribution '{contrib_id}'"
+        )
+        if structure is None:
+            raise ValueError(
+                f"Objective contribution '{contrib_id}' contains an unresolved port field."
+            )
         if structure == IndexingStructure(time=False, scenario=True):
             warnings.warn(
                 f"Objective contribution '{contrib_id}' has a scenario dimension "
@@ -153,6 +194,79 @@ def _is_objective_contribution_valid(
     return True
 
 
+def _check_bound_sets(
+    bound_expr: ExpressionNode,
+    owner_sets: Optional[FrozenSet[str]],
+    owner: str,
+    kind: str,
+    provider: IndexingStructureProvider,
+) -> None:
+    """A bound may not be indexed by a set its owner is not indexed by.
+    `owner_sets` is None when the owner's structure is not known yet."""
+    structure = _safe_indexation(bound_expr, provider, f"{kind.lower()} of {owner}")
+    if structure is None or owner_sets is None:
+        return
+    stray = structure.sets - owner_sets
+    if stray:
+        raise ValueError(
+            f"{kind} of {owner} is indexed by set(s) {sorted(stray)} "
+            f"that {owner} is not indexed by."
+        )
+
+
+def _check_local_set_crosses_port(
+    definition: PortFieldDefinition,
+    local_sets: FrozenSet[str],
+    provider: IndexingStructureProvider,
+) -> None:
+    port_field = f"{definition.port_field.port_name}.{definition.port_field.field_name}"
+    structure = _safe_indexation(
+        definition.definition, provider, f"port field definition '{port_field}'"
+    )
+    if structure is None:
+        return
+    crossing = structure.sets & local_sets
+    if crossing:
+        raise ValueError(
+            f"Port field definition for '{port_field}' is still indexed by local "
+            f"set(s) {sorted(crossing)}; wrap it in sum_over(...) before it "
+            "can cross a port."
+        )
+
+
+def _check_model_set_indexing(model: "Model") -> None:
+    provider = _make_structure_provider(
+        model.parameters,
+        model.variables,
+        {**model.constraints, **model.binding_constraints},
+    )
+
+    for c in model.get_all_constraints():
+        owner = f"constraint '{c.name}'"
+        expr_structure = _safe_indexation(c.expression, provider, owner)
+        expr_sets = expr_structure.sets if expr_structure is not None else None
+        _check_bound_sets(c.lower_bound, expr_sets, owner, "Lower bound", provider)
+        _check_bound_sets(c.upper_bound, expr_sets, owner, "Upper bound", provider)
+
+    for oid, expr in (model.objective_contributions or {}).items():
+        _safe_indexation(expr, provider, f"objective contribution '{oid}'")
+
+    for eo_id, eo_expr in (model.extra_outputs or {}).items():
+        _safe_indexation(eo_expr, provider, f"extra-output '{eo_id}'")
+
+    for var in model.variables.values():
+        owner = f"variable '{var.name}'"
+        for kind, bound in (
+            ("Lower bound", var.lower_bound),
+            ("Upper bound", var.upper_bound),
+        ):
+            if bound is not None:
+                _check_bound_sets(bound, var.structure.sets, owner, kind, provider)
+
+    for definition in model.port_fields_definitions.values():
+        _check_local_set_crosses_port(definition, model.local_sets, provider)
+
+
 def _iter_nodes(
     node: ExpressionNode, skip: Tuple[Type[ExpressionNode], ...] = ()
 ) -> Iterator[ExpressionNode]:
@@ -181,6 +295,25 @@ def _model_expressions(model: "Model") -> Iterator[Tuple[str, ExpressionNode]]:
             f"port field definition '{port_field.port_name}.{port_field.field_name}'",
             definition.definition,
         )
+
+
+def sets_used_by_model(model: "Model") -> Set[str]:
+    """Sets indexing some parameter or variable of *model*, or summed over by a
+    sum_over (whose operand may not be indexed by it)."""
+    used: Set[str] = set()
+    for p in model.parameters.values():
+        used |= p.structure.sets
+    for v in model.variables.values():
+        used |= v.structure.sets
+    expressions = [expr for _, expr in _model_expressions(model)] + [
+        bound
+        for v in model.variables.values()
+        for bound in (v.lower_bound, v.upper_bound)
+        if bound is not None
+    ]
+    for expr in expressions:
+        used |= {n.set_id for n in _iter_nodes(expr) if isinstance(n, SumOverNode)}
+    return used
 
 
 def _check_time_sum_bounds(model: "Model") -> None:
@@ -270,6 +403,7 @@ class Model:
     )
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None
     properties: List[str] = field(default_factory=list)
+    local_sets: FrozenSet[str] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
         _check_time_sum_bounds(self)
@@ -277,6 +411,8 @@ class Model:
         if self.objective_contributions:
             for expr in self.objective_contributions.values():
                 _is_objective_contribution_valid(self, expr)
+
+        _check_model_set_indexing(self)
 
         for definition in self.port_fields_definitions.values():
             port_name = definition.port_field.port_name
@@ -314,6 +450,7 @@ def model(
     port_fields_definitions: Optional[Iterable[PortFieldDefinition]] = None,
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None,
     properties: Optional[Iterable[str]] = None,
+    local_sets: Optional[Iterable[str]] = None,
 ) -> Model:
     """
     Utility method to create Models from relaxed arguments
@@ -357,4 +494,5 @@ def model(
         ),
         extra_outputs=extra_outputs,
         properties=list(properties) if properties else [],
+        local_sets=frozenset(local_sets) if local_sets else frozenset(),
     )

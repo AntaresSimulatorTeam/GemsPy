@@ -13,14 +13,21 @@
 
 import pytest
 
-from gems_craft.expression import ExpressionNode, param, relative_time, var
+from gems_craft.expression import literal, param, relative_time, var
 from gems_craft.expression.expression import (
     DualNode,
+    ExpressionNode,
     LowerBoundNode,
     ReducedCostNode,
     UpperBoundNode,
+    port_field,
 )
-from gems_craft.expression.indexing import IndexingStructureProvider, compute_indexation
+from gems_craft.expression.indexing import (
+    IndexingStructureProvider,
+    IndexingUsageError,
+    UnresolvedPortFieldError,
+    compute_indexation,
+)
 from gems_craft.expression.indexing_structure import IndexingStructure
 
 
@@ -131,32 +138,53 @@ def test_dual_reduced_cost_indexing() -> None:
     )
 
 
+class _SetStructureProvider(IndexingStructureProvider):
+    """Variable 'x' varies over time and the sets 'fuel' and 'segment';
+    parameters vary over scenarios only."""
+
+    def get_parameter_structure(self, name: str) -> IndexingStructure:
+        return IndexingStructure(False, True)
+
+    def get_variable_structure(self, name: str) -> IndexingStructure:
+        return IndexingStructure(True, False, frozenset({"fuel", "segment"}))
+
+    def get_constraint_structure(self, name: str) -> IndexingStructure:
+        raise NotImplementedError()
+
+
+_X_NO_SET = var("x").sum_over("fuel").sum_over("segment")
+
+
 @pytest.mark.parametrize(
-    "expr, expected",
+    "expr, scenario, sets",
     [
+        # an explicit position or a sum_over removes the set dimension...
+        (var("x").set_index("fuel", position=literal(2)), False, {"segment"}),
+        (var("x").sum_over("fuel"), False, {"segment"}),
+        # ...a bare or relative-shift index keeps it
+        (var("x").set_index("fuel"), False, {"fuel", "segment"}),
         (
-            var("x").set_index("fuel", position=param("p")),
-            IndexingStructure(False, True),
+            var("x").set_index("fuel", relative_shift=literal(1)),
+            False,
+            {"fuel", "segment"},
         ),
+        # the position or shift brings its own scenario dependency
+        (var("x").set_index("fuel", position=param("p")), True, {"segment"}),
         (
             var("x").set_index("fuel", relative_shift=param("p")),
-            IndexingStructure(False, True),
+            True,
+            {"fuel", "segment"},
         ),
-        (param("p").set_index("fuel"), IndexingStructure(False, True)),
-        (param("p").sum_over("fuel"), IndexingStructure(False, True)),
+        # operands after a time/scenario-varying one still contribute their sets
+        (_X_NO_SET * param("p") + var("x"), True, {"fuel", "segment"}),
     ],
 )
-def test_set_index_sum_over_indexing(
-    expr: ExpressionNode, expected: IndexingStructure
+def test_set_index_and_sum_over_structure(
+    expr: ExpressionNode, scenario: bool, sets: set
 ) -> None:
-    class ScenarioParameterProvider(StructureProvider):
-        def get_parameter_structure(self, name: str) -> IndexingStructure:
-            return IndexingStructure(False, True)
-
-        def get_variable_structure(self, name: str) -> IndexingStructure:
-            return IndexingStructure(False, False)
-
-    assert compute_indexation(expr, ScenarioParameterProvider()) == expected
+    assert compute_indexation(expr, _SetStructureProvider()) == IndexingStructure(
+        True, scenario, frozenset(sets)
+    )
 
 
 def test_lower_upper_bound_indexing() -> None:
@@ -172,6 +200,31 @@ def test_lower_upper_bound_indexing() -> None:
 class ConstantParameterProvider(StructureProvider):
     def get_parameter_structure(self, name: str) -> IndexingStructure:
         return IndexingStructure(False, False)
+
+
+_PORT = port_field("p", "f").sum_connections()
+_BAD_INDEX = param("p").set_index("fuel")
+
+
+@pytest.mark.parametrize(
+    "expr, error",
+    [
+        (_PORT, UnresolvedPortFieldError),
+        # an invalid set index is still reported next to an unresolved port field
+        (_PORT + _BAD_INDEX, IndexingUsageError),
+        (_BAD_INDEX + _PORT, IndexingUsageError),
+    ],
+)
+def test_indexing_errors(expr: ExpressionNode, error: type) -> None:
+    with pytest.raises(error):
+        compute_indexation(expr, ConstantParameterProvider())
+
+
+def test_sum_over_unindexed_operand_warns() -> None:
+    x = var("x")
+    provider = _SetStructureProvider()
+    with pytest.warns(UserWarning, match="not indexed by .other."):
+        compute_indexation(x.sum_over("other"), provider)
 
 
 def test_time_sum_with_mixed_bounds_of_a_constant_depends_on_time() -> None:
@@ -222,6 +275,10 @@ def test_time_sum_with_scenario_dependent_bound_depends_on_scenario(
         # d read at t + p: a time step per scenario
         pytest.param(
             param("d").shift(param("p")), IndexingStructure(True, True), id="shift"
+        ),
+        # d read at time p: one value per scenario
+        pytest.param(
+            param("d").eval(param("p")), IndexingStructure(False, True), id="index"
         ),
         # p does not depend on time: reading it elsewhere changes nothing
         pytest.param(

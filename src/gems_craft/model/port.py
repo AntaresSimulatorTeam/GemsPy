@@ -148,8 +148,6 @@ class _PortFieldExpressionChecker(ExpressionVisitor[None]):
         visit(node.operand, self)
 
     def set_index(self, node: SetIndexNode) -> None:
-        # TODO(custom sets): reject a port-field definition still indexed by a
-        # local set (not reduced by sum_over): local sets cannot cross a port.
         visit(node.operand, self)
 
     def sum_over(self, node: SumOverNode) -> None:
