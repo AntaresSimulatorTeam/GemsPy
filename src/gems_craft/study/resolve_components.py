@@ -69,9 +69,10 @@ def resolve_system(input_system: SystemSchema, libraries: dict[str, Library]) ->
     for component in components_list:
         s.add_component(component)
 
+    components_by_id = {component.id: component for component in components_list}
     connections_input = getattr(input_system, "connections", []) or []
     for cnx in connections_input:
-        port_ref_1, port_ref_2 = _resolve_port_refs(cnx, components_list)
+        port_ref_1, port_ref_2 = _resolve_port_refs(cnx, components_by_id)
         s.connect(port_ref_1, port_ref_2)
 
     return s
@@ -114,21 +115,14 @@ def _resolve_component(
 
 def _resolve_port_refs(
     connection: PortConnectionsSchema,
-    all_components: List[Component],
+    components_by_id: Dict[str, Component],
 ) -> Tuple[PortRef, PortRef]:
-    component_1 = _get_component_by_id(all_components, connection.component1)
-    component_2 = _get_component_by_id(all_components, connection.component2)
+    component_1 = components_by_id.get(connection.component1)
+    component_2 = components_by_id.get(connection.component2)
     assert component_1 is not None and component_2 is not None
     return PortRef(component_1, connection.port1), PortRef(
         component_2, connection.port2
     )
-
-
-def _get_component_by_id(
-    all_components: List[Component], component_id: str
-) -> Optional[Component]:
-    components_dict = {component.id: component for component in all_components}
-    return components_dict.get(component_id)
 
 
 def build_data_base(
