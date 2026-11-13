@@ -191,14 +191,17 @@ the element names of the row in the same order (e.g. `coal|s0`). Both are empty 
 outputs without a set dimension. Positions beyond a component's own set size (ragged
 local sets) produce no row.
 
-With the fluent API, the columns of a set-indexed output's pivot are a
-(`scenario_index`, `set_index`) MultiIndex, and `value(...)` returns data keyed by
-`set_index`:
+With the fluent API, the columns of a set-indexed output are a
+(`scenario_index`, `set_index`) MultiIndex:
 
 ~~~ python
-view = results.component(component_id).output(var_id)
-view.value(time_index=0, scenario_index=0)  # Series indexed by set_index
-view.value(time_index=0, scenario_index=0)["s0|f1"]  # one element
+generation = results.component("gen_de").output("generation")
+
+frame = generation.data                                    # Time × (Scenario, set_index)
+series = generation.value(time_index=0, scenario_index=0)  # Series over set_index
+val = series["coal|s0"]                                    # one element
+by_time = generation.value(scenario_index=0)               # Time × set_index DataFrame
+by_scenario = generation.value(time_index=0)               # Series over (Scenario, set_index)
 ~~~
 
 ---
