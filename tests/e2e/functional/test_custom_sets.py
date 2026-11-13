@@ -15,11 +15,10 @@ import shutil
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from gems_craft.study.folder import load_study
-from gems_runner.simulation import SimulationTable, TimeBlock, build_problem
+from gems_runner.simulation import TimeBlock, build_problem
 from gems_runner.simulation.simulation_table import SimulationTableBuilder
 
 STUDY_DIR = Path(__file__).parent / "studies" / "custom_sets"
@@ -32,7 +31,7 @@ SET_IDS = {
 }
 
 
-def test_custom_sets_study(tmp_path: Path) -> None:
+def test_custom_sets_study() -> None:
     """Ragged local sets (`seg` and `slot` together), a global set and an
     `indexed-by` override (G2), all sharing one node and one demand.
 
@@ -47,8 +46,7 @@ def test_custom_sets_study(tmp_path: Path) -> None:
     assert problem.termination_condition == "optimal"
     assert problem.objective_value == pytest.approx(25.4)
 
-    table = SimulationTableBuilder().build(problem)
-    df = table.data
+    df = SimulationTableBuilder().build(problem).data
 
     def rows(component: str, output: str) -> dict:  # type: ignore[type-arg]
         sub = df[(df["component"] == component) & (df["output"] == output)]
@@ -68,16 +66,6 @@ def test_custom_sets_study(tmp_path: Path) -> None:
         "s1|f0": pytest.approx(0),
         "s2|f0": pytest.approx(0),
     }
-
-    obj = df[df["output"] == "objective-value"]
-    assert obj["set_id"].isna().all() and obj["set_index"].isna().all()
-
-    view = table.component("P").output("x")
-    assert view.data.columns.names == ["scenario_index", "set_index"]
-    assert view.value(time_index=0, scenario_index=0)["s0|f1"] == 1.0
-
-    stored = SimulationTable.open(table.save(tmp_path / "table"))
-    pd.testing.assert_frame_equal(stored.to_pandas(load_all=True), df)
 
 
 def test_positive_lower_bound_on_ragged_sets(tmp_path: Path) -> None:

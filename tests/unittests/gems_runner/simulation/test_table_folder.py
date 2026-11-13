@@ -30,6 +30,7 @@ from gems_runner.simulation.simulation_table import (
 )
 from gems_runner.simulation.table_folder import (
     MANIFEST_FILE,
+    MANIFEST_SCHEMA_VERSION,
     _FolderStore,
     _TableFile,
     _TableWriter,
@@ -71,7 +72,7 @@ def test_save_writes_scenario_files_common_file_and_manifest(
         ]
     )
     manifest = json.loads((folder / MANIFEST_FILE).read_text())
-    assert manifest["schema_version"] == 1
+    assert manifest["schema_version"] == MANIFEST_SCHEMA_VERSION
     assert manifest["run_id"] == "run"
     assert manifest["format"] == ext
     assert manifest["scenarios"] == [0, 1]
@@ -106,7 +107,10 @@ def test_csv_empty_cells_read_back_as_missing_values(tmp_path: Path) -> None:
 def test_labels_that_look_missing_round_trip(tmp_path: Path, fmt: OutputFormat) -> None:
     labels = ["NA", "N/A", "null", "NULL", "nan", "NaN", "#N/A"]
     table = _table([(0, label, label, 0, 0, 1.0) for label in labels])
-    df = table.data.assign(basis_status=pd.array(labels, dtype="string[python]"))
+    label_array = pd.array(labels, dtype="string[python]")
+    df = table.data.assign(
+        set_id=label_array, set_index=label_array, basis_status=label_array
+    )
     table = SimulationTable(df, table_id="run")
 
     reopened = SimulationTable.open(table.save(tmp_path / "table", fmt))
@@ -114,7 +118,7 @@ def test_labels_that_look_missing_round_trip(tmp_path: Path, fmt: OutputFormat) 
     pd.testing.assert_frame_equal(
         _sorted(reopened.to_pandas(load_all=True)), _sorted(table.data)
     )
-    assert reopened.component("NA").output("NA").value(0, 0) == 1.0
+    assert reopened.component("NA").output("NA").value(0, 0)["NA"] == 1.0
 
 
 def test_a_table_without_rows_round_trips(tmp_path: Path) -> None:

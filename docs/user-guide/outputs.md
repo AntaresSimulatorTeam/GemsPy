@@ -219,4 +219,5 @@ given an `output_dir`, by contrast, keeps its partial files (see above).
 
 `to_csv()`, `to_parquet()`, `to_dataset()` and `to_netcdf()` are deprecated and
 will be removed in a following release: use `save()`, or build an xarray object
-from `to_pandas()`.
+from `to_pandas()`. `to_dataset()` and `to_netcdf()` raise `NotImplementedError`
+on a table with set-indexed outputs.

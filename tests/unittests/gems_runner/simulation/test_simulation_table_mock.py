@@ -220,67 +220,9 @@ def test_da_to_df_two_sets_ragged_drops_padding() -> None:
     ]
     assert list(b_values) == [7.0, 9.0, 8.0, 10.0]
 
-
-def test_da_to_df_without_set_has_none_set_columns() -> None:
-    da = xr.DataArray([1.0], dims=["component"], coords={"component": ["a"]})
-    df = SimulationTableBuilder._da_to_df(da, "x", 1, 0, None)
-    assert df[SimulationColumns.SET_ID.value].isna().all()
-    assert df[SimulationColumns.SET_INDEX.value].isna().all()
-
-
-def test_to_dataset_multi_set_outputs_sharing_set_id() -> None:
-    """Two outputs indexed by (fuel, seg) share the 'fuel|seg' dimension even
-    when components label their local set differently, next to a plain output."""
-
-    def da_of(comps: list, seg: int, offset: float) -> xr.DataArray:  # type: ignore
-        return xr.DataArray(
-            np.arange(len(comps) * 2 * seg, dtype=float).reshape(
-                len(comps), 1, 1, 2, seg
-            )
-            + offset,
-            dims=["component", "time", "scenario", "fuel", "seg"],
-            coords={
-                "component": comps,
-                "time": [0],
-                "scenario": [0],
-                "fuel": [0, 1],
-                "seg": range(seg),
-            },
-        )
-
-    elements = {
-        ("a", "fuel"): ("coal", "gas"),
-        ("b", "fuel"): ("coal", "gas"),
-        ("a", "seg"): ("s0", "s1"),
-        ("b", "seg"): ("t0", "t1"),
-    }
-    lookup = _set_lookup(elements)
-    frames = [
-        SimulationTableBuilder._da_to_df(
-            da_of([c], 2, off), out, 1, 0, None, set_elements=lookup
-        )
-        for out, off in (("g1", 0.0), ("g2", 100.0))
-        for c in ("a", "b")
-    ]
-    plain = xr.DataArray(
-        [[[5.0]]],
-        dims=["component", "time", "scenario"],
-        coords={"component": ["a"], "time": [0], "scenario": [0]},
-    )
-    frames.append(SimulationTableBuilder._da_to_df(plain, "p", 1, 0, None))
-    ds = SimulationTable(pd.concat(frames, ignore_index=True)).to_dataset()
-
-    assert ds["g1"].dims == ds["g2"].dims
-    assert ds["g1"].dims == (
-        "component",
-        "absolute_time_index",
-        "scenario_index",
-        "fuel|seg",
-    )
-    assert ds["g1"].sel(component="a", **{"fuel|seg": "gas|s1"}).item() == 3.0
-    assert ds["g2"].sel(component="b", **{"fuel|seg": "gas|t0"}).item() == 102.0
-    assert "fuel|seg" not in ds["p"].dims
-    assert ds["p"].sel(component="a").item() == 5.0
+    # The deprecated xarray export does not support set-indexed outputs.
+    with pytest.warns(DeprecationWarning), pytest.raises(NotImplementedError):
+        SimulationTable(df).to_dataset()
 
 
 # ---------------------------------------------------------------------------

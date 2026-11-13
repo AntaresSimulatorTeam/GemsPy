@@ -139,8 +139,11 @@ class OutputResults:
         - ``value(scenario_index=s)`` → Series indexed by absolute_time_index
         - ``value(time_index=t)``     → Series indexed by scenario_index
         Called with both indices returns a scalar ``float``.
-        For a set-indexed output the columns are a (scenario_index, set_index)
-        MultiIndex: the results are DataFrames/Series keyed by ``set_index`` instead.
+        For a set-indexed output, the columns are a (scenario_index, set_index)
+        MultiIndex:
+        - ``value(scenario_index=s)`` → Time × set_index DataFrame
+        - ``value(time_index=t)``     → Series indexed by (scenario_index, set_index)
+        - both indices                → Series indexed by set_index
 
         An index of a dimension the output does not have is accepted and
         ignored. ``block`` selects the block, and is required when a requested
@@ -479,45 +482,32 @@ class SimulationTable:
         """Return simulation results as an xr.Dataset.
 
         Each output variable becomes a DataArray with dimensions
-        (component, absolute_time_index, scenario_index). A set-indexed output
-        gets one more dimension named after its ``set_id`` (e.g. ``"fuel|seg"``),
-        labelled by ``set_index``.
+        (component, absolute_time_index, scenario_index).
         Scalar rows without component/time/scenario (e.g. objective-value)
         are stored as zero-dimensional variables.
+
+        Raises ``NotImplementedError`` for a table with set-indexed outputs.
         """
         df = self.data
+        if df[SimulationColumns.SET_ID.value].notna().any():
+            raise NotImplementedError(
+                "Set-indexed outputs cannot be exported to xarray by this "
+                "deprecated method: build the xarray object from to_pandas()."
+            )
         col_comp = SimulationColumns.COMPONENT.value
         col_out = SimulationColumns.OUTPUT.value
         col_time = SimulationColumns.ABSOLUTE_TIME_INDEX.value
         col_scen = SimulationColumns.SCENARIO_INDEX.value
         col_val = SimulationColumns.VALUE.value
 
-        col_set_id = SimulationColumns.SET_ID.value
-        col_set_idx = SimulationColumns.SET_INDEX.value
-
         main = df.dropna(subset=[col_comp, col_time, col_scen])
         # xarray needs numpy dtypes; these columns have no empty cell left.
         main = main.astype(
-            {
-                col_comp: object,
-                col_out: object,
-                col_time: "int64",
-                col_scen: "int64",
-                col_set_id: object,
-                col_set_idx: object,
-            }
+            {col_comp: object, col_out: object, col_time: "int64", col_scen: "int64"}
         )
-        plain = main[main[col_set_id].isna()]
-        indexed = plain.set_index([col_comp, col_time, col_scen, col_out])[col_val]
+        indexed = main.set_index([col_comp, col_time, col_scen, col_out])[col_val]
         unstacked = indexed.unstack(col_out)
         ds = xr.Dataset.from_dataframe(unstacked)
-
-        for (out, set_id), grp in main[main[col_set_id].notna()].groupby(
-            [col_out, col_set_id]
-        ):
-            series = grp.set_index([col_comp, col_time, col_scen, col_set_idx])[col_val]
-            da = xr.DataArray.from_series(series).rename({col_set_idx: set_id})
-            ds = xr.merge([ds, da.to_dataset(name=out)], join="outer")
 
         scalars = df[df[col_comp].isna() & df[col_time].isna()]
         for _, row in scalars.iterrows():
@@ -676,7 +666,7 @@ class SimulationTableBuilder:
         self, problem: OptimizationProblem
     ) -> List[Tuple[str, xr.DataArray]]:
         """(output name, array) for every variable, then every extra output, in
-        table row order. Arrays keep their component, time and scenario
+        table row order. Arrays keep their component, time, scenario and set
         dimensions; ``_da_to_df`` turns them into rows."""
         return self._collect_vars_outputs(problem) + self._collect_extra_outputs(
             problem

@@ -464,6 +464,7 @@ def test_set_index_node_rejects_position_and_relative_shift() -> None:
     [
         ({"v"}, set(), {"v"}, "clash"),
         (set(), set(), {"t"}, "reserved"),
+        (set(), set(), {"time", "scenario", "component"}, "reserved"),
     ],
 )
 def test_model_identifiers_reject_ambiguous_sets(
