@@ -41,6 +41,8 @@ from gems_craft.expression.expression import (
     RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -94,6 +96,10 @@ class EqualityVisitor:
             return self.visit(left.offset, right.offset)
         if isinstance(left, AllTimeSumNode) and isinstance(right, AllTimeSumNode):
             return self.all_time_sum(left, right)
+        if isinstance(left, SetIndexNode) and isinstance(right, SetIndexNode):
+            return self.set_index(left, right)
+        if isinstance(left, SumOverNode) and isinstance(right, SumOverNode):
+            return self.sum_over(left, right)
         if isinstance(left, ScenarioOperatorNode) and isinstance(
             right, ScenarioOperatorNode
         ):
@@ -182,6 +188,24 @@ class EqualityVisitor:
 
     def all_time_sum(self, left: AllTimeSumNode, right: AllTimeSumNode) -> bool:
         return self.visit(left.operand, right.operand)
+
+    def set_index(self, left: SetIndexNode, right: SetIndexNode) -> bool:
+        return (
+            left.set_id == right.set_id
+            and self._optional(left.position, right.position)
+            and self._optional(left.relative_shift, right.relative_shift)
+            and self.visit(left.operand, right.operand)
+        )
+
+    def _optional(
+        self, left: Optional[ExpressionNode], right: Optional[ExpressionNode]
+    ) -> bool:
+        if left is None or right is None:
+            return left is right
+        return self.visit(left, right)
+
+    def sum_over(self, left: SumOverNode, right: SumOverNode) -> bool:
+        return left.set_id == right.set_id and self.visit(left.operand, right.operand)
 
     def scenario_operator(
         self, left: ScenarioOperatorNode, right: ScenarioOperatorNode

@@ -39,6 +39,8 @@ from .expression import (
     RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -145,6 +147,20 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
 
     def all_time_sum(self, node: AllTimeSumNode) -> IndexingStructure:
         return IndexingStructure(False, visit(node.operand, self).scenario)
+
+    def set_index(self, node: SetIndexNode) -> IndexingStructure:
+        # TODO(custom sets): resolve the `node.set_id` dimension once
+        # IndexingStructure tracks sets.
+        result = visit(node.operand, self)
+        # The position or shift brings its own time/scenario dependency.
+        for index in (node.position, node.relative_shift):
+            if index is not None:
+                result = result | visit(index, self)
+        return result
+
+    def sum_over(self, node: SumOverNode) -> IndexingStructure:
+        # TODO(custom sets): remove `node.set_id` once IndexingStructure tracks sets.
+        return visit(node.operand, self)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> IndexingStructure:
         return IndexingStructure(visit(node.operand, self).time, False)

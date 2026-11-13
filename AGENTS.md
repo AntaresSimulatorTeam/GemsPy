@@ -80,6 +80,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `ExpressionNode`: base frozen dataclass for all expression tree nodes
 - Grammar is defined in `grammar/Expr.g4` and parsed via ANTLR4 (generated files live in `expression/parsing/antlr/` — do not edit directly; regenerate with `uv run bash grammar/generate-parser.sh`, then `black`/`isort`)
 - `ExpressionVisitor` is the dominant pattern for traversing and transforming expression trees (linearization support, printing, degree analysis, indexing)
+- Custom-set indexing (`SetIndexNode`, `SumOverNode` — `X[fuel]`, `X[fuel=2]`, `X[fuel+1]`, `sum_over(fuel, expr)`) exists only in the grammar, AST and visitors: model libraries cannot declare sets yet, and `gems_runner` raises `NotImplementedError` on these nodes.
 - Numeric evaluation (`EvaluationVisitor`) lives in `gems_runner.expression.evaluate`, not here — several of its node handlers (`dual()`, `reduced_cost()`, `variable()`) are solver-output-shaped and only make sense at solve time.
 
 **`gems_craft/study/`** — Study definition and instantiation.

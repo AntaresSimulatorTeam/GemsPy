@@ -53,6 +53,9 @@ from gems_craft.expression.expression import (
         var("x").round(),
         maximum(var("x"), param("p")),
         minimum(var("x"), param("p")),
+        var("x").set_index("fuel", position=2),
+        var("x").set_index("fuel", relative_shift=1),
+        var("x").sum_over("fuel"),
     ],
 )
 def test_equals(expr: ExpressionNode) -> None:
@@ -126,3 +129,28 @@ def test_lower_upper_bound_equality() -> None:
     assert expressions_equal(UpperBoundNode("x"), copy_expression(UpperBoundNode("x")))
     assert not expressions_equal(UpperBoundNode("x"), UpperBoundNode("y"))
     assert not expressions_equal(LowerBoundNode("x"), UpperBoundNode("x"))
+
+
+@pytest.mark.parametrize(
+    "lhs, rhs",
+    [
+        (var("x").set_index("fuel"), var("x").set_index("segment")),
+        (var("x").set_index("fuel"), var("x").set_index("fuel", position=2)),
+        (
+            var("x").set_index("fuel", position=2),
+            var("x").set_index("fuel", relative_shift=2),
+        ),
+        (
+            var("x").set_index("fuel", position=2),
+            var("x").set_index("fuel", position=3),
+        ),
+        (var("x").set_index("fuel"), var("x").set_index("fuel", relative_shift=1)),
+        (
+            var("x").set_index("fuel", relative_shift=1),
+            var("x").set_index("fuel", relative_shift=2),
+        ),
+        (var("x").sum_over("fuel"), var("x").sum_over("segment")),
+    ],
+)
+def test_set_index_sum_over_not_equal(lhs: ExpressionNode, rhs: ExpressionNode) -> None:
+    assert not expressions_equal(lhs, rhs)

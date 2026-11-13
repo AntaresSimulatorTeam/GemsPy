@@ -43,16 +43,16 @@ class ExprVisitor(ParseTreeVisitor):
     def visitAllTimeSum(self, ctx: ExprParser.AllTimeSumContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#timeIndexExpr.
-    def visitTimeIndexExpr(self, ctx: ExprParser.TimeIndexExprContext):
+    # Visit a parse tree produced by ExprParser#sumOver.
+    def visitSumOver(self, ctx: ExprParser.SumOverContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#addsub.
     def visitAddsub(self, ctx: ExprParser.AddsubContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#timeShiftExpr.
-    def visitTimeShiftExpr(self, ctx: ExprParser.TimeShiftExprContext):
+    # Visit a parse tree produced by ExprParser#bracketIndex.
+    def visitBracketIndex(self, ctx: ExprParser.BracketIndexContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#muldiv.
@@ -63,12 +63,8 @@ class ExprVisitor(ParseTreeVisitor):
     def visitTimeSum(self, ctx: ExprParser.TimeSumContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#timeIndex.
-    def visitTimeIndex(self, ctx: ExprParser.TimeIndexContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by ExprParser#timeShift.
-    def visitTimeShift(self, ctx: ExprParser.TimeShiftContext):
+    # Visit a parse tree produced by ExprParser#bracketIndexExpr.
+    def visitBracketIndexExpr(self, ctx: ExprParser.BracketIndexExprContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#function.
@@ -77,6 +73,22 @@ class ExprVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by ExprParser#argList.
     def visitArgList(self, ctx: ExprParser.ArgListContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#indexList.
+    def visitIndexList(self, ctx: ExprParser.IndexListContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#timeShiftTerm.
+    def visitTimeShiftTerm(self, ctx: ExprParser.TimeShiftTermContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#keywordTerm.
+    def visitKeywordTerm(self, ctx: ExprParser.KeywordTermContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by ExprParser#bareTerm.
+    def visitBareTerm(self, ctx: ExprParser.BareTermContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#sum_bound.

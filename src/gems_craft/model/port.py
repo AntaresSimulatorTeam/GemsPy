@@ -40,6 +40,8 @@ from gems_craft.expression.expression import (
     ReducedCostNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -143,6 +145,14 @@ class _PortFieldExpressionChecker(ExpressionVisitor[None]):
         visit(node.operand, self)
 
     def all_time_sum(self, node: AllTimeSumNode) -> None:
+        visit(node.operand, self)
+
+    def set_index(self, node: SetIndexNode) -> None:
+        # TODO(custom sets): reject a port-field definition still indexed by a
+        # local set (not reduced by sum_over): local sets cannot cross a port.
+        visit(node.operand, self)
+
+    def sum_over(self, node: SumOverNode) -> None:
         visit(node.operand, self)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> None:

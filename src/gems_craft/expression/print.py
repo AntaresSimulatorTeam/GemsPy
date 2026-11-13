@@ -28,6 +28,8 @@ from gems_craft.expression.expression import (
     ReducedCostNode,
     RelativeTimeNode,
     RoundNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -124,6 +126,17 @@ class PrinterVisitor(ExpressionVisitor[str]):
 
     def all_time_sum(self, node: AllTimeSumNode) -> str:
         return f"({visit(node.operand, self)}.time_sum())"
+
+    def set_index(self, node: SetIndexNode) -> str:
+        args = node.set_id
+        if node.position is not None:
+            args += f", position={visit(node.position, self)}"
+        elif node.relative_shift is not None:
+            args += f", relative_shift={visit(node.relative_shift, self)}"
+        return f"({visit(node.operand, self)}.set_index({args}))"
+
+    def sum_over(self, node: SumOverNode) -> str:
+        return f"({visit(node.operand, self)}.sum_over({node.set_id}))"
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> str:
         return f"({visit(node.operand, self)}.{str(node.name)})"

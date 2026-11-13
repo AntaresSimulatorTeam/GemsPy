@@ -41,6 +41,8 @@ from gems_craft.expression.expression import (
     RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -104,6 +106,12 @@ class ExpressionVisitor(ABC, Generic[T]):
 
     @abstractmethod
     def all_time_sum(self, node: AllTimeSumNode) -> T: ...
+
+    @abstractmethod
+    def set_index(self, node: SetIndexNode) -> T: ...
+
+    @abstractmethod
+    def sum_over(self, node: SumOverNode) -> T: ...
 
     @abstractmethod
     def scenario_operator(self, node: ScenarioOperatorNode) -> T: ...
@@ -175,6 +183,10 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
         return visitor.relative_time(root)
     elif isinstance(root, AllTimeSumNode):
         return visitor.all_time_sum(root)
+    elif isinstance(root, SetIndexNode):
+        return visitor.set_index(root)
+    elif isinstance(root, SumOverNode):
+        return visitor.sum_over(root)
     elif isinstance(root, ScenarioOperatorNode):
         return visitor.scenario_operator(root)
     elif isinstance(root, PortFieldNode):

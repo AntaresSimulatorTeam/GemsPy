@@ -23,18 +23,28 @@ expr
     | '(' expr ')'                             # expression
     | expr op=('/' | '*') expr                 # muldiv
     | expr op=('+' | '-') expr                 # addsub
-    | expr COMPARISON expr                     # comparison
+    | expr op=(EQ | COMPARISON) expr           # comparison
     | 'sum' '(' expr ')'                       # allTimeSum
     | 'sum_connections' '(' portFieldExpr ')'  # portFieldSum
     | 'sum' '(' from=sum_bound '..' to=sum_bound ',' expr ')'  # timeSum
+    | 'sum_over' '(' IDENTIFIER ',' expr ')'   # sumOver
     | IDENTIFIER '(' argList? ')'              # function
-    | IDENTIFIER '[' shift ']'                 # timeShift
-    | IDENTIFIER '[' time_expr ']'             # timeIndex
-    | '(' expr ')' '[' shift ']'               # timeShiftExpr
-    | '(' expr ')' '[' time_expr ']'           # timeIndexExpr
+    | IDENTIFIER '[' indexList ']'             # bracketIndex
+    | '(' expr ')' '[' indexList ']'           # bracketIndexExpr
     ;
 
 argList : expr (',' expr)* ;
+
+// Comma-separated index terms, in any order. Whether a bareTerm is a set shift
+// (`X[fuel + 1]`) or a time index (`X[p + 1]`) is decided by
+// ExpressionNodeBuilderVisitor, which also checks the term combinations.
+indexList : indexTerm (',' indexTerm)* ;
+
+indexTerm
+    : shift                                # timeShiftTerm
+    | (TIME | IDENTIFIER) EQ time_expr     # keywordTerm
+    | time_expr                            # bareTerm
+    ;
 
 // A time sum bound is either relative to the current time step ("t", "t + ...",
 // "t - ...") or an absolute time index (an expression without "t").
@@ -76,6 +86,7 @@ fragment CHAR_OR_DIGIT : (CHAR | DIGIT);
 NUMBER        : DIGIT+ ('.' DIGIT+)?;
 TIME          : 't';
 IDENTIFIER    : CHAR CHAR_OR_DIGIT*;
-COMPARISON    : ( '=' | '>=' | '<=' );
+EQ            : '=';
+COMPARISON    : ( '>=' | '<=' );
 
 WS: (' ' | '\t' | '\r'| '\n') -> skip;
