@@ -248,7 +248,7 @@ def _sparse_gather(
     for i, master_comp in conn_list:
         by_slave[i].append(master_index[master_comp.id])
 
-    result: Optional[Any] = None
+    terms: List[Any] = []
     for t in range(max(len(js) for js in by_slave.values())):
         slaves = [i for i, js in by_slave.items() if len(js) > t]
         picked = expr_master.isel(
@@ -263,8 +263,11 @@ def _sparse_gather(
             if isinstance(picked, linopy.Variable):
                 picked = 1 * picked
             picked = picked.reindex(component=comp_ids)
-        result = picked if result is None else _linopy_add(result, picked)
-    return result
+        terms.append(picked)
+    if isinstance(terms[0], xr.DataArray):
+        return sum(terms[1:], terms[0])
+    # Single merge along _term: pairwise `+` would recopy the accumulator each time (O(D²)).
+    return linopy.merge(terms)
 
 
 def _build_slave_port_array(
