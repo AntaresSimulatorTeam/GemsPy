@@ -1,0 +1,84 @@
+system:
+  sets:
+    - id: fuel
+      elements: [coal, gas]
+  components:
+    # One node and one demand shared by every cluster.
+    - id: N
+      model: basic.node
+    - id: D
+      model: basic.demand
+      parameters:
+        - id: demand
+          time-dependent: false
+          scenario-dependent: false
+          value: 14
+
+    - id: G
+      model: custom_sets.global-plant
+      parameters:
+        - id: cost
+          indexed-by: [fuel]
+          value: cost_G
+    # Cost constant over `fuel`: `indexed-by` narrowed to no set.
+    - id: G2
+      model: custom_sets.global-plant
+      parameters:
+        - id: cost
+          indexed-by: []
+          value: 2.0
+
+    - id: P
+      model: custom_sets.grid
+      sets:
+        - id: seg
+          elements: [s0, s1]
+        - id: slot
+          elements: [f0, f1]
+      parameters:
+        - id: cost
+          indexed-by: [seg, slot]
+          value: cost_P
+        - id: cap
+          indexed-by: [seg, slot]
+          value: cap_P
+        - id: ramp
+          value: 1
+    - id: Q
+      model: custom_sets.grid
+      sets:
+        - id: seg
+          elements: [s0, s1, s2]
+        - id: slot
+          elements: [f0]
+      parameters:
+        - id: cost
+          indexed-by: [seg, slot]
+          value: cost_Q
+        - id: cap
+          indexed-by: [seg, slot]
+          value: cap_Q
+        - id: ramp
+          value: 1
+
+  connections:
+    - component1: N
+      port1: balance_port
+      component2: D
+      port2: balance_port
+    - component1: N
+      port1: balance_port
+      component2: G
+      port2: balance_port
+    - component1: N
+      port1: balance_port
+      component2: G2
+      port2: balance_port
+    - component1: N
+      port1: balance_port
+      component2: P
+      port2: balance_port
+    - component1: N
+      port1: balance_port
+      component2: Q
+      port2: balance_port
