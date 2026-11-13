@@ -10,10 +10,11 @@
 #
 # This file is part of the Antares project.
 from dataclasses import dataclass, field
-from typing import Set
+from typing import Sequence, Set
 
 from antlr4 import CommonTokenStream, InputStream
 from antlr4.error.ErrorStrategy import BailErrorStrategy
+from antlr4.Token import Token
 
 from gems_craft.expression import ExpressionNode, literal, param, relative_time, var
 from gems_craft.expression.equality import expressions_equal
@@ -120,10 +121,6 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             return param(identifier)
         raise ValueError(f"{identifier} is not a valid variable or parameter name.")
 
-    # Visit a parse tree produced by ExprParser#portField.
-    def visitPortField(self, ctx: ExprParser.PortFieldContext) -> ExpressionNode:
-        return ctx.portFieldExpr().accept(self)  # type: ignore
-
     # Visit a parse tree produced by ExprParser#comparison.
     def visitComparison(self, ctx: ExprParser.ComparisonContext) -> ExpressionNode:
         op = ctx.COMPARISON().getText()  # type: ignore
@@ -143,31 +140,23 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     # Visit a parse tree produced by ExprParser#timeShift.
     def visitTimeIndex(self, ctx: ExprParser.TimeIndexContext) -> ExpressionNode:
         expr = self._convert_identifier(ctx.IDENTIFIER().getText())  # type: ignore
-        eval_time = ctx.expr().accept(self)  # type: ignore
+        eval_time = ctx.time_expr().accept(self)  # type: ignore
         return expr.eval(eval_time)
 
     def visitTimeShift(self, ctx: ExprParser.TimeShiftContext) -> ExpressionNode:
         shifted_expr = self._convert_identifier(ctx.IDENTIFIER().getText())  # type: ignore
-        time_shift = ctx.shift().accept(self)  # type: ignore
-        # specifics for x[t] ...
-        if expressions_equal(time_shift, literal(0)):
-            return shifted_expr
-        return shifted_expr.shift(time_shift)
+        return _shift(shifted_expr, ctx.shift().accept(self))  # type: ignore
 
     def visitTimeShiftExpr(
         self, ctx: ExprParser.TimeShiftExprContext
     ) -> ExpressionNode:
-        shifted_expr = ctx.expr().accept(self)  # type: ignore
-        time_shift = ctx.shift().accept(self)  # type: ignore
-        if expressions_equal(time_shift, literal(0)):
-            return shifted_expr
-        return shifted_expr.shift(time_shift)
+        return _shift(ctx.expr().accept(self), ctx.shift().accept(self))  # type: ignore
 
     def visitTimeIndexExpr(
         self, ctx: ExprParser.TimeIndexExprContext
     ) -> ExpressionNode:
-        expr = ctx.expr(0).accept(self)  # type: ignore
-        eval_time = ctx.expr(1).accept(self)  # type: ignore
+        expr = ctx.expr().accept(self)  # type: ignore
+        eval_time = ctx.time_expr().accept(self)  # type: ignore
         return expr.eval(eval_time)
 
     def visitTimeSum(self, ctx: ExprParser.TimeSumContext) -> ExpressionNode:
@@ -181,7 +170,7 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         other expression is an absolute time index."""
         if ctx.shift() is not None:  # type: ignore
             return relative_time(ctx.shift().accept(self))  # type: ignore
-        return ctx.expr().accept(self)  # type: ignore
+        return ctx.time_expr().accept(self)  # type: ignore
 
     def visitAllTimeSum(self, ctx: ExprParser.AllTimeSumContext) -> ExpressionNode:
         shifted_expr = ctx.expr().accept(self)  # type: ignore
@@ -234,86 +223,106 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         if function_name == "upper_bound":
             return self._visit_upper_bound(arg_exprs)
 
-        args: list[ExpressionNode] = (
-            [expr.accept(self) for expr in arg_exprs]  # type: ignore
-            if arg_list is not None
-            else []
-        )
-        if function_name in _UNARY_FUNCTIONS:
-            if len(args) != 1:
-                raise ValueError(
-                    f"Function {function_name} requires exactly 1 argument, got {len(args)}"
-                )
-            return _UNARY_FUNCTIONS[function_name](args[0])
-        if function_name in _N_ARY_FUNCTIONS:
-            return _N_ARY_FUNCTIONS[function_name](*args)
-        raise ValueError(f"Encountered invalid function name {function_name}")
+        args = [expr.accept(self) for expr in arg_exprs]  # type: ignore
+        return _apply_function(function_name, args)
 
     # Visit a parse tree produced by ExprParser#shift.
     def visitShift(self, ctx: ExprParser.ShiftContext) -> ExpressionNode:
-        if ctx.shift_expr() is None:  # type: ignore
+        """Offset of "t + ...": the terms folded from left to right."""
+        terms = [term.accept(self) for term in ctx.terms]  # type: ignore
+        if not terms:
             return literal(0)
-        shift = ctx.shift_expr().accept(self)  # type: ignore
-        return shift
+        ops = ctx.ops  # type: ignore
+        first = -terms[0] if ops[0].text == "-" else terms[0]
+        return _fold(first, ops[1:], terms[1:])
 
-    # Visit a parse tree produced by ExprParser#shiftAddsub.
-    def visitShiftAddsub(self, ctx: ExprParser.ShiftAddsubContext) -> ExpressionNode:
-        left = ctx.shift_expr().accept(self)  # type: ignore
-        right = ctx.right_expr().accept(self)  # type: ignore
-        op = ctx.op.text  # type: ignore
-        if op == "+":
-            return left + right
-        elif op == "-":
-            return left - right
-        raise ValueError(f"Invalid operator {op}")
+    # Visit a parse tree produced by ExprParser#time_expr.
+    def visitTime_expr(self, ctx: ExprParser.Time_exprContext) -> ExpressionNode:
+        terms = [term.accept(self) for term in ctx.time_term()]  # type: ignore
+        first = -terms[0] if ctx.neg is not None else terms[0]  # type: ignore
+        return _fold(first, ctx.ops, terms[1:])  # type: ignore
 
-    # Visit a parse tree produced by ExprParser#shiftMuldiv.
-    def visitShiftMuldiv(self, ctx: ExprParser.ShiftMuldivContext) -> ExpressionNode:
-        left = ctx.shift_expr().accept(self)  # type: ignore
-        right = ctx.right_expr().accept(self)  # type: ignore
-        op = ctx.op.text  # type: ignore
-        if op == "*":
-            return left * right
-        elif op == "/":
-            return left / right
-        raise ValueError(f"Invalid operator {op}")
+    # Visit a parse tree produced by ExprParser#time_term.
+    def visitTime_term(self, ctx: ExprParser.Time_termContext) -> ExpressionNode:
+        factors = [factor.accept(self) for factor in ctx.time_factor()]  # type: ignore
+        return _fold(factors[0], ctx.ops, factors[1:])  # type: ignore
 
-    # Visit a parse tree produced by ExprParser#signedExpression.
-    def visitSignedExpression(
-        self, ctx: ExprParser.SignedExpressionContext
+    # Visit a parse tree produced by ExprParser#timeNumber.
+    def visitTimeNumber(self, ctx: ExprParser.TimeNumberContext) -> ExpressionNode:
+        return literal(float(ctx.NUMBER().getText()))  # type: ignore
+
+    # Visit a parse tree produced by ExprParser#timeIdentifier.
+    def visitTimeIdentifier(
+        self, ctx: ExprParser.TimeIdentifierContext
     ) -> ExpressionNode:
-        if ctx.op.text == "-":  # type: ignore
-            return -ctx.expr().accept(self)  # type: ignore
-        else:
-            return ctx.expr().accept(self)  # type: ignore
+        return self._convert_time_identifier(ctx.IDENTIFIER().getText())  # type: ignore
 
-    # Visit a parse tree produced by ExprParser#signedAtom.
-    def visitSignedAtom(self, ctx: ExprParser.SignedAtomContext) -> ExpressionNode:
-        if ctx.op.text == "-":  # type: ignore
-            return -ctx.atom().accept(self)  # type: ignore
-        else:
-            return ctx.atom().accept(self)  # type: ignore
-
-    # Visit a parse tree produced by ExprParser#rightExpression.
-    def visitRightExpression(
-        self, ctx: ExprParser.RightExpressionContext
+    # Visit a parse tree produced by ExprParser#timeFactorIndex.
+    def visitTimeFactorIndex(
+        self, ctx: ExprParser.TimeFactorIndexContext
     ) -> ExpressionNode:
-        return ctx.expr().accept(self)  # type: ignore
+        expr = self._convert_time_identifier(ctx.IDENTIFIER().getText())  # type: ignore
+        return expr.eval(ctx.time_expr().accept(self))  # type: ignore
 
-    # Visit a parse tree produced by ExprParser#rightMuldiv.
-    def visitRightMuldiv(self, ctx: ExprParser.RightMuldivContext) -> ExpressionNode:
-        left = ctx.right_expr(0).accept(self)  # type: ignore
-        right = ctx.right_expr(1).accept(self)  # type: ignore
-        op = ctx.op.text  # type: ignore
-        if op == "*":
-            return left * right
-        elif op == "/":
-            return left / right
-        raise ValueError(f"Invalid operator {op}")
+    # Visit a parse tree produced by ExprParser#timeFactorShift.
+    def visitTimeFactorShift(
+        self, ctx: ExprParser.TimeFactorShiftContext
+    ) -> ExpressionNode:
+        expr = self._convert_time_identifier(ctx.IDENTIFIER().getText())  # type: ignore
+        return _shift(expr, ctx.shift().accept(self))  # type: ignore
 
-    # Visit a parse tree produced by ExprParser#rightAtom.
-    def visitRightAtom(self, ctx: ExprParser.RightAtomContext) -> ExpressionNode:
-        return ctx.atom().accept(self)  # type: ignore
+    def _convert_time_identifier(self, identifier: str) -> ExpressionNode:
+        if self.identifiers.is_variable(identifier):
+            raise ValueError(
+                f"Variable '{identifier}' is not allowed in a time shift, time index "
+                "or time sum bound: only parameters and literals are."
+            )
+        return self._convert_identifier(identifier)
+
+    # Visit a parse tree produced by ExprParser#timeFunction.
+    def visitTimeFunction(self, ctx: ExprParser.TimeFunctionContext) -> ExpressionNode:
+        function_name: str = ctx.IDENTIFIER().getText()  # type: ignore
+        if (
+            function_name not in _UNARY_FUNCTIONS
+            and function_name not in _N_ARY_FUNCTIONS
+        ):
+            raise ValueError(
+                f"Function {function_name} is not allowed in a time shift, time index "
+                "or time sum bound."
+            )
+        args = [expr.accept(self) for expr in ctx.time_expr()]  # type: ignore
+        return _apply_function(function_name, args)
+
+    # Visit a parse tree produced by ExprParser#timeParenthesis.
+    def visitTimeParenthesis(
+        self, ctx: ExprParser.TimeParenthesisContext
+    ) -> ExpressionNode:
+        return ctx.time_expr().accept(self)  # type: ignore
+
+
+def _shift(expr: ExpressionNode, time_shift: ExpressionNode) -> ExpressionNode:
+    """expr shifted by time_shift; x[t] is x itself."""
+    if expressions_equal(time_shift, literal(0)):
+        return expr
+    return expr.shift(time_shift)
+
+
+def _fold(
+    first: ExpressionNode, ops: Sequence[Token], operands: Sequence[ExpressionNode]
+) -> ExpressionNode:
+    """Applies the binary operator tokens ops from left to right."""
+    result = first
+    for op, operand in zip(ops, operands):
+        result = _BINARY_OPERATORS[op.text](result, operand)
+    return result
+
+
+_BINARY_OPERATORS = {
+    "+": ExpressionNode.__add__,
+    "-": ExpressionNode.__sub__,
+    "*": ExpressionNode.__mul__,
+    "/": ExpressionNode.__truediv__,
+}
 
 
 _UNARY_FUNCTIONS = {
@@ -328,6 +337,18 @@ _N_ARY_FUNCTIONS = {
     "max": maximum,
     "min": minimum,
 }
+
+
+def _apply_function(name: str, args: list[ExpressionNode]) -> ExpressionNode:
+    if name in _UNARY_FUNCTIONS:
+        if len(args) != 1:
+            raise ValueError(
+                f"Function {name} requires exactly 1 argument, got {len(args)}"
+            )
+        return _UNARY_FUNCTIONS[name](args[0])
+    if name in _N_ARY_FUNCTIONS:
+        return _N_ARY_FUNCTIONS[name](*args)
+    raise ValueError(f"Encountered invalid function name {name}")
 
 
 class ParsingException(Exception):

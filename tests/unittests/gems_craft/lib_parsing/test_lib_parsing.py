@@ -636,7 +636,7 @@ def test_bare_defined_port_field_in_binding_constraint_raises() -> None:
     input_lib = parse_yaml_library(
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.flow >= 0"))
     )
-    with pytest.raises(ValueError, match="Bare port field"):
+    with pytest.raises(ParsingException, match="ParseCancellationException"):
         resolve_library([input_lib])
 
 
@@ -645,7 +645,7 @@ def test_bare_undefined_port_field_in_binding_constraint_raises() -> None:
     input_lib = parse_yaml_library(
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.price >= 0"))
     )
-    with pytest.raises(ValueError, match="Bare port field"):
+    with pytest.raises(ParsingException, match="ParseCancellationException"):
         resolve_library([input_lib])
 
 

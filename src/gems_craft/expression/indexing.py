@@ -111,10 +111,19 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return IndexingStructure(time, scenario)
 
     def time_shift(self, node: TimeShiftNode) -> IndexingStructure:
-        return visit(node.operand, self)
+        operand = visit(node.operand, self)
+        if not operand.time:  # the same value at every time step
+            return operand
+        # The operand is read at t + shift: the shift brings its scenario dependency.
+        return operand | IndexingStructure(False, visit(node.time_shift, self).scenario)
 
     def time_eval(self, node: TimeEvalNode) -> IndexingStructure:
-        return IndexingStructure(False, visit(node.operand, self).scenario)
+        operand = visit(node.operand, self)
+        if not operand.time:  # the same value at every time step
+            return operand
+        # The time index removes the operand's time dimension, but brings its own.
+        index = visit(node.eval_time, self)
+        return IndexingStructure(False, operand.scenario) | index
 
     def time_sum(self, node: TimeSumNode) -> IndexingStructure:
         # Bounds are time-independent (checked when the model is created), so

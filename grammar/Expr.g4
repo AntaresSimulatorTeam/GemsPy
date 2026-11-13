@@ -19,7 +19,6 @@ fullexpr: expr EOF;
 
 expr
     : atom                                     # unsignedAtom
-    | portFieldExpr                            # portField
     | '-' expr                                 # negation
     | '(' expr ')'                             # expression
     | expr op=('/' | '*') expr                 # muldiv
@@ -30,9 +29,9 @@ expr
     | 'sum' '(' from=sum_bound '..' to=sum_bound ',' expr ')'  # timeSum
     | IDENTIFIER '(' argList? ')'              # function
     | IDENTIFIER '[' shift ']'                 # timeShift
-    | IDENTIFIER '[' expr  ']'                 # timeIndex
+    | IDENTIFIER '[' time_expr ']'             # timeIndex
     | '(' expr ')' '[' shift ']'               # timeShiftExpr
-    | '(' expr ')' '[' expr ']'               # timeIndexExpr
+    | '(' expr ')' '[' time_expr ']'           # timeIndexExpr
     ;
 
 argList : expr (',' expr)* ;
@@ -41,7 +40,7 @@ argList : expr (',' expr)* ;
 // "t - ...") or an absolute time index (an expression without "t").
 sum_bound
     : shift
-    | expr
+    | time_expr
     ;
 
 atom
@@ -49,32 +48,24 @@ atom
     | IDENTIFIER                               # identifier
     ;
 
-// a shift is required to be either "t" or "t + ..." or "t - ..."
-// Note: simply defining it as "shift: TIME ('+' | '-') expr" won't work
-//       because the minus sign will not have the expected precedence:
-//       "t - d + 1" would be equivalent to "t - (d + 1)"
-shift: TIME shift_expr?;
+// A shift is "t" followed by additive terms: "t - d + 1" is t + (-d + 1).
+shift: TIME (ops+=('+' | '-') terms+=time_term)*;
 
-// Because the shift MUST start with + or -, we need
-// to differentiate it from generic "expr".
-// A shift expression can only be extended to the right by a
-// "right_expr" which cannot start with a + or -,
-// unlike shift_expr itself.
-// TODO: the grammar is still a little weird, because we
-//       allow more things in the "expr" parts of those
-//       shift expressions than on their left-most part
-//       (port fields, nested time shifts and so on).
-shift_expr
-    : shift_expr op=('*' | '/') right_expr     # shiftMuldiv
-    | shift_expr op=('+' | '-') right_expr     # shiftAddsub
-    | op=('+' | '-') atom                      # signedAtom
-    | op=('+' | '-') '(' expr ')'              # signedExpression
-    ;
+// Arithmetic of time shifts, time indices and sum bounds: numbers, parameters,
+// parameters at a time index or time shift (d[0], d[t-1]), scalar functions,
+// + - * / and parentheses. No variables, port fields, sums or comparisons.
+// A unary minus only starts an expression: "-1", "t + (-1)", not "t + -1".
+time_expr: neg='-'? time_term (ops+=('+' | '-') terms+=time_term)*;
 
-right_expr
-    : right_expr op=('/' | '*') right_expr     # rightMuldiv
-    | '(' expr ')'                             # rightExpression
-    | atom                                     # rightAtom
+time_term: time_factor (ops+=('*' | '/') factors+=time_factor)*;
+
+time_factor
+    : NUMBER                                         # timeNumber
+    | IDENTIFIER                                     # timeIdentifier
+    | IDENTIFIER '(' time_expr (',' time_expr)* ')'  # timeFunction
+    | IDENTIFIER '[' shift ']'                       # timeFactorShift
+    | IDENTIFIER '[' time_expr ']'                   # timeFactorIndex
+    | '(' time_expr ')'                              # timeParenthesis
     ;
 
 
