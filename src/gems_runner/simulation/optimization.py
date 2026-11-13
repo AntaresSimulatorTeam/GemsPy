@@ -240,34 +240,57 @@ def _sparse_gather(
     """Return ``out[i] = sum of expr_master[j]`` over the connections (i, j).
 
     Equivalent to a dense ``(A * expr_master).sum("component_master")`` but
-    stacks only as many terms as the max number of masters per slave,
-    instead of one per master component.
+    gathers only as many ranks as the max number of masters per slave,
+    instead of one per master component, in a single vectorized ``isel``.
     """
     master_index = {cid: j for j, cid in enumerate(master_comp_ids)}
     by_slave: Dict[int, List[int]] = defaultdict(list)
     for i, master_comp in conn_list:
         by_slave[i].append(master_index[master_comp.id])
 
-    terms: List[Any] = []
-    for t in range(max(len(js) for js in by_slave.values())):
-        slaves = [i for i, js in by_slave.items() if len(js) > t]
-        picked = expr_master.isel(
-            component_master=[by_slave[i][t] for i in slaves]
+    # idx[slave, rank] -> master position, -1 padding.
+    idx = np.full(
+        (len(comp_ids), max(len(js) for js in by_slave.values())), -1, dtype=np.int64
+    )
+    for i, js in by_slave.items():
+        idx[i, : len(js)] = js
+    dims = ("component", "_rank")
+    valid = xr.DataArray(idx >= 0, dims=dims)
+    indexer = xr.DataArray(np.maximum(idx, 0), dims=dims)
+
+    if isinstance(expr_master, xr.DataArray):
+        picked = expr_master.isel(component_master=indexer).drop_vars(
+            "component_master", errors="ignore"
         )
-        picked = picked.assign_coords(
-            component_master=[comp_ids[i] for i in slaves]
-        ).rename({"component_master": "component"})
-        if isinstance(picked, xr.DataArray):
-            picked = picked.reindex(component=comp_ids, fill_value=0.0)
-        else:
-            if isinstance(picked, linopy.Variable):
-                picked = 1 * picked
-            picked = picked.reindex(component=comp_ids)
-        terms.append(picked)
-    if isinstance(terms[0], xr.DataArray):
-        return sum(terms[1:], terms[0])
-    # Single merge along _term: pairwise `+` would recopy the accumulator each time (O(D²)).
-    return linopy.merge(terms)
+        return picked.where(valid, 0.0).sum("_rank").assign_coords(component=comp_ids)
+
+    if isinstance(expr_master, linopy.Variable):
+        expr_master = 1 * expr_master
+    data = expr_master.data.isel(component_master=indexer).drop_vars(
+        "component_master", errors="ignore"
+    )
+    merged = xr.Dataset(
+        {
+            "vars": _merge_rank_into_term(data.vars.where(valid, -1)),
+            "coeffs": _merge_rank_into_term(data.coeffs.where(valid, 0.0)),
+            "const": data.const.where(valid, 0.0).sum("_rank"),
+        }
+    ).assign_coords(component=comp_ids)
+    return linopy.LinearExpression(merged, expr_master.model)
+
+
+def _merge_rank_into_term(da: xr.DataArray) -> xr.DataArray:
+    """Flatten the ``(_rank, _term)`` dims of *da* into a single ``_term`` dim."""
+    da = da.transpose(..., "_rank", "_term")
+    return xr.DataArray(
+        da.values.reshape(*da.shape[:-2], -1),
+        dims=da.dims[:-2] + ("_term",),
+        coords={
+            k: v
+            for k, v in da.coords.items()
+            if "_rank" not in v.dims and "_term" not in v.dims
+        },
+    )
 
 
 def _build_slave_port_array(
