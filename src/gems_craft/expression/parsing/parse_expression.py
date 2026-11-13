@@ -53,9 +53,11 @@ class ModelIdentifiers:
             raise ValueError(
                 f"Set ids clash with variable/parameter ids: {sorted(clashes)}"
             )
-        if "t" in self.sets:
+        # 't' denotes time; the others name the solve-time dimensions of every array
+        reserved = self.sets & {"t", "time", "scenario", "component"}
+        if reserved:
             raise ValueError(
-                "'t' is reserved for the time dimension and cannot be a set id."
+                f"{sorted(reserved)} are reserved dimension names and cannot be set ids."
             )
 
     def is_variable(self, identifier: str) -> bool:

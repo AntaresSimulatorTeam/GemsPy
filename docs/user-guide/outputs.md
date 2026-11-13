@@ -117,8 +117,8 @@ simulation_table/
   (`has_common`) and the column schema.
 - Every file has the same columns and types: `block`, `absolute_time_index`,
   `block_time_index` and `scenario_index` are integers (empty for a missing
-  dimension), `component`, `output` and `basis_status` are strings, `value` is
-  a float.
+  dimension), `component`, `output`, `set_id`, `set_index` and `basis_status`
+  are strings, `value` is a float.
 - In CSV, only an empty cell is read as missing, so a label that is an empty
   string and a missing value both read back as `<NA>`. Parquet keeps them
   apart.
@@ -183,6 +183,27 @@ df = results.to_pandas(load_all=True)    # in memory or on disk
 On a stored table, `data` raises and `to_pandas()` without a filter needs
 `load_all=True`, so that a large run is not loaded by accident.
 
+### Set-indexed outputs
+
+An output indexed by custom sets has one row per combination of set elements.
+`set_id` lists the sets (sorted by id, joined by `|`, e.g. `fuel|seg`) and `set_index`
+the element names of the row in the same order (e.g. `coal|s0`). Both are empty for
+outputs without a set dimension. Positions beyond a component's own set size (ragged
+local sets) produce no row.
+
+With the fluent API, the columns of a set-indexed output are a
+(`scenario_index`, `set_index`) MultiIndex:
+
+~~~ python
+generation = results.component("gen_de").output("generation")
+
+frame = generation.data                                    # Time × (Scenario, set_index)
+series = generation.value(time_index=0, scenario_index=0)  # Series over set_index
+val = series["coal|s0"]                                    # one element
+by_time = generation.value(scenario_index=0)               # Time × set_index DataFrame
+by_scenario = generation.value(time_index=0)               # Series over (Scenario, set_index)
+~~~
+
 ---
 
 ## Saving a table
@@ -201,4 +222,5 @@ given an `output_dir`, by contrast, keeps its partial files (see above).
 
 `to_csv()`, `to_parquet()`, `to_dataset()` and `to_netcdf()` are deprecated and
 will be removed in a following release: use `save()`, or build an xarray object
-from `to_pandas()`.
+from `to_pandas()`. `to_dataset()` and `to_netcdf()` raise `NotImplementedError`
+on a table with set-indexed outputs.

@@ -5,6 +5,36 @@ All notable changes to GemsPy are documented here.
 ## [Unreleased]
 
 ### Added
+- **Custom-set indexing** - parameters, variables and outputs may be indexed by
+  custom sets (fuels, segments, tiers...) in addition to time and scenarios.
+  - Libraries declare global sets and models local sets (`sets:`); parameters
+    and variables list theirs in `indexed-by:`. `system.yml` gives the elements
+    of global sets in its own `sets:` and of local sets on each component, as a
+    list or a range (`"0..9"`). Components of one model may give a local set
+    different elements and sizes.
+  - New expression forms: `X[fuel]`, `X[fuel=2]`, `X[fuel+1]`,
+    `X[segment=2, fuel=1]` and `sum_over(fuel, expr)`. Positions are 0-based and
+    `X[fuel+1]` wraps around the component's own elements. A position or shift
+    may be given by a parameter varying per component, time step or scenario.
+    An index list may combine time and sets (`x[t-1, fuel=0]`), and `x[t=3]`
+    is accepted as a time index, like `x[3]`.
+  - Checked when the library is resolved (unknown sets, a bound indexed by a set
+    its variable or constraint is not, a local set crossing a port) and when the
+    system is loaded (missing or unknown instantiations, duplicate elements, an
+    element containing `|`). A set id may not be a variable or parameter id, nor
+    `t`, `time`, `scenario` or `component`. `sum_over` of an operand not indexed
+    by the set raises a warning.
+  - Set-indexed data is read from tidy files (one row per combination, columns
+    `time`, `scenario`, one per set and `value`). Parameters indexed by sets only
+    may also give their values inline in `system.yml`
+    (e.g. `value: {gas: 45, coal: 30}`).
+  - Simulation tables gain `set_id` (set ids, sorted and joined by `|`) and
+    `set_index` (element names) columns. For a set-indexed output,
+    `component(...).output(...).value()` returns data keyed by `set_index`.
+- **Data series**
+  - Series files may also use the `.tsv` extension.
+  - A time- or scenario-dependent parameter may also read a tidy file (columns
+    `time`, `scenario`, `value`), recognised by a `value` column in its first row.
 - **Expression language**
   - Time shifts accept functions without parentheses (e.g. `x[t - ceil(d / 2)]`).
   - A time index or time shift may be given by a parameter varying in time,
@@ -27,6 +57,13 @@ All notable changes to GemsPy are documented here.
   `x[d]` and `sum(-1 .. 1, x)` are now skipped where they read `x` outside the
   block, instead of wrapping around it, and `p[t-1]` no longer skips the
   constraint at `t = 0`. Port fields are never checked.
+- **Breaking** - the simulation table schema gains the `set_id` and `set_index`
+  string columns and the manifest `schema_version` becomes 2, so tables saved
+  by 0.3.0 can no longer be opened.
+- **Breaking** - several series files with the same name and different
+  extensions (e.g. `load.txt` and `load.csv`) are rejected.
+- The deprecated `SimulationTable.to_dataset()` and `to_netcdf()` raise
+  `NotImplementedError` on a table with set-indexed outputs.
 
 ### Fixed
 - `x[d]` with `d` varying in time, per component or per scenario read `x` at

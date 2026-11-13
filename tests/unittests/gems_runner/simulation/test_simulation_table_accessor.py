@@ -279,7 +279,8 @@ def test_scalar_output_accessible_via_fluent_api() -> None:
 
 
 def _table(rows: list) -> SimulationTable:
-    """SimulationTable from (block, component, output, time, scenario, value)."""
+    """SimulationTable from (block, component, output, time, scenario, value[,
+    fuel element]): a row with a fuel element is indexed by the set ``fuel``."""
     df = pd.DataFrame(
         [
             {
@@ -289,10 +290,12 @@ def _table(rows: list) -> SimulationTable:
                 "absolute_time_index": t,
                 "block_time_index": None if t is None else t,
                 "scenario_index": s,
+                "set_id": "fuel" if fuel else None,
+                "set_index": fuel[0] if fuel else None,
                 "value": v,
                 "basis_status": None,
             }
-            for b, c, o, t, s, v in rows
+            for b, c, o, t, s, v, *fuel in rows
         ]
     )
     return SimulationTable(_apply_schema(df))
@@ -386,6 +389,36 @@ def test_per_block_rows_of_a_time_independent_output_need_a_block() -> None:
     with pytest.raises(ValueError, match="block="):
         output.value(time_index=3, scenario_index=0)
     assert output.value(time_index=3, scenario_index=0, block=1) == pytest.approx(80.0)
+
+
+_SET_INDEXED = [
+    (0, "g", "p", t, s, 10.0 * t + s + (0.5 if f == "gas" else 0.0), f)
+    for t in (0, 1)
+    for s in (0, 1)
+    for f in ("coal", "gas")
+]
+
+
+def test_set_indexed_output_by_scenario_is_time_by_set_index() -> None:
+    output = _table(_SET_INDEXED).component("g").output("p")
+
+    frame = output.value(scenario_index=1)
+    assert list(frame.columns) == ["coal", "gas"]
+    assert frame.loc[1].tolist() == pytest.approx([11.0, 11.5])
+    assert output.value(time_index=1, scenario_index=0).to_dict() == {
+        "coal": pytest.approx(10.0),
+        "gas": pytest.approx(10.5),
+    }
+
+
+def test_set_elements_at_a_same_time_and_scenario_are_not_several_blocks() -> None:
+    """Rows differing only by set_index are distinct values, not a block overlap."""
+    output = _table(_SET_INDEXED).component("g").output("p")
+
+    assert output.data.shape == (2, 4)
+    overlap = _table(_SET_INDEXED + [(1, "g", "p", 1, 0, 99.0, "gas")])
+    with pytest.raises(ValueError, match=r"blocks \[0, 1\]"):
+        overlap.component("g").output("p").value(time_index=1, scenario_index=0)
 
 
 def test_objective_values() -> None:
