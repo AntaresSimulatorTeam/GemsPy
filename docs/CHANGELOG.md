@@ -8,6 +8,8 @@ All notable changes to GemsPy are documented here.
 - `ComponentView` and `OutputView` are renamed `ComponentResults` and
   `OutputResults`, so that they are not confused with GEMS views. The calls
   `component(...).output(...)`, `value()` and `data` are unchanged.
+- **Breaking** - In optim-config `heuristics`, every `inputs`/`outputs` entry
+  must now set `type`; it no longer defaults to `parameter`.
 
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
