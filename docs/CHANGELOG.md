@@ -4,6 +4,13 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Parametric export** - `export_parametric_problems(study, optim_config,
+  output_dir)` (`gems_runner.parametric`) writes, for each time block, the
+  problem shared by all scenarios (MPS) and the entries that differ between
+  scenarios (Parquet). Frontal, parallel and
+  Benders modes are supported; sequential mode is rejected.
+
 ### Changed
 - `ComponentView` and `OutputView` are renamed `ComponentResults` and
   `OutputResults`, so that they are not confused with GEMS views. The calls

@@ -112,3 +112,47 @@ problem.solve(solver_name="gurobi")             # Gurobi
 ~~~ python
 problem.export_lp(Path("debug.lp"))
 ~~~
+
+---
+
+## Exporting parametric problems
+
+`export_parametric_problems()` writes, for each time block, the problem of the
+first scenario and the entries that differ in the other scenarios, without
+solving.
+
+~~~ python
+from pathlib import Path
+from gems_craft.study.folder import load_study
+from gems_craft.optim_config import load_optim_config
+from gems_runner.parametric import export_parametric_problems
+
+study = load_study(Path("my_study"))
+optim_config = load_optim_config(Path("my_study/input/optim-config.yml"))
+
+export_parametric_problems(study, optim_config, Path("my_study/export"))
+~~~
+
+Scenarios are those of `scenario-scope`, resolved by the
+[scenario builder](scenario-builder.md), and equally likely. Only
+scenario-dependent parameters vary; they may appear anywhere (right-hand side,
+coefficient, bound, objective).
+
+Blocks follow `resolution.mode`: one block for `frontal`, one per
+`block-length` for `parallel-subproblems`, a `master` and a `subproblem` for
+`benders-decomposition`. `sequential-subproblems` is rejected.
+
+~~~
+export/
+  manifest.json                  {"format_version": 1, "scenarios": [0, 1, 2], "blocks": [0, 1]}
+  block_0/
+    problem.mps                  problem of the first scenario
+    problem_parameters.parquet   entries that differ between scenarios
+  block_1/
+    ...
+~~~
+
+The Parquet file has one row per entry and scenario: `kind` (`rhs`, `coef`,
+`lower`, `upper`, `obj`, `obj_const`), `row` and `col` (names in the MPS file,
+empty when not relevant), `scenario` and `value`. The objective constant is
+not in the MPS file: it is given by `obj_const`.

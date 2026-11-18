@@ -43,6 +43,31 @@ from gems_runner.simulation.time_block import TimeBlock
 SIMULATION_TABLE_FOLDER = "simulation_table"
 
 
+def time_scope_block(optim_config: OptimConfig, block_id: int) -> TimeBlock:
+    """One block covering the whole time scope (frontal and Benders modes)."""
+    return TimeBlock(
+        block_id,
+        list(
+            range(
+                optim_config.time_scope.first_time_step,
+                optim_config.time_scope.last_time_step + 1,
+            )
+        ),
+    )
+
+
+def parallel_blocks(optim_config: OptimConfig) -> List[TimeBlock]:
+    """Split the time scope into consecutive blocks of ``block-length`` time
+    steps, the last one possibly shorter (parallel-subproblems mode)."""
+    block_length: int = optim_config.resolution.block_length  # type: ignore[assignment]
+    first = optim_config.time_scope.first_time_step
+    last = optim_config.time_scope.last_time_step
+    return [
+        TimeBlock(i, list(range(t, min(t + block_length, last + 1))))
+        for i, t in enumerate(range(first, last + 1, block_length))
+    ]
+
+
 class SimulationSession:
     """Solves a study and returns its results as a ``SimulationTable``.
 
@@ -175,15 +200,7 @@ class SimulationSession:
                 yield scenario_id, self._iter_parallel(scenario_id)
 
     def _frontal_block(self) -> TimeBlock:
-        return TimeBlock(
-            0,
-            list(
-                range(
-                    self.optim_config.time_scope.first_time_step,
-                    self.optim_config.time_scope.last_time_step + 1,
-                )
-            ),
-        )
+        return time_scope_block(self.optim_config, block_id=0)
 
     def _iter_frontal(self) -> Iterator[Tuple[Optional[int], Iterator[pd.DataFrame]]]:
         # The rows of each scenario are built from the solution arrays one at a
@@ -237,14 +254,7 @@ class SimulationSession:
     def _iter_parallel(self, scenario_id: int) -> Iterator[pd.DataFrame]:
         """Solve the blocks of *scenario_id* independently of each other, and
         yield the rows of each block."""
-        cfg = self.optim_config.resolution
-        block_length: int = cfg.block_length  # type: ignore[assignment]
-        last = self.optim_config.time_scope.last_time_step
-        starts = range(
-            self.optim_config.time_scope.first_time_step, last + 1, block_length
-        )
-        for i, t in enumerate(starts):
-            block = TimeBlock(i, list(range(t, min(t + block_length, last + 1))))
+        for block in parallel_blocks(self.optim_config):
             yield self._run_block(block, scenario_ids=[scenario_id])[1]
 
     def _run_benders(self) -> None:
@@ -255,15 +265,7 @@ class SimulationSession:
             dump_couplings,
         )
 
-        block = TimeBlock(
-            1,
-            list(
-                range(
-                    self.optim_config.time_scope.first_time_step,
-                    self.optim_config.time_scope.last_time_step + 1,
-                )
-            ),
-        )
+        block = time_scope_block(self.optim_config, block_id=1)
         decomposed = build_decomposed_problems(
             self.study, block, self.scenario_ids, self.optim_config
         )
