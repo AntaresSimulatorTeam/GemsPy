@@ -467,17 +467,17 @@ def test_generation_xpansion_two_time_steps_two_scenarios(
 
     df = SimulationTableBuilder().build(problem)
 
-    g1_view = df.component("G1").output("generation")
-    assert g1_view.value(time_index=0, scenario_index=0) == pytest.approx(0.0)
-    assert g1_view.value(time_index=1, scenario_index=0) == pytest.approx(200.0)
-    assert g1_view.value(time_index=0, scenario_index=1) == pytest.approx(0.0)
-    assert g1_view.value(time_index=1, scenario_index=1) == pytest.approx(100.0)
+    g1_generation = df.component("G1").output("generation")
+    assert g1_generation.value(time_index=0, scenario_index=0) == pytest.approx(0.0)
+    assert g1_generation.value(time_index=1, scenario_index=0) == pytest.approx(200.0)
+    assert g1_generation.value(time_index=0, scenario_index=1) == pytest.approx(0.0)
+    assert g1_generation.value(time_index=1, scenario_index=1) == pytest.approx(100.0)
 
-    cand_view = df.component("CAND").output("generation")
-    assert cand_view.value(time_index=0, scenario_index=0) == pytest.approx(300.0)
-    assert cand_view.value(time_index=1, scenario_index=0) == pytest.approx(300.0)
-    assert cand_view.value(time_index=0, scenario_index=1) == pytest.approx(200.0)
-    assert cand_view.value(time_index=1, scenario_index=1) == pytest.approx(300.0)
+    cand_generation = df.component("CAND").output("generation")
+    assert cand_generation.value(time_index=0, scenario_index=0) == pytest.approx(300.0)
+    assert cand_generation.value(time_index=1, scenario_index=0) == pytest.approx(300.0)
+    assert cand_generation.value(time_index=0, scenario_index=1) == pytest.approx(200.0)
+    assert cand_generation.value(time_index=1, scenario_index=1) == pytest.approx(300.0)
 
     assert df.component("CAND").output("p_max").value(
         time_index=0, scenario_index=0

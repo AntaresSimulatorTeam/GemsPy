@@ -563,10 +563,10 @@ def test_rows_read_in_full_are_reused_on_disk(tmp_path: Path) -> None:
     stored = _stored(tmp_path)
     store = _CountingStore(stored._store, stored.path)  # type: ignore[arg-type]
     stored._store = store
-    view = stored.component("gen").output("p")
+    p = stored.component("gen").output("p")
 
-    view.data
-    view.value(time_index=0, scenario_index=1)
+    p.data
+    p.value(time_index=0, scenario_index=1)
 
     assert [f.scenarios for f in store.reads] == [None]
 
@@ -586,6 +586,9 @@ def test_a_table_opened_from_a_relative_path_reads_from_anywhere(
     assert pickle.loads(payload).component("gen").output("p").value(1, 1) == 13.0
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="':' is not allowed in Windows folder names"
+)
 @pytest.mark.parametrize("fmt", _FORMATS)
 def test_a_folder_named_like_a_uri_is_read_as_a_local_path(
     tmp_path: Path, fmt: OutputFormat, monkeypatch: pytest.MonkeyPatch

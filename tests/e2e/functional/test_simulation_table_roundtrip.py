@@ -26,7 +26,7 @@ from gems_craft.optim_config.parsing import ResolutionMode
 from gems_craft.study.parsing import OutputFormat
 from gems_runner.simulation.simulation_table import SimulationTable
 from tests.e2e.functional.simulation_table_output import assert_same_tables
-from tests.e2e.functional.test_simulation_table_views import (
+from tests.e2e.functional.test_simulation_table_blocks import (
     _run_13_1,
     _sequential_overlap,
 )

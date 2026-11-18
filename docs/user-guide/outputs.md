@@ -137,11 +137,11 @@ table, only the files and rows a call needs are read.
 ### Fluent API
 
 ~~~ python
-output_view = results.component("gen_de").output("generation")
+generation = results.component("gen_de").output("generation")
 
-val = output_view.value(time_index=0, scenario_index=0)  # a float
-series = output_view.value(scenario_index=0)             # Series over time
-frame = output_view.data                                 # Time × Scenario DataFrame
+val = generation.value(time_index=0, scenario_index=0)  # a float
+series = generation.value(scenario_index=0)             # Series over time
+frame = generation.data                                 # Time × Scenario DataFrame
 ~~~
 
 - An output without a time (or scenario) dimension has a single row (or

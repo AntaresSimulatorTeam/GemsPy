@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
 """Tests for the SimulationTable read API and its storage: to_pandas,
-iter_scenario_frames, scan, scenarios, path, and the cache of the lazy views."""
+iter_scenario_frames, scan, scenarios, path, and the lazy reads of the
+component and output results."""
 
 from pathlib import Path
 from typing import Any, Iterator, List, Optional, Set, Tuple
@@ -351,11 +352,11 @@ def test_scan_returns_a_dataset_with_the_schema_and_every_row() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Lazy views
+# Lazy component and output results
 # ---------------------------------------------------------------------------
 
 
-def test_views_read_nothing_until_a_value_is_asked() -> None:
+def test_results_read_nothing_until_a_value_is_asked() -> None:
     table, store = _counting_table()
 
     table.component("gen").output("p")
@@ -363,32 +364,32 @@ def test_views_read_nothing_until_a_value_is_asked() -> None:
     assert store.reads == []
 
 
-def test_output_view_reads_its_rows_once() -> None:
+def test_output_results_read_their_rows_once() -> None:
     table, store = _counting_table()
-    view = table.component("gen").output("p")
+    p = table.component("gen").output("p")
 
-    view.data
-    view.value(time_index=0, scenario_index=0)
-    view.value(scenario_index=1)
+    p.data
+    p.value(time_index=0, scenario_index=0)
+    p.value(scenario_index=1)
 
     assert len(store.reads) == 1
 
 
 def test_scenario_value_in_memory_reads_all_rows_once() -> None:
     table, store = _counting_table()
-    view = table.component("gen").output("p")
+    p = table.component("gen").output("p")
 
-    view.value(time_index=1, scenario_index=1)
-    view.value(time_index=0, scenario_index=0)
+    p.value(time_index=1, scenario_index=1)
+    p.value(time_index=0, scenario_index=0)
 
     assert [f.scenarios for f in store.reads] == [None]
 
 
 def test_scenario_value_on_disk_reads_only_that_scenario() -> None:
     table, store = _counting_table(path=Path("stored"))
-    view = table.component("gen").output("p")
+    p = table.component("gen").output("p")
 
-    assert view.value(time_index=1, scenario_index=1) == 13.0
-    view.value(time_index=0, scenario_index=1)
+    assert p.value(time_index=1, scenario_index=1) == 13.0
+    p.value(time_index=0, scenario_index=1)
 
     assert [f.scenarios for f in store.reads] == [frozenset({1})]

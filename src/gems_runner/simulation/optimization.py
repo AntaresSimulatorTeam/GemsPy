@@ -306,6 +306,10 @@ def _build_slave_port_array(
                 raise
             continue
 
+        if "component" not in expr_master.dims:  # type: ignore[union-attr]
+            # A constant definition (e.g. ``0``) has no component dimension:
+            # broadcast it so that each connection contributes it once.
+            expr_master = expr_master.expand_dims(component=master_comp_ids)  # type: ignore[union-attr]
         expr_master_r = expr_master.rename({"component": "component_master"})  # type: ignore[union-attr]
         contribution = (A * expr_master_r).sum("component_master")  # type: ignore[operator]
 

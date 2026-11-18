@@ -16,6 +16,21 @@ All notable changes to GemsPy are documented here.
   `ExpressionVisitor.power` is not abstract, so a custom visitor that does not
   implement it still instantiates and raises `NotImplementedError` on `^`.
 
+### Changed
+- `ComponentView` and `OutputView` are renamed `ComponentResults` and
+  `OutputResults`, so that they are not confused with GEMS views. The calls
+  `component(...).output(...)`, `value()` and `data` are unchanged.
+- **Breaking** - In optim-config `heuristics`, every `inputs`/`outputs` entry
+  must now set `type`; it no longer defaults to `parameter`.
+
+### Deprecated
+- `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
+
+### Fixed
+- A port field defined by a constant expression (e.g. `definition: 0`) no
+  longer makes `build_problem` fail when its component is connected; the
+  constant is contributed once per connection.
+
 ## [0.3.0] - 2026-10-29
 
 Simulation results are now written to disk as they are solved, as one file per

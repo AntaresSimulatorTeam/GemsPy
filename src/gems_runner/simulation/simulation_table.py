@@ -44,7 +44,7 @@ from gems_runner.simulation.table_schema import (
 )
 from gems_runner.simulation.table_store import _MemoryStore, _RowFilter, _TableStore
 
-_VIEW_COLUMNS = [_BLOCK, _TIME, _SCENARIO, _VALUE]
+_RESULT_COLUMNS = [_BLOCK, _TIME, _SCENARIO, _VALUE]
 
 
 def _filter_values(values: Optional[Sequence[Any]]) -> Optional[frozenset]:
@@ -56,7 +56,7 @@ def _filter_values(values: Optional[Sequence[Any]]) -> Optional[frozenset]:
     return frozenset(values)
 
 
-class OutputView:
+class OutputResults:
     """Time × Scenario values of one (component, output).
 
     Obtain via ``SimulationTable.component(...).output(...)``.
@@ -89,8 +89,8 @@ class OutputView:
 
     @functools.cached_property
     def _rows(self) -> pd.DataFrame:
-        """All rows of the view, long format, one row per (block, time, scenario)."""
-        return self._store.read(self._filter)[_VIEW_COLUMNS]
+        """All rows of the output, long format, one row per (block, time, scenario)."""
+        return self._store.read(self._filter)[_RESULT_COLUMNS]
 
     def _rows_for(self, scenario_index: Optional[int]) -> pd.DataFrame:
         """The rows needed for *scenario_index*: all rows if already read,
@@ -99,7 +99,7 @@ class OutputView:
 
         Reading one scenario only saves work when the table is stored on disk
         (one file per scenario): in memory, each read starts from all the rows
-        of the view's component, so the view reads all its rows once instead."""
+        of the component, so all the rows of the output are read once instead."""
         if (
             scenario_index is None
             or self._store.path is None
@@ -109,7 +109,7 @@ class OutputView:
         if scenario_index not in self._scenario_rows:
             narrowed = self._filter.narrow(scenarios=frozenset({scenario_index}))
             self._scenario_rows[scenario_index] = self._store.read(narrowed)[
-                _VIEW_COLUMNS
+                _RESULT_COLUMNS
             ]
         return self._scenario_rows[scenario_index]
 
@@ -201,8 +201,8 @@ class OutputView:
         return repr(self._rows)
 
 
-class ComponentView:
-    """Filtered view of simulation results for one component.
+class ComponentResults:
+    """Simulation results of one component.
 
     Obtain via ``SimulationTable.component(...)``. It reads nothing itself: its
     outputs read their rows when accessed.
@@ -215,13 +215,13 @@ class ComponentView:
         self._filter = row_filter
         self._component_id = component_id
 
-    def output(self, output_id: str, block: Optional[int] = None) -> OutputView:
-        """Return an OutputView for the given output name.
+    def output(self, output_id: str, block: Optional[int] = None) -> OutputResults:
+        """Return the results of the given output.
 
-        ``block`` restricts the view to one block, for outputs that have values
+        ``block`` restricts them to one block, for outputs that have values
         from several blocks for the same (time, scenario).
         """
-        return OutputView(
+        return OutputResults(
             self._store,
             self._filter.narrow(outputs=frozenset({output_id})),
             name=f"{self._component_id}.{output_id}",
@@ -334,9 +334,9 @@ class SimulationTable:
         """Where the table is stored, None in memory."""
         return self._store.path
 
-    def component(self, component_id: str) -> ComponentView:
-        """Return a ComponentView filtered to the given component ID."""
-        return ComponentView(
+    def component(self, component_id: str) -> ComponentResults:
+        """Return the results of the given component."""
+        return ComponentResults(
             self._store, _RowFilter(components=frozenset({component_id})), component_id
         )
 
@@ -914,3 +914,23 @@ def _concat_frames(frames: Iterable[pd.DataFrame]) -> pd.DataFrame:
     if not frames:
         return _empty_frame()
     return _with_schema(pd.concat(frames, ignore_index=True))
+
+
+# The former names, kept for one release.
+_DEPRECATED_NAMES = {
+    "ComponentView": ComponentResults,
+    "OutputView": OutputResults,
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DEPRECATED_NAMES:
+        new = _DEPRECATED_NAMES[name]
+        warnings.warn(
+            f"{name} is deprecated and will be removed in a following release; "
+            f"use {new.__name__}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return new
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
