@@ -43,11 +43,11 @@ from gems_craft.expression.expression import (
 )
 from gems_craft.expression.visitor import visit
 from gems_craft.model.port import PortFieldId
+from gems_runner.expression.power import real_power
 from gems_runner.simulation.vectorized_builder import (
     VectorizedBuilderBase,
     VectorizedExpr,
     _linopy_add,
-    _real_power,
 )
 
 
@@ -114,7 +114,7 @@ class VectorizedLinearExprBuilder(VectorizedBuilderBase[VectorizedExpr]):
         base = visit(node.left, self)
         exponent = visit(node.right, self)
         if isinstance(base, xr.DataArray) and isinstance(exponent, xr.DataArray):
-            return _real_power(base, exponent)
+            return real_power(base, exponent)
         raise NotImplementedError(
             "^ is only supported for parameter (DataArray) expressions; "
             "it cannot be used with decision variables in a linear programme."

@@ -31,7 +31,6 @@ from gems_craft.expression.expression import (
     MinNode,
     PortFieldAggregatorNode,
     PortFieldNode,
-    PowerNode,
     ScenarioOperatorNode,
     literal,
     maximum,
@@ -484,16 +483,10 @@ def test_power_of_infinite_parameter_is_infinite(
     assert float(result) == float("inf")
 
 
-def test_power_node_of_variable_to_one_raises(
-    builder: VectorizedLinearExprBuilder,
-) -> None:
-    """Built directly, without the simplification of ``**``."""
-    with pytest.raises(NotImplementedError, match=r"\^"):
-        visit(PowerNode(var("x"), literal(1)), builder)
-
-
 @pytest.mark.parametrize(
-    "exponent", [literal(2), param("p")], ids=["literal", "parameter"]
+    "exponent",
+    [literal(0), literal(1), literal(2), param("p")],
+    ids=["zero", "one", "literal", "parameter"],
 )
 def test_power_of_variable_raises(
     builder: VectorizedLinearExprBuilder, exponent: ExpressionNode

@@ -74,23 +74,10 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         return visit(node.left, self)
 
     def power(self, node: PowerNode) -> int | float:
-        """
-        A constant base gives a constant power; a non-constant base gives a
-        polynomial only for an integer literal exponent of at least 2, the
-        exponents 0 and 1 being simplified when the node is built.
-        """
-        if visit(node.right, self) != 0:
-            return math.inf
-        base_degree = visit(node.left, self)
-        if base_degree == 0:
+        """Constant when both operands are constant; any power of a variable is
+        non-linear, whatever the exponent."""
+        if visit(node.left, self) == 0 and visit(node.right, self) == 0:
             return 0
-        exponent = node.right
-        if (
-            isinstance(exponent, LiteralNode)
-            and exponent.value >= 2
-            and exponent.value.is_integer()
-        ):
-            return base_degree * int(exponent.value)
         return math.inf
 
     def comparison(self, node: ComparisonNode) -> int | float:
