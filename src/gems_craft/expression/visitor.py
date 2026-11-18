@@ -76,8 +76,11 @@ class ExpressionVisitor(ABC, Generic[T]):
     @abstractmethod
     def division(self, node: DivisionNode) -> T: ...
 
-    @abstractmethod
-    def power(self, node: PowerNode) -> T: ...
+    def power(self, node: PowerNode) -> T:
+        """Not abstract, so that visitors written before ``^`` still instantiate."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support the power operator ^."
+        )
 
     @abstractmethod
     def comparison(self, node: ComparisonNode) -> T: ...
@@ -212,7 +215,8 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
 
 class SupportsOperations(Protocol[T]):
     """
-    Defines a type which implements math operations +, -, *, /, **
+    Defines a type which implements math operations +, -, *, /
+    (``**`` is not required: only ``ExpressionVisitorOperations.power`` uses it)
     """
 
     @abstractmethod
@@ -233,10 +237,6 @@ class SupportsOperations(Protocol[T]):
 
     @abstractmethod
     def __truediv__(self, other: T) -> T:
-        pass
-
-    @abstractmethod
-    def __pow__(self, other: T) -> T:
         pass
 
 
@@ -272,4 +272,4 @@ class ExpressionVisitorOperations(ExpressionVisitor[T_op], ABC):
     def power(self, node: PowerNode) -> T_op:
         left_value = visit(node.left, self)
         right_value = visit(node.right, self)
-        return left_value**right_value
+        return left_value**right_value  # type: ignore[operator,no-any-return]

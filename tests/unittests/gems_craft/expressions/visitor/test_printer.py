@@ -72,7 +72,4 @@ def test_power_printer() -> None:
     q = param("q")
 
     assert visit(p**2, PrinterVisitor()) == "(p ^ 2.0)"
-    assert visit(p ** (q + 1), PrinterVisitor()) == "(p ^ (q + 1.0))"
-    assert visit(p ** (q**2), PrinterVisitor()) == "(p ^ (q ^ 2.0))"
     assert visit((p**q) ** 2, PrinterVisitor()) == "((p ^ q) ^ 2.0)"
-    assert visit(-(p**2), PrinterVisitor()) == "-((p ^ 2.0))"

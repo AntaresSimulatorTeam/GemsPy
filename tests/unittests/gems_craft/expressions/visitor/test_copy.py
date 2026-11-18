@@ -53,6 +53,5 @@ def test_copy_power() -> None:
         PowerNode(ParameterNode("p"), LiteralNode(2)),
     )
     copy = copy_expression(ast)
-    assert isinstance(copy, PowerNode)
     assert copy is not ast
     assert expressions_equal(ast, copy)

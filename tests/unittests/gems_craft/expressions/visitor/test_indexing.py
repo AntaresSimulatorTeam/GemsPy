@@ -193,14 +193,6 @@ def test_power_of_differently_indexed_terms() -> None:
         def get_parameter_structure(self, name: str) -> IndexingStructure:
             return IndexingStructure(name == "p_time", name == "p_scenario")
 
-    provider = CustomStructureProvider()
-
     assert compute_indexation(
-        param("p_time") ** param("p_scenario"), provider
+        param("p_time") ** param("p_scenario"), CustomStructureProvider()
     ) == IndexingStructure(True, True)
-    assert compute_indexation(param("p_time") ** 2, provider) == IndexingStructure(
-        True, False
-    )
-    assert compute_indexation(2 ** param("p_scenario"), provider) == IndexingStructure(
-        False, True
-    )

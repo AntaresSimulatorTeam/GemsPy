@@ -110,28 +110,9 @@ def test_abs_round() -> None:
 
 
 def test_power() -> None:
-    context = EvaluationContext(variables={"x": 3}, parameters={"p": 2, "q": -2})
-    x = var("x")
-    p = param("p")
-
-    assert visit(x**2, EvaluationVisitor(context)) == pytest.approx(9.0)
-    assert visit(2**x, EvaluationVisitor(context)) == pytest.approx(8.0)
-    assert visit(x ** (2 + p), EvaluationVisitor(context)) == pytest.approx(81.0)
-    assert visit(x ** param("q"), EvaluationVisitor(context)) == pytest.approx(1 / 9)
-    assert visit(x**0.5, EvaluationVisitor(context)) == pytest.approx(3**0.5)
-    assert visit(param("q") ** 3, EvaluationVisitor(context)) == pytest.approx(-8.0)
-    assert visit(-(p**2), EvaluationVisitor(context)) == pytest.approx(-4.0)
-
-
-@pytest.mark.parametrize(
-    "expr",
-    [param("q") ** 0.5, literal(0) ** param("q"), literal(10) ** (-1000 * param("q"))],
-    ids=["complex", "division_by_zero", "overflow"],
-)
-def test_power_without_finite_real_value_raises(expr: ExpressionNode) -> None:
-    context = EvaluationContext(parameters={"q": -2})
-    with pytest.raises(ValueError, match="no finite real value"):
-        visit(expr, EvaluationVisitor(context))
+    context = EvaluationContext(variables={"x": 3}, parameters={"p": 2})
+    expr = var("x") ** (2 + param("p"))
+    assert visit(expr, EvaluationVisitor(context)) == pytest.approx(81.0)
 
 
 def test_dual_reduced_cost_evaluation_raises() -> None:

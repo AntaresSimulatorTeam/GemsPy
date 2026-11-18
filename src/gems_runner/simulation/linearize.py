@@ -116,8 +116,8 @@ class VectorizedLinearExprBuilder(VectorizedBuilderBase[VectorizedExpr]):
         if isinstance(base, xr.DataArray) and isinstance(exponent, xr.DataArray):
             return real_power(base, exponent)
         raise NotImplementedError(
-            "^ is only supported for parameter (DataArray) expressions; "
-            "it cannot be used with decision variables in a linear programme."
+            "^ only accepts parameters and literals as operands; "
+            "it cannot be applied to decision variables in a linear problem."
         )
 
     # ------------------------------------------------------------------ #

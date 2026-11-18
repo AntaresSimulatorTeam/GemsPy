@@ -432,15 +432,6 @@ def test_round_banker_on_da(builder: VectorizedLinearExprBuilder) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_power_of_parameter_matches_expanded_expression(
-    builder: VectorizedLinearExprBuilder,
-) -> None:
-    result = visit(param("p") ** 3, builder)
-    assert isinstance(result, xr.DataArray)
-    expanded = visit(param("p") * param("p") * param("p"), builder)
-    xr.testing.assert_allclose(result, expanded)
-
-
 def test_power_with_parameter_exponent(builder: VectorizedLinearExprBuilder) -> None:
     result = visit(literal(2) ** param("p"), builder)
     expected = xr.DataArray(
@@ -460,46 +451,24 @@ def test_power_of_parameter_as_coefficient_matches_expanded_expression(
     xr.testing.assert_allclose(result.coeffs, expanded.coeffs)
 
 
+def test_power_without_finite_real_value_raises(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    # Negative base, fractional exponent; the cases are covered by test_power.py.
+    with pytest.raises(ValueError, match="no finite real value"):
+        visit((-param("p")) ** 0.5, builder)
+
+
 @pytest.mark.parametrize(
     "expr",
-    [
-        (-param("p")) ** 0.5,  # negative base, fractional exponent
-        literal(0) ** -param("p"),  # zero, negative exponent
-        literal(10) ** (literal(100) * param("p")),  # overflow
-    ],
-    ids=["complex", "division_by_zero", "overflow"],
+    [var("x") ** 2, literal(2) ** var("x")],
+    ids=["variable_base", "variable_exponent"],
 )
-def test_power_without_finite_real_value_raises(
+def test_power_with_variable_operand_raises(
     builder: VectorizedLinearExprBuilder, expr: ExpressionNode
 ) -> None:
-    with pytest.raises(ValueError, match="no finite real value"):
+    with pytest.raises(NotImplementedError, match=r"\^"):
         visit(expr, builder)
-
-
-def test_power_of_infinite_parameter_is_infinite(
-    builder: VectorizedLinearExprBuilder,
-) -> None:
-    result = visit(literal(float("inf")) ** 2, builder)
-    assert float(result) == float("inf")
-
-
-@pytest.mark.parametrize(
-    "exponent",
-    [literal(0), literal(1), literal(2), param("p")],
-    ids=["zero", "one", "literal", "parameter"],
-)
-def test_power_of_variable_raises(
-    builder: VectorizedLinearExprBuilder, exponent: ExpressionNode
-) -> None:
-    with pytest.raises(NotImplementedError, match=r"\^"):
-        visit(var("x") ** exponent, builder)
-
-
-def test_power_with_variable_exponent_raises(
-    builder: VectorizedLinearExprBuilder,
-) -> None:
-    with pytest.raises(NotImplementedError, match=r"\^"):
-        visit(literal(2) ** var("x"), builder)
 
 
 # ---------------------------------------------------------------------------

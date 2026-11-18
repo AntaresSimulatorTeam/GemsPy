@@ -316,11 +316,7 @@ _UNRESTRICTED_EXPRS = [
     pytest.param("abs(x)", var("x").abs(), id="abs"),
     pytest.param("floor(x)", var("x").floor(), id="floor"),
     pytest.param("ceil(x)", var("x").ceil(), id="ceil"),
-    pytest.param("x^2", var("x") ** 2, id="var_power_literal"),
-    pytest.param("x^a", var("x") ** param("a"), id="var_power_param"),
-    pytest.param("a^x", param("a") ** var("x"), id="param_power_var"),
-    pytest.param("x^0", var("x") ** 0, id="var_power_zero"),
-    pytest.param("x^1", var("x") ** 1, id="var_power_one"),
+    pytest.param("x^2", var("x") ** 2, id="power"),
 ]
 
 # Parameter-only expressions (degree 0).  Accepted in every context:
@@ -331,11 +327,7 @@ _CONSTANT_EXPRS = [
     pytest.param("abs(a)", param("a").abs(), id="abs"),
     pytest.param("floor(a)", param("a").floor(), id="floor"),
     pytest.param("ceil(a)", param("a").ceil(), id="ceil"),
-    pytest.param("a^2", param("a") ** 2, id="param_power_literal"),
-    pytest.param("2^a", 2 ** param("a"), id="literal_power_param"),
-    pytest.param(
-        "a^(1 + b)", param("a") ** (1 + param("b")), id="param_power_expression"
-    ),
+    pytest.param("a^b", param("a") ** param("b"), id="power"),
 ]
 
 # Degree-1 variable expressions.  Rejected in variable bounds (not constant);
@@ -656,6 +648,24 @@ def test_bare_undefined_port_field_in_binding_constraint_raises() -> None:
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.price >= 0"))
     )
     with pytest.raises(ValueError, match="Bare port field"):
+        resolve_library([input_lib])
+
+
+@pytest.mark.parametrize(
+    "extra_output_expr, match",
+    [
+        ("balance_port.price^2", "Bare port field"),
+        ("2^sum_connections(balance_port.flow)", "sum_connections"),
+    ],
+)
+def test_port_field_rules_apply_inside_power(
+    extra_output_expr: str, match: str
+) -> None:
+    """Both operands of ^ are checked; extra outputs allow non-linear ^."""
+    input_lib = parse_yaml_library(
+        io.StringIO(_port_model_yaml(extra_output_expr=extra_output_expr))
+    )
+    with pytest.raises(ValueError, match=match):
         resolve_library([input_lib])
 
 

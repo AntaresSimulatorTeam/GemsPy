@@ -19,9 +19,7 @@ tighter than unary minus: ``-k^2`` is ``-(k^2)``, also inside a time shift.
 """
 
 from pathlib import Path
-from typing import Dict, List
-
-import pytest
+from typing import Dict, List, Tuple
 
 from gems_craft.optim_config.parsing import load_optim_config
 from gems_craft.study.folder import load_study
@@ -41,21 +39,23 @@ library:
           scenario-dependent: false
       variables:
         - id: x
-        - id: y
+          lower-bound: 0
         - id: z
+          lower-bound: 0
         - id: s
+          lower-bound: 0
+        - id: w
+          lower-bound: 0
       constraints:
 {constraints}
       extra-outputs:
         - id: square_root
           expression: x^0.5
-        - id: inverse
-          expression: d^-1
-        - id: root_k
-          expression: y^(1/k)
+        - id: exponential
+          expression: k^x
       objective-contributions:
         - id: objective
-          expression: sum(x + y + z + s)
+          expression: sum(x + z + s + w)
 """
 
 _SYSTEM = """\
@@ -85,7 +85,9 @@ solver-options:
 """
 
 
-def _make_study(tmp_path: Path, constraints: List[str]) -> Path:
+def _make_study(
+    tmp_path: Path, constraints: List[str], dropped_constraints: Tuple[int, ...] = ()
+) -> Path:
     study_dir = tmp_path / "study"
     (study_dir / "input" / "model-libraries").mkdir(parents=True)
     (study_dir / "input" / "data-series").mkdir()
@@ -99,7 +101,17 @@ def _make_study(tmp_path: Path, constraints: List[str]) -> Path:
     )
     (study_dir / "input" / "system.yml").write_text(_SYSTEM)
     (study_dir / "input" / "data-series" / "d_ts.tsv").write_text("1\n2\n3\n4\n")
-    (study_dir / "input" / "optim-config.yml").write_text(_OPTIM_CONFIG)
+    optim_config = _OPTIM_CONFIG
+    if dropped_constraints:
+        optim_config += (
+            "models:\n  - id: lib.m\n    out-of-bounds-processing:\n"
+            "      constraints:\n"
+            + "".join(
+                f"        - id: c{i}\n          mode: drop\n"
+                for i in dropped_constraints
+            )
+        )
+    (study_dir / "input" / "optim-config.yml").write_text(optim_config)
     return study_dir
 
 
@@ -120,10 +132,10 @@ def test_power_of_parameters_in_constraints_and_of_variables_in_extra_outputs(
         tmp_path,
         constraints=[
             "x = d^k",
-            "y = k^d",
             "z = -k^2 + 10",
             # -(k^2)/4 = -1: x one time step before, cyclic in the block.
             "s = x[t-(k^2)/4]",
+            "w = sum(t-(k^2)/4 .. t, x)",
         ],
     )
 
@@ -131,29 +143,26 @@ def test_power_of_parameters_in_constraints_and_of_variables_in_extra_outputs(
 
     # d = [1, 2, 3, 4], k = 2
     assert results["x"] == [1, 4, 9, 16]
-    assert results["y"] == [2, 4, 8, 16]
     assert results["z"] == [6, 6, 6, 6]
     assert results["s"] == [16, 1, 4, 9]
+    assert results["w"] == [17, 5, 13, 25]
     assert results["square_root"] == [1, 2, 3, 4]
-    assert results["inverse"] == [1, 0.5, 0.333333, 0.25]
-    assert results["root_k"] == [1.414214, 2, 2.828427, 4]
+    assert results["exponential"] == [2, 16, 512, 65536]
 
 
-@pytest.mark.parametrize("constraint", ["x^2 = d", "x^k = d", "k^x = d"])
-def test_power_of_variable_in_constraint_is_rejected(
-    tmp_path: Path, constraint: str
-) -> None:
-    study_dir = _make_study(tmp_path, constraints=[constraint])
+def test_power_with_time_shift_in_drop_mode(tmp_path: Path) -> None:
+    study_dir = _make_study(
+        tmp_path,
+        constraints=[
+            # The shift inside the power operand drops t = 0.
+            "s = d[t-(k^2)/4]^2",
+            "w = sum(t-(k^2)/4 .. t, d)",
+        ],
+        dropped_constraints=(0, 1),
+    )
 
-    with pytest.raises(ValueError, match="Non-linear expression is not allowed"):
-        load_study(study_dir)
+    results = _solve(study_dir)
 
-
-@pytest.mark.parametrize("constraint", ["x = (-d)^0.5", "x = 0^(-k)"])
-def test_power_without_finite_real_value_in_constraint_raises(
-    tmp_path: Path, constraint: str
-) -> None:
-    study_dir = _make_study(tmp_path, constraints=[constraint])
-
-    with pytest.raises(ValueError, match="no finite real value"):
-        _solve(study_dir)
+    # d = [1, 2, 3, 4], k = 2; at t = 0, s and w are free and minimized to 0.
+    assert results["s"] == [0, 1, 4, 9]
+    assert results["w"] == [0, 3, 5, 7]

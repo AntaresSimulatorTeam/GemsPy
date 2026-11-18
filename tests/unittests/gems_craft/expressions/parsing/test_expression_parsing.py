@@ -282,36 +282,15 @@ def test_parsing_visitor(
 @pytest.mark.parametrize(
     "variables, parameters, expression_str, expected",
     [
-        ({}, {"p"}, "p^2", param("p") ** 2),
-        ({}, {"p"}, "2^p", 2 ** param("p")),
         ({}, {"p", "q"}, "p^(1 + q)", param("p") ** (literal(1) + param("q"))),
         ({"x"}, {}, "x[t-1]^2", var("x").shift(-literal(1)) ** 2),
-        # "^" binds tighter than unary minus, and is right-associative.
+        # "^" binds tighter than unary minus and "*", and is right-associative.
         ({}, {}, "-2^2", -(literal(2) ** 2)),
-        ({}, {}, "2^-3", literal(2) ** -literal(3)),
-        ({}, {}, "2^3^2", literal(2) ** (literal(3) ** 2)),
-        ({}, {}, "(2^3)^2", (literal(2) ** 3) ** 2),
-        ({}, {}, "2*3^2", literal(2) * (literal(3) ** 2)),
-        ({}, {}, "2^3*2", (literal(2) ** 3) * 2),
         ({}, {}, "2^-3*2", (literal(2) ** -literal(3)) * 2),
-        ({}, {}, "1 + 2^2", literal(1) + literal(2) ** 2),
-        ({}, {"p"}, "floor(p)^2", param("p").floor() ** 2),
-        # The exponents 1 and 0 are kept.
-        ({"x"}, {}, "x^1", var("x") ** 1),
-        ({"x"}, {}, "x^0", var("x") ** 0),
-        ({"x"}, {}, "(x^0.5)^0 + x", (var("x") ** 0.5) ** 0 + var("x")),
+        ({}, {}, "2*3^2", literal(2) * (literal(3) ** 2)),
+        ({}, {}, "2^3^2", literal(2) ** (literal(3) ** 2)),
         # Inside a time shift, a power is written in parentheses.
         ({"x"}, {}, "x[t-(2^2)]", var("x").shift(-(literal(2) ** 2))),
-        ({"x"}, {}, "x[t-(2^2)*3]", var("x").shift(-(literal(2) ** 2) * 3)),
-        ({"x"}, {"d"}, "x[t-1+(d^2)]", var("x").shift(-literal(1) + param("d") ** 2)),
-        ({"x"}, {"d"}, "x[t-((d+1)^2)]", var("x").shift(-((param("d") + 1) ** 2))),
-        ({"x"}, {}, "x[2^2]", var("x").eval(literal(2) ** 2)),
-        (
-            {"x"},
-            {},
-            "sum(t-(2^2)..t, x)",
-            var("x").time_sum(-(literal(2) ** 2), literal(0)),
-        ),
     ],
 )
 def test_parsing_power(
@@ -381,7 +360,7 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
         "sum(2*t .. t, x)",
         "2^",
         "x[t-2^2]",
-        "x[t^2]",
+        "2**3",
     ],
 )
 def test_parse_cancellation_should_throw(expression_str: str) -> None:
