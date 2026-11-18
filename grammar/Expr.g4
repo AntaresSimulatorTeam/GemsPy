@@ -68,21 +68,14 @@ shift: TIME shift_expr?;
 shift_expr
     : shift_expr op=('*' | '/') right_expr     # shiftMuldiv
     | shift_expr op=('+' | '-') right_expr     # shiftAddsub
-    | op=('+' | '-') shift_operand             # signedOperand
+    | op=('+' | '-') atom                      # signedAtom
+    | op=('+' | '-') '(' expr ')'              # signedExpression
     ;
 
 right_expr
     : right_expr op=('/' | '*') right_expr     # rightMuldiv
-    | shift_operand                            # rightOperand
-    ;
-
-shift_operand
-    : shift_primary ('^' shift_operand)?
-    ;
-
-shift_primary
-    : atom                                     # shiftAtom
-    | '(' expr ')'                             # shiftExpression
+    | '(' expr ')'                             # rightExpression
+    | atom                                     # rightAtom
     ;
 
 

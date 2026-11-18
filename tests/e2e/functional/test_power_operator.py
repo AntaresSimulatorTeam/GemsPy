@@ -122,8 +122,8 @@ def test_power_of_parameters_in_constraints_and_of_variables_in_extra_outputs(
             "x = d^k",
             "y = k^d",
             "z = -k^2 + 10",
-            # -k^2/4 = -(k^2)/4 = -1: x one time step before, cyclic in the block.
-            "s = x[t-k^2/4]",
+            # -(k^2)/4 = -1: x one time step before, cyclic in the block.
+            "s = x[t-(k^2)/4]",
         ],
     )
 

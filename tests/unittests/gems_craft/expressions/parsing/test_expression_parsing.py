@@ -300,17 +300,16 @@ def test_parsing_visitor(
         ({"x"}, {}, "x^1", var("x") ** 1),
         ({"x"}, {}, "x^0", var("x") ** 0),
         ({"x"}, {}, "(x^0.5)^0 + x", (var("x") ** 0.5) ** 0 + var("x")),
-        # The same precedence holds inside a time shift.
-        ({"x"}, {}, "x[t-2^2]", var("x").shift(-(literal(2) ** 2))),
-        ({"x"}, {}, "x[t-2^2*3]", var("x").shift(-(literal(2) ** 2) * 3)),
-        ({"x"}, {}, "x[t+2*3^2]", var("x").shift(literal(2) * (literal(3) ** 2))),
-        ({"x"}, {}, "x[t+2^3^2]", var("x").shift(literal(2) ** (literal(3) ** 2))),
-        ({"x"}, {"d"}, "x[t-1+d^2]", var("x").shift(-literal(1) + param("d") ** 2)),
-        ({"x"}, {"d"}, "x[t-(d+1)^2]", var("x").shift(-((param("d") + 1) ** 2))),
+        # Inside a time shift, a power is written in parentheses.
+        ({"x"}, {}, "x[t-(2^2)]", var("x").shift(-(literal(2) ** 2))),
+        ({"x"}, {}, "x[t-(2^2)*3]", var("x").shift(-(literal(2) ** 2) * 3)),
+        ({"x"}, {"d"}, "x[t-1+(d^2)]", var("x").shift(-literal(1) + param("d") ** 2)),
+        ({"x"}, {"d"}, "x[t-((d+1)^2)]", var("x").shift(-((param("d") + 1) ** 2))),
+        ({"x"}, {}, "x[2^2]", var("x").eval(literal(2) ** 2)),
         (
             {"x"},
             {},
-            "sum(t-2^2..t, x)",
+            "sum(t-(2^2)..t, x)",
             var("x").time_sum(-(literal(2) ** 2), literal(0)),
         ),
     ],
@@ -381,7 +380,7 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
         "x[t 4]",
         "sum(2*t .. t, x)",
         "2^",
-        "x[t+2^-1]",
+        "x[t-2^2]",
         "x[t^2]",
     ],
 )

@@ -8,8 +8,8 @@ All notable changes to GemsPy are documented here.
 - **Power operator `^`** - `p^2`, `2^p`, `p^(1 + q)` in any expression of a
   model library; `^` was a parse error before. It
   binds tighter than `*`, `/` and unary minus (`-2^2` is `-(2^2) = -4`), and
-  is right-associative (`2^3^2` is `2^(3^2)`), also inside time shifts
-  (`x[t-2^2]` is `x[t-4]`).
+  is right-associative (`2^3^2` is `2^(3^2)`). Inside a time shift, a power
+  is written in parentheses (`x[t-(2^2)]` is `x[t-4]`).
   In constraints, bounds and objectives, its operands can only be parameters
   and literals; in extra outputs, variables are allowed. In the Python API,
   `param("p") ** 2` builds the new `PowerNode`.
