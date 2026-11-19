@@ -180,7 +180,7 @@ def build_port_arrays(
     - If *model* defines the field (master): evaluate the definition with
       ``make_builder(model.id, model)``.
     - Otherwise (slave): sum contributions from connected master components
-      via incidence matrices.
+      (see :func:`_build_slave_port_array`).
 
     Parameters
     ----------
@@ -234,7 +234,6 @@ def build_port_arrays(
 def _sparse_gather(
     expr_master: Any,
     conn_list: List[Tuple[int, Component]],
-    master_comp_ids: List[str],
     comp_ids: List[str],
 ) -> Any:
     """Return ``out[i] = sum of expr_master[j]`` over the connections (i, j).
@@ -242,8 +241,11 @@ def _sparse_gather(
     Equivalent to a dense ``(A * expr_master).sum("component_master")`` but
     gathers only as many ranks as the max number of masters per slave,
     instead of one per master component, in a single vectorized ``isel``.
+    Masters are located by id in *expr_master*'s ``component_master`` index.
     """
-    master_index = {cid: j for j, cid in enumerate(master_comp_ids)}
+    master_index = {
+        cid: j for j, cid in enumerate(expr_master.indexes["component_master"])
+    }
     by_slave: Dict[int, List[int]] = defaultdict(list)
     for i, master_comp in conn_list:
         by_slave[i].append(master_index[master_comp.id])
@@ -359,9 +361,7 @@ def _build_slave_port_array(
             # broadcast it so that each connection contributes it once.
             expr_master = expr_master.expand_dims(component=master_comp_ids)  # type: ignore[union-attr]
         expr_master_r = expr_master.rename({"component": "component_master"})  # type: ignore[union-attr]
-        contribution = _sparse_gather(
-            expr_master_r, conn_list, master_comp_ids, comp_ids
-        )
+        contribution = _sparse_gather(expr_master_r, conn_list, comp_ids)
 
         if isinstance(contribution, xr.DataArray):
             constant = contribution if constant is None else constant + contribution

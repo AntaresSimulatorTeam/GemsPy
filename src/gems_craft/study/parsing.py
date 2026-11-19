@@ -16,14 +16,10 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
 
-import yaml
 from pydantic import Field, ValidationError, model_validator
 from yaml import safe_dump
 
-from gems_craft.utils import ModifiedBaseModel
-
-# libyaml-backed loader (~4x faster), falling back to pure Python if unavailable.
-_SafeLoader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+from gems_craft.utils import ModifiedBaseModel, load_yaml
 
 
 class PortConnectionsSchema(ModifiedBaseModel):
@@ -108,7 +104,7 @@ def load_input_system(
 ) -> SystemSchema:
     try:
         with input_study.open() as f:
-            return schema.model_validate(yaml.load(f, Loader=_SafeLoader))
+            return schema.model_validate(load_yaml(f))
     except ValidationError as e:
         raise ValueError(f"An error occurred during parsing: {e}")
 
@@ -120,7 +116,7 @@ def parse_yaml_system(input_study: TextIO, schema: Type[_S]) -> _S: ...
 def parse_yaml_system(
     input_study: TextIO, schema: Type[SystemSchema] = SystemSchema
 ) -> SystemSchema:
-    tree = yaml.load(input_study, Loader=_SafeLoader)
+    tree = load_yaml(input_study)
     return schema.model_validate(tree["system"])
 
 

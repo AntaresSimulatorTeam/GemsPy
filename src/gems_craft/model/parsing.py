@@ -15,9 +15,9 @@ from pathlib import Path
 from typing import List, Optional
 
 from pydantic import ConfigDict, Field, ValidationError
-from yaml import safe_dump, safe_load
+from yaml import safe_dump
 
-from gems_craft.utils import ModifiedBaseModel
+from gems_craft.utils import ModifiedBaseModel, load_yaml
 
 
 class ParameterSchema(ModifiedBaseModel):
@@ -134,7 +134,7 @@ class LibrarySchema(ModifiedBaseModel):
 
 
 def parse_yaml_library(input: typing.TextIO) -> LibrarySchema:
-    tree = safe_load(input)
+    tree = load_yaml(input)
     try:
         return LibrarySchema.model_validate(tree["library"])
     except ValidationError as e:

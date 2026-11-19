@@ -14,10 +14,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
-import yaml
 from pydantic import Field
 
-from gems_craft.utils import ModifiedBaseModel
+from gems_craft.utils import ModifiedBaseModel, load_yaml
 
 
 class TaxonomyItem(ModifiedBaseModel):
@@ -52,7 +51,7 @@ class Taxonomy:
 
 def load_taxonomy(taxonomy_file: Path) -> Taxonomy:
     with open(taxonomy_file, encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
+        raw = load_yaml(f)
     if "taxonomy" not in raw:
         raise ValueError(f"Missing 'taxonomy' key at root of {taxonomy_file}")
     data = TaxonomySchema.model_validate(raw["taxonomy"])
