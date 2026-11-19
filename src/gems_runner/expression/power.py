@@ -25,17 +25,9 @@ def real_power(base: xr.DataArray, exponent: xr.DataArray) -> xr.DataArray: ...
 
 
 def real_power(base: Any, exponent: Any) -> Any:
-    """``base ^ exponent``, for scalars or arrays, raising where it has no finite
-    real value although both operands are finite: a negative base with a
-    fractional exponent, zero with a negative exponent, or an overflow.
+    """``base ^ exponent``, for scalars or arrays. Like ``/``, it never raises:
+    a negative base with a fractional exponent gives ``nan``, zero with a
+    negative exponent or an overflow gives ``inf``, cell by cell.
     """
     with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
-        result = np.float_power(base, exponent)
-    undefined = ~np.isfinite(result) & np.isfinite(base) & np.isfinite(exponent)
-    if undefined.any():
-        raise ValueError(
-            "^ has no finite real value for some values of its operands: "
-            "a negative base with a fractional exponent, zero with a negative "
-            "exponent, or an overflow."
-        )
-    return result
+        return np.float_power(base, exponent)

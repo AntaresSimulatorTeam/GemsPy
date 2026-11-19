@@ -12,9 +12,9 @@ All notable changes to GemsPy are documented here.
   (`x[t-(2^2)]` is `x[t-4]`). In constraints, bounds and objectives, its
   operands can only be parameters and literals: any power of a variable is
   rejected as non-linear, even `x^1` and `x^0`. In extra outputs, variables
-  are allowed. In the Python API, `param("p") ** 2` builds the new `PowerNode`;
-  `ExpressionVisitor.power` is not abstract, so a custom visitor that does not
-  implement it still instantiates and raises `NotImplementedError` on `^`.
+  are allowed. Like `/`, `^` never raises on values: a negative base with a
+  fractional exponent gives `nan`, zero with a negative exponent gives `inf`,
+  cell by cell. In the Python API, `param("p") ** 2` builds the new `PowerNode`.
 
 ### Changed
 - `ComponentView` and `OutputView` are renamed `ComponentResults` and
@@ -22,6 +22,8 @@ All notable changes to GemsPy are documented here.
   `component(...).output(...)`, `value()` and `data` are unchanged.
 - **Breaking** - In optim-config `heuristics`, every `inputs`/`outputs` entry
   must now set `type`; it no longer defaults to `parameter`.
+- **Breaking** - `ExpressionVisitor.power` is abstract: a custom visitor must
+  implement it to be instantiated.
 
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.

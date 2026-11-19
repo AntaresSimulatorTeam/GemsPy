@@ -34,13 +34,13 @@ def test_real_power(base: float, exponent: float, expected: float) -> None:
 
 
 @pytest.mark.parametrize(
-    "base, exponent",
-    [(-2.0, 0.5), (0.0, -1.0), (10.0, 1000.0)],
+    "base, exponent, expected",
+    [(-2.0, 0.5, math.nan), (0.0, -1.0, math.inf), (10.0, 1000.0, math.inf)],
     ids=["complex", "division_by_zero", "overflow"],
 )
-def test_real_power_without_finite_real_value_raises(
-    base: float, exponent: float
+def test_real_power_without_finite_real_value_is_nan_or_inf_per_cell(
+    base: float, exponent: float, expected: float
 ) -> None:
-    # A single undefined element of an array is enough.
-    with pytest.raises(ValueError, match="no finite real value"):
-        real_power(xr.DataArray([4.0, base]), xr.DataArray([2.0, exponent]))
+    # Like `/`: only the undefined cell is affected, nothing raises.
+    result = real_power(xr.DataArray([4.0, base]), xr.DataArray([2.0, exponent]))
+    xr.testing.assert_equal(result, xr.DataArray([16.0, expected]))

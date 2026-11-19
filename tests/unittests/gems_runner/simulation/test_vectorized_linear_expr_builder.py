@@ -451,12 +451,12 @@ def test_power_of_parameter_as_coefficient_matches_expanded_expression(
     xr.testing.assert_allclose(result.coeffs, expanded.coeffs)
 
 
-def test_power_without_finite_real_value_raises(
+def test_power_without_finite_real_value_is_nan(
     builder: VectorizedLinearExprBuilder,
 ) -> None:
-    # Negative base, fractional exponent; the cases are covered by test_power.py.
-    with pytest.raises(ValueError, match="no finite real value"):
-        visit((-param("p")) ** 0.5, builder)
+    # Negative base, fractional exponent: nan per cell, like `/` gives inf.
+    result = visit((-param("p")) ** 0.5, builder)
+    assert bool(result.isnull().all())
 
 
 @pytest.mark.parametrize(
