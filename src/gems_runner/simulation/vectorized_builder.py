@@ -32,6 +32,7 @@ behaviour (operand-swap in addition, type guards in nonlinear functions).
 """
 
 import functools
+import math
 from abc import abstractmethod
 from dataclasses import dataclass, replace
 from typing import Any, Dict, FrozenSet, Generic, Optional, Tuple, TypeVar, Union
@@ -503,8 +504,12 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
                 "values (NaN)."
             )
         rounded = np.round(values)
-        # A tolerance absorbs rounding errors, e.g. d / 3 * 3.
-        wrong = values[~np.isclose(values, rounded, rtol=0.0, atol=_INTEGER_TOLERANCE)]
+        # A tolerance absorbs rounding errors, e.g. d / 3 * 3. An infinite value
+        # (e.g. 1 / 0) is not an integer, although isclose(inf, inf) is true.
+        wrong = values[
+            ~np.isfinite(values)
+            | ~np.isclose(values, rounded, rtol=0.0, atol=_INTEGER_TOLERANCE)
+        ]
         if wrong.size:
             raise ValueError(
                 f"{what} '{print_expr(node)}' in model '{self.model_id}' must take "
@@ -519,7 +524,11 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         value = visit(node, visitor)
         if isinstance(value, int):
             return value
-        if isinstance(value, float) and abs(value - round(value)) <= _INTEGER_TOLERANCE:
+        if (
+            isinstance(value, float)
+            and math.isfinite(value)  # round() raises on nan and inf
+            and abs(value - round(value)) <= _INTEGER_TOLERANCE
+        ):
             return int(round(value))
         raise ValueError(
             f"Expected an integer constant expression, got {value!r} from "

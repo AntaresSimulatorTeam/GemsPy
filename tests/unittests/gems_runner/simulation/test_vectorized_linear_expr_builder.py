@@ -881,6 +881,19 @@ def test_eval_int_from_non_integer_float_raises() -> None:
         VectorizedBuilderBase._eval_int(literal(3.5))
 
 
+@pytest.mark.parametrize(
+    "node",
+    [
+        literal(-8) ** (literal(1) / 3),  # nan
+        literal(0) ** -literal(1),  # inf
+        literal(10) ** 400,  # overflow: inf
+    ],
+)
+def test_eval_int_from_non_finite_float_raises(node: ExpressionNode) -> None:
+    with pytest.raises(ValueError, match="Expected an integer constant expression"):
+        VectorizedBuilderBase._eval_int(node)
+
+
 # ---------------------------------------------------------------------------
 # Time index that depends on the data
 # ---------------------------------------------------------------------------
@@ -1003,6 +1016,7 @@ def test_time_shift_tolerates_rounding_errors(
     [
         (list(np.arange(100) + 0.5), r"got 0\.5, 1\.5, 2\.5, 3\.5, 4\.5, \.\.\.\.$"),
         ([1.0, np.nan], "missing values"),
+        ([1.0, np.inf], r"integer values, got inf\.$"),
     ],
 )
 def test_invalid_time_shift_raises(
