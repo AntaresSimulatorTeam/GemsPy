@@ -120,7 +120,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 
 ### Key Design Patterns
 
-- **Visitor pattern** for all expression tree operations (`ExpressionVisitor` subclasses). Use `ExpressionVisitorOperations` as a base when the return type supports `+, -, *, /, **` — it provides those five method implementations (`power` included) for free.
+- **Visitor pattern** for all expression tree operations (`ExpressionVisitor` subclasses). Use `ExpressionVisitorOperations` as a base when the return type supports `+, -, *, /` — it provides those four method implementations for free. `power` is not among them: numeric visitors implement it with `gems_runner.expression.power.real_power`.
 - **Template-method via single abstract method**: `VectorizedBuilderBase` implements all 18+ visitor methods once with `xr.DataArray`-compatible semantics; concrete subclasses only override `variable()` (and optionally a few linopy-specific methods).
 - **Indexing dimensions**: parameters and variables carry time and scenario indices explicitly via `IndexingStructure`; expressions track these automatically.
 
