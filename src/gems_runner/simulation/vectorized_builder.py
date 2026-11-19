@@ -60,6 +60,7 @@ from gems_craft.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RelativeTimeNode,
     RoundNode,
@@ -77,6 +78,7 @@ from gems_craft.expression.visitor import (
 )
 from gems_craft.model.port import PortFieldId
 from gems_runner.expression.evaluate import EvaluationContext, EvaluationVisitor
+from gems_runner.expression.power import real_power
 
 # ---------------------------------------------------------------------------
 # Public types
@@ -93,7 +95,7 @@ T_expr = TypeVar("T_expr", bound=VectorizedExpr)
 
 
 # ---------------------------------------------------------------------------
-# Module-level helper — also used by optimization.py
+# Module-level helpers — also used by optimization.py and linearize.py
 # ---------------------------------------------------------------------------
 
 
@@ -197,6 +199,14 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         left = visit(node.left, self)
         right = visit(node.right, self)
         return left / right  # type: ignore[operator,return-value]
+
+    def power(self, node: PowerNode) -> VectorizedExpr:
+        """DataArray default; overridden in
+        :class:`~gems_runner.simulation.linearize.VectorizedLinearExprBuilder`
+        to raise when an operand contains linopy types."""
+        left = visit(node.left, self)
+        right = visit(node.right, self)
+        return real_power(left, right)  # type: ignore[arg-type]
 
     def comparison(self, node: ComparisonNode) -> VectorizedExpr:
         raise NotImplementedError(
@@ -681,6 +691,9 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return _and_mask(visit(node.left, self), visit(node.right, self))
 
     def division(self, node: DivisionNode) -> Optional[xr.DataArray]:
+        return _and_mask(visit(node.left, self), visit(node.right, self))
+
+    def power(self, node: PowerNode) -> Optional[xr.DataArray]:
         return _and_mask(visit(node.left, self), visit(node.right, self))
 
     def comparison(self, node: ComparisonNode) -> Optional[xr.DataArray]:

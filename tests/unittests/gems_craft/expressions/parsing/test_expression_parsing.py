@@ -297,6 +297,44 @@ def test_parsing_visitor(
 
 
 @pytest.mark.parametrize(
+    "variables, parameters, expression_str, expected",
+    [
+        ({}, {"p", "q"}, "p^(1 + q)", param("p") ** (literal(1) + param("q"))),
+        ({"x"}, {}, "x[t-1]^2", var("x").shift(-literal(1)) ** 2),
+        # "^" binds tighter than unary minus and "*", and is right-associative.
+        ({}, {}, "-2^2", -(literal(2) ** 2)),
+        ({}, {}, "2^-3*2", (literal(2) ** -literal(3)) * 2),
+        ({}, {}, "2*3^2", literal(2) * (literal(3) ** 2)),
+        ({}, {}, "2^3^2", literal(2) ** (literal(3) ** 2)),
+        # Same precedence in time shifts, time indices and time sum bounds.
+        ({"x"}, {}, "x[t-(2^2)]", var("x").shift(-(literal(2) ** 2))),
+        ({"x"}, {}, "x[t-2^2]", var("x").shift(-(literal(2) ** 2))),
+        ({"x"}, {}, "x[t-2^3*2]", var("x").shift(-((literal(2) ** 3) * 2))),
+        ({"x"}, {}, "x[2^3^2]", var("x").eval(literal(2) ** (literal(3) ** 2))),
+        ({"x"}, {}, "x[-2^2]", var("x").eval(-(literal(2) ** 2))),
+        ({"x"}, {}, "x[2^(-1)]", var("x").eval(literal(2) ** -literal(1))),
+        (
+            {"x"},
+            {"p"},
+            "sum(t-p^2 .. t, x)",
+            var("x").time_sum_between(
+                relative_time(-(param("p") ** 2)), relative_time(literal(0))
+            ),
+        ),
+    ],
+)
+def test_parsing_power(
+    variables: Set[str],
+    parameters: Set[str],
+    expression_str: str,
+    expected: ExpressionNode,
+) -> None:
+    identifiers = ModelIdentifiers(variables, parameters)
+    expr = parse_expression(expression_str, identifiers)
+    assert expressions_equal(expr, expected), print_expr(expr)
+
+
+@pytest.mark.parametrize(
     "variables, parameters, constraints, expression_str, expected",
     [
         (set(), set(), {"balance"}, "dual(balance)", DualNode("balance")),
@@ -361,6 +399,9 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
         "x.f <= 0",
         "x[t + sum_connections(p.f)]",
         "x[t + (p + 1)[t-1]]",
+        "2^",
+        "2**3",
+        "x[2^-1]",
     ],
 )
 def test_parse_cancellation_should_throw(expression_str: str) -> None:

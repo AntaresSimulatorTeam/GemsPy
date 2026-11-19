@@ -25,6 +25,7 @@ import xarray as xr
 
 from gems_craft.expression.expression import (
     AllTimeSumNode,
+    ExpressionNode,
     LiteralNode,
     MaxNode,
     MinNode,
@@ -424,6 +425,50 @@ def test_round_banker_on_da(builder: VectorizedLinearExprBuilder) -> None:
     # Banker's rounding: 2.5 -> 2, 3.5 -> 4.
     assert float(visit(literal(2.5).round(), builder)) == pytest.approx(2.0)
     assert float(visit(literal(3.5).round(), builder)) == pytest.approx(4.0)
+
+
+# ---------------------------------------------------------------------------
+# 9b. power — linopy guard
+# ---------------------------------------------------------------------------
+
+
+def test_power_with_parameter_exponent(builder: VectorizedLinearExprBuilder) -> None:
+    result = visit(literal(2) ** param("p"), builder)
+    expected = xr.DataArray(
+        [[2.0, 4.0, 8.0], [16.0, 32.0, 64.0]],
+        dims=["component", "time"],
+        coords={"component": ["c1", "c2"], "time": [0, 1, 2]},
+    )
+    xr.testing.assert_allclose(result, expected)
+
+
+def test_power_of_parameter_as_coefficient_matches_expanded_expression(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    result = visit(param("p") ** 2 * var("x"), builder)
+    expanded = visit(param("p") * param("p") * var("x"), builder)
+    assert isinstance(result, linopy.LinearExpression)
+    xr.testing.assert_allclose(result.coeffs, expanded.coeffs)
+
+
+def test_power_without_finite_real_value_is_nan(
+    builder: VectorizedLinearExprBuilder,
+) -> None:
+    # Negative base, fractional exponent: nan per cell, like `/` gives inf.
+    result = visit((-param("p")) ** 0.5, builder)
+    assert bool(result.isnull().all())
+
+
+@pytest.mark.parametrize(
+    "expr",
+    [var("x") ** 2, literal(2) ** var("x")],
+    ids=["variable_base", "variable_exponent"],
+)
+def test_power_with_variable_operand_raises(
+    builder: VectorizedLinearExprBuilder, expr: ExpressionNode
+) -> None:
+    with pytest.raises(NotImplementedError, match=r"\^"):
+        visit(expr, builder)
 
 
 # ---------------------------------------------------------------------------

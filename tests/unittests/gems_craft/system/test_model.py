@@ -202,6 +202,7 @@ def test_instantiating_a_model_with_non_linear_scenario_operator_in_the_objectiv
         var("x") <= 0,
         port_field("p", "f"),
         port_field("p", "f").sum_connections(),
+        var("x") ** port_field("p", "f"),
     ],
 )
 def test_invalid_port_field_definition_should_raise(expression: ExpressionNode) -> None:

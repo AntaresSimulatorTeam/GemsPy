@@ -64,8 +64,10 @@ models:
             type: variable-upper-bound
           - heuristic-element: min_up_duration
             id: min_up_duration
+            type: parameter
           - heuristic-element: min_down_duration
             id: min_down_duration
+            type: parameter
         outputs:
           - heuristic-element: minimum_num_units_on
             id: num_units_on
@@ -438,15 +440,15 @@ variables via `models[].heuristics`:
 Each `inputs`/`outputs` entry binds a fixed `heuristic-element` name (see
 table below) to one of the model's own parameter/variable ids:
 
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `heuristic-element` | str | — | Fixed name the heuristic function expects |
-| `id` | str | — | The model's own parameter or variable id |
-| `type` | str | `parameter` | How the element is read/written |
+| Key | Type | Description |
+|---|---|---|
+| `heuristic-element` | str | Fixed name the heuristic function expects |
+| `id` | str | The model's own parameter or variable id |
+| `type` | str | How the element is read/written |
 
 | `type` | Meaning |
 |---|---|
-| `parameter` (default) | Read the model's parameter value (inputs only) |
+| `parameter` | Read the model's parameter value (inputs only) |
 | `variable-solution` | Read the variable's solved value from the first solve (inputs only) |
 | `variable-lower-bound` | Read/write the variable's lower bound |
 | `variable-upper-bound` | Read/write the variable's upper bound |
@@ -467,8 +469,10 @@ models:
             type: variable-upper-bound
           - heuristic-element: min_up_duration
             id: min_up_duration
+            type: parameter
           - heuristic-element: min_down_duration
             id: min_down_duration
+            type: parameter
         outputs:
           - heuristic-element: minimum_num_units_on
             id: num_units_on

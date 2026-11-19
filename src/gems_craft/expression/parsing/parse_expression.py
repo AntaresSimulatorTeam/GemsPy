@@ -102,6 +102,12 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             return left - right
         raise ValueError(f"Invalid operator {op}")
 
+    # Visit a parse tree produced by ExprParser#power.
+    def visitPower(self, ctx: ExprParser.PowerContext) -> ExpressionNode:
+        left = ctx.expr(0).accept(self)  # type: ignore
+        right = ctx.expr(1).accept(self)  # type: ignore
+        return left**right
+
     # Visit a parse tree produced by ExprParser#negation.
     def visitNegation(self, ctx: ExprParser.NegationContext) -> ExpressionNode:
         return -ctx.expr().accept(self)  # type: ignore
@@ -244,8 +250,16 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
 
     # Visit a parse tree produced by ExprParser#time_term.
     def visitTime_term(self, ctx: ExprParser.Time_termContext) -> ExpressionNode:
-        factors = [factor.accept(self) for factor in ctx.time_factor()]  # type: ignore
+        factors = [factor.accept(self) for factor in ctx.time_power()]  # type: ignore
         return _fold(factors[0], ctx.ops, factors[1:])  # type: ignore
+
+    # Visit a parse tree produced by ExprParser#time_power.
+    def visitTime_power(self, ctx: ExprParser.Time_powerContext) -> ExpressionNode:
+        base = ctx.time_factor().accept(self)  # type: ignore
+        exponent = ctx.time_power()  # type: ignore
+        if exponent is None:
+            return base
+        return base ** exponent.accept(self)
 
     # Visit a parse tree produced by ExprParser#timeNumber.
     def visitTimeNumber(self, ctx: ExprParser.TimeNumberContext) -> ExpressionNode:

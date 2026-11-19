@@ -316,6 +316,7 @@ _UNRESTRICTED_EXPRS = [
     pytest.param("abs(x)", var("x").abs(), id="abs"),
     pytest.param("floor(x)", var("x").floor(), id="floor"),
     pytest.param("ceil(x)", var("x").ceil(), id="ceil"),
+    pytest.param("x^2", var("x") ** 2, id="power"),
 ]
 
 # Parameter-only expressions (degree 0).  Accepted in every context:
@@ -326,6 +327,7 @@ _CONSTANT_EXPRS = [
     pytest.param("abs(a)", param("a").abs(), id="abs"),
     pytest.param("floor(a)", param("a").floor(), id="floor"),
     pytest.param("ceil(a)", param("a").ceil(), id="ceil"),
+    pytest.param("a^b", param("a") ** param("b"), id="power"),
 ]
 
 # Degree-1 variable expressions.  Rejected in variable bounds (not constant);
@@ -646,6 +648,24 @@ def test_bare_undefined_port_field_in_binding_constraint_raises() -> None:
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.price >= 0"))
     )
     with pytest.raises(ParsingException, match="ParseCancellationException"):
+        resolve_library([input_lib])
+
+
+@pytest.mark.parametrize(
+    "extra_output_expr, match",
+    [
+        ("balance_port.price^2", "ParseCancellationException"),
+        ("2^sum_connections(balance_port.flow)", "sum_connections"),
+    ],
+)
+def test_port_field_rules_apply_inside_power(
+    extra_output_expr: str, match: str
+) -> None:
+    """Both operands of ^ are checked; extra outputs allow non-linear ^."""
+    input_lib = parse_yaml_library(
+        io.StringIO(_port_model_yaml(extra_output_expr=extra_output_expr))
+    )
+    with pytest.raises((ValueError, ParsingException), match=match):
         resolve_library([input_lib])
 
 

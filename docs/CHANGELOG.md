@@ -9,13 +9,28 @@ All notable changes to GemsPy are documented here.
   - Time shifts accept functions without parentheses (e.g. `x[t - ceil(d / 2)]`).
   - A time index or time shift may be given by a parameter varying in time,
     per component or per scenario (e.g. `x[d[t]]`, `x[d[t-1]]`, `x[t + k[t]]`).
+- **Power operator `^`** - `p^2`, `2^p`, `p^(1 + q)` in any expression of a
+  model library; `^` was a parse error before. It binds tighter than `*`, `/`
+  and unary minus (`-2^2` is `-(2^2) = -4`), and is right-associative (`2^3^2`
+  is `2^(3^2)`). Time shifts, time indices and time sum bounds accept it too
+  (`x[t-2^2]` is `x[t-4]`); there, a negative exponent is written in
+  parentheses (`x[2^(-1)]`). In constraints, bounds and objectives, its
+  operands can only be parameters and literals: any power of a variable is
+  rejected as non-linear, even `x^1` and `x^0`. In extra outputs, variables
+  are allowed. `^` never raises on values: a negative base with a fractional
+  exponent gives `nan`, zero with a negative exponent or an overflow gives
+  `inf`, cell by cell. In the Python API, `param("p") ** 2` builds the new `PowerNode`.
 
 ### Changed
 - `ComponentView` and `OutputView` are renamed `ComponentResults` and
   `OutputResults`, so that they are not confused with GEMS views. The calls
   `component(...).output(...)`, `value()` and `data` are unchanged.
+- **Breaking** - In optim-config `heuristics`, every `inputs`/`outputs` entry
+  must now set `type`; it no longer defaults to `parameter`.
+- **Breaking** - `ExpressionVisitor.power` is abstract: a custom visitor must
+  implement it to be instantiated.
 - **Breaking** - time shifts, time indices and time sum bounds only accept
-  numbers, parameters, `+ - * /`, parentheses and the functions `floor`,
+  numbers, parameters, `+ - * / ^`, parentheses and the functions `floor`,
   `ceil`, `round`, `abs`, `max`, `min`, `expec`. Variables, port fields, sums
   and comparisons are rejected when the library is parsed. A unary minus must
   start the expression or a parenthesis: write `x[a * (-1)]`, not `x[a * -1]`.
@@ -28,7 +43,13 @@ All notable changes to GemsPy are documented here.
   block, instead of wrapping around it, and `p[t-1]` no longer skips the
   constraint at `t = 0`. Port fields are never checked.
 
+### Deprecated
+- `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
+
 ### Fixed
+- A port field defined by a constant expression (e.g. `definition: 0`) no
+  longer makes `build_problem` fail when its component is connected; the
+  constant is contributed once per connection.
 - `x[d]` with `d` varying in time, per component or per scenario read `x` at
   the first value of `d` only.
 - In `drop` mode, a time shift or index of a shifted expression (e.g.
@@ -37,9 +58,6 @@ All notable changes to GemsPy are documented here.
   from the other side of the constraint.
 - A non-integer time sum bound given by a parameter was truncated. It now
   raises an error.
-
-### Deprecated
-- `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
 
 ## [0.3.0] - 2026-10-29
 

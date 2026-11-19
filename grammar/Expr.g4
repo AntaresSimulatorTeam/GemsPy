@@ -19,6 +19,7 @@ fullexpr: expr EOF;
 
 expr
     : atom                                     # unsignedAtom
+    | <assoc=right> expr '^' expr              # power
     | '-' expr                                 # negation
     | '(' expr ')'                             # expression
     | expr op=('/' | '*') expr                 # muldiv
@@ -53,11 +54,14 @@ shift: TIME (ops+=('+' | '-') terms+=time_term)*;
 
 // Arithmetic of time shifts, time indices and sum bounds: numbers, parameters,
 // parameters at a time index or time shift (d[0], d[t-1]), scalar functions,
-// + - * / and parentheses. No variables, port fields, sums or comparisons.
+// + - * / ^ and parentheses. No variables, port fields, sums or comparisons.
 // A unary minus only starts an expression: "-1", "t + (-1)", not "t + -1".
 time_expr: neg='-'? time_term (ops+=('+' | '-') terms+=time_term)*;
 
-time_term: time_factor (ops+=('*' | '/') factors+=time_factor)*;
+time_term: time_power (ops+=('*' | '/') factors+=time_power)*;
+
+// Right-associative: "2^3^2" is 2^(3^2).
+time_power: time_factor ('^' time_power)?;
 
 time_factor
     : NUMBER                                         # timeNumber
