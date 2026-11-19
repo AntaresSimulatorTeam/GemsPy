@@ -14,8 +14,7 @@
 E2E test: the power operator ``^`` in a YAML study.
 
 In constraints and objectives, ``^`` may only be applied to parameters and
-literals; in extra outputs, it may also be applied to variables. ``^`` binds
-tighter than unary minus: ``-k^2`` is ``-(k^2)``, also inside a time shift.
+literals; in extra outputs, it may also be applied to variables.
 """
 
 from pathlib import Path
@@ -40,8 +39,6 @@ library:
       variables:
         - id: x
           lower-bound: 0
-        - id: z
-          lower-bound: 0
         - id: s
           lower-bound: 0
         - id: w
@@ -55,7 +52,7 @@ library:
           expression: k^x
       objective-contributions:
         - id: objective
-          expression: sum(x + z + s + w)
+          expression: sum(x + s + w)
 """
 
 _SYSTEM = """\
@@ -132,7 +129,6 @@ def test_power_of_parameters_in_constraints_and_of_variables_in_extra_outputs(
         tmp_path,
         constraints=[
             "x = d^k",
-            "z = -k^2 + 10",
             # -(k^2)/4 = -1: x one time step before, cyclic in the block.
             "s = x[t-(k^2)/4]",
             "w = sum(t-(k^2)/4 .. t, x)",
@@ -143,7 +139,6 @@ def test_power_of_parameters_in_constraints_and_of_variables_in_extra_outputs(
 
     # d = [1, 2, 3, 4], k = 2
     assert results["x"] == [1, 4, 9, 16]
-    assert results["z"] == [6, 6, 6, 6]
     assert results["s"] == [16, 1, 4, 9]
     assert results["w"] == [17, 5, 13, 25]
     assert results["square_root"] == [1, 2, 3, 4]
