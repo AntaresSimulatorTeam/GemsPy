@@ -19,6 +19,7 @@ from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
 from pydantic import Field, ValidationError, model_validator
 from yaml import safe_dump, safe_load
 
+from gems_craft.schema_validation import validate_input_schema
 from gems_craft.utils import ModifiedBaseModel
 
 
@@ -104,8 +105,20 @@ def load_input_system(
 ) -> SystemSchema:
     try:
         with input_study.open() as f:
-            return schema.model_validate(safe_load(f))
-    except ValidationError as e:
+            system = schema.model_validate(safe_load(f))
+        validate_input_schema(
+            "system",
+            {
+                "system": system.model_dump(
+                    by_alias=True,
+                    exclude_none=True,
+                    exclude_unset=True,
+                    mode="json",
+                )
+            },
+        )
+        return system
+    except ValueError as e:
         raise ValueError(f"An error occurred during parsing: {e}")
 
 
@@ -117,7 +130,19 @@ def parse_yaml_system(
     input_study: TextIO, schema: Type[SystemSchema] = SystemSchema
 ) -> SystemSchema:
     tree = safe_load(input_study)
-    return schema.model_validate(tree["system"])
+    system = schema.model_validate(tree["system"])
+    validate_input_schema(
+        "system",
+        {
+            "system": system.model_dump(
+                by_alias=True,
+                exclude_none=True,
+                exclude_unset=True,
+                mode="json",
+            )
+        },
+    )
+    return system
 
 
 def write_yaml_system(system: SystemSchema, path: Path) -> None:

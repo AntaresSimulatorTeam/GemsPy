@@ -41,6 +41,8 @@ dependencies = [
     "pandas>=2.2",
     "attrs>=26.0",
     "pyarrow>=15.0",
+    "jsonschema>=4.21",
+    "referencing>=0.30",
 ]
 classifiers = [
    #    Classifiers here: https://pypi.org/classifiers/
@@ -70,6 +72,9 @@ Repository = "https://github.com/AntaresSimulatorTeam/GemsPy"
 # All the following settings are optional:
 where = ["src"]
 
+[tool.setuptools.package-data]
+gems_craft = ["schemas/*.schema.yml"]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
@@ -81,6 +86,7 @@ dev = [
     "types-PyYAML>=6.0.12",
     "antlr4-tools>=0.2.1",
     "pandas-stubs",
+    "types-jsonschema",
     "pytest-xdist>=3.8.0",
 ]
 # Only needed for runnning solver specific tests (dual / reduced cost)
