@@ -37,7 +37,11 @@ _RUNS: Dict[str, Callable[[], SimulationTable]] = {
     "frontal-2": lambda: _run_13_1(ResolutionMode.FRONTAL, [0, 1]),
     "sequential-overlap-1": _sequential_overlap,
     "sequential-overlap-2": lambda: _run_13_1(
-        ResolutionMode.SEQUENTIAL_SUBPROBLEMS, [0, 1], block_length=2, block_overlap=1
+        ResolutionMode.SEQUENTIAL_SUBPROBLEMS,
+        [0, 1],
+        study=STUDY_13_1_SCENARIO_DEPENDENT,
+        block_length=2,
+        block_overlap=1,
     ),
     "parallel-1": lambda: _run_13_1(
         ResolutionMode.PARALLEL_SUBPROBLEMS, [0], block_length=2

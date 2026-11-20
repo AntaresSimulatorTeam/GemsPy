@@ -44,7 +44,8 @@ from tests.e2e.functional.test_sequential_carry_over_length import (
 )
 
 _STUDY_13_1 = Path(__file__).parent / "studies" / "13_1"
-# p_max depends on the scenario: parallel mode solves each scenario separately.
+# p_max depends on the scenario: parallel and sequential modes solve each
+# scenario separately.
 STUDY_13_1_SCENARIO_DEPENDENT = (
     Path(__file__).parent / "studies" / "13_1_scenario_dependent"
 )

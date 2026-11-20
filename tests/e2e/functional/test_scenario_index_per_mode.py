@@ -15,8 +15,8 @@ E2E test: scenario_index of scenario-independent outputs per resolution mode.
 
 The 13_1 investment study is run with 2 MC scenarios whose load differs
 (300 and 500). ``p_max`` (the invested capacity) is scenario-independent,
-except in parallel mode, which requires every variable to depend on the
-scenario (13_1_scenario_dependent).
+except in parallel and sequential modes, which require every variable to
+depend on the scenario (13_1_scenario_dependent).
 
 - frontal: both scenarios are solved in one problem, so ``p_max`` and the
   objective value are shared and keep an empty scenario_index.

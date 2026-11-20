@@ -379,8 +379,9 @@ def validate_optim_config(
     - Heuristic inputs/outputs reference existing model parameters/variables with the
       time-dependence the heuristic function expects.
     - The scenario scope selects at least one scenario.
-    - In ``parallel-subproblems`` mode with several scenarios, every variable
-      depends on the scenario (each scenario is solved separately).
+    - In ``parallel-subproblems`` and ``sequential-subproblems`` modes with
+      several scenarios, every variable depends on the scenario (each scenario
+      is solved separately).
     - If ``scenario_builder`` is provided, every scenario index in
       ``config.scenario_scope.scenario_ids`` is defined for every scenario
       group in the builder.
@@ -431,7 +432,10 @@ def validate_optim_config(
     if config.resolution.mode == ResolutionMode.BENDERS_DECOMPOSITION:
         _check_no_heuristic_with_benders(system, errors)
         _check_no_integer_variables_in_subproblems(config, system, errors)
-    if config.resolution.mode == ResolutionMode.PARALLEL_SUBPROBLEMS:
+    if config.resolution.mode in (
+        ResolutionMode.PARALLEL_SUBPROBLEMS,
+        ResolutionMode.SEQUENTIAL_SUBPROBLEMS,
+    ):
         _check_variables_depend_on_scenario(config, system, errors)
 
     if errors:

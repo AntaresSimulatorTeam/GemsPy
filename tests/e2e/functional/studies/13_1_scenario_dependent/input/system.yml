@@ -13,7 +13,7 @@
 # Study case 13_1 : to test investment problems
 # Simple generation expansion problem on one node, one timestep and one scenario with one candidate.
 # Same as 13_1, except that the invested capacity p_max depends on the scenario:
-# allowed in parallel-subproblems mode with several scenarios.
+# allowed in parallel- and sequential-subproblems modes with several scenarios.
 
 # Demand = 400
 # Generator : P_max : 200, Cost : 45
