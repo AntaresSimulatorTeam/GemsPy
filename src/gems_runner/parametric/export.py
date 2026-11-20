@@ -11,8 +11,8 @@
 # This file is part of the Antares project.
 
 """
-Exports, for each time block, one problem shared by all scenarios (MPS) and
-its scenario-dependent entries (Parquet).
+Exports one problem shared by all time blocks and scenarios (MPS) and its
+entries that depend on the block or the scenario (Parquet).
 
 See the "Exporting parametric problems" section of
 docs/user-guide/optimisation.md for the format.
@@ -20,13 +20,13 @@ docs/user-guide/optimisation.md for the format.
 
 import json
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 from gems_craft.optim_config.parsing import OptimConfig, ResolutionMode
 from gems_craft.optim_config.validation import validate_optim_config
 from gems_craft.study.study import Study
 from gems_craft.study.validation import check_data_requirements
-from gems_runner.parametric.builder import ParametricEntries, _ParametricProblemBuilder
+from gems_runner.parametric.builder import _ParametricProblemBuilder
 from gems_runner.session.session import parallel_blocks, time_scope_block
 from gems_runner.simulation.couplings import build_couplings, dump_couplings
 from gems_runner.simulation.optimization import (
@@ -35,7 +35,6 @@ from gems_runner.simulation.optimization import (
     OutOfBoundsFilter,
     _build_decomposed,
 )
-from gems_runner.simulation.time_block import TimeBlock
 
 FORMAT_VERSION = 1
 MANIFEST_FILE = "manifest.json"
@@ -44,20 +43,22 @@ MANIFEST_FILE = "manifest.json"
 def export_parametric_problems(
     study: Study, optim_config: OptimConfig, output_dir: Path
 ) -> Path:
-    """Write, for each time block of *optim_config*, the problem of its first
-    scenario and the entries that differ in the other scenarios.
+    """Write one problem shared by all time blocks and scenarios of
+    *optim_config* (that of the first block and scenario), and its entries
+    that differ in the other blocks and scenarios.
 
     The blocks follow the resolution mode: one block covering the time scope
-    in ``frontal`` mode, blocks of ``block-length`` time steps in
-    ``parallel-subproblems`` mode, and a master and a subproblem covering the
-    time scope in ``benders-decomposition`` mode.  ``sequential-subproblems``
-    mode is rejected: each block starts from the solution of the previous one.
+    in ``frontal`` and ``benders-decomposition`` modes (a master and a
+    subproblem in the latter), blocks of ``block-length`` time steps in
+    ``parallel-subproblems`` mode, which must all have the same length.
+    ``sequential-subproblems`` mode is rejected: each block starts from the
+    solution of the previous one.
 
     Returns *output_dir*, which holds:
 
-    - ``block_<id>/<name>.mps`` and ``block_<id>/<name>_parameters.parquet``
-      for each problem of a block (``problem``, or ``master`` and
-      ``subproblem`` with ``structure.txt`` in Benders mode);
+    - ``<name>.mps`` and ``<name>_parameters.parquet`` for each problem
+      (``problem``, or ``master`` and ``subproblem`` with ``structure.txt`` in
+      Benders mode);
     - ``manifest.json``, written last: ``format_version``, ``scenarios`` and
       the ordered ``blocks`` ids.
     """
@@ -69,6 +70,16 @@ def export_parametric_problems(
             "the solution of the previous one. Use "
             f"'{ResolutionMode.PARALLEL_SUBPROBLEMS.value}' instead."
         )
+    if mode == ResolutionMode.PARALLEL_SUBPROBLEMS:
+        blocks = parallel_blocks(optim_config)
+        if len(blocks[-1].timesteps) != len(blocks[0].timesteps):
+            raise ValueError(
+                "All time blocks must have the same length: the number of time "
+                "steps of the time scope must be a multiple of 'block-length'."
+            )
+    else:
+        block_id = 1 if mode == ResolutionMode.BENDERS_DECOMPOSITION else 0
+        blocks = [time_scope_block(optim_config, block_id=block_id)]
     check_data_requirements(study)
 
     output_dir = Path(output_dir)
@@ -77,87 +88,56 @@ def export_parametric_problems(
     (output_dir / MANIFEST_FILE).unlink(missing_ok=True)
 
     scenario_ids = optim_config.scenario_scope.scenario_ids
-    if mode == ResolutionMode.BENDERS_DECOMPOSITION:
-        time_blocks = [time_scope_block(optim_config, block_id=1)]
-        _export_benders_block(study, optim_config, time_blocks[0], output_dir)
-    else:
-        time_blocks = (
-            [time_scope_block(optim_config, block_id=0)]
-            if mode == ResolutionMode.FRONTAL
-            else parallel_blocks(optim_config)
+    oob_filter = OutOfBoundsFilter(optim_config)
+    builders: Dict[str, _ParametricProblemBuilder] = {}
+
+    def build(
+        name: str, location_filter: Optional[DecompositionFilter] = None
+    ) -> OptimizationProblem:
+        builder = _ParametricProblemBuilder(
+            name=name,
+            study=study,
+            blocks=blocks,
+            scenario_ids=scenario_ids,
+            location_filter=location_filter,
+            oob_filter=oob_filter,
         )
-        oob_filter = OutOfBoundsFilter(optim_config)
-        for block in time_blocks:
-            builder = _ParametricProblemBuilder(
-                name="problem",
-                study=study,
-                block=block,
-                scenario_ids=scenario_ids,
-                oob_filter=oob_filter,
+        builders[name] = builder
+        return builder.build()
+
+    if mode == ResolutionMode.BENDERS_DECOMPOSITION:
+        decomposed = _build_decomposed(
+            build, optim_config, subproblem_name="subproblem", master_name="master"
+        )
+        if decomposed.master is None:
+            raise ValueError(
+                "Benders decomposition requires a master problem: no element of "
+                "the optim-config is located in the master."
             )
-            _write_problem(builder.build(), builder.entries, output_dir, block)
+        problems = [decomposed.master, decomposed.subproblem]
+        dump_couplings(build_couplings(decomposed, optim_config), output_dir)
+    else:
+        problems = [build("problem")]
+
+    for problem in problems:
+        _write_problem(problem, builders[problem.name], output_dir)
 
     manifest = {
         "format_version": FORMAT_VERSION,
         "scenarios": scenario_ids,
-        "blocks": [block.id for block in time_blocks],
+        "blocks": [block.id for block in blocks],
     }
     (output_dir / MANIFEST_FILE).write_text(json.dumps(manifest, indent=2))
     return output_dir
 
 
-def _export_benders_block(
-    study: Study, optim_config: OptimConfig, block: TimeBlock, output_dir: Path
-) -> None:
-    oob_filter = OutOfBoundsFilter(optim_config)
-    entries: Dict[str, ParametricEntries] = {}
-
-    def build(name: str, location_filter: DecompositionFilter) -> OptimizationProblem:
-        builder = _ParametricProblemBuilder(
-            name=name,
-            study=study,
-            block=block,
-            scenario_ids=optim_config.scenario_scope.scenario_ids,
-            location_filter=location_filter,
-            oob_filter=oob_filter,
-        )
-        problem = builder.build()
-        entries[name] = builder.entries
-        return problem
-
-    decomposed = _build_decomposed(
-        build, optim_config, subproblem_name="subproblem", master_name="master"
-    )
-    if decomposed.master is None:
-        raise ValueError(
-            "Benders decomposition requires a master problem: no element of "
-            "the optim-config is located in the master."
-        )
-    for problem in (decomposed.master, decomposed.subproblem):
-        _write_problem(problem, entries[problem.name], output_dir, block)
-    dump_couplings(
-        build_couplings(decomposed, optim_config), output_dir / _block_folder(block)
-    )
-
-
-def _block_folder(block: TimeBlock) -> str:
-    return f"block_{block.id}"
-
-
 def _write_problem(
-    problem: OptimizationProblem,
-    entries: ParametricEntries,
-    output_dir: Path,
-    block: TimeBlock,
+    problem: OptimizationProblem, builder: _ParametricProblemBuilder, output_dir: Path
 ) -> None:
-    """Write ``<name>.mps`` and ``<name>_parameters.parquet`` in the block
-    folder."""
-    folder = output_dir / _block_folder(block)
-    folder.mkdir(parents=True, exist_ok=True)
+    """Write ``<name>.mps`` and ``<name>_parameters.parquet`` in *output_dir*."""
     problem.linopy_model.to_file(
-        folder / f"{problem.name}.mps", explicit_coordinate_names=True
+        output_dir / f"{problem.name}.mps", explicit_coordinate_names=True
     )
-    assert problem.scenario_ids is not None
-    entries.to_frame(problem.linopy_model, problem.scenario_ids).to_parquet(
-        folder / f"{problem.name}_parameters.parquet", index=False
+    builder.entries.to_frame(problem.linopy_model, builder.realizations).to_parquet(
+        output_dir / f"{problem.name}_parameters.parquet", index=False
     )

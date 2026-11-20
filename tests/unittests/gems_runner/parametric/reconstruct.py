@@ -10,8 +10,8 @@
 #
 # This file is part of the Antares project.
 
-"""Rebuilds the problem of one scenario from a parametric export and solves it,
-as a consumer of the export would."""
+"""Rebuilds the problem of one block and scenario from a parametric export and
+solves it, as a consumer of the export would."""
 
 from pathlib import Path
 
@@ -20,9 +20,11 @@ import numpy as np
 import pandas as pd
 
 
-def solve_scenario(mps: Path, parameters: pd.DataFrame, scenario: int) -> float:
-    """Read *mps*, apply the entries of *scenario*, solve and return the
-    objective value, constant included."""
+def solve_realization(
+    mps: Path, parameters: pd.DataFrame, block: int, scenario: int
+) -> float:
+    """Read *mps*, apply the entries of *block* and *scenario*, solve and
+    return the objective value, constant included."""
     h = highspy.Highs()
     h.setOptionValue("output_flag", False)
     h.readModel(str(mps))
@@ -30,7 +32,8 @@ def solve_scenario(mps: Path, parameters: pd.DataFrame, scenario: int) -> float:
     rows = {name: i for i, name in enumerate(lp.row_names_)}
     cols = {name: i for i, name in enumerate(lp.col_names_)}
     constant = 0.0
-    for entry in parameters[parameters["scenario"] == scenario].itertuples():
+    selected = (parameters["block"] == block) & (parameters["scenario"] == scenario)
+    for entry in parameters[selected].itertuples():
         if entry.kind == "coef":
             h.changeCoeff(rows[entry.row], cols[entry.col], entry.value)
         elif entry.kind == "rhs":

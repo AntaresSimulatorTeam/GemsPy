@@ -42,7 +42,7 @@ from gems_runner.simulation import (
     build_problem,
     dump_couplings,
 )
-from tests.unittests.gems_runner.parametric.reconstruct import solve_scenario
+from tests.unittests.gems_runner.parametric.reconstruct import solve_realization
 
 STUDIES_DIR = Path(__file__).parent / "studies"
 
@@ -78,25 +78,21 @@ def test_scenarized_study_in_parallel_mode(
 
     manifest = json.loads((tmp_path / "manifest.json").read_text())
     assert manifest["blocks"] == [0, 1]
+    mps = tmp_path / "problem.mps"
+    parameters = pd.read_parquet(tmp_path / "problem_parameters.parquet")
+
+    h = highspy.Highs()
+    h.readModel(str(mps))
+    names = set(h.getLp().row_names_) | set(h.getLp().col_names_)
+    assert set(parameters["row"].dropna()) | set(parameters["col"].dropna()) <= names
+
     for block_id in manifest["blocks"]:
-        mps = tmp_path / f"block_{block_id}" / "problem.mps"
-        parameters = pd.read_parquet(
-            tmp_path / f"block_{block_id}" / "problem_parameters.parquet"
-        )
-
-        h = highspy.Highs()
-        h.readModel(str(mps))
-        names = set(h.getLp().row_names_) | set(h.getLp().col_names_)
-        assert (
-            set(parameters["row"].dropna()) | set(parameters["col"].dropna()) <= names
-        )
-
         # Blocks of one time step: block i holds time step i.
         time_block = TimeBlock(block_id, [block_id])
         for s in manifest["scenarios"]:
             reference = build_problem(scenarized_study, time_block, [s])
             reference.solve(solver_name="highs", output_flag=False)
-            assert solve_scenario(mps, parameters, s) == pytest.approx(
+            assert solve_realization(mps, parameters, block_id, s) == pytest.approx(
                 reference.objective_value
             )
 
@@ -118,10 +114,10 @@ def test_benders_study_exports_master_subproblem_and_structure(
 
     manifest = json.loads((tmp_path / "export" / "manifest.json").read_text())
     assert manifest["blocks"] == [1]
-    block_dir = tmp_path / "export" / "block_1"
+    export_dir = tmp_path / "export"
     for name in ("master", "subproblem"):
-        assert (block_dir / f"{name}.mps").exists()
-        assert (block_dir / f"{name}_parameters.parquet").exists()
+        assert (export_dir / f"{name}.mps").exists()
+        assert (export_dir / f"{name}_parameters.parquet").exists()
 
     # Same structure.txt as the one written for a Benders run.
     reference_dir = tmp_path / "reference"
@@ -132,6 +128,6 @@ def test_benders_study_exports_master_subproblem_and_structure(
         config,
     )
     dump_couplings(build_couplings(decomposed, config), reference_dir)
-    assert (block_dir / "structure.txt").read_text() == (
+    assert (export_dir / "structure.txt").read_text() == (
         reference_dir / "structure.txt"
     ).read_text()

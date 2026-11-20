@@ -11,9 +11,9 @@
 # This file is part of the Antares project.
 
 """
-`export_parametric_problems` writes one problem per block and the entries that
-depend on the scenario.  Each scenario rebuilt from the export must have the
-objective of the problem built for that scenario alone.
+`export_parametric_problems` writes one problem for all blocks and scenarios,
+and the entries that depend on them.  Each (block, scenario) rebuilt from the
+export must have the objective of the block built for that scenario alone.
 """
 
 import json
@@ -41,15 +41,17 @@ from gems_craft.study import (
     Study,
     System,
     TimeScenarioSeriesData,
+    TimeSeriesData,
     create_component,
 )
 from gems_runner.parametric import export_parametric_problems
 from gems_runner.session.session import parallel_blocks
 from gems_runner.simulation import TimeBlock, build_problem
-from tests.unittests.gems_runner.parametric.reconstruct import solve_scenario
+from tests.unittests.gems_runner.parametric.reconstruct import solve_realization
 
 CONSTANT = IndexingStructure(False, False)
 SCENARIO_ONLY = IndexingStructure(False, True)
+TIME_ONLY = IndexingStructure(True, False)
 TIME_SCENARIO = IndexingStructure(True, True)
 
 SCENARIOS = [0, 1, 2]
@@ -68,6 +70,7 @@ def _study(
         id="PLANT",
         parameters=[
             float_parameter("demand", TIME_SCENARIO),
+            float_parameter("export", TIME_ONLY),
             float_parameter("p", SCENARIO_ONLY),
             float_parameter("q", CONSTANT),
             float_parameter("cost", CONSTANT),
@@ -83,7 +86,10 @@ def _study(
             ),
         ],
         constraints=[
-            Constraint("balance", var("gen") + var("unsupplied") == param("demand")),
+            Constraint(
+                "balance",
+                var("gen") + var("unsupplied") == param("demand") + param("export"),
+            ),
             Constraint("availability", var("gen") <= availability * var("cap")),
         ],
         objective_contributions={
@@ -102,6 +108,7 @@ def _study(
     database.add_data(
         "P", "p", ScenarioSeriesData(np.array(p_values or [0.5, 0.8, 1.0]))
     )
+    database.add_data("P", "export", TimeSeriesData(pd.Series([1.0, 3.0])))
     database.add_data("P", "q", ConstantData(0.7))
     database.add_data("P", "cost", ConstantData(2))
     system = System("parametric")
@@ -122,18 +129,23 @@ def _config(mode: str = "frontal", block_length: Optional[int] = None) -> OptimC
     )
 
 
-def _parameters(output_dir: Path, block: int = 0) -> pd.DataFrame:
-    return pd.read_parquet(output_dir / f"block_{block}" / "problem_parameters.parquet")
+def _parameters(output_dir: Path) -> pd.DataFrame:
+    return pd.read_parquet(output_dir / "problem_parameters.parquet")
 
 
-def _assert_scenarios_match(study: Study, output_dir: Path) -> None:
+def _assert_realizations_match(
+    study: Study, output_dir: Path, blocks: List[TimeBlock]
+) -> None:
+    """Each (block, scenario) rebuilt from the export has the objective of the
+    block built for that scenario alone."""
     parameters = _parameters(output_dir)
-    for s in SCENARIOS:
-        reference = build_problem(study, TimeBlock(0, list(range(TIME_STEPS))), [s])
-        reference.solve(solver_name="highs", output_flag=False)
-        assert solve_scenario(
-            output_dir / "block_0" / "problem.mps", parameters, s
-        ) == pytest.approx(reference.objective_value)
+    for block in blocks:
+        for s in SCENARIOS:
+            reference = build_problem(study, block, [s])
+            reference.solve(solver_name="highs", output_flag=False)
+            assert solve_realization(
+                output_dir / "problem.mps", parameters, block.id, s
+            ) == pytest.approx(reference.objective_value)
 
 
 @pytest.mark.parametrize(
@@ -157,7 +169,7 @@ def test_each_scenario_rebuilt_from_the_export_has_its_own_objective(
     export_parametric_problems(study, _config(), tmp_path)
 
     assert set(_parameters(tmp_path)["kind"]) == kinds
-    _assert_scenarios_match(study, tmp_path)
+    _assert_realizations_match(study, tmp_path, [TimeBlock(0, list(range(TIME_STEPS)))])
 
 
 def test_only_entries_that_differ_between_scenarios_are_written(
@@ -175,19 +187,42 @@ def test_only_entries_that_differ_between_scenarios_are_written(
     assert parameters.groupby("row").size().tolist() == [3, 3]
 
 
-def test_parallel_mode_exports_one_problem_per_block(tmp_path: Path) -> None:
+def test_parallel_mode_exports_one_problem_for_all_blocks(tmp_path: Path) -> None:
+    """The time-dependent parameters (`demand`, and `export` which does not
+    depend on the scenario) vary between blocks: their entries are in the
+    Parquet file, per block and scenario."""
     config = _config("parallel-subproblems", block_length=1)
-    export_parametric_problems(_study(), config, tmp_path)
+    study = _study()
+    export_parametric_problems(study, config, tmp_path)
 
+    blocks = parallel_blocks(config)
     manifest = json.loads((tmp_path / "manifest.json").read_text())
     assert manifest == {
         "format_version": 1,
         "scenarios": SCENARIOS,
-        "blocks": [b.id for b in parallel_blocks(config)],
+        "blocks": [b.id for b in blocks],
     }
-    for block_id in manifest["blocks"]:
-        assert (tmp_path / f"block_{block_id}" / "problem.mps").exists()
-        assert (tmp_path / f"block_{block_id}" / "problem_parameters.parquet").exists()
+    assert sorted(p.name for p in tmp_path.iterdir()) == [
+        "manifest.json",
+        "problem.mps",
+        "problem_parameters.parquet",
+    ]
+    _assert_realizations_match(study, tmp_path, blocks)
+
+
+def test_blocks_of_different_lengths_are_rejected_before_writing(
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "export"
+    config = OptimConfig.model_validate(
+        {
+            "time-scope": {"first-time-step": 0, "last-time-step": 2},
+            "resolution": {"mode": "parallel-subproblems", "block-length": 2},
+        }
+    )
+    with pytest.raises(ValueError, match="multiple of 'block-length'"):
+        export_parametric_problems(_study(), config, output_dir)
+    assert not output_dir.exists()
 
 
 def test_sequential_mode_is_rejected_before_writing(tmp_path: Path) -> None:

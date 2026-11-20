@@ -53,6 +53,7 @@ from gems_craft.expression.expression import is_unbounded
 from gems_craft.expression.visitor import visit
 from gems_craft.model.common import ValueType
 from gems_craft.model.model import Model
+from gems_craft.model.parameter import Parameter
 from gems_craft.model.port import PortField, PortFieldId
 from gems_craft.model.variable import Variable
 from gems_craft.study.parsing import IntegerStrategyId
@@ -702,59 +703,65 @@ class _OptimizationProblemBuilder:
     def _build_param_arrays_for_model(
         self, model: Model, components: List[Component]
     ) -> None:
+        for param in model.parameters.values():
+            self.param_arrays[(model.id, param.name)] = self._param_array(
+                param, components
+            )
+
+    def _param_array(
+        self, param: Parameter, components: List[Component]
+    ) -> xr.DataArray:
+        """Return the values of *param* for *components* in this block."""
         T = self.block_length
         S = len(self.scenario_ids)
         C = len(components)
         comp_ids = [c.id for c in components]
         abs_timesteps = self.block.timesteps  # mapping: block_t → abs_t
+        use_time = param.structure.time
+        use_scenario = param.structure.scenario
 
-        for param in model.parameters.values():
-            use_time = param.structure.time
-            use_scenario = param.structure.scenario
+        # Determine the minimal shape for this parameter based on its
+        # declared structure. Using minimal shapes avoids spurious broadcasting
+        # (e.g., invest_cost * p_max should not gain time/scenario dims).
+        if use_time and use_scenario:
+            data = np.zeros((C, T, S))
+            dims = ["component", "time", "scenario"]
+            coords: Dict[str, object] = {
+                "component": comp_ids,
+                "time": self.time_coord,
+                "scenario": self.local_scenario_coord,
+            }
+        elif use_time:
+            data = np.zeros((C, T))
+            dims = ["component", "time"]
+            coords = {"component": comp_ids, "time": self.time_coord}
+        elif use_scenario:
+            data = np.zeros((C, S))
+            dims = ["component", "scenario"]
+            coords = {"component": comp_ids, "scenario": self.local_scenario_coord}
+        else:
+            data = np.zeros((C,))
+            dims = ["component"]
+            coords = {"component": comp_ids}
 
-            # Determine the minimal shape for this parameter based on its
-            # declared structure. Using minimal shapes avoids spurious broadcasting
-            # (e.g., invest_cost * p_max should not gain time/scenario dims).
+        mc_scenarios = self.scenario_ids if use_scenario else None
+        for i, c in enumerate(components):
+            v = self.study.database.get_values(
+                c.id,
+                param.name,
+                abs_timesteps if use_time else None,
+                mc_scenarios,
+            )
             if use_time and use_scenario:
-                data = np.zeros((C, T, S))
-                dims = ["component", "time", "scenario"]
-                coords: Dict[str, object] = {
-                    "component": comp_ids,
-                    "time": self.time_coord,
-                    "scenario": self.local_scenario_coord,
-                }
+                data[i, :, :] = v  # (T, S)
             elif use_time:
-                data = np.zeros((C, T))
-                dims = ["component", "time"]
-                coords = {"component": comp_ids, "time": self.time_coord}
+                data[i, :] = v  # (T,) or scalar
             elif use_scenario:
-                data = np.zeros((C, S))
-                dims = ["component", "scenario"]
-                coords = {"component": comp_ids, "scenario": self.local_scenario_coord}
+                data[i, :] = v  # (S,) or scalar
             else:
-                data = np.zeros((C,))
-                dims = ["component"]
-                coords = {"component": comp_ids}
+                data[i] = v  # scalar
 
-            mc_scenarios = self.scenario_ids if use_scenario else None
-            for i, c in enumerate(components):
-                v = self.study.database.get_values(
-                    c.id,
-                    param.name,
-                    abs_timesteps if use_time else None,
-                    mc_scenarios,
-                )
-                if use_time and use_scenario:
-                    data[i, :, :] = v  # (T, S)
-                elif use_time:
-                    data[i, :] = v  # (T,) or scalar
-                elif use_scenario:
-                    data[i, :] = v  # (S,) or scalar
-                else:
-                    data[i] = v  # scalar
-
-            arr = xr.DataArray(data, dims=dims, coords=coords)
-            self.param_arrays[(model.id, param.name)] = arr
+        return xr.DataArray(data, dims=dims, coords=coords)
 
     # ------------------------------------------------------------------
     # Phase 2 — Variables

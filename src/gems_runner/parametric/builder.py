@@ -11,15 +11,17 @@
 # This file is part of the Antares project.
 
 """
-Builds one problem shared by all scenarios, plus its scenario-dependent entries.
+Builds one problem shared by all time blocks and scenarios, plus its entries
+that depend on them.
 
-Parameters keep their ``scenario`` dimension while variables are created
-without it.  xarray broadcasting then carries the ``scenario`` dimension into
-every coefficient, right-hand side, bound or objective term that depends on a
-scenario-dependent parameter, whatever the expression.  Each such element is
-added to the linopy model for the first scenario (the nominal problem), and
-its entries that differ between scenarios are recorded in
-:class:`ParametricEntries`.
+The ``scenario`` dimension of parameters indexes *realizations*: the
+(block, scenario) pairs, flattened.  Parameters that depend on time or on the
+scenario get this dimension, while variables are created without it.  xarray
+broadcasting then carries it into every coefficient, right-hand side, bound or
+objective term that depends on such a parameter, whatever the expression.
+Each such element is added to the linopy model for the first realization
+(first block, first scenario: the nominal problem), and its entries that
+differ between realizations are recorded in :class:`ParametricEntries`.
 """
 
 from typing import (
@@ -42,13 +44,21 @@ import xarray as xr
 
 from gems_craft.expression.expression import ScenarioOperatorNode
 from gems_craft.expression.visitor import visit
+from gems_craft.model.parameter import Parameter
 from gems_craft.model.port import PortFieldId
 from gems_craft.model.variable import Variable
+from gems_craft.study.study import Study
+from gems_craft.study.system import Component
 from gems_runner.simulation.linearize import (
     VectorizedExpr,
     VectorizedLinearExprBuilder,
 )
-from gems_runner.simulation.optimization import _OptimizationProblemBuilder
+from gems_runner.simulation.optimization import (
+    DecompositionFilter,
+    OutOfBoundsFilter,
+    _OptimizationProblemBuilder,
+)
+from gems_runner.simulation.time_block import TimeBlock
 
 SCENARIO = "scenario"
 TERM = "_term"
@@ -61,18 +71,20 @@ _COLUMNS: Dict[str, Any] = {
     "kind": str,
     "row": str,
     "col": str,
+    "block": "int64",
     "scenario": "int64",
     "value": float,
 }
 
 
 class ParametricEntries:
-    """Scenario-dependent entries of a problem, keyed by linopy labels.
+    """Entries of a problem that depend on the realization, keyed by linopy
+    labels.
 
     Each chunk holds *n* entries of one kind (``rhs``, ``coef``, ``lower``,
     ``upper``, ``obj`` or ``obj_const``): their row (constraint) label, their
-    column (variable) label, and their value in each scenario, shaped
-    ``(n, number of scenarios)``.
+    column (variable) label, and their value in each realization, shaped
+    ``(n, number of realizations)``.
     """
 
     def __init__(self) -> None:
@@ -95,26 +107,32 @@ class ParametricEntries:
         self._chunks.append((kind, rows, cols, values))
 
     def to_frame(
-        self, linopy_model: linopy.Model, scenario_ids: List[int]
+        self, linopy_model: linopy.Model, realizations: List[Tuple[int, int]]
     ) -> pd.DataFrame:
-        """Return the entries in long format (one row per entry and scenario),
-        rows and columns named as in the MPS file written with
-        ``explicit_coordinate_names=True``."""
+        """Return the entries in long format (one row per entry and
+        realization), rows and columns named as in the MPS file written with
+        ``explicit_coordinate_names=True``.
+
+        *realizations* lists the (block id, scenario) pair of each realization.
+        """
         if not self._chunks:
             return pd.DataFrame(columns=list(_COLUMNS)).astype(_COLUMNS)
 
         print_variables, print_constraints = linopy.io.get_printers_scalar(
             linopy_model, explicit_coordinate_names=True
         )
-        n_scenarios = len(scenario_ids)
+        n = len(realizations)
+        block_ids = [block for block, _ in realizations]
+        scenario_ids = [scenario for _, scenario in realizations]
         frames = []
         for kind, rows, cols, values in self._chunks:
             frames.append(
                 pd.DataFrame(
                     {
                         "kind": kind,
-                        "row": np.repeat(_names(rows, print_constraints), n_scenarios),
-                        "col": np.repeat(_names(cols, print_variables), n_scenarios),
+                        "row": np.repeat(_names(rows, print_constraints), n),
+                        "col": np.repeat(_names(cols, print_variables), n),
+                        "block": np.tile(block_ids, len(values)),
                         "scenario": np.tile(scenario_ids, len(values)),
                         "value": values.reshape(-1),
                     }
@@ -136,12 +154,13 @@ def _names(
 
 
 def _has_scenario(value: object) -> bool:
-    """Whether *value* (DataArray, linopy object, number) depends on the scenario."""
+    """Whether *value* (DataArray, linopy object, number) depends on the
+    realization."""
     return SCENARIO in getattr(value, "dims", ())
 
 
 def _varying(values: np.ndarray) -> np.ndarray:
-    """Mask of the rows of *values* that differ between scenarios (columns)."""
+    """Mask of the rows of *values* that differ between realizations (columns)."""
     return ~np.all(values == values[:, :1], axis=1)
 
 
@@ -161,8 +180,9 @@ def _drop_scenario(da: xr.DataArray) -> xr.DataArray:
 
 
 class _ParametricLinearExprBuilder(VectorizedLinearExprBuilder):
-    """Linear builder for a problem holding a single scenario: the expectation
-    over scenarios is the identity, applied to each scenario separately."""
+    """Linear builder for a problem holding a single realization: the
+    expectation over scenarios is the identity, applied to each realization
+    separately."""
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> VectorizedExpr:
         if node.name != "Expectation":
@@ -171,14 +191,74 @@ class _ParametricLinearExprBuilder(VectorizedLinearExprBuilder):
 
 
 class _ParametricProblemBuilder(_OptimizationProblemBuilder):
-    """Builds the nominal problem and records its scenario-dependent entries
-    in :attr:`entries` (see the module docstring)."""
+    """Builds the nominal problem of *blocks*, which must have the same length,
+    and records in :attr:`entries` its entries that depend on the realization
+    (see the module docstring)."""
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+    def __init__(
+        self,
+        name: str,
+        study: Study,
+        blocks: List[TimeBlock],
+        scenario_ids: List[int],
+        location_filter: Optional[DecompositionFilter] = None,
+        oob_filter: Optional[OutOfBoundsFilter] = None,
+    ) -> None:
+        if len({len(block.timesteps) for block in blocks}) != 1:
+            raise ValueError("All time blocks must have the same length.")
+        super().__init__(
+            name=name,
+            study=study,
+            block=blocks[0],
+            scenario_ids=scenario_ids,
+            location_filter=location_filter,
+            oob_filter=oob_filter,
+        )
+        self.blocks = blocks
+        # The (block id, scenario) pair of each realization, block-major.
+        self.realizations = [(b.id, s) for b in blocks for s in scenario_ids]
+        self.local_scenario_coord = list(range(len(self.realizations)))
         self.entries = ParametricEntries()
-        # Bounds of the variable being added, in each scenario.
+        # Bounds of the variable being added, in each realization.
         self._pending_bounds: Optional[Tuple[np.ndarray, np.ndarray]] = None
+
+    def _param_array(
+        self, param: Parameter, components: List[Component]
+    ) -> xr.DataArray:
+        """Values of *param* in each realization when it depends on time or on
+        the scenario: the time steps are those of the block."""
+        use_time, use_scenario = param.structure.time, param.structure.scenario
+        if not (use_time or use_scenario):
+            return super()._param_array(param, components)
+
+        n_blocks, n_scenarios = len(self.blocks), len(self.scenario_ids)
+        shape = (len(components), self.block_length, n_blocks, n_scenarios)
+        data = np.zeros(shape if use_time else (shape[0], n_blocks, n_scenarios))
+        for i, component in enumerate(components):
+            for b, block in enumerate(self.blocks):
+                values = self.study.database.get_values(
+                    component.id,
+                    param.name,
+                    block.timesteps if use_time else None,
+                    self.scenario_ids if use_scenario else None,
+                )
+                if use_time:
+                    if not use_scenario and np.ndim(values) == 1:
+                        values = np.asarray(values)[:, None]  # (T,) → (T, 1)
+                    data[i, :, b, :] = values
+                else:
+                    data[i, b, :] = values
+
+        dims = ["component", "time", SCENARIO] if use_time else ["component", SCENARIO]
+        coords: Dict[str, object] = {
+            "component": [c.id for c in components],
+            SCENARIO: self.local_scenario_coord,
+        }
+        if use_time:
+            coords["time"] = self.time_coord
+        # (block, scenario) flattened block-major, as in :attr:`realizations`.
+        data = data.reshape(*data.shape[:-2], n_blocks * n_scenarios)
+        return xr.DataArray(data, dims=dims, coords=coords)
 
     def _new_expr_builder(
         self,
@@ -196,7 +276,7 @@ class _ParametricProblemBuilder(_OptimizationProblemBuilder):
         )
 
     @property
-    def _n_scenarios(self) -> int:
+    def _n_realizations(self) -> int:
         return len(self.local_scenario_coord)
 
     # ------------------------------------------------------------------
@@ -211,7 +291,7 @@ class _ParametricProblemBuilder(_OptimizationProblemBuilder):
         cols: Optional[np.ndarray] = None,
     ) -> None:
         """Record the entries of *values* (one row per entry, one column per
-        scenario) that differ between scenarios and are in the model."""
+        realization) that differ between realizations and are in the model."""
         keep = _varying(values)
         if rows is not None:
             keep &= rows != _NO_LABEL
@@ -228,7 +308,7 @@ class _ParametricProblemBuilder(_OptimizationProblemBuilder):
         self, kind: str, rows: np.ndarray, cols: np.ndarray, values: np.ndarray
     ) -> None:
         """Sum the coefficients of each (row, variable) pair, then record the
-        pairs whose coefficient differs between scenarios.
+        pairs whose coefficient differs between realizations.
 
         *rows* and *cols* are shaped ``(N,)``, *values* ``(N, S)``.
         """
@@ -245,7 +325,7 @@ class _ParametricProblemBuilder(_OptimizationProblemBuilder):
         )
 
     # ------------------------------------------------------------------
-    # Variables: shared by all scenarios, bounds may depend on them
+    # Variables: shared by all realizations, bounds may depend on them
     # ------------------------------------------------------------------
 
     def _variable_coords(
@@ -274,8 +354,8 @@ class _ParametricProblemBuilder(_OptimizationProblemBuilder):
                 return value.isel({SCENARIO: s})  # type: ignore[union-attr]
             return value
 
-        # Checked in every scenario, not only the nominal one.
-        per_scenario = [
+        # Checked in every realization, not only the nominal one.
+        per_realization = [
             super(_ParametricProblemBuilder, self)._resolve_bounds(
                 var,
                 comp_ids,
@@ -284,13 +364,13 @@ class _ParametricProblemBuilder(_OptimizationProblemBuilder):
                 in_scenario(lower_value, s),
                 in_scenario(upper_value, s),
             )
-            for s in range(self._n_scenarios)
+            for s in range(self._n_realizations)
         ]
         self._pending_bounds = (
-            np.stack([lower for lower, _ in per_scenario], axis=-1),
-            np.stack([upper for _, upper in per_scenario], axis=-1),
+            np.stack([lower for lower, _ in per_realization], axis=-1),
+            np.stack([upper for _, upper in per_realization], axis=-1),
         )
-        return per_scenario[0]
+        return per_realization[0]
 
     def _on_variable_added(self, linopy_var: linopy.Variable) -> None:
         if self._pending_bounds is None:
@@ -313,7 +393,7 @@ class _ParametricProblemBuilder(_OptimizationProblemBuilder):
         super()._add_constraint(constraint.isel({SCENARIO: 0}), name)
         row_labels = self.linopy_model.constraints[name].labels
 
-        n = self._n_scenarios
+        n = self._n_realizations
         sizes = {**constraint.coeffs.sizes, **constraint.rhs.sizes, SCENARIO: n}
         row_dims: List[Hashable] = list(row_labels.dims)
         rows = _as_array(row_labels, row_dims, sizes).reshape(-1)  # (R,)
@@ -338,7 +418,7 @@ class _ParametricProblemBuilder(_OptimizationProblemBuilder):
         self._add_varying("rhs", rhs, rows=rows)
 
     # ------------------------------------------------------------------
-    # Objective: one per scenario
+    # Objective: one per realization
     # ------------------------------------------------------------------
 
     def _sum_objective_contribution(
@@ -354,7 +434,7 @@ class _ParametricProblemBuilder(_OptimizationProblemBuilder):
         return contribution.sum(dim=others)  # type: ignore[union-attr,return-value]
 
     def _set_objective(self, total_obj: Optional[VectorizedExpr]) -> float:
-        n = self._n_scenarios
+        n = self._n_realizations
         constants: Optional[np.ndarray] = None
 
         if isinstance(total_obj, xr.DataArray) and _has_scenario(total_obj):
@@ -375,7 +455,7 @@ class _ParametricProblemBuilder(_OptimizationProblemBuilder):
         if constants is None:
             constants = np.full(n, nominal_constant)
         # linopy keeps the constant out of the model (and of the MPS file):
-        # written for every scenario whenever it is not zero.
+        # written for every realization whenever it is not zero.
         if np.any(constants != 0):
             self.entries.add("obj_const", constants.reshape(1, -1).astype(float))
         return nominal_constant
