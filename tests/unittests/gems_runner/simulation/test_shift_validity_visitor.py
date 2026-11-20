@@ -10,15 +10,26 @@
 #
 # This file is part of the Antares project.
 
-"""Unit tests for ShiftValidityVisitor and _ShiftAmountEvaluator."""
+"""Unit tests for ShiftValidityVisitor."""
 
 import numpy as np
 import pytest
 import xarray as xr
 
-from gems_craft.expression.expression import literal, param, relative_time, var
+from gems_craft.expression.expression import (
+    literal,
+    param,
+    port_field,
+    relative_time,
+    var,
+)
 from gems_craft.expression.visitor import visit
 from gems_runner.simulation.vectorized_builder import ShiftValidityVisitor
+
+
+def _valid(mask):
+    """Mask values, ``True`` when the visitor returns None (all valid)."""
+    return np.array(True) if mask is None else mask.values
 
 
 def _visitor(param_arrays=None, block_length=4):
@@ -59,21 +70,6 @@ def test_variable_returns_none():
 
 
 # ---------------------------------------------------------------------------
-# Arithmetic over leaves — None propagates
-# ---------------------------------------------------------------------------
-
-
-def test_addition_of_params_returns_none(per_comp_lag):
-    expr = param("lag") + literal(1.0)
-    assert visit(expr, _visitor(per_comp_lag)) is None
-
-
-def test_negation_of_param_returns_none(per_comp_lag):
-    expr = -param("lag")
-    assert visit(expr, _visitor(per_comp_lag)) is None
-
-
-# ---------------------------------------------------------------------------
 # time_shift with compile-time constant shift
 # ---------------------------------------------------------------------------
 
@@ -95,11 +91,9 @@ def test_time_shift_positive_literal_blocks_last_t():
     np.testing.assert_array_equal(mask.values, [True, True, False])
 
 
-def test_time_shift_zero_returns_all_true():
+def test_time_shift_zero_returns_none():
     expr = var("x").shift(0)
-    mask = visit(expr, _visitor(block_length=3))
-    assert mask is not None
-    assert bool(mask.all())
+    assert visit(expr, _visitor(block_length=3)) is None
 
 
 # ---------------------------------------------------------------------------
@@ -142,22 +136,6 @@ def test_time_sum_positive_to_blocks_last_t():
     np.testing.assert_array_equal(mask.values, [True, True, True, False])
 
 
-@pytest.mark.parametrize("start, end", [(0, 4), (-1, 1)])
-def test_time_sum_absolute_bounds_never_dropped(start: int, end: int) -> None:
-    # Absolute indices wrap around the block, as x[N], also outside it.
-    expr = var("x").time_sum_between(start, end)
-    assert visit(expr, _visitor(block_length=4)) is None
-
-
-def test_time_sum_mixed_bounds_only_relative_bound_checked():
-    # sum from index -1 to t: the relative end stays in the block, the
-    # absolute start wraps; valid at every t
-    expr = var("x").time_sum_between(-1, relative_time(0))
-    mask = visit(expr, _visitor(block_length=4))
-    assert mask is not None
-    np.testing.assert_array_equal(mask.values, [True, True, True, True])
-
-
 def test_time_sum_mixed_bounds_blocks_last_t():
     # sum from index 0 to t+1: t=3 accesses 4 >= 4, invalid
     expr = var("x").time_sum_between(0, relative_time(1))
@@ -185,8 +163,7 @@ def test_time_sum_mixed_bounds_blocks_last_t():
 def test_time_sum_shifted_operand_checked_at_summed_positions(start, end, expected):
     expr = var("x").shift(-1).time_sum_between(start, end)
     mask = visit(expr, _visitor(block_length=4))
-    assert mask is not None
-    np.testing.assert_array_equal(mask.values, expected)
+    np.testing.assert_array_equal(_valid(mask), expected)
 
 
 def test_time_sum_empty_does_not_read_operand():
@@ -227,69 +204,121 @@ def test_nested_shifts_and_combined():
     np.testing.assert_array_equal(mask.values, [False, True, False])
 
 
-def test_shift_inside_multiplication():
-    # shift -1 inside a multiplication: same validity as bare shift -1
-    expr = literal(2.0) * var("x").shift(-1)
-    mask = visit(expr, _visitor(block_length=3))
-    assert mask is not None
-    np.testing.assert_array_equal(mask.values, [False, True, True])
-
-
 # ---------------------------------------------------------------------------
-# Unevaluable shift — raises ValueError
+# Invalid time amounts — raise ValueError
 # ---------------------------------------------------------------------------
 
 
-def test_unevaluable_shift_raises():
-    # shift = var("p") is a variable, not a parameter → unevaluable → error
-    shift_expr = var("p")
-    expr = var("x").shift(shift_expr)
-    with pytest.raises(ValueError, match="not evaluable"):
+def test_variable_in_shift_raises():
+    expr = var("x").shift(var("p"))
+    with pytest.raises(ValueError, match="cannot contain the variable"):
         visit(expr, _visitor(block_length=4))
 
 
-# ---------------------------------------------------------------------------
-# Time- or scenario-dependent parameter in shift — raises specific error
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def time_dependent_lag():
-    """Lag parameter that varies over both component and time."""
-    return {
-        ("m", "lag"): xr.DataArray(
-            [[1.0, 2.0, 1.0, 2.0], [2.0, 1.0, 2.0, 1.0]],
-            dims=["component", "time"],
-            coords={"component": ["c1", "c2"], "time": [0, 1, 2, 3]},
-        )
-    }
-
-
-@pytest.fixture
-def scenario_dependent_lag():
-    """Lag parameter that varies over scenario."""
-    return {
-        ("m", "lag"): xr.DataArray(
-            [1.0, 2.0],
-            dims=["scenario"],
-            coords={"scenario": ["s1", "s2"]},
-        )
-    }
-
-
-def test_time_dependent_param_in_shift_raises(time_dependent_lag):
-    expr = var("x").shift(param("lag"))
-    with pytest.raises(ValueError, match="depends on time"):
-        visit(expr, _visitor(time_dependent_lag, block_length=4))
-
-
-def test_time_dependent_param_in_time_sum_bound_raises(time_dependent_lag):
+def test_time_dependent_param_in_time_sum_bound_raises():
+    lag = xr.DataArray([1.0, 2.0, 1.0, 2.0], dims=["time"], coords={"time": range(4)})
     expr = var("x").time_sum(-param("lag"), 0)
     with pytest.raises(ValueError, match="depends on time"):
-        visit(expr, _visitor(time_dependent_lag, block_length=4))
+        visit(expr, _visitor({("m", "lag"): lag}, block_length=4))
 
 
-def test_scenario_dependent_param_in_shift_raises(scenario_dependent_lag):
+# ---------------------------------------------------------------------------
+# Shift varying per component, time step or scenario
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "lag, expected",
+    [
+        pytest.param(
+            # t + lag = [1, 3, 3, 5] for c1, [2, 2, 4, 4] for c2
+            xr.DataArray(
+                [[1.0, 2.0, 1.0, 2.0], [2.0, 1.0, 2.0, 1.0]],
+                dims=["component", "time"],
+                coords={"component": ["c1", "c2"], "time": [0, 1, 2, 3]},
+            ),
+            [[True, True, True, False], [True, True, False, False]],
+            id="time",
+        ),
+        pytest.param(
+            # t + lag = [1, 2, 3, 4] for s1, [2, 3, 4, 5] for s2
+            xr.DataArray([1.0, 2.0], dims=["scenario"], coords={"scenario": [0, 1]}),
+            [[True, True, True, False], [True, True, False, False]],
+            id="scenario",
+        ),
+    ],
+)
+def test_shift_by_a_varying_parameter(lag, expected):
     expr = var("x").shift(param("lag"))
-    with pytest.raises(ValueError, match="depends on scenario"):
-        visit(expr, _visitor(scenario_dependent_lag, block_length=4))
+    mask = visit(expr, _visitor({("m", "lag"): lag}, block_length=4))
+    other = "component" if "component" in lag.dims else "scenario"
+    np.testing.assert_array_equal(mask.transpose(other, "time").values, expected)
+
+
+# ---------------------------------------------------------------------------
+# Dropped where a variable is read out of the block; parameters read modulo it
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        pytest.param(param("d").shift(-1), True, id="shifted-parameter"),
+        pytest.param(var("x").eval(4), False, id="index-out"),
+        pytest.param(
+            var("x").eval(param("d")), [True, False, False, True], id="index-by-d"
+        ),
+        # d[t-1] = [2, 1, 5, -1]
+        pytest.param(
+            var("x").eval(param("d").shift(-1)),
+            [True, True, False, False],
+            id="index-by-d[t-1]",
+        ),
+        # t + d[t-1] = [2, 2, 7, 2]
+        pytest.param(
+            var("x").shift(param("d").shift(-1)),
+            [True, True, False, True],
+            id="shift-by-d[t-1]",
+        ),
+        pytest.param(var("x").time_sum_between(-1, 1), False, id="absolute-sum"),
+        pytest.param(
+            var("x").time_sum_between(-1, relative_time(0)), False, id="mixed-sum"
+        ),
+        # x[s + d[s]] for s in t-1 .. t: out of the block at s = 1 and s = 3
+        pytest.param(
+            var("x").shift(param("d")).time_sum(-1, 0),
+            [True, False, False, False],
+            id="sum-of-shift-by-d",
+        ),
+        # Nested time operators: shifts add up
+        pytest.param(var("x").shift(-1).shift(1), True, id="shift-of-shift"),
+        pytest.param(var("x").shift(-1).eval(0), False, id="index-of-shift"),
+        pytest.param(
+            var("x").time_sum(-1, 0).shift(1),
+            [True, True, True, False],
+            id="shift-of-sum",
+        ),
+    ],
+)
+def test_variable_read_out_of_the_block(expr, expected):
+    d = xr.DataArray([1.0, 5.0, -1.0, 2.0], dims=["time"], coords={"time": range(4)})
+    mask = visit(expr, _visitor({("m", "d"): d}))
+    np.testing.assert_array_equal(_valid(mask), expected)
+
+
+def test_parameters_and_port_fields_are_never_dropped():
+    # The shift of a parameter is not evaluated: a non-integer one does not raise.
+    expr = param("d").shift(param("k")) + port_field("p", "f").sum_connections().shift(
+        -1
+    )
+    assert visit(expr, _visitor({("m", "k"): xr.DataArray(0.5)})) is None
+
+
+def test_time_independent_variable_is_never_dropped():
+    visitor = ShiftValidityVisitor(
+        model_id="m",
+        param_arrays={},
+        block_length=4,
+        time_independent_variables=frozenset({"x"}),
+    )
+    assert visit(var("x").shift(-1) + var("x").eval(10), visitor) is None

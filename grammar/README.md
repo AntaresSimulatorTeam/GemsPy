@@ -8,7 +8,9 @@ parser code, which must be written to [gems_craft.expression.parsing.antlr](/src
 package. **No other files are expected to be present in that package**.
 
 To achieve this you may use the provided `generate-parser.sh` script after having installed
-antlr4-tools (`pip install -r requirements-dev.txt` in root directory).
+antlr4-tools (`uv sync --group dev` in root directory), for example with
+`uv run bash grammar/generate-parser.sh`. Then format the generated files with
+`black` and `isort`, as for the rest of `src`.
 
 You may also, for example, use the ANTLR4 PyCharm plugin.
 

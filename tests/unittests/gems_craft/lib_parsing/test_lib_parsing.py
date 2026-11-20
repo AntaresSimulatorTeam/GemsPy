@@ -638,7 +638,7 @@ def test_bare_defined_port_field_in_binding_constraint_raises() -> None:
     input_lib = parse_yaml_library(
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.flow >= 0"))
     )
-    with pytest.raises(ValueError, match="Bare port field"):
+    with pytest.raises(ParsingException, match="ParseCancellationException"):
         resolve_library([input_lib])
 
 
@@ -647,25 +647,18 @@ def test_bare_undefined_port_field_in_binding_constraint_raises() -> None:
     input_lib = parse_yaml_library(
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.price >= 0"))
     )
-    with pytest.raises(ValueError, match="Bare port field"):
+    with pytest.raises(ParsingException, match="ParseCancellationException"):
         resolve_library([input_lib])
 
 
-@pytest.mark.parametrize(
-    "extra_output_expr, match",
-    [
-        ("balance_port.price^2", "Bare port field"),
-        ("2^sum_connections(balance_port.flow)", "sum_connections"),
-    ],
-)
-def test_port_field_rules_apply_inside_power(
-    extra_output_expr: str, match: str
-) -> None:
-    """Both operands of ^ are checked; extra outputs allow non-linear ^."""
+def test_sum_connections_rules_apply_inside_power() -> None:
+    """The operands of ^ are checked; extra outputs allow non-linear ^."""
     input_lib = parse_yaml_library(
-        io.StringIO(_port_model_yaml(extra_output_expr=extra_output_expr))
+        io.StringIO(
+            _port_model_yaml(extra_output_expr="2^sum_connections(balance_port.flow)")
+        )
     )
-    with pytest.raises(ValueError, match=match):
+    with pytest.raises(ValueError, match="sum_connections"):
         resolve_library([input_lib])
 
 
