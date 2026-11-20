@@ -4,6 +4,13 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-20
+
+The expression language gains the power operator `^`. Simulation table views
+are renamed so they are not confused with GEMS views, and heuristic
+inputs/outputs must set `type` explicitly. This release contains breaking
+changes, marked **Breaking** below.
+
 ### Added
 - **Power operator `^`** - `p^2`, `2^p`, `p^(1 + q)` in any expression of a
   model library; `^` was a parse error before. It binds tighter than `*`, `/`
