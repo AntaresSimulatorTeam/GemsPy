@@ -44,6 +44,10 @@ from tests.e2e.functional.test_sequential_carry_over_length import (
 )
 
 _STUDY_13_1 = Path(__file__).parent / "studies" / "13_1"
+# p_max depends on the scenario: parallel mode solves each scenario separately.
+STUDY_13_1_SCENARIO_DEPENDENT = (
+    Path(__file__).parent / "studies" / "13_1_scenario_dependent"
+)
 
 
 def _sequential_overlap() -> SimulationTable:
@@ -56,14 +60,17 @@ def _sequential_overlap() -> SimulationTable:
 
 
 def _run_13_1(
-    mode: ResolutionMode, scenarios: list, **resolution: int
+    mode: ResolutionMode,
+    scenarios: list,
+    study: Path = _STUDY_13_1,
+    **resolution: int,
 ) -> SimulationTable:
     config = OptimConfig(
         time_scope=TimeScopeConfig(first_time_step=0, last_time_step=3),
         scenario_scope=ScenarioScopeConfig(include=scenarios),
         resolution=ResolutionConfig(mode=mode, **resolution),
     )
-    return SimulationSession(load_study(_STUDY_13_1), config).run()
+    return SimulationSession(load_study(study), config).run()
 
 
 def test_sequential_overlap_needs_block_only_in_the_overlap() -> None:
@@ -108,7 +115,10 @@ def test_objective_values_frontal() -> None:
 
 def test_objective_values_parallel() -> None:
     objective = _run_13_1(
-        ResolutionMode.PARALLEL_SUBPROBLEMS, [0, 1], block_length=2
+        ResolutionMode.PARALLEL_SUBPROBLEMS,
+        [0, 1],
+        study=STUDY_13_1_SCENARIO_DEPENDENT,
+        block_length=2,
     ).objective_values()
 
     pairs = sorted(zip(objective["scenario_index"], objective["block"]))

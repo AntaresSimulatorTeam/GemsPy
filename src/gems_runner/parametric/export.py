@@ -20,14 +20,13 @@ docs/user-guide/optimisation.md for the format.
 
 import json
 from pathlib import Path
-from typing import Dict, Optional, Set, Tuple
+from typing import Dict, Optional
 
-from gems_craft.optim_config.parsing import (
-    ElementLocation,
-    OptimConfig,
-    ResolutionMode,
+from gems_craft.optim_config.parsing import OptimConfig, ResolutionMode
+from gems_craft.optim_config.validation import (
+    check_variables_depend_on_scenario,
+    validate_optim_config,
 )
-from gems_craft.optim_config.validation import validate_optim_config
 from gems_craft.study.study import Study
 from gems_craft.study.validation import check_data_requirements
 from gems_runner.parametric.builder import _ParametricProblemBuilder
@@ -97,9 +96,8 @@ def export_parametric_problems(
             "Benders decomposition requires a master problem: no element of "
             "the optim-config is located in the master."
         )
-    scenario_ids = optim_config.scenario_scope.scenario_ids
-    if len(scenario_ids) > 1:
-        _check_scenario_dependent_variables(study, optim_config)
+    if mode != ResolutionMode.PARALLEL_SUBPROBLEMS:  # parallel: checked above
+        check_variables_depend_on_scenario(optim_config, study.system)
     check_data_requirements(study)
 
     output_dir = Path(output_dir)
@@ -107,6 +105,7 @@ def export_parametric_problems(
     # Removed first: a folder without manifest is incomplete.
     (output_dir / MANIFEST_FILE).unlink(missing_ok=True)
 
+    scenario_ids = optim_config.scenario_scope.scenario_ids
     oob_filter = OutOfBoundsFilter(optim_config)
     builders: Dict[str, _ParametricProblemBuilder] = {}
 
@@ -145,49 +144,6 @@ def export_parametric_problems(
     }
     (output_dir / MANIFEST_FILE).write_text(json.dumps(manifest, indent=2))
     return output_dir
-
-
-def _check_scenario_dependent_variables(
-    study: Study, optim_config: OptimConfig
-) -> None:
-    """Reject the variables that do not depend on the scenario: each scenario
-    of the export would give them its own value.  In Benders mode, only the
-    subproblem is checked, and its variables fixed by the master are allowed."""
-    location_filter: Optional[DecompositionFilter] = None
-    fixed_by_master: Set[Tuple[str, str]] = set()
-    if optim_config.resolution.mode == ResolutionMode.BENDERS_DECOMPOSITION:
-        location_filter = DecompositionFilter(
-            optim_config,
-            {ElementLocation.SUBPROBLEMS, ElementLocation.MASTER_AND_SUBPROBLEMS},
-        )
-        fixed_by_master = {
-            (mc.id, v.id)
-            for mc in optim_config.models
-            if mc.model_decomposition is not None
-            for v in mc.model_decomposition.variables
-            if v.location == ElementLocation.MASTER_AND_SUBPROBLEMS
-        }
-
-    for model_id in study.model_components:
-        model = study.models[model_id]
-        for var in model.variables.values():
-            key = (model.id, var.name)
-            if (
-                var.structure.scenario
-                or key in fixed_by_master
-                or (location_filter and not location_filter.include_variable(*key))
-            ):
-                continue
-            raise ValueError(
-                f"Variable '{var.name}' of model '{model.id}' does not depend on "
-                "the scenario: each exported scenario would give it its own "
-                "value. Export one scenario at a time"
-                + (
-                    ", or locate it in 'master-and-subproblems'."
-                    if location_filter
-                    else "."
-                )
-            )
 
 
 def _write_problem(

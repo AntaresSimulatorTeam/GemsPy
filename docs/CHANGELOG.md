@@ -31,6 +31,9 @@ All notable changes to GemsPy are documented here.
   must now set `type`; it no longer defaults to `parameter`.
 - **Breaking** - `ExpressionVisitor.power` is abstract: a custom visitor must
   implement it to be instantiated.
+- **Breaking** - In `parallel-subproblems` mode with several scenarios, a
+  variable that does not depend on the scenario is rejected: each scenario is
+  solved separately, so it took a different value in each one.
 
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
