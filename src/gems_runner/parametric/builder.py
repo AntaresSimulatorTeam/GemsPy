@@ -225,10 +225,12 @@ class _ParametricProblemBuilder(_OptimizationProblemBuilder):
     def _param_array(
         self, param: Parameter, components: List[Component]
     ) -> xr.DataArray:
-        """Values of *param* in each realization when it depends on time or on
-        the scenario: the time steps are those of the block."""
+        """Values of *param* in each realization when it depends on the
+        scenario, or on time with several blocks: the time steps are those of
+        the block."""
         use_time, use_scenario = param.structure.time, param.structure.scenario
-        if not (use_time or use_scenario):
+        if not (use_scenario or (use_time and len(self.blocks) > 1)):
+            # Same values in every realization.
             return super()._param_array(param, components)
 
         n_blocks, n_scenarios = len(self.blocks), len(self.scenario_ids)

@@ -27,6 +27,7 @@ from gems_craft.model.resolve_library import resolve_library
 from gems_craft.optim_config.parsing import (
     OptimConfig,
     ResolutionMode,
+    ScenarioScopeConfig,
     load_optim_config,
 )
 from gems_craft.study import Study
@@ -109,24 +110,22 @@ def test_benders_study_exports_master_subproblem_and_structure(
     config = load_optim_config(input_dir / "optim-config.yml")
     assert config is not None
     config.resolution.mode = ResolutionMode.BENDERS_DECOMPOSITION
+    # `p_max` does not depend on the scenario: allowed, fixed by the master.
+    config.scenario_scope = ScenarioScopeConfig(include=["0-1"])
 
     export_parametric_problems(study, config, tmp_path / "export")
 
     manifest = json.loads((tmp_path / "export" / "manifest.json").read_text())
     assert manifest["blocks"] == [1]
+    assert manifest["problems"] == ["master", "subproblem"]
     export_dir = tmp_path / "export"
-    for name in ("master", "subproblem"):
+    for name in manifest["problems"]:
         assert (export_dir / f"{name}.mps").exists()
         assert (export_dir / f"{name}_parameters.parquet").exists()
 
-    # Same structure.txt as the one written for a Benders run.
+    # Same structure.txt as the one written for a Benders run of one scenario.
     reference_dir = tmp_path / "reference"
-    decomposed = build_decomposed_problems(
-        study,
-        TimeBlock(1, [0]),
-        config.scenario_scope.scenario_ids,
-        config,
-    )
+    decomposed = build_decomposed_problems(study, TimeBlock(1, [0]), [0], config)
     dump_couplings(build_couplings(decomposed, config), reference_dir)
     assert (export_dir / "structure.txt").read_text() == (
         reference_dir / "structure.txt"

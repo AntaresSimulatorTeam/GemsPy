@@ -133,9 +133,15 @@ export_parametric_problems(study, optim_config, Path("my_study/export"))
 ~~~
 
 Scenarios are those of `scenario-scope`, resolved by the
-[scenario builder](scenario-builder.md), and equally likely. Parameters that
-depend on time or on the scenario vary; they may appear anywhere (right-hand
-side, coefficient, bound, objective).
+[scenario builder](scenario-builder.md). Parameters that depend on time or on
+the scenario vary; they may appear anywhere (right-hand side, coefficient,
+bound, objective).
+
+Each block and scenario is a problem of its own: `expec()` applies to one
+scenario, so the objective is not weighted by the scenario probability. With
+several scenarios, every variable must therefore depend on the scenario; in
+Benders mode, a variable of the subproblem may not depend on it only if it is
+located in `master-and-subproblems`.
 
 Blocks follow `resolution.mode`: one block for `frontal`, one per
 `block-length` for `parallel-subproblems` (the time scope must be a multiple
@@ -144,12 +150,22 @@ of `block-length`), a `master` and a `subproblem` for `benders-decomposition`.
 
 ~~~
 export/
-  manifest.json                {"format_version": 1, "scenarios": [0, 1, 2], "blocks": [0, 1]}
+  manifest.json                {"format_version": 1, "problems": ["problem"], "scenarios": [0, 1, 2], "blocks": [0, 1]}
   problem.mps                  problem of the first block and scenario
   problem_parameters.parquet   entries that differ between blocks or scenarios
 ~~~
 
+In Benders mode, `problem` is replaced by `master` and `subproblem` (one MPS
+and one Parquet file each, `"problems": ["master", "subproblem"]`), and
+`structure.txt` lists the variables shared by both, as for a Benders run.
+
 The Parquet file has one row per entry, block and scenario: `kind` (`rhs`,
 `coef`, `lower`, `upper`, `obj`, `obj_const`), `row` and `col` (names in the
-MPS file, empty when not relevant), `block`, `scenario` and `value`. The
-objective constant is not in the MPS file: it is given by `obj_const`.
+MPS file, null when not relevant), `block`, `scenario` and `value`.
+
+- `rhs`: each row of the MPS file has one finite bound, or two equal ones
+  (equality); the value replaces it, or both.
+- `coef`: the coefficient may be absent from the MPS file (zero in the first
+  block and scenario); it must then be added.
+- `obj_const`: the objective constant, not in the MPS file; written for every
+  block and scenario when it is not zero.

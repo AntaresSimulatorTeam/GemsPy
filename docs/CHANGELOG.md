@@ -9,7 +9,9 @@ All notable changes to GemsPy are documented here.
   output_dir)` (`gems_runner.parametric`) writes one problem shared by all
   time blocks and scenarios (MPS) and the entries that differ between blocks
   or scenarios (Parquet). Frontal, parallel (blocks of equal length) and
-  Benders modes are supported; sequential mode is rejected.
+  Benders modes are supported; sequential mode is rejected, and so are
+  variables that do not depend on the scenario when several scenarios are
+  exported (except Benders coupling variables).
 - **Power operator `^`** - `p^2`, `2^p`, `p^(1 + q)` in any expression of a
   model library; `^` was a parse error before. It binds tighter than `*`, `/`
   and unary minus (`-2^2` is `-(2^2) = -4`), and is right-associative (`2^3^2`

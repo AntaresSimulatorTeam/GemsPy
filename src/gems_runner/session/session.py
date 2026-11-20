@@ -38,34 +38,13 @@ from gems_runner.simulation.simulation_table import (
 )
 from gems_runner.simulation.table_folder import _TableWriter
 from gems_runner.simulation.table_schema import _empty_frame
-from gems_runner.simulation.time_block import TimeBlock
+from gems_runner.simulation.time_block import (
+    TimeBlock,
+    parallel_blocks,
+    time_scope_block,
+)
 
 SIMULATION_TABLE_FOLDER = "simulation_table"
-
-
-def time_scope_block(optim_config: OptimConfig, block_id: int) -> TimeBlock:
-    """One block covering the whole time scope (frontal and Benders modes)."""
-    return TimeBlock(
-        block_id,
-        list(
-            range(
-                optim_config.time_scope.first_time_step,
-                optim_config.time_scope.last_time_step + 1,
-            )
-        ),
-    )
-
-
-def parallel_blocks(optim_config: OptimConfig) -> List[TimeBlock]:
-    """Split the time scope into consecutive blocks of ``block-length`` time
-    steps, the last one possibly shorter (parallel-subproblems mode)."""
-    block_length: int = optim_config.resolution.block_length  # type: ignore[assignment]
-    first = optim_config.time_scope.first_time_step
-    last = optim_config.time_scope.last_time_step
-    return [
-        TimeBlock(i, list(range(t, min(t + block_length, last + 1))))
-        for i, t in enumerate(range(first, last + 1, block_length))
-    ]
 
 
 class SimulationSession:

@@ -18,19 +18,13 @@ export must have the objective of the block built for that scenario alone.
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from gems_craft.expression.expression import (
-    ExpressionNode,
-    literal,
-    maximum,
-    param,
-    var,
-)
+from gems_craft.expression.expression import ExpressionNode, literal, param, var
 from gems_craft.expression.indexing_structure import IndexingStructure
 from gems_craft.model import Constraint, float_parameter, float_variable, model
 from gems_craft.optim_config.parsing import OptimConfig
@@ -45,8 +39,8 @@ from gems_craft.study import (
     create_component,
 )
 from gems_runner.parametric import export_parametric_problems
-from gems_runner.session.session import parallel_blocks
 from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.simulation.time_block import parallel_blocks
 from tests.unittests.gems_runner.parametric.reconstruct import solve_realization
 
 CONSTANT = IndexingStructure(False, False)
@@ -62,7 +56,9 @@ def _study(
     gen_upper: ExpressionNode = literal(50),
     availability: ExpressionNode = literal(1),
     gen_cost: ExpressionNode = param("cost"),
+    fixed_cost: ExpressionNode = literal(0),
     p_values: Optional[List[float]] = None,
+    cap_structure: IndexingStructure = SCENARIO_ONLY,
 ) -> Study:
     """One plant (`gen` bounded by `availability * cap`) meeting a demand,
     with unsupplied energy at 1000 per unit."""
@@ -72,7 +68,6 @@ def _study(
             float_parameter("demand", TIME_SCENARIO),
             float_parameter("export", TIME_ONLY),
             float_parameter("p", SCENARIO_ONLY),
-            float_parameter("q", CONSTANT),
             float_parameter("cost", CONSTANT),
         ],
         variables=[
@@ -82,7 +77,7 @@ def _study(
                 "cap",
                 lower_bound=literal(0),
                 upper_bound=literal(100),
-                structure=CONSTANT,
+                structure=cap_structure,
             ),
         ],
         constraints=[
@@ -96,7 +91,8 @@ def _study(
             "operation": (gen_cost * var("gen") + 1000 * var("unsupplied"))
             .time_sum()
             .expec(),
-            "investment": 3 * var("cap"),
+            "investment": (3 * var("cap")).expec(),
+            "fixed": fixed_cost.expec(),
         },
     )
     database = DataBase()
@@ -109,20 +105,21 @@ def _study(
         "P", "p", ScenarioSeriesData(np.array(p_values or [0.5, 0.8, 1.0]))
     )
     database.add_data("P", "export", TimeSeriesData(pd.Series([1.0, 3.0])))
-    database.add_data("P", "q", ConstantData(0.7))
     database.add_data("P", "cost", ConstantData(2))
     system = System("parametric")
     system.add_component(create_component(model=plant, id="P"))
     return Study(system, database)
 
 
-def _config(mode: str = "frontal", block_length: Optional[int] = None) -> OptimConfig:
+def _config(
+    mode: str = "frontal", block_length: Optional[int] = None, time_steps: int = 2
+) -> OptimConfig:
     resolution: Dict[str, object] = {"mode": mode}
     if block_length is not None:
         resolution["block-length"] = block_length
     return OptimConfig.model_validate(
         {
-            "time-scope": {"first-time-step": 0, "last-time-step": TIME_STEPS - 1},
+            "time-scope": {"first-time-step": 0, "last-time-step": time_steps - 1},
             "scenario-scope": {"include": [f"0-{len(SCENARIOS) - 1}"]},
             "resolution": resolution,
         }
@@ -153,17 +150,22 @@ def _assert_realizations_match(
     [
         pytest.param({}, {"rhs"}, id="rhs"),
         pytest.param({"availability": param("p")}, {"rhs", "coef"}, id="coefficient"),
+        pytest.param(
+            {"availability": param("p"), "p_values": [0.0, 0.8, 1.0]},
+            {"rhs", "coef"},
+            id="coefficient-absent-from-the-mps",
+        ),
         pytest.param({"gen_upper": 10 * param("p")}, {"rhs", "upper"}, id="bound"),
         pytest.param({"gen_cost": 4 * param("p")}, {"rhs", "obj"}, id="objective"),
         pytest.param(
-            {"availability": maximum(param("p"), param("q"))},
-            {"rhs", "coef"},
-            id="nonlinear-in-parameters",
+            {"fixed_cost": 10 * param("p")},
+            {"rhs", "obj_const"},
+            id="objective-constant",
         ),
     ],
 )
 def test_each_scenario_rebuilt_from_the_export_has_its_own_objective(
-    study_kwargs: Dict[str, ExpressionNode], kinds: set, tmp_path: Path
+    study_kwargs: Dict[str, Any], kinds: set, tmp_path: Path
 ) -> None:
     study = _study(**study_kwargs)
     export_parametric_problems(study, _config(), tmp_path)
@@ -199,6 +201,7 @@ def test_parallel_mode_exports_one_problem_for_all_blocks(tmp_path: Path) -> Non
     manifest = json.loads((tmp_path / "manifest.json").read_text())
     assert manifest == {
         "format_version": 1,
+        "problems": ["problem"],
         "scenarios": SCENARIOS,
         "blocks": [b.id for b in blocks],
     }
@@ -210,29 +213,33 @@ def test_parallel_mode_exports_one_problem_for_all_blocks(tmp_path: Path) -> Non
     _assert_realizations_match(study, tmp_path, blocks)
 
 
-def test_blocks_of_different_lengths_are_rejected_before_writing(
-    tmp_path: Path,
+@pytest.mark.parametrize(
+    ("study_kwargs", "config", "match"),
+    [
+        pytest.param(
+            {},
+            _config("sequential-subproblems", block_length=1),
+            "parallel-subproblems",
+            id="sequential-mode",
+        ),
+        pytest.param(
+            {},
+            _config("parallel-subproblems", block_length=2, time_steps=3),
+            "multiple of 'block-length'",
+            id="blocks-of-different-lengths",
+        ),
+        pytest.param(
+            {"cap_structure": CONSTANT},
+            _config(),
+            "'cap' of model 'PLANT' does not depend on the scenario",
+            id="scenario-independent-variable",
+        ),
+    ],
+)
+def test_export_is_rejected_before_writing(
+    study_kwargs: Dict[str, Any], config: OptimConfig, match: str, tmp_path: Path
 ) -> None:
     output_dir = tmp_path / "export"
-    config = OptimConfig.model_validate(
-        {
-            "time-scope": {"first-time-step": 0, "last-time-step": 2},
-            "resolution": {"mode": "parallel-subproblems", "block-length": 2},
-        }
-    )
-    with pytest.raises(ValueError, match="multiple of 'block-length'"):
-        export_parametric_problems(_study(), config, output_dir)
-    assert not output_dir.exists()
-
-
-def test_sequential_mode_is_rejected_before_writing(tmp_path: Path) -> None:
-    output_dir = tmp_path / "export"
-    config = OptimConfig.model_validate(
-        {
-            "time-scope": {"first-time-step": 0, "last-time-step": 1},
-            "resolution": {"mode": "sequential-subproblems", "block-length": 1},
-        }
-    )
-    with pytest.raises(ValueError, match="parallel-subproblems"):
-        export_parametric_problems(_study(), config, output_dir)
+    with pytest.raises(ValueError, match=match):
+        export_parametric_problems(_study(**study_kwargs), config, output_dir)
     assert not output_dir.exists()
