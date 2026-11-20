@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
 
 from pydantic import Field, ValidationError, model_validator
-from yaml import safe_dump, safe_load
+from yaml import safe_dump
 
-from gems_craft.utils import ModifiedBaseModel
+from gems_craft.utils import ModifiedBaseModel, load_yaml
 
 
 class PortConnectionsSchema(ModifiedBaseModel):
@@ -104,7 +104,7 @@ def load_input_system(
 ) -> SystemSchema:
     try:
         with input_study.open() as f:
-            return schema.model_validate(safe_load(f))
+            return schema.model_validate(load_yaml(f))
     except ValidationError as e:
         raise ValueError(f"An error occurred during parsing: {e}")
 
@@ -116,7 +116,7 @@ def parse_yaml_system(input_study: TextIO, schema: Type[_S]) -> _S: ...
 def parse_yaml_system(
     input_study: TextIO, schema: Type[SystemSchema] = SystemSchema
 ) -> SystemSchema:
-    tree = safe_load(input_study)
+    tree = load_yaml(input_study)
     return schema.model_validate(tree["system"])
 
 

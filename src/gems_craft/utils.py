@@ -16,9 +16,13 @@ Module for technical utilities.
 
 import json
 import pathlib
-from typing import Any, Callable, Dict, Optional, TypeVar
+from typing import IO, Any, Callable, Dict, Optional, TypeVar, Union
 
+import yaml
 from pydantic import BaseModel, ConfigDict
+
+# libyaml-backed loader (~4x faster), falling back to pure Python if unavailable.
+_SafeLoader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -71,6 +75,11 @@ def read_json(filename: str, path: pathlib.Path) -> Dict[str, Any]:
     with (path / filename).open() as file:
         data = json.load(file)
     return data
+
+
+def load_yaml(stream: Union[str, IO[Any]]) -> Any:
+    """Parse a YAML document like ``yaml.safe_load``, with libyaml when available."""
+    return yaml.load(stream, Loader=_SafeLoader)
 
 
 """

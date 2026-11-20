@@ -23,10 +23,9 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from yaml import safe_load
 
 from gems_craft.study.parsing import HeuristicId
-from gems_craft.utils import ModifiedBaseModel
+from gems_craft.utils import ModifiedBaseModel, load_yaml
 
 
 class ElementLocation(str, Enum):
@@ -392,7 +391,7 @@ def load_optim_config(config_path: Path) -> Optional[OptimConfig]:
         return None
     try:
         with config_path.open() as config_file:
-            config = OptimConfig.model_validate(safe_load(config_file))
+            config = OptimConfig.model_validate(load_yaml(config_file))
     except ValidationError as e:
         raise ValueError(f"Invalid {config_path.stem}: {e}")
 

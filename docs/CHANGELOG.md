@@ -31,6 +31,10 @@ changes, marked **Breaking** below.
   must now set `type`; it no longer defaults to `parameter`.
 - **Breaking** - `ExpressionVisitor.power` is abstract: a custom visitor must
   implement it to be instantiated.
+- Faster problem build on large systems: a port field summed from connected
+  components no longer builds a dense (components x connected components)
+  matrix. YAML files (systems, libraries, taxonomy, optim-config) are read
+  with libyaml when it is available.
 
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
