@@ -101,6 +101,12 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             return left - right
         raise ValueError(f"Invalid operator {op}")
 
+    # Visit a parse tree produced by ExprParser#power.
+    def visitPower(self, ctx: ExprParser.PowerContext) -> ExpressionNode:
+        left = ctx.expr(0).accept(self)  # type: ignore
+        right = ctx.expr(1).accept(self)  # type: ignore
+        return left**right
+
     # Visit a parse tree produced by ExprParser#negation.
     def visitNegation(self, ctx: ExprParser.NegationContext) -> ExpressionNode:
         return -ctx.expr().accept(self)  # type: ignore

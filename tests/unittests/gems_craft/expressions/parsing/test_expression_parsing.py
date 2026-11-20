@@ -280,6 +280,31 @@ def test_parsing_visitor(
 
 
 @pytest.mark.parametrize(
+    "variables, parameters, expression_str, expected",
+    [
+        ({}, {"p", "q"}, "p^(1 + q)", param("p") ** (literal(1) + param("q"))),
+        ({"x"}, {}, "x[t-1]^2", var("x").shift(-literal(1)) ** 2),
+        # "^" binds tighter than unary minus and "*", and is right-associative.
+        ({}, {}, "-2^2", -(literal(2) ** 2)),
+        ({}, {}, "2^-3*2", (literal(2) ** -literal(3)) * 2),
+        ({}, {}, "2*3^2", literal(2) * (literal(3) ** 2)),
+        ({}, {}, "2^3^2", literal(2) ** (literal(3) ** 2)),
+        # Inside a time shift, a power is written in parentheses.
+        ({"x"}, {}, "x[t-(2^2)]", var("x").shift(-(literal(2) ** 2))),
+    ],
+)
+def test_parsing_power(
+    variables: Set[str],
+    parameters: Set[str],
+    expression_str: str,
+    expected: ExpressionNode,
+) -> None:
+    identifiers = ModelIdentifiers(variables, parameters)
+    expr = parse_expression(expression_str, identifiers)
+    assert expressions_equal(expr, expected), print_expr(expr)
+
+
+@pytest.mark.parametrize(
     "variables, parameters, constraints, expression_str, expected",
     [
         (set(), set(), {"balance"}, "dual(balance)", DualNode("balance")),
@@ -333,6 +358,9 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
         "x[2*t]",
         "x[t 4]",
         "sum(2*t .. t, x)",
+        "2^",
+        "x[t-2^2]",
+        "2**3",
     ],
 )
 def test_parse_cancellation_should_throw(expression_str: str) -> None:

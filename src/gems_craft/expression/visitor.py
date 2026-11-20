@@ -37,6 +37,7 @@ from gems_craft.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RelativeTimeNode,
     RoundNode,
@@ -74,6 +75,9 @@ class ExpressionVisitor(ABC, Generic[T]):
 
     @abstractmethod
     def division(self, node: DivisionNode) -> T: ...
+
+    @abstractmethod
+    def power(self, node: PowerNode) -> T: ...
 
     @abstractmethod
     def comparison(self, node: ComparisonNode) -> T: ...
@@ -163,6 +167,8 @@ def visit(root: ExpressionNode, visitor: ExpressionVisitor[T]) -> T:
         return visitor.multiplication(root)
     elif isinstance(root, DivisionNode):
         return visitor.division(root)
+    elif isinstance(root, PowerNode):
+        return visitor.power(root)
     elif isinstance(root, ComparisonNode):
         return visitor.comparison(root)
     elif isinstance(root, TimeShiftNode):
@@ -236,7 +242,8 @@ T_op = TypeVar("T_op", bound=SupportsOperations)
 class ExpressionVisitorOperations(ExpressionVisitor[T_op], ABC):
     """
     Provides default implementations of math operations
-    based on (+, -, /, *) operations of type T.
+    based on (+, -, /, *) operations of type T. ``power`` is left to
+    subclasses: numeric ones use ``gems_runner``'s ``real_power``, not ``**``.
     """
 
     def negation(self, node: NegationNode) -> T_op:

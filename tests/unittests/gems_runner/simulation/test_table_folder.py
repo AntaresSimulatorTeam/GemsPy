@@ -586,6 +586,9 @@ def test_a_table_opened_from_a_relative_path_reads_from_anywhere(
     assert pickle.loads(payload).component("gen").output("p").value(1, 1) == 13.0
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="':' is not allowed in Windows folder names"
+)
 @pytest.mark.parametrize("fmt", _FORMATS)
 def test_a_folder_named_like_a_uri_is_read_as_a_local_path(
     tmp_path: Path, fmt: OutputFormat, monkeypatch: pytest.MonkeyPatch

@@ -10,11 +10,25 @@ All notable changes to GemsPy are documented here.
   time blocks and scenarios (MPS) and the entries that differ between blocks
   or scenarios (Parquet). Frontal, parallel (blocks of equal length) and
   Benders modes are supported; sequential mode is rejected.
+- **Power operator `^`** - `p^2`, `2^p`, `p^(1 + q)` in any expression of a
+  model library; `^` was a parse error before. It binds tighter than `*`, `/`
+  and unary minus (`-2^2` is `-(2^2) = -4`), and is right-associative (`2^3^2`
+  is `2^(3^2)`). Inside a time shift, a power is written in parentheses
+  (`x[t-(2^2)]` is `x[t-4]`). In constraints, bounds and objectives, its
+  operands can only be parameters and literals: any power of a variable is
+  rejected as non-linear, even `x^1` and `x^0`. In extra outputs, variables
+  are allowed. `^` never raises on values: a negative base with a fractional
+  exponent gives `nan`, zero with a negative exponent or an overflow gives
+  `inf`, cell by cell. In the Python API, `param("p") ** 2` builds the new `PowerNode`.
 
 ### Changed
 - `ComponentView` and `OutputView` are renamed `ComponentResults` and
   `OutputResults`, so that they are not confused with GEMS views. The calls
   `component(...).output(...)`, `value()` and `data` are unchanged.
+- **Breaking** - In optim-config `heuristics`, every `inputs`/`outputs` entry
+  must now set `type`; it no longer defaults to `parameter`.
+- **Breaking** - `ExpressionVisitor.power` is abstract: a custom visitor must
+  implement it to be instantiated.
 
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.

@@ -20,6 +20,7 @@ fullexpr: expr EOF;
 expr
     : atom                                     # unsignedAtom
     | portFieldExpr                            # portField
+    | <assoc=right> expr '^' expr              # power
     | '-' expr                                 # negation
     | '(' expr ')'                             # expression
     | expr op=('/' | '*') expr                 # muldiv
