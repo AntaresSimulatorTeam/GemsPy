@@ -25,6 +25,7 @@ from pydantic import (
 )
 from yaml import safe_load
 
+from gems_craft.schema_validation import validate_input_schema
 from gems_craft.study.parsing import HeuristicId
 from gems_craft.utils import ModifiedBaseModel
 
@@ -392,8 +393,18 @@ def load_optim_config(config_path: Path) -> Optional[OptimConfig]:
         return None
     try:
         with config_path.open() as config_file:
-            config = OptimConfig.model_validate(safe_load(config_file))
-    except ValidationError as e:
+            tree = safe_load(config_file)
+        config = OptimConfig.model_validate({} if tree is None else tree)
+        validate_input_schema(
+            "optim-config",
+            config.model_dump(
+                by_alias=True,
+                exclude_none=True,
+                exclude_unset=True,
+                mode="json",
+            ),
+        )
+    except ValueError as e:
         raise ValueError(f"Invalid {config_path.stem}: {e}")
 
     return config

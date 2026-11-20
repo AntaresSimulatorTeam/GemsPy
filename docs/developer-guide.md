@@ -14,6 +14,16 @@ To reformat your code, use this command line: `python -m black src tests && pyth
 
 To typecheck your code, use this command line: `mypy`
 
+## Input-file schemas
+
+The model-library, system, and optimization-config parsers validate their normalized YAML
+inputs against the bundled Draft 2020-12 schemas in `src/gems_craft/schemas/`. Each shared
+GEMS schema must validate; Pydantic then applies GemsPy's typed parsing and business rules. If a
+GemsPy feature is missing from a shared schema, add a targeted schema extension and test rather
+than bypassing the shared validation. These files are a snapshot of GEMS PR #284; update the
+snapshot and parser conformance tests together when the shared schemas change. The
+optimization-config schema is provisional.
+
 ## Documentation
 
 1. To preview the docs on your local machine run `mkdocs serve`.
