@@ -40,6 +40,9 @@ from gems_runner.simulation.simulation_table import (
 from gems_runner.simulation.table_folder import MANIFEST_FILE, _TableWriter
 from gems_runner.study.runner import run_study
 from tests.e2e.functional.simulation_table_output import assert_same_tables
+from tests.e2e.functional.test_simulation_table_blocks import (
+    STUDY_13_1_SCENARIO_DEPENDENT,
+)
 
 _STUDY_13_1 = Path(__file__).parent / "studies" / "13_1"
 
@@ -65,7 +68,9 @@ _CONFIGS = {
 
 
 def _session(config: Any, **kwargs: Any) -> SimulationSession:
-    return SimulationSession(load_study(_STUDY_13_1), config, run_id="run", **kwargs)
+    return SimulationSession(
+        load_study(STUDY_13_1_SCENARIO_DEPENDENT), config, run_id="run", **kwargs
+    )
 
 
 @pytest.mark.parametrize("fmt", [OutputFormat.PARQUET, OutputFormat.CSV])

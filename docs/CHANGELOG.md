@@ -12,6 +12,13 @@ inputs/outputs must set `type` explicitly. This release contains breaking
 changes, marked **Breaking** below.
 
 ### Added
+- **Parametric export** - `export_parametric_problems(study, optim_config,
+  output_dir)` (`gems_runner.parametric`) writes one problem shared by all
+  time blocks and scenarios (MPS) and the entries that differ between blocks
+  or scenarios (Parquet). Frontal, parallel (blocks of equal length) and
+  Benders modes are supported; sequential mode is rejected, and so are
+  variables that do not depend on the scenario when several scenarios are
+  exported (except Benders coupling variables).
 - **Power operator `^`** - `p^2`, `2^p`, `p^(1 + q)` in any expression of a
   model library; `^` was a parse error before. It binds tighter than `*`, `/`
   and unary minus (`-2^2` is `-(2^2) = -4`), and is right-associative (`2^3^2`
@@ -31,6 +38,9 @@ changes, marked **Breaking** below.
   must now set `type`; it no longer defaults to `parameter`.
 - **Breaking** - `ExpressionVisitor.power` is abstract: a custom visitor must
   implement it to be instantiated.
+- **Breaking** - In `parallel-subproblems` and `sequential-subproblems` modes
+  with several scenarios, a variable that does not depend on the scenario is rejected: each scenario is
+  solved separately, so it took a different value in each one.
 
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.

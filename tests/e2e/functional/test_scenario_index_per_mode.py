@@ -14,7 +14,9 @@
 E2E test: scenario_index of scenario-independent outputs per resolution mode.
 
 The 13_1 investment study is run with 2 MC scenarios whose load differs
-(300 and 500). ``p_max`` (the invested capacity) is scenario-independent.
+(300 and 500). ``p_max`` (the invested capacity) is scenario-independent,
+except in parallel and sequential modes, which require every variable to
+depend on the scenario (13_1_scenario_dependent).
 
 - frontal: both scenarios are solved in one problem, so ``p_max`` and the
   objective value are shared and keep an empty scenario_index.
@@ -37,6 +39,9 @@ from gems_runner.simulation import TimeBlock, build_problem
 from gems_runner.simulation.simulation_table import SimulationTableBuilder
 from gems_runner.study.runner import run_study
 from tests.e2e.functional.simulation_table_output import read_run_table
+from tests.e2e.functional.test_simulation_table_blocks import (
+    STUDY_13_1_SCENARIO_DEPENDENT,
+)
 
 _STUDY_SRC = Path(__file__).parent / "studies" / "13_1"
 
@@ -61,10 +66,10 @@ _PARALLEL_RESOLUTION = textwrap.dedent("""\
 _KEY = ["block", "component", "output", "absolute_time_index", "scenario_index"]
 
 
-def _two_load_study(tmp_path: Path) -> Path:
-    """Copy 13_1 with a load of 300 in scenario 0 and 500 in scenario 1."""
+def _two_load_study(tmp_path: Path, source: Path = _STUDY_SRC) -> Path:
+    """Copy *source* with a load of 300 in scenario 0 and 500 in scenario 1."""
     study_dir = tmp_path / "13_1"
-    shutil.copytree(_STUDY_SRC, study_dir)
+    shutil.copytree(source, study_dir)
 
     system_path = study_dir / "input" / "system.yml"
     system_path.write_text(
@@ -87,9 +92,12 @@ def _two_load_study(tmp_path: Path) -> Path:
 
 
 def _run_study(
-    tmp_path: Path, resolution: str, scenarios: Tuple[int, ...] = (0, 1)
+    tmp_path: Path,
+    resolution: str,
+    scenarios: Tuple[int, ...] = (0, 1),
+    source: Path = _STUDY_SRC,
 ) -> pd.DataFrame:
-    study_dir = _two_load_study(tmp_path)
+    study_dir = _two_load_study(tmp_path, source)
     (study_dir / "input" / "optim-config.yml").write_text(
         _CONFIG_TEMPLATE.format(scenarios=list(scenarios)) + resolution
     )
@@ -113,7 +121,11 @@ def test_frontal_shared_rows_have_no_scenario(tmp_path: Path) -> None:
 
 
 def test_parallel_rows_are_tagged_with_their_scenario(tmp_path: Path) -> None:
-    df = _run_study(tmp_path, resolution=_PARALLEL_RESOLUTION)
+    df = _run_study(
+        tmp_path,
+        resolution=_PARALLEL_RESOLUTION,
+        source=STUDY_13_1_SCENARIO_DEPENDENT,
+    )
 
     assert df["scenario_index"].notna().all()
     assert not df.duplicated(subset=_KEY).any()

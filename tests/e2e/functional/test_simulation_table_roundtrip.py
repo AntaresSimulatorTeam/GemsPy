@@ -27,6 +27,7 @@ from gems_craft.study.parsing import OutputFormat
 from gems_runner.simulation.simulation_table import SimulationTable
 from tests.e2e.functional.simulation_table_output import assert_same_tables
 from tests.e2e.functional.test_simulation_table_blocks import (
+    STUDY_13_1_SCENARIO_DEPENDENT,
     _run_13_1,
     _sequential_overlap,
 )
@@ -36,13 +37,20 @@ _RUNS: Dict[str, Callable[[], SimulationTable]] = {
     "frontal-2": lambda: _run_13_1(ResolutionMode.FRONTAL, [0, 1]),
     "sequential-overlap-1": _sequential_overlap,
     "sequential-overlap-2": lambda: _run_13_1(
-        ResolutionMode.SEQUENTIAL_SUBPROBLEMS, [0, 1], block_length=2, block_overlap=1
+        ResolutionMode.SEQUENTIAL_SUBPROBLEMS,
+        [0, 1],
+        study=STUDY_13_1_SCENARIO_DEPENDENT,
+        block_length=2,
+        block_overlap=1,
     ),
     "parallel-1": lambda: _run_13_1(
         ResolutionMode.PARALLEL_SUBPROBLEMS, [0], block_length=2
     ),
     "parallel-2": lambda: _run_13_1(
-        ResolutionMode.PARALLEL_SUBPROBLEMS, [0, 1], block_length=2
+        ResolutionMode.PARALLEL_SUBPROBLEMS,
+        [0, 1],
+        study=STUDY_13_1_SCENARIO_DEPENDENT,
+        block_length=2,
     ),
 }
 

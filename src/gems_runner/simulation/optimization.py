@@ -32,7 +32,17 @@ optimization problem in four phases:
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    cast,
+)
 
 import linopy
 import numpy as np
@@ -43,6 +53,7 @@ from gems_craft.expression.expression import is_unbounded
 from gems_craft.expression.visitor import visit
 from gems_craft.model.common import ValueType
 from gems_craft.model.model import Model
+from gems_craft.model.parameter import Parameter
 from gems_craft.model.port import PortField, PortFieldId
 from gems_craft.model.variable import Variable
 from gems_craft.study.parsing import IntegerStrategyId
@@ -639,6 +650,22 @@ class _OptimizationProblemBuilder:
                 name=f"carry_over__{safe}",
             )
 
+        objective_constant = self._set_objective(total_obj)
+
+        return OptimizationProblem(
+            name=self.name,
+            linopy_model=self.linopy_model,
+            study=self.study,
+            block=self.block,
+            linopy_vars=self.linopy_vars,
+            linopy_vars_by_component=self.linopy_vars_by_component,
+            param_arrays=self.param_arrays,
+            objective_constant=objective_constant,
+            scenario_ids=self.scenario_ids,
+        )
+
+    def _set_objective(self, total_obj: Optional[VectorizedExpr]) -> float:
+        """Add *total_obj* to the linopy model and return its constant term."""
         # Extract the constant part of the objective (whole objective or constant term of a mixed one), since linopy rejects constants.
         objective_constant = 0.0
         has_objective = False
@@ -667,18 +694,7 @@ class _OptimizationProblemBuilder:
                 name="__dummy",
             )
             self.linopy_model.add_objective(0 * dummy)  # type: ignore[operator]
-
-        return OptimizationProblem(
-            name=self.name,
-            linopy_model=self.linopy_model,
-            study=self.study,
-            block=self.block,
-            linopy_vars=self.linopy_vars,
-            linopy_vars_by_component=self.linopy_vars_by_component,
-            param_arrays=self.param_arrays,
-            objective_constant=objective_constant,
-            scenario_ids=self.scenario_ids,
-        )
+        return objective_constant
 
     # ------------------------------------------------------------------
     # Phase 1 — Parameter arrays
@@ -687,59 +703,65 @@ class _OptimizationProblemBuilder:
     def _build_param_arrays_for_model(
         self, model: Model, components: List[Component]
     ) -> None:
+        for param in model.parameters.values():
+            self.param_arrays[(model.id, param.name)] = self._param_array(
+                param, components
+            )
+
+    def _param_array(
+        self, param: Parameter, components: List[Component]
+    ) -> xr.DataArray:
+        """Return the values of *param* for *components* in this block."""
         T = self.block_length
         S = len(self.scenario_ids)
         C = len(components)
         comp_ids = [c.id for c in components]
         abs_timesteps = self.block.timesteps  # mapping: block_t → abs_t
+        use_time = param.structure.time
+        use_scenario = param.structure.scenario
 
-        for param in model.parameters.values():
-            use_time = param.structure.time
-            use_scenario = param.structure.scenario
+        # Determine the minimal shape for this parameter based on its
+        # declared structure. Using minimal shapes avoids spurious broadcasting
+        # (e.g., invest_cost * p_max should not gain time/scenario dims).
+        if use_time and use_scenario:
+            data = np.zeros((C, T, S))
+            dims = ["component", "time", "scenario"]
+            coords: Dict[str, object] = {
+                "component": comp_ids,
+                "time": self.time_coord,
+                "scenario": self.local_scenario_coord,
+            }
+        elif use_time:
+            data = np.zeros((C, T))
+            dims = ["component", "time"]
+            coords = {"component": comp_ids, "time": self.time_coord}
+        elif use_scenario:
+            data = np.zeros((C, S))
+            dims = ["component", "scenario"]
+            coords = {"component": comp_ids, "scenario": self.local_scenario_coord}
+        else:
+            data = np.zeros((C,))
+            dims = ["component"]
+            coords = {"component": comp_ids}
 
-            # Determine the minimal shape for this parameter based on its
-            # declared structure. Using minimal shapes avoids spurious broadcasting
-            # (e.g., invest_cost * p_max should not gain time/scenario dims).
+        mc_scenarios = self.scenario_ids if use_scenario else None
+        for i, c in enumerate(components):
+            v = self.study.database.get_values(
+                c.id,
+                param.name,
+                abs_timesteps if use_time else None,
+                mc_scenarios,
+            )
             if use_time and use_scenario:
-                data = np.zeros((C, T, S))
-                dims = ["component", "time", "scenario"]
-                coords: Dict[str, object] = {
-                    "component": comp_ids,
-                    "time": self.time_coord,
-                    "scenario": self.local_scenario_coord,
-                }
+                data[i, :, :] = v  # (T, S)
             elif use_time:
-                data = np.zeros((C, T))
-                dims = ["component", "time"]
-                coords = {"component": comp_ids, "time": self.time_coord}
+                data[i, :] = v  # (T,) or scalar
             elif use_scenario:
-                data = np.zeros((C, S))
-                dims = ["component", "scenario"]
-                coords = {"component": comp_ids, "scenario": self.local_scenario_coord}
+                data[i, :] = v  # (S,) or scalar
             else:
-                data = np.zeros((C,))
-                dims = ["component"]
-                coords = {"component": comp_ids}
+                data[i] = v  # scalar
 
-            mc_scenarios = self.scenario_ids if use_scenario else None
-            for i, c in enumerate(components):
-                v = self.study.database.get_values(
-                    c.id,
-                    param.name,
-                    abs_timesteps if use_time else None,
-                    mc_scenarios,
-                )
-                if use_time and use_scenario:
-                    data[i, :, :] = v  # (T, S)
-                elif use_time:
-                    data[i, :] = v  # (T,) or scalar
-                elif use_scenario:
-                    data[i, :] = v  # (S,) or scalar
-                else:
-                    data[i] = v  # scalar
-
-            arr = xr.DataArray(data, dims=dims, coords=coords)
-            self.param_arrays[(model.id, param.name)] = arr
+        return xr.DataArray(data, dims=dims, coords=coords)
 
     # ------------------------------------------------------------------
     # Phase 2 — Variables
@@ -834,6 +856,42 @@ class _OptimizationProblemBuilder:
         name_suffix: str = "",
     ) -> linopy.Variable:
         comp_ids = [c.id for c in components]
+        coords, dims = self._variable_coords(var, comp_ids)
+        var_shape = tuple(len(cast(List[object], coords[d])) for d in dims)
+
+        bound_builder = self._new_expr_builder(
+            model_id=model.id,
+            linopy_vars={},
+            param_arrays=self._param_arrays_for_components(model.id, comp_ids),
+            port_arrays={},
+        )
+        lower_value = (
+            None if var.lower_bound is None else visit(var.lower_bound, bound_builder)
+        )
+        upper_value = (
+            None if var.upper_bound is None else visit(var.upper_bound, bound_builder)
+        )
+        lower, upper = self._resolve_bounds(
+            var, comp_ids, var_shape, dims, lower_value, upper_value
+        )
+
+        prefix = model.id.replace("-", "_")
+        name = f"{prefix}__{var.name}{name_suffix}"
+        linopy_var = self.linopy_model.add_variables(
+            lower=lower,
+            upper=upper,
+            coords=coords,
+            name=name,
+            binary=var.data_type == ValueType.BINARY and not relax,
+            integer=var.data_type == ValueType.INTEGER and not relax,
+        )
+        self._on_variable_added(linopy_var)
+        return linopy_var
+
+    def _variable_coords(
+        self, var: Variable, comp_ids: List[str]
+    ) -> Tuple[Dict[str, object], List[str]]:
+        """Return the coords and dims of *var* for the components *comp_ids*."""
         coords: Dict[str, object] = {"component": comp_ids}
         dims = ["component"]
         if var.structure.time:
@@ -842,42 +900,33 @@ class _OptimizationProblemBuilder:
         if var.structure.scenario:
             coords["scenario"] = self.local_scenario_coord
             dims.append("scenario")
+        return coords, dims
 
-        var_shape = tuple(
-            (
-                len(comp_ids)
-                if d == "component"
-                else (
-                    len(self.time_coord)
-                    if d == "time"
-                    else len(self.local_scenario_coord)
-                )
-            )
-            for d in dims
-        )
+    def _on_variable_added(self, linopy_var: linopy.Variable) -> None:
+        """Hook called after each variable is added to the linopy model."""
 
-        bound_builder = VectorizedLinearExprBuilder(
-            model_id=model.id,
-            linopy_vars={},
-            param_arrays=self._param_arrays_for_components(model.id, comp_ids),
-            port_arrays={},
-            block_length=self.block_length,
-        )
-
+    def _resolve_bounds(
+        self,
+        var: Variable,
+        comp_ids: List[str],
+        var_shape: Tuple[int, ...],
+        dims: List[str],
+        lower_value: Optional[object],
+        upper_value: Optional[object],
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Turn the evaluated bound expressions of *var* (``None`` when the
+        bound is not set) into arrays shaped like *var_shape*, and check that
+        the lower bound is not above the upper bound."""
         is_binary = var.data_type == ValueType.BINARY
         lower: object = (
             np.full(var_shape, 0.0 if is_binary else -np.inf)
-            if var.lower_bound is None
-            else self._to_bound_array(
-                visit(var.lower_bound, bound_builder), var_shape, dims
-            )
+            if lower_value is None
+            else self._to_bound_array(lower_value, var_shape, dims)
         )
         upper: object = (
             np.full(var_shape, 1.0 if is_binary else np.inf)
-            if var.upper_bound is None
-            else self._to_bound_array(
-                visit(var.upper_bound, bound_builder), var_shape, dims
-            )
+            if upper_value is None
+            else self._to_bound_array(upper_value, var_shape, dims)
         )
 
         lower_arr = lower if isinstance(lower, np.ndarray) else np.array(lower)
@@ -894,17 +943,7 @@ class _OptimizationProblemBuilder:
                     f"greater than lower bound ({float(lo.flat[idx]):g}) "
                     f"for variable {comp_id}.{var.name}"
                 )
-
-        prefix = model.id.replace("-", "_")
-        name = f"{prefix}__{var.name}{name_suffix}"
-        return self.linopy_model.add_variables(
-            lower=lower,
-            upper=upper,
-            coords=coords,
-            name=name,
-            binary=var.data_type == ValueType.BINARY and not relax,
-            integer=var.data_type == ValueType.INTEGER and not relax,
-        )
+        return lower_arr, upper_arr
 
     # ------------------------------------------------------------------
     # Phase 3 — Port arrays
@@ -979,18 +1018,22 @@ class _OptimizationProblemBuilder:
                     lb = visit(constraint.lower_bound, builder)
                     if validity_mask is not None:
                         lb = _apply_validity_mask(lb, validity_mask)
-                    self.linopy_model.add_constraints(lhs == lb, name=f"{prefix}__{safe_name}__eq")  # type: ignore[operator,arg-type]
+                    self._add_constraint(lhs == lb, name=f"{prefix}__{safe_name}__eq")  # type: ignore[operator,arg-type]
                 else:
                     if not is_unbounded(constraint.lower_bound):
                         lb = visit(constraint.lower_bound, builder)
                         if validity_mask is not None:
                             lb = _apply_validity_mask(lb, validity_mask)
-                        self.linopy_model.add_constraints(lhs >= lb, name=f"{prefix}__{safe_name}__lb")  # type: ignore[operator,arg-type]
+                        self._add_constraint(lhs >= lb, name=f"{prefix}__{safe_name}__lb")  # type: ignore[operator,arg-type]
                     if not is_unbounded(constraint.upper_bound):
                         ub = visit(constraint.upper_bound, builder)
                         if validity_mask is not None:
                             ub = _apply_validity_mask(ub, validity_mask)
-                        self.linopy_model.add_constraints(lhs <= ub, name=f"{prefix}__{safe_name}__ub")  # type: ignore[operator,arg-type]
+                        self._add_constraint(lhs <= ub, name=f"{prefix}__{safe_name}__ub")  # type: ignore[operator,arg-type]
+
+    def _add_constraint(self, constraint: linopy.Constraint, name: str) -> None:
+        """Add *constraint* to the linopy model under *name*."""
+        self.linopy_model.add_constraints(constraint, name=name)
 
     def _add_objectives_for_model(
         self,
@@ -1004,10 +1047,7 @@ class _OptimizationProblemBuilder:
         def _accumulate(
             acc: Optional[VectorizedExpr], contribution: VectorizedExpr
         ) -> VectorizedExpr:
-            if isinstance(contribution, xr.DataArray):
-                summed: VectorizedExpr = float(contribution.sum().item())  # type: ignore[assignment]
-            else:
-                summed = contribution.sum()  # type: ignore[union-attr]
+            summed = self._sum_objective_contribution(contribution)
             return summed if acc is None else _linopy_add(acc, summed)
 
         if model.objective_contributions:
@@ -1020,6 +1060,14 @@ class _OptimizationProblemBuilder:
                     total_obj = _accumulate(total_obj, obj_term)
 
         return total_obj
+
+    def _sum_objective_contribution(
+        self, contribution: VectorizedExpr
+    ) -> VectorizedExpr:
+        """Sum one objective contribution over all its dimensions."""
+        if isinstance(contribution, xr.DataArray):
+            return float(contribution.sum().item())  # type: ignore[return-value]
+        return contribution.sum()  # type: ignore[union-attr,return-value]
 
     # ------------------------------------------------------------------
     # Helpers
@@ -1054,10 +1102,25 @@ class _OptimizationProblemBuilder:
         model: Model,
         port_arrays: Dict[PortFieldId, VectorizedExpr],
     ) -> VectorizedLinearExprBuilder:
-        return VectorizedLinearExprBuilder(
+        return self._new_expr_builder(
             model_id=model.id,
             linopy_vars=self.linopy_vars,
             param_arrays=self.param_arrays,
+            port_arrays=port_arrays,
+        )
+
+    def _new_expr_builder(
+        self,
+        model_id: str,
+        linopy_vars: Dict[Tuple[str, str], linopy.Variable],
+        param_arrays: Dict[Tuple[str, str], xr.DataArray],
+        port_arrays: Dict[PortFieldId, VectorizedExpr],
+    ) -> VectorizedLinearExprBuilder:
+        """Return the visitor turning expression ASTs into linopy expressions."""
+        return VectorizedLinearExprBuilder(
+            model_id=model_id,
+            linopy_vars=linopy_vars,
+            param_arrays=param_arrays,
             port_arrays=port_arrays,
             block_length=self.block_length,
         )
@@ -1177,11 +1240,38 @@ def build_decomposed_problems(
     subproblem_name, master_name:
         Labels used for the underlying linopy models.
     """
-    from gems_craft.optim_config.parsing import ElementLocation
-
     check_data_requirements(study)
-
     oob_filter = OutOfBoundsFilter(optim_config)
+
+    def build(name: str, location_filter: DecompositionFilter) -> OptimizationProblem:
+        return _OptimizationProblemBuilder(
+            name=name,
+            study=study,
+            block=block,
+            scenario_ids=scenario_ids,
+            location_filter=location_filter,
+            oob_filter=oob_filter,
+        ).build()
+
+    return _build_decomposed(
+        build,
+        optim_config,
+        subproblem_name=subproblem_name,
+        master_name=master_name,
+    )
+
+
+def _build_decomposed(
+    build: Callable[[str, DecompositionFilter], OptimizationProblem],
+    optim_config: "OptimConfig",
+    *,
+    subproblem_name: str,
+    master_name: str,
+) -> DecomposedProblems:
+    """Build the subproblem and, if any element is on the master side, the
+    master, each with ``build(name, location_filter)`` (see
+    :func:`build_decomposed_problems`)."""
+    from gems_craft.optim_config.parsing import ElementLocation
 
     master_locs: Set["ElementLocation"] = {
         ElementLocation.MASTER,
@@ -1192,27 +1282,11 @@ def build_decomposed_problems(
         ElementLocation.MASTER_AND_SUBPROBLEMS,
     }
 
-    oob_filter = OutOfBoundsFilter(optim_config)
-
-    subproblem = _OptimizationProblemBuilder(
-        name=subproblem_name,
-        study=study,
-        block=block,
-        scenario_ids=scenario_ids,
-        location_filter=DecompositionFilter(optim_config, sub_locs),
-        oob_filter=oob_filter,
-    ).build()
+    subproblem = build(subproblem_name, DecompositionFilter(optim_config, sub_locs))
 
     master: Optional[OptimizationProblem] = None
     if _has_any_master_element(optim_config):
-        master = _OptimizationProblemBuilder(
-            name=master_name,
-            study=study,
-            block=block,
-            scenario_ids=scenario_ids,
-            location_filter=DecompositionFilter(optim_config, master_locs),
-            oob_filter=oob_filter,
-        ).build()
+        master = build(master_name, DecompositionFilter(optim_config, master_locs))
 
     return DecomposedProblems(subproblem=subproblem, master=master)
 

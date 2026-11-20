@@ -315,6 +315,54 @@ def _check_no_integer_variables_in_subproblems(
                         )
 
 
+def _check_variables_depend_on_scenario(
+    config: "OptimConfig",
+    system: "System",
+    errors: List[str],
+) -> None:
+    """With several scenarios each solved as a problem of its own, reject the
+    variables that do not depend on the scenario: they would take a different
+    value in each one.  In Benders mode, only the subproblem variables are
+    checked, and those fixed by the master are allowed."""
+    if len(config.scenario_scope.scenario_ids) <= 1:
+        return
+    benders = config.resolution.mode == ResolutionMode.BENDERS_DECOMPOSITION
+    locations = {
+        (model_config.id, variable_config.id): variable_config.location
+        for model_config in config.models
+        if model_config.model_decomposition is not None
+        for variable_config in model_config.model_decomposition.variables
+    }
+    models = {c.model.id: c.model for c in system.all_components}
+    for model_id, model in models.items():
+        for var_name, var in model.variables.items():
+            location = locations.get((model_id, var_name), ElementLocation.SUBPROBLEMS)
+            if var.structure.scenario or (
+                benders and location != ElementLocation.SUBPROBLEMS
+            ):
+                continue
+            errors.append(
+                f"Variable '{var_name}' of model '{model_id}' does not depend on "
+                "the scenario, but each scenario is solved as a problem of its "
+                "own: it would take a different value in each one"
+                + (
+                    "; locate it in 'master-and-subproblems' to share it."
+                    if benders
+                    else "."
+                )
+            )
+
+
+def check_variables_depend_on_scenario(config: OptimConfig, system: "System") -> None:
+    """Raise ``ValueError`` if a variable does not depend on the scenario while
+    each scenario is solved as a problem of its own (see
+    :func:`_check_variables_depend_on_scenario`)."""
+    errors: List[str] = []
+    _check_variables_depend_on_scenario(config, system, errors)
+    if errors:
+        raise ValueError("\n".join(errors))
+
+
 def validate_optim_config(
     config: OptimConfig,
     system: "System",
@@ -331,6 +379,9 @@ def validate_optim_config(
     - Heuristic inputs/outputs reference existing model parameters/variables with the
       time-dependence the heuristic function expects.
     - The scenario scope selects at least one scenario.
+    - In ``parallel-subproblems`` and ``sequential-subproblems`` modes with
+      several scenarios, every variable depends on the scenario (each scenario
+      is solved separately).
     - If ``scenario_builder`` is provided, every scenario index in
       ``config.scenario_scope.scenario_ids`` is defined for every scenario
       group in the builder.
@@ -381,6 +432,11 @@ def validate_optim_config(
     if config.resolution.mode == ResolutionMode.BENDERS_DECOMPOSITION:
         _check_no_heuristic_with_benders(system, errors)
         _check_no_integer_variables_in_subproblems(config, system, errors)
+    if config.resolution.mode in (
+        ResolutionMode.PARALLEL_SUBPROBLEMS,
+        ResolutionMode.SEQUENTIAL_SUBPROBLEMS,
+    ):
+        _check_variables_depend_on_scenario(config, system, errors)
 
     if errors:
         raise ValueError(
