@@ -384,7 +384,7 @@ class OptimizationProblem:
 
     # Solvers whose linopy backend implements the direct (in-memory) API.
     # All others fall back to file-based LP/MPS exchange.
-    _DIRECT_API_SOLVERS = {"highs", "gurobi"}
+    _DIRECT_API_SOLVERS = {"highs", "gurobi", "xpress"}
 
     # Native option switching each solver's console output on or off. linopy
     # has no generic logging switch: options are forwarded to the solver as is.

@@ -106,6 +106,8 @@ problem.solve(solver_name="gurobi")             # Gurobi
 > **Note** — dual variables and reduced costs are available as model outputs
 > when using any of these solvers.  Xpress and Gurobi require their respective
 > Python packages (`xpress>=9.8`, `gurobipy>=10.0`) and a valid licence.
+> All three receive the problem in memory through linopy's direct API, without
+> writing an LP file; pass `io_api="lp"` (or `"mps"`) to use a file instead.
 
 ### Exporting the LP file
 
