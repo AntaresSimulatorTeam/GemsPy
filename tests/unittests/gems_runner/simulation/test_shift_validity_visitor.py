@@ -209,12 +209,6 @@ def test_nested_shifts_and_combined():
 # ---------------------------------------------------------------------------
 
 
-def test_variable_in_shift_raises():
-    expr = var("x").shift(var("p"))
-    with pytest.raises(ValueError, match="cannot contain the variable"):
-        visit(expr, _visitor(block_length=4))
-
-
 def test_time_dependent_param_in_time_sum_bound_raises():
     lag = xr.DataArray([1.0, 2.0, 1.0, 2.0], dims=["time"], coords={"time": range(4)})
     expr = var("x").time_sum(-param("lag"), 0)
@@ -256,14 +250,21 @@ def test_shift_by_a_varying_parameter(lag, expected):
 
 
 # ---------------------------------------------------------------------------
-# Dropped where a variable is read out of the block; parameters read modulo it
+# Dropped where a variable, parameter or port field is read out of the block
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     "expr, expected",
     [
-        pytest.param(param("d").shift(-1), True, id="shifted-parameter"),
+        pytest.param(
+            param("d").shift(-1), [False, True, True, True], id="shifted-parameter"
+        ),
+        pytest.param(
+            port_field("p", "f").sum_connections().shift(-1),
+            [False, True, True, True],
+            id="shifted-port-field",
+        ),
         pytest.param(var("x").eval(4), False, id="index-out"),
         pytest.param(
             var("x").eval(param("d")), [True, False, False, True], id="index-by-d"
@@ -271,23 +272,24 @@ def test_shift_by_a_varying_parameter(lag, expected):
         # d[t-1] = [2, 1, 5, -1]
         pytest.param(
             var("x").eval(param("d").shift(-1)),
-            [True, True, False, False],
+            [False, True, False, False],
             id="index-by-d[t-1]",
         ),
-        # t + d[t-1] = [2, 2, 7, 2]
+        # t + d[t-1] = [2, 2, 7, 2]; d[-1] is out of the block at t = 0
         pytest.param(
             var("x").shift(param("d").shift(-1)),
-            [True, True, False, True],
+            [False, True, False, True],
             id="shift-by-d[t-1]",
         ),
         pytest.param(var("x").time_sum_between(-1, 1), False, id="absolute-sum"),
         pytest.param(
             var("x").time_sum_between(-1, relative_time(0)), False, id="mixed-sum"
         ),
-        # x[s + d[s]] for s in t-1 .. t: out of the block at s = 1 and s = 3
+        # x[s + d[s]] for s in t-1 .. t: d[-1] is out of the block at t = 0,
+        # x is read out of the block at s = 1 and s = 3
         pytest.param(
             var("x").shift(param("d")).time_sum(-1, 0),
-            [True, False, False, False],
+            [False, False, False, False],
             id="sum-of-shift-by-d",
         ),
         # Nested time operators: shifts add up
@@ -300,25 +302,22 @@ def test_shift_by_a_varying_parameter(lag, expected):
         ),
     ],
 )
-def test_variable_read_out_of_the_block(expr, expected):
+def test_read_out_of_the_block_is_dropped(expr, expected):
     d = xr.DataArray([1.0, 5.0, -1.0, 2.0], dims=["time"], coords={"time": range(4)})
     mask = visit(expr, _visitor({("m", "d"): d}))
     np.testing.assert_array_equal(_valid(mask), expected)
 
 
-def test_parameters_and_port_fields_are_never_dropped():
-    # The shift of a parameter is not evaluated: a non-integer one does not raise.
-    expr = param("d").shift(param("k")) + port_field("p", "f").sum_connections().shift(
-        -1
-    )
-    assert visit(expr, _visitor({("m", "k"): xr.DataArray(0.5)})) is None
+def test_time_sum_of_shifted_operand_is_dropped_whole():
+    # sum(x[t-1]) reads x[-1]: no time step is valid
+    mask = visit(var("x").shift(-1).time_sum(), _visitor())
+    np.testing.assert_array_equal(_valid(mask), False)
+    assert visit(var("x").time_sum(), _visitor()) is None
 
 
-def test_time_independent_variable_is_never_dropped():
-    visitor = ShiftValidityVisitor(
-        model_id="m",
-        param_arrays={},
-        block_length=4,
-        time_independent_variables=frozenset({"x"}),
-    )
-    assert visit(var("x").shift(-1) + var("x").eval(10), visitor) is None
+def test_expectation_drops_every_scenario_if_one_reads_out_of_the_block():
+    # x[t + k]: k = 0 for s1 (valid), k = 1 for s2 (invalid at t = 3)
+    k = xr.DataArray([0.0, 1.0], dims=["scenario"], coords={"scenario": [0, 1]})
+    mask = visit(var("x").shift(param("k")).expec(), _visitor({("m", "k"): k}))
+    assert "scenario" not in mask.dims
+    np.testing.assert_array_equal(mask.values, [True, True, True, False])

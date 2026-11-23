@@ -29,6 +29,7 @@ optimization problem in four phases:
    ``Model.add_constraints()`` call per constraint type.
 """
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -121,6 +122,9 @@ class DecompositionFilter:
     def include_objective(self, model_id: str, obj_id: str) -> bool:
         loc = self._objs.get((model_id, obj_id), self._default)
         return loc in self._target
+
+
+logger = logging.getLogger(__name__)
 
 
 def _apply_validity_mask(expr: VectorizedExpr, mask: xr.DataArray) -> VectorizedExpr:
@@ -959,13 +963,16 @@ class _OptimizationProblemBuilder:
                                 model_id=model.id,
                                 param_arrays=self.param_arrays,
                                 block_length=self.block_length,
-                                time_independent_variables=frozenset(
-                                    name
-                                    for name, variable in model.variables.items()
-                                    if not variable.structure.time
-                                ),
                             ),
                         )
+                        if validity_mask is not None and not bool(validity_mask.any()):
+                            logger.warning(
+                                "Constraint '%s' of model '%s' is dropped at every "
+                                "instance: out-of-bounds processing is 'drop' and "
+                                "each instance reads outside the block.",
+                                constraint.name,
+                                model.id,
+                            )
 
                 lhs = visit(constraint.expression, builder)
 

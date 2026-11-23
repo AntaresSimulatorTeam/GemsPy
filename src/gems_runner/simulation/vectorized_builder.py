@@ -35,13 +35,12 @@ import functools
 import math
 from abc import abstractmethod
 from dataclasses import dataclass, replace
-from typing import Any, Dict, FrozenSet, Generic, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, Optional, Tuple, TypeVar, Union
 
 import linopy
 import numpy as np
 import xarray as xr
 
-from gems_craft.expression.degree import is_constant
 from gems_craft.expression.expression import (
     AbsNode,
     AdditionNode,
@@ -580,15 +579,22 @@ class _TimeAmountEvaluator(VectorizedBuilderBase[xr.DataArray]):
         )
 
 
+def _bound_amount(bound: ExpressionNode) -> ExpressionNode:
+    """The expression of a time sum bound: the offset of a relative bound."""
+    return bound.offset if isinstance(bound, RelativeTimeNode) else bound
+
+
 @dataclass(kw_only=True)
 class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     """Validity mask of an expression for ``OutOfBoundsMode.DROP``.
 
     An instance (component, time step, scenario) is valid iff the expression
-    reads no variable at a time step outside ``[0, block_length)``. Time
-    operators compose: ``(x[t-1])[t+1]`` reads ``x[t]``. Parameters, including
-    those of shift amounts and time indices, are read modulo the block, as in
-    cyclic mode.
+    reads no variable, parameter or port field at a time step outside
+    ``[0, block_length)``, including in shift amounts, time indices and time
+    sum bounds. Time operators compose: ``(x[t-1])[t+1]`` reads ``x[t]``.
+    Aggregations (time sum, expectation) read every step: the instance is
+    invalid as soon as one read is out of the block. Limitation: the
+    definition of a port field (``p.f = x[t-1]``) is not inspected.
 
     Returns ``None`` when every instance is valid, else a boolean DataArray
     where ``True`` marks the valid instances.
@@ -597,7 +603,6 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     model_id: str
     param_arrays: Dict[Tuple[str, str], xr.DataArray]
     block_length: int
-    time_independent_variables: FrozenSet[str] = frozenset()
     # Time steps at which the expression is read, not wrapped into the block;
     # None for t itself.
     positions: Optional[xr.DataArray] = None
@@ -637,32 +642,36 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     # ------------------------------------------------------------------ #
 
     def time_shift(self, node: TimeShiftNode) -> Optional[xr.DataArray]:
-        if is_constant(node.operand):  # reads no variable: nothing to drop
-            return None
         amount = self._evaluator()._time_value(node.time_shift, "Time shift")
-        return self._read_at(
-            node.operand, self._positions() + self._at_positions(amount)
+        return _and_mask(
+            visit(node.time_shift, self),
+            self._read_at(node.operand, self._positions() + self._at_positions(amount)),
         )
 
     def time_eval(self, node: TimeEvalNode) -> Optional[xr.DataArray]:
-        if is_constant(node.operand):  # reads no variable: nothing to drop
-            return None
         index = self._evaluator()._time_value(node.eval_time, "Time index")
-        return self._read_at(node.operand, xr.DataArray(self._at_positions(index)))
+        return _and_mask(
+            visit(node.eval_time, self),
+            self._read_at(node.operand, xr.DataArray(self._at_positions(index))),
+        )
 
     def time_sum(self, node: TimeSumNode) -> Optional[xr.DataArray]:
         start = self._time_sum_position(node.from_time)
         end = self._time_sum_position(node.to_time)
+        bounds_mask = _and_mask(
+            visit(_bound_amount(node.from_time), self),
+            visit(_bound_amount(node.to_time), self),
+        )
         first, last = int(start.min()), int(end.max())
         if last < first:  # empty sum: the operand is never read
-            return None
+            return bounds_mask
 
         # The operand is read at every position first..last, along its own dim.
         dim = f"summed_{id(node)}"
         summed = xr.DataArray(np.arange(first, last + 1), dims=dim)
         operand_mask = self._read_at(node.operand, summed)
         if operand_mask is None:
-            return None
+            return bounds_mask
         operand_mask, _ = xr.broadcast(operand_mask, summed)
 
         # Running count of the invalid positions: the count over start..end is
@@ -675,7 +684,7 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         upper = (end - first + 1).clip(0, size)
         lower = (start - first).clip(0, size)
         valid = counted.isel({dim: upper}) - counted.isel({dim: lower}) <= 0
-        return None if bool(valid.all()) else valid
+        return _and_mask(bounds_mask, None if bool(valid.all()) else valid)
 
     def _time_sum_position(self, bound: ExpressionNode) -> xr.DataArray:
         """Position of a time sum bound: offset from the positions read for a
@@ -731,10 +740,16 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         )
 
     def all_time_sum(self, node: AllTimeSumNode) -> Optional[xr.DataArray]:
-        return visit(node.operand, self)
+        # Every time step is read: valid only if all the reads are in the block.
+        mask = visit(node.operand, replace(self, positions=None))
+        return mask.all("time") if mask is not None and "time" in mask.dims else mask
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> Optional[xr.DataArray]:
-        return visit(node.operand, self)
+        # Every scenario is read: valid only if all the reads are in the block.
+        mask = visit(node.operand, self)
+        if mask is not None and "scenario" in mask.dims:
+            return mask.all("scenario")
+        return mask
 
     def port_field_aggregator(
         self, node: PortFieldAggregatorNode
@@ -749,16 +764,13 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return None
 
     def parameter(self, node: ParameterNode) -> Optional[xr.DataArray]:
-        return None
+        return self._in_block()
 
     def variable(self, node: VariableNode) -> Optional[xr.DataArray]:
-        if node.name in self.time_independent_variables:
-            return None
         return self._in_block()
 
     def port_field(self, node: PortFieldNode) -> Optional[xr.DataArray]:
-        # Port fields are never checked: they are read as in cyclic mode.
-        return None
+        return self._in_block()
 
     def dual(self, node: DualNode) -> Optional[xr.DataArray]:
         return None

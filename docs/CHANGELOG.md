@@ -37,11 +37,12 @@ All notable changes to GemsPy are documented here.
 - **Breaking** - a port field outside `sum_connections` (e.g. `p.f <= 0`) is a
   syntax error.
 - **Breaking** - **`drop` out-of-bounds mode** skips a constraint where it
-  reads a variable outside the block, through a time shift, a time index or a
-  time sum; parameters are read modulo the block, as in `cyclic`. So `x[200]`,
-  `x[d]` and `sum(-1 .. 1, x)` are now skipped where they read `x` outside the
-  block, instead of wrapping around it, and `p[t-1]` no longer skips the
-  constraint at `t = 0`. Port fields are never checked.
+  reads a variable, a parameter or a port field outside the block through a
+  time index or a time sum bound (e.g. `x[200]`, `x[d]`, `sum(-1 .. 1, x)`),
+  instead of wrapping around the block. Aggregations (`sum(x[t-1])`,
+  `expec(...)`) are skipped as soon as one read is out of the block. The
+  definition of a port field is not inspected. A constraint skipped at every
+  time step logs a warning.
 
 ### Deprecated
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.

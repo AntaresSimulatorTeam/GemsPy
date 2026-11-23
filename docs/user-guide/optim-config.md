@@ -327,7 +327,7 @@ strategies are available:
 | Mode | Behaviour |
 |---|---|
 | `cyclic` (default) | Wrap around: time shift are defined modulo `block-length` |
-| `drop` | Skip the constraint where it reads a variable out of the block |
+| `drop` | Skip the constraint where it reads a variable, parameter or port field out of the block |
 
 ~~~ yaml
 models:
@@ -339,29 +339,31 @@ models:
 ~~~
 
 In `drop` mode, the constraint is skipped for a component, time step and
-scenario as soon as it reads a **variable** at a time step outside the block,
-whether through a time shift, a time index or a time sum. **Parameters** are
-always read modulo the block, as in `cyclic` mode.
+scenario as soon as it reads a **variable**, a **parameter** or a **port field**
+at a time step outside the block, whether through a time shift, a time index or
+a time sum, including in the shift amount, the time index or the sum bounds.
+Nothing wraps around the block in `drop` mode.
 
 Examples, in a block of 168 time steps (`t` from 0 to 167):
 
 | Expression | Skipped |
 |---|---|
 | `x[t-1]`, `sum(t-1 .. t, x)` | at `t = 0` |
+| `p[t-1]`, `sum_connections(p.f)[t-1]` | at `t = 0` |
 | `x[t + k[t]]`, `x[t - lag]` | where `t + k[t]` or `t - lag` is out of the block, per component and scenario |
 | `x[200]`, `sum(-1 .. 1, x)` | at every time step |
-| `x[d]`, `x[d[t-1]]` | where the value of `d` is out of the block (`d[t-1]` reads `d[167]` at `t = 0`) |
-| `x[t + d[t-1]]` | where `t + d[t-1]` is out of the block |
-| `p[t-1]`, `x[t] - p[t-1]` | never: `p[t-1]` reads `p[167]` at `t = 0` |
+| `x[d]`, `x[d[t-1]]` | where the value of `d` is out of the block, or at `t = 0` for `d[t-1]` |
 | `(x[t-1])[t+2]` | at `t = 167`: shifts add up, so it reads `x[t+1]` |
 | `(x[t-1])[0]` | at every time step: it reads `x[-1]` |
-| `y[t-1]`, `y` a time-independent variable | never |
+| `y[t-1]`, `y` a time-independent variable | at `t = 0` |
+| `sum(x[t-1])`, `expec(x[t + k])` | aggregations read every time step (or scenario): skipped as soon as one read is out of the block |
 
 A time sum that is empty at a time step reads nothing there.
 
-**Port fields** are never checked: they are read as in `cyclic` mode, so
-`sum_connections(p.f)[t-1]` never skips the constraint, nor does a time shift
-in the definition of the port field in the connected model (e.g. `x[t-1]`).
+A constraint skipped at every time step logs a warning.
+
+**Limitation:** the definition of a port field (e.g. `p.f = x[t-1]`) is not
+inspected, so a read of `x[-1]` there does not skip the constraint.
 
 ### `model-decomposition`
 

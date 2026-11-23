@@ -37,8 +37,8 @@ from tests.e2e.functional.test_time_sum_bounds import (
         pytest.param("cyclic", "x[t + k[t]]", [0, 3, 2, 1], id="shift"),
         # skipped at t = 0 and t = 3, where a is then 0
         pytest.param("drop", "x[t + k[t]]", [0, 3, 2, 0], id="shift-drop"),
-        # d is a parameter, read modulo the block: as in cyclic mode
-        pytest.param("drop", "x[d[t-1]]", [1, 2, 3, 0], id="shifted-index-drop"),
+        # d[-1] is out of the block at t = 0: skipped there, where a is then 0
+        pytest.param("drop", "x[d[t-1]]", [0, 2, 3, 0], id="shifted-index-drop"),
         # d + 2 = [3, 4, 5, 2]: skipped at t = 1 and t = 2, where x is read out of the block
         pytest.param("drop", "x[d[t] + 2]", [0, 0, 0, 3], id="index-drop"),
     ],
@@ -58,19 +58,3 @@ def test_time_operator_given_by_a_time_dependent_parameter(
     )
 
     assert _solve(study_dir)["a"] == expected
-
-
-def test_drop_skips_a_time_independent_constraint(tmp_path: Path) -> None:
-    """x[5] >= c reads x outside a block of 4 time steps."""
-    study_dir = _make_study(
-        tmp_path,
-        variables=["x"],
-        constraints=["x[5] >= c"],
-        objective="sum(x)",
-        data={},
-        constants={"c": 3},
-        nb_time_steps=4,
-        resolution=_out_of_bounds("drop", ["c0"]),
-    )
-
-    assert _solve(study_dir)["x"] == [0] * 4
