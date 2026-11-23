@@ -4,6 +4,10 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Changed
+- Xpress now receives the problem in memory through linopy's direct API, like
+  HiGHS and Gurobi, instead of through an LP file.
+
 ## [0.4.0] - 2026-11-20
 
 The expression language gains the power operator `^`. Simulation table views

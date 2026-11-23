@@ -56,7 +56,7 @@ problem.solve(solver_name="highs")
 
 ## Architecture
 
-The pipeline flows: **YAML input → parsing → model resolution → system instantiation → optimization problem → HiGHS solver (via linopy) → results**
+The pipeline flows: **YAML input → parsing → model resolution → system instantiation → optimization problem → HiGHS, Xpress or Gurobi solver (via linopy's direct API) → results**
 
 An optional `optim-config.yml` activates decomposition: variables and constraints are split across a master problem and subproblems, with either sequential resolution or full Benders decomposition.
 
@@ -102,7 +102,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 **`gems_craft_hybrid/study/`** — `HybridSystemSchema(SystemSchema)`: adds `area-connections` (`AreaConnectionsSchema`) and `thermal-capacity-connections` (`ThermalCapacityConnectionSchema`, referencing a `ThermalComponentSchema`).
 
 **`gems_runner/simulation/`** — Optimization problem construction and solving.
-- `OptimizationProblem` (`optimization.py`): main interface; translates a `Study` into a linopy model solved by HiGHS
+- `OptimizationProblem` (`optimization.py`): main interface; translates a `Study` into a linopy model solved by HiGHS, Xpress or Gurobi (in memory via linopy's direct API for all three, `_DIRECT_API_SOLVERS`)
 - `DecomposedProblems` (`optimization.py`): holds the master problem and subproblem produced by temporal decomposition
 - `VectorizedLinearExprBuilder` (`linearize.py`): `ExpressionVisitor` subclass that converts an expression AST into a `VectorizedExpr`
 - `VectorizedBuilderBase` (`vectorized_builder.py`): shared base for all vectorized visitors (used by both `linearize.py` and `extra_output.py`)
