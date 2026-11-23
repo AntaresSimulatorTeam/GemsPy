@@ -211,35 +211,6 @@ def test_absolute_bound_given_by_a_parameter(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "mode, time_sum, expected",
-    [
-        pytest.param("cyclic", "sum(0 .. d[1], x)", [6, 6, 6, 6], id="absolute"),
-        pytest.param("cyclic", "sum(t - (d[0]) .. t, x)", [5, 3, 5, 7], id="relative"),
-        # dropped at t = 0, where a is then 0
-        pytest.param(
-            "drop", "sum(t - (d[0]) .. t, x)", [0, 3, 5, 7], id="relative-drop"
-        ),
-        pytest.param("cyclic", "sum(t - (d[0]) .. 3, x)", [14, 10, 9, 7], id="mixed"),
-    ],
-)
-def test_bound_with_a_time_operator(
-    tmp_path: Path, mode: str, time_sum: str, expected: List[float]
-) -> None:
-    study_dir = _make_study(
-        tmp_path,
-        variables=["x", "a"],
-        constraints=["x = d", f"a = {time_sum}"],
-        objective="sum(x) + sum(a)",
-        data={"d": [1, 2, 3, 4]},
-        constants={},
-        nb_time_steps=4,
-        resolution=_out_of_bounds(mode, ["c1"]),
-    )
-
-    assert _solve(study_dir)["a"] == expected
-
-
-@pytest.mark.parametrize(
     "time_sum",
     [
         pytest.param("sum(2 .. 1, x)", id="absolute"),

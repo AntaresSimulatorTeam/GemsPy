@@ -269,18 +269,6 @@ def test_shift_by_a_varying_parameter(lag, expected):
         pytest.param(
             var("x").eval(param("d")), [True, False, False, True], id="index-by-d"
         ),
-        # d[t-1] = [2, 1, 5, -1]
-        pytest.param(
-            var("x").eval(param("d").shift(-1)),
-            [False, True, False, False],
-            id="index-by-d[t-1]",
-        ),
-        # t + d[t-1] = [2, 2, 7, 2]; d[-1] is out of the block at t = 0
-        pytest.param(
-            var("x").shift(param("d").shift(-1)),
-            [False, True, False, True],
-            id="shift-by-d[t-1]",
-        ),
         pytest.param(var("x").time_sum_between(-1, 1), False, id="absolute-sum"),
         pytest.param(
             var("x").time_sum_between(-1, relative_time(0)), False, id="mixed-sum"

@@ -16,7 +16,7 @@ def serializedATN():
         4,
         1,
         19,
-        184,
+        174,
         2,
         0,
         7,
@@ -377,29 +377,9 @@ def serializedATN():
         10,
         1,
         10,
-        1,
-        10,
-        1,
-        10,
-        1,
-        10,
-        1,
-        10,
-        1,
-        10,
-        1,
-        10,
-        1,
-        10,
-        1,
-        10,
-        1,
-        10,
-        1,
-        10,
         3,
         10,
-        182,
+        172,
         8,
         10,
         1,
@@ -431,7 +411,7 @@ def serializedATN():
         3,
         8,
         8,
-        201,
+        189,
         0,
         22,
         1,
@@ -493,7 +473,7 @@ def serializedATN():
         0,
         0,
         20,
-        181,
+        171,
         1,
         0,
         0,
@@ -1423,13 +1403,13 @@ def serializedATN():
         0,
         0,
         153,
-        182,
+        172,
         5,
         15,
         0,
         0,
         154,
-        182,
+        172,
         5,
         17,
         0,
@@ -1507,7 +1487,7 @@ def serializedATN():
         0,
         0,
         166,
-        182,
+        172,
         1,
         0,
         0,
@@ -1515,124 +1495,52 @@ def serializedATN():
         167,
         168,
         5,
-        17,
+        4,
         0,
         0,
         168,
         169,
-        5,
-        13,
-        0,
+        3,
+        14,
+        7,
         0,
         169,
         170,
-        3,
-        12,
-        6,
+        5,
+        5,
+        0,
         0,
         170,
-        171,
-        5,
-        14,
-        0,
-        0,
-        171,
-        182,
-        1,
-        0,
-        0,
-        0,
         172,
-        173,
-        5,
-        17,
-        0,
-        0,
-        173,
-        174,
-        5,
-        13,
-        0,
-        0,
-        174,
-        175,
-        3,
-        14,
-        7,
-        0,
-        175,
-        176,
-        5,
-        14,
-        0,
-        0,
-        176,
-        182,
         1,
         0,
         0,
         0,
-        177,
-        178,
-        5,
-        4,
-        0,
-        0,
-        178,
-        179,
-        3,
-        14,
-        7,
-        0,
-        179,
-        180,
-        5,
-        5,
-        0,
-        0,
-        180,
-        182,
-        1,
-        0,
-        0,
-        0,
-        181,
+        171,
         153,
         1,
         0,
         0,
         0,
-        181,
+        171,
         154,
         1,
         0,
         0,
         0,
-        181,
+        171,
         155,
         1,
         0,
         0,
         0,
-        181,
+        171,
         167,
         1,
         0,
         0,
         0,
-        181,
         172,
-        1,
-        0,
-        0,
-        0,
-        181,
-        177,
-        1,
-        0,
-        0,
-        0,
-        182,
         21,
         1,
         0,
@@ -1652,7 +1560,7 @@ def serializedATN():
         145,
         151,
         162,
-        181,
+        171,
     ]
 
 
@@ -2933,26 +2841,6 @@ class ExprParser(Parser):
             else:
                 return visitor.visitChildren(self)
 
-    class TimeFactorIndexContext(Time_factorContext):
-
-        def __init__(
-            self, parser, ctx: ParserRuleContext
-        ):  # actually a ExprParser.Time_factorContext
-            super().__init__(parser)
-            self.copyFrom(ctx)
-
-        def IDENTIFIER(self):
-            return self.getToken(ExprParser.IDENTIFIER, 0)
-
-        def time_expr(self):
-            return self.getTypedRuleContext(ExprParser.Time_exprContext, 0)
-
-        def accept(self, visitor: ParseTreeVisitor):
-            if hasattr(visitor, "visitTimeFactorIndex"):
-                return visitor.visitTimeFactorIndex(self)
-            else:
-                return visitor.visitChildren(self)
-
     class TimeIdentifierContext(Time_factorContext):
 
         def __init__(
@@ -2967,26 +2855,6 @@ class ExprParser(Parser):
         def accept(self, visitor: ParseTreeVisitor):
             if hasattr(visitor, "visitTimeIdentifier"):
                 return visitor.visitTimeIdentifier(self)
-            else:
-                return visitor.visitChildren(self)
-
-    class TimeFactorShiftContext(Time_factorContext):
-
-        def __init__(
-            self, parser, ctx: ParserRuleContext
-        ):  # actually a ExprParser.Time_factorContext
-            super().__init__(parser)
-            self.copyFrom(ctx)
-
-        def IDENTIFIER(self):
-            return self.getToken(ExprParser.IDENTIFIER, 0)
-
-        def shift(self):
-            return self.getTypedRuleContext(ExprParser.ShiftContext, 0)
-
-        def accept(self, visitor: ParseTreeVisitor):
-            if hasattr(visitor, "visitTimeFactorShift"):
-                return visitor.visitTimeFactorShift(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -3036,7 +2904,7 @@ class ExprParser(Parser):
         self.enterRule(localctx, 20, self.RULE_time_factor)
         self._la = 0  # Token type
         try:
-            self.state = 181
+            self.state = 171
             self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input, 13, self._ctx)
             if la_ == 1:
@@ -3079,39 +2947,13 @@ class ExprParser(Parser):
                 pass
 
             elif la_ == 4:
-                localctx = ExprParser.TimeFactorShiftContext(self, localctx)
+                localctx = ExprParser.TimeParenthesisContext(self, localctx)
                 self.enterOuterAlt(localctx, 4)
                 self.state = 167
-                self.match(ExprParser.IDENTIFIER)
-                self.state = 168
-                self.match(ExprParser.T__12)
-                self.state = 169
-                self.shift()
-                self.state = 170
-                self.match(ExprParser.T__13)
-                pass
-
-            elif la_ == 5:
-                localctx = ExprParser.TimeFactorIndexContext(self, localctx)
-                self.enterOuterAlt(localctx, 5)
-                self.state = 172
-                self.match(ExprParser.IDENTIFIER)
-                self.state = 173
-                self.match(ExprParser.T__12)
-                self.state = 174
-                self.time_expr()
-                self.state = 175
-                self.match(ExprParser.T__13)
-                pass
-
-            elif la_ == 6:
-                localctx = ExprParser.TimeParenthesisContext(self, localctx)
-                self.enterOuterAlt(localctx, 6)
-                self.state = 177
                 self.match(ExprParser.T__3)
-                self.state = 178
+                self.state = 168
                 self.time_expr()
-                self.state = 179
+                self.state = 169
                 self.match(ExprParser.T__4)
                 pass
 

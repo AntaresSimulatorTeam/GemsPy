@@ -123,14 +123,6 @@ class ExprVisitor(ParseTreeVisitor):
     def visitTimeFunction(self, ctx: ExprParser.TimeFunctionContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by ExprParser#timeFactorShift.
-    def visitTimeFactorShift(self, ctx: ExprParser.TimeFactorShiftContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by ExprParser#timeFactorIndex.
-    def visitTimeFactorIndex(self, ctx: ExprParser.TimeFactorIndexContext):
-        return self.visitChildren(ctx)
-
     # Visit a parse tree produced by ExprParser#timeParenthesis.
     def visitTimeParenthesis(self, ctx: ExprParser.TimeParenthesisContext):
         return self.visitChildren(ctx)

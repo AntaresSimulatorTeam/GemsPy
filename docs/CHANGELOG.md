@@ -7,8 +7,6 @@ All notable changes to GemsPy are documented here.
 ### Added
 - **Expression language**
   - Time shifts accept functions without parentheses (e.g. `x[t - ceil(d / 2)]`).
-  - A time index or time shift may be given by a parameter varying in time,
-    per component or per scenario (e.g. `x[d[t]]`, `x[d[t-1]]`, `x[t + k[t]]`).
 - **Power operator `^`** - `p^2`, `2^p`, `p^(1 + q)` in any expression of a
   model library; `^` was a parse error before. It binds tighter than `*`, `/`
   and unary minus (`-2^2` is `-(2^2) = -4`), and is right-associative (`2^3^2`

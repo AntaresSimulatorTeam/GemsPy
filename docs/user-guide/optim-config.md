@@ -350,9 +350,9 @@ Examples, in a block of 168 time steps (`t` from 0 to 167):
 |---|---|
 | `x[t-1]`, `sum(t-1 .. t, x)` | at `t = 0` |
 | `p[t-1]`, `sum_connections(p.f)[t-1]` | at `t = 0` |
-| `x[t + k[t]]`, `x[t - lag]` | where `t + k[t]` or `t - lag` is out of the block, per component and scenario |
+| `x[t + k]`, `x[t - lag]` | where `t + k` or `t - lag` is out of the block, per component and scenario |
 | `x[200]`, `sum(-1 .. 1, x)` | at every time step |
-| `x[d]`, `x[d[t-1]]` | where the value of `d` is out of the block, or at `t = 0` for `d[t-1]` |
+| `x[d]` | where the value of `d` is out of the block |
 | `(x[t-1])[t+2]` | at `t = 167`: shifts add up, so it reads `x[t+1]` |
 | `(x[t-1])[0]` | at every time step: it reads `x[-1]` |
 | `y[t-1]`, `y` a time-independent variable | at `t = 0` |

@@ -271,20 +271,6 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     ) -> ExpressionNode:
         return self._convert_time_identifier(ctx.IDENTIFIER().getText())  # type: ignore
 
-    # Visit a parse tree produced by ExprParser#timeFactorIndex.
-    def visitTimeFactorIndex(
-        self, ctx: ExprParser.TimeFactorIndexContext
-    ) -> ExpressionNode:
-        expr = self._convert_time_identifier(ctx.IDENTIFIER().getText())  # type: ignore
-        return expr.eval(ctx.time_expr().accept(self))  # type: ignore
-
-    # Visit a parse tree produced by ExprParser#timeFactorShift.
-    def visitTimeFactorShift(
-        self, ctx: ExprParser.TimeFactorShiftContext
-    ) -> ExpressionNode:
-        expr = self._convert_time_identifier(ctx.IDENTIFIER().getText())  # type: ignore
-        return _shift(expr, ctx.shift().accept(self))  # type: ignore
-
     def _convert_time_identifier(self, identifier: str) -> ExpressionNode:
         if self.identifiers.is_variable(identifier):
             raise ValueError(

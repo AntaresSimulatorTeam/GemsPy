@@ -271,10 +271,6 @@ from gems_craft.expression.parsing.parse_expression import (
             var("x").shift(maximum(literal(1), param("d"))),
         ),
         ({"x"}, {"p"}, "x[ceil(p)]", var("x").eval(param("p").ceil())),
-        ({"x"}, {"p"}, "x[t - p[0]]", var("x").shift(-param("p").eval(literal(0)))),
-        ({"x"}, {"p"}, "x[p[t]]", var("x").eval(param("p"))),
-        ({"x"}, {"p"}, "x[p[t-1]]", var("x").eval(param("p").shift(-literal(1)))),
-        ({"x"}, {"p"}, "x[t + p[t]]", var("x").shift(param("p"))),
         (
             {"x"},
             {"p"},
@@ -314,13 +310,7 @@ def test_parsing_visitor(
         ({"x"}, {}, "x[-2^2]", var("x").eval(-(literal(2) ** 2))),
         ({"x"}, {}, "x[(-2)^2]", var("x").eval((-literal(2)) ** 2)),
         ({"x"}, {}, "x[2^(-1)]", var("x").eval(literal(2) ** -literal(1))),
-        # The base of a power can be a parameter read at a time, or a function.
-        (
-            {"x"},
-            {"d"},
-            "x[t-d[t-1]^2]",
-            var("x").shift(-(param("d").shift(-literal(1)) ** 2)),
-        ),
+        # The base of a power can be a function.
         (
             {"x"},
             {"k"},
@@ -440,9 +430,6 @@ def test_parse_cancellation_should_throw(expression_str: str) -> None:
         "x[y]",
         "sum(y .. 2, x)",
         "x[t + max(1, y)]",
-        "x[y[0]]",
-        "sum(y[1] .. 2, x)",
-        "x[t - (y[t-1])]",
     ],
 )
 def test_variable_in_time_expression_should_throw(expression_str: str) -> None:

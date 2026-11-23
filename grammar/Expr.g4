@@ -67,8 +67,6 @@ time_factor
     : NUMBER                                         # timeNumber
     | IDENTIFIER                                     # timeIdentifier
     | IDENTIFIER '(' time_expr (',' time_expr)* ')'  # timeFunction
-    | IDENTIFIER '[' shift ']'                       # timeFactorShift
-    | IDENTIFIER '[' time_expr ']'                   # timeFactorIndex
     | '(' time_expr ')'                              # timeParenthesis
     ;
 
