@@ -17,8 +17,10 @@ import pytest
 
 from gems_craft.model.parsing import parse_yaml_library
 from gems_craft.model.taxonomy import (
+    Importance,
     Taxonomy,
     TaxonomyCategory,
+    TaxonomyInputItem,
     TaxonomyItem,
     load_taxonomy,
 )
@@ -181,6 +183,11 @@ taxonomy:
         - id: injection_port
       parameters:
         - id: p_max
+          importance: main
+        - id: cost
+      properties:
+        - id: technology
+          importance: main
     - id: balance
       ports:
         - id: balance_port
@@ -194,6 +201,11 @@ taxonomy:
 
     production = next(c for c in taxonomy.categories if c.id == "production")
     assert [p.id for p in production.ports] == ["injection_port"]
+    assert [(p.id, p.importance) for p in production.parameters] == [
+        ("p_max", Importance.MAIN),
+        ("cost", Importance.STANDARD),
+    ]
+    assert production.properties[0].importance == Importance.MAIN
 
     balance = next(c for c in taxonomy.categories if c.id == "balance")
     assert [p.id for p in balance.ports] == ["balance_port"]
@@ -266,7 +278,7 @@ library:
 
 def test_model_missing_required_taxonomy_parameter_raises() -> None:
     taxonomy = _make_taxonomy(
-        TaxonomyCategory(id="production", parameters=[TaxonomyItem(id="p_max")])
+        TaxonomyCategory(id="production", parameters=[TaxonomyInputItem(id="p_max")])
     )
     lib = _parse_lib("""
 library:
@@ -333,7 +345,9 @@ library:
 
 def test_model_missing_required_taxonomy_property_raises() -> None:
     taxonomy = _make_taxonomy(
-        TaxonomyCategory(id="production", properties=[TaxonomyItem(id="technology")])
+        TaxonomyCategory(
+            id="production", properties=[TaxonomyInputItem(id="technology")]
+        )
     )
     lib = _parse_lib("""
 library:
@@ -378,13 +392,13 @@ def test_model_exposing_all_required_fields_is_valid() -> None:
         TaxonomyCategory(
             id="production",
             variables=[TaxonomyItem(id="generation")],
-            parameters=[TaxonomyItem(id="p_max")],
+            parameters=[TaxonomyInputItem(id="p_max")],
             ports=[TaxonomyItem(id="injection_port")],
             port_field_definitions=[TaxonomyItem(id="injection_port.flow")],
             constraints=[TaxonomyItem(id="max_output")],
             binding_constraints=[TaxonomyItem(id="balance")],
             extra_outputs=[TaxonomyItem(id="co2")],
-            properties=[TaxonomyItem(id="technology")],
+            properties=[TaxonomyInputItem(id="technology")],
         )
     )
     lib = _parse_lib("""

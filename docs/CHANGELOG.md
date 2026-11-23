@@ -4,6 +4,11 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Taxonomy importance** - taxonomy parameters and properties accept an
+  optional `importance`: `main` or `standard` (default). Exposed as
+  `TaxonomyInputItem.importance` (`Importance` enum).
+
 ## [0.4.0] - 2026-11-20
 
 The expression language gains the power operator `^`. Simulation table views

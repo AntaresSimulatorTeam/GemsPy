@@ -79,7 +79,7 @@ def check_library_against_taxonomy(library: LibrarySchema, taxonomy: Taxonomy) -
     # Each entry maps a human-readable field-group name to the required items
     # (from the taxonomy category) and the items exposed by the model, plus the
     # function identifying a model-side item within that group. Taxonomy items are
-    # homogeneous (``TaxonomyItem``) and always identified by their ``id``.
+    # all ``TaxonomyItem`` (or subclasses) and always identified by their ``id``.
     def field_groups(
         category: TaxonomyCategory, model_schema: ModelSchema
     ) -> List[tuple]:
