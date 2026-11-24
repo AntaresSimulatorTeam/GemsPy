@@ -329,7 +329,6 @@ def test_requirements_consistency_scenario_varying_parameter_with_correct_data_p
     system = System("test")
     system.add_component(node)
     system.add_component(gen)
-    system.add_component(gen)
 
     # No ValueError should be raised
     check_data_requirements(Study(system, database))
