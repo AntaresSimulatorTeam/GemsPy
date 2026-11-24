@@ -91,6 +91,14 @@ class SystemSchema(ModifiedBaseModel):
     components: List[ComponentSchema] = Field(default_factory=list)
     connections: Optional[List[PortConnectionsSchema]] = None
 
+    @model_validator(mode="after")
+    def _unique_component_ids(self) -> "SystemSchema":
+        ids = [component.id for component in self.components]
+        duplicates = sorted({id_ for id_ in ids if ids.count(id_) > 1})
+        if duplicates:
+            raise ValueError(f"Duplicate component id(s) in system: {duplicates}")
+        return self
+
 
 _S = TypeVar("_S", bound=SystemSchema)
 

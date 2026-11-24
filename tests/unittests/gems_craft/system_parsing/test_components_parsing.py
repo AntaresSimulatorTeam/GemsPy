@@ -216,6 +216,25 @@ def test_resolve_system_normalizes_list_properties_to_dict(
     }
 
 
+_SYSTEM_WITH_DUPLICATE_COMPONENT_IDS = """\
+system:
+  components:
+    - id: generator
+      model: basic.generator
+    - id: node
+      model: basic.node
+    - id: generator
+      model: basic.generator
+"""
+
+
+def test_parse_yaml_system_duplicate_component_ids_raises() -> None:
+    with pytest.raises(
+        ValidationError, match=r"Duplicate component id\(s\).*'generator'"
+    ):
+        parse_yaml_system(io.StringIO(_SYSTEM_WITH_DUPLICATE_COMPONENT_IDS))
+
+
 _SYSTEM_WITH_PROPERTIES_MISSING_KEY = """\
 system:
   components:
