@@ -160,6 +160,10 @@ class System:
 
     def add_component(self, component: Component) -> None:
         require_not_none(component)
+        if component.id in self._components:
+            raise ValueError(
+                f"Component id {component.id!r} is already defined in system {self.id!r}."
+            )
         self._check_model_id_unique(component.model)
         self._components[component.id] = component
 
