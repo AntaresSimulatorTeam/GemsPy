@@ -276,18 +276,9 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
 
     def _bound_value(self, node: ExpressionNode) -> xr.DataArray:
         """Integer value of a time sum bound (an absolute bound or a relative
-        offset). It is time-independent: this is checked when the model is
-        created."""
+        offset)."""
         result = self._time_value(node, "Time sum bound")
-        if isinstance(result, int):
-            return xr.DataArray(result)
-        if "time" in result.dims:  # cannot happen in a model that passed the check
-            raise ValueError(
-                f"Model '{self.model_id}': the time sum bound '{print_expr(node)}' "
-                "depends on time, but must be time-independent."
-            )
-        # A time operator such as d[0] leaves a scalar time coordinate.
-        return result.drop_vars("time", errors="ignore")
+        return xr.DataArray(result) if isinstance(result, int) else result
 
     def _time_sum_bound(self, bound: ExpressionNode, t: xr.DataArray) -> xr.DataArray:
         """Time index of a time sum bound at each time step: ``t + offset`` for a
@@ -448,7 +439,7 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     def _apply_time_shift(self, operand: Any, shift: Union[int, xr.DataArray]) -> Any:
         """Apply a cyclic (modulo ``self.block_length``) time shift to *operand*.
 
-        *shift* may vary per component, time step or scenario."""
+        *shift* may vary per component or scenario."""
         t = xr.DataArray(np.arange(self.block_length), dims="time")
         return self._take_time(operand, t + shift)
 
@@ -480,8 +471,9 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
 
     def _time_value(self, node: ExpressionNode, what: str) -> Union[int, xr.DataArray]:
         """Integer value of a time shift, time index or time sum bound: an int
-        when it is a constant, else an integer DataArray computed from the data.
-        A non-integer value raises, whether it is a constant or not."""
+        when it is a constant, else an integer DataArray computed from the data,
+        varying per component or scenario only. A non-integer value raises,
+        whether it is a constant or not."""
         try:
             return self._eval_int(node)
         except (KeyError, NotImplementedError):  # depends on the data
@@ -495,6 +487,11 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
             raise ValueError(
                 f"{what} expression must evaluate to a parameter (DataArray), "
                 f"got {type(value).__name__!r}."
+            )
+        if "time" in value.dims:  # cannot happen in a model that passed the check
+            raise ValueError(
+                f"{what} '{print_expr(node)}' in model '{self.model_id}' depends on "
+                "time, but must be time-independent."
             )
         values = value.values
         if np.isnan(values).any():
@@ -579,19 +576,13 @@ class _TimeAmountEvaluator(VectorizedBuilderBase[xr.DataArray]):
         )
 
 
-def _bound_amount(bound: ExpressionNode) -> ExpressionNode:
-    """The expression of a time sum bound: the offset of a relative bound."""
-    return bound.offset if isinstance(bound, RelativeTimeNode) else bound
-
-
 @dataclass(kw_only=True)
 class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     """Validity mask of an expression for ``OutOfBoundsMode.DROP``.
 
     An instance (component, time step, scenario) is valid iff the expression
     reads no variable, parameter or port field at a time step outside
-    ``[0, block_length)``, including in shift amounts, time indices and time
-    sum bounds. Time operators compose: ``(x[t-1])[t+1]`` reads ``x[t]``.
+    ``[0, block_length)``. Time operators compose: ``(x[t-1])[t+1]`` reads ``x[t]``.
     Aggregations (time sum, expectation) read every step: the instance is
     invalid as soon as one read is out of the block. Limitation: the
     definition of a port field (``p.f = x[t-1]``) is not inspected.
@@ -625,13 +616,6 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     ) -> Optional[xr.DataArray]:
         return visit(operand, replace(self, positions=positions))
 
-    def _at_positions(self, value: Union[int, xr.DataArray]) -> Any:
-        """*value*, computed over the block, at the positions read (modulo the
-        block, as parameters are read)."""
-        if isinstance(value, int):
-            return value
-        return self._evaluator()._take_time(value, self._positions())
-
     def _in_block(self) -> Optional[xr.DataArray]:
         positions = self._positions()
         mask = (positions >= 0) & (positions < self.block_length)
@@ -643,35 +627,25 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
 
     def time_shift(self, node: TimeShiftNode) -> Optional[xr.DataArray]:
         amount = self._evaluator()._time_value(node.time_shift, "Time shift")
-        return _and_mask(
-            visit(node.time_shift, self),
-            self._read_at(node.operand, self._positions() + self._at_positions(amount)),
-        )
+        return self._read_at(node.operand, self._positions() + amount)
 
     def time_eval(self, node: TimeEvalNode) -> Optional[xr.DataArray]:
         index = self._evaluator()._time_value(node.eval_time, "Time index")
-        return _and_mask(
-            visit(node.eval_time, self),
-            self._read_at(node.operand, xr.DataArray(self._at_positions(index))),
-        )
+        return self._read_at(node.operand, xr.DataArray(index))
 
     def time_sum(self, node: TimeSumNode) -> Optional[xr.DataArray]:
         start = self._time_sum_position(node.from_time)
         end = self._time_sum_position(node.to_time)
-        bounds_mask = _and_mask(
-            visit(_bound_amount(node.from_time), self),
-            visit(_bound_amount(node.to_time), self),
-        )
         first, last = int(start.min()), int(end.max())
         if last < first:  # empty sum: the operand is never read
-            return bounds_mask
+            return None
 
         # The operand is read at every position first..last, along its own dim.
         dim = f"summed_{id(node)}"
         summed = xr.DataArray(np.arange(first, last + 1), dims=dim)
         operand_mask = self._read_at(node.operand, summed)
         if operand_mask is None:
-            return bounds_mask
+            return None
         operand_mask, _ = xr.broadcast(operand_mask, summed)
 
         # Running count of the invalid positions: the count over start..end is
@@ -684,7 +658,7 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         upper = (end - first + 1).clip(0, size)
         lower = (start - first).clip(0, size)
         valid = counted.isel({dim: upper}) - counted.isel({dim: lower}) <= 0
-        return _and_mask(bounds_mask, None if bool(valid.all()) else valid)
+        return None if bool(valid.all()) else valid
 
     def _time_sum_position(self, bound: ExpressionNode) -> xr.DataArray:
         """Position of a time sum bound: offset from the positions read for a

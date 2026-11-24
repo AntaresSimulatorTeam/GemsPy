@@ -915,11 +915,6 @@ def _builder_with_index(
     "index, expected",
     [
         pytest.param(
-            xr.DataArray([2.0, 0.0, 4.0], dims="time", coords={"time": [0, 1, 2]}),
-            [[3.0, 1.0, 2.0], [6.0, 4.0, 5.0]],
-            id="time",
-        ),
-        pytest.param(
             xr.DataArray(
                 [1.0, 2.0], dims="component", coords={"component": ["c1", "c2"]}
             ),
@@ -945,24 +940,6 @@ def test_time_eval_at_an_index_given_by_a_parameter(
     assert result.values.tolist() == expected
 
 
-def test_time_eval_of_a_variable_at_an_index_given_by_a_parameter(
-    comp_time_var: linopy.Variable, param_da: xr.DataArray
-) -> None:
-    index = xr.DataArray(
-        [[2.0, 0.0, 1.0], [0.0, 0.0, 2.0]],
-        dims=["component", "time"],
-        coords={"component": ["c1", "c2"], "time": [0, 1, 2]},
-    )
-    builder = _builder_with_index(comp_time_var, param_da, index)
-    result = visit(var("x").eval(param("d")), builder)
-    labels = comp_time_var.labels
-    expected = [
-        [labels.sel(component=c, time=int(i)).item() for i in index.sel(component=c)]
-        for c in ["c1", "c2"]
-    ]
-    assert result.labels.values.tolist() == expected
-
-
 def test_time_eval_of_a_variable_at_an_index_per_component(
     comp_time_var: linopy.Variable, param_da: xr.DataArray
 ) -> None:
@@ -980,15 +957,6 @@ def test_time_eval_of_a_variable_at_an_index_per_component(
     ]
     assert "time" not in result.dims
     assert result.vars.squeeze("_term").values.tolist() == expected
-
-
-def test_time_eval_at_a_non_integer_index_raises(
-    comp_time_var: linopy.Variable, param_da: xr.DataArray
-) -> None:
-    index = xr.DataArray([0.5, 0.0, 1.0], dims="time", coords={"time": [0, 1, 2]})
-    builder = _builder_with_index(comp_time_var, param_da, index)
-    with pytest.raises(ValueError, match="integer values"):
-        visit(param("p").eval(param("d")), builder)
 
 
 def test_time_sum_bound_given_by_a_non_integer_parameter_raises(

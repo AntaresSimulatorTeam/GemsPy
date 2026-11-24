@@ -195,11 +195,9 @@ def test_time_sum_with_scenario_dependent_bound_depends_on_scenario(
         pytest.param(
             param("d").shift(param("p")), IndexingStructure(True, True), id="shift"
         ),
-        # p does not depend on time: reading it elsewhere changes nothing
+        # d read at a time step per scenario
         pytest.param(
-            param("p").eval(param("d")),
-            IndexingStructure(False, True),
-            id="index-of-constant",
+            param("d").eval(param("p")), IndexingStructure(False, True), id="index"
         ),
     ],
 )

@@ -249,7 +249,7 @@ def test_absolute_index_refers_to_the_block(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "time_sum, error",
+    "time_amount, error",
     [
         pytest.param(
             "sum(0 .. k, x)",
@@ -263,17 +263,29 @@ def test_absolute_index_refers_to_the_block(tmp_path: Path) -> None:
             "time-independent. Declare 'k' with `time-dependent: false`.",
             id="relative",
         ),
+        pytest.param(
+            "x[t - k]",
+            "the time shift '-(k)' depends on time, but must be time-independent. "
+            "Declare 'k' with `time-dependent: false`.",
+            id="shift",
+        ),
+        pytest.param(
+            "x[k]",
+            "the time index 'k' depends on time, but must be time-independent. "
+            "Declare 'k' with `time-dependent: false`.",
+            id="index",
+        ),
     ],
 )
-def test_bound_must_be_declared_time_independent(
-    tmp_path: Path, time_sum: str, error: str
+def test_time_amount_must_be_declared_time_independent(
+    tmp_path: Path, time_amount: str, error: str
 ) -> None:
     """The declared structure decides, whatever the data: k is declared
     time-dependent, so it is rejected although its series is constant."""
     study_dir = _make_study(
         tmp_path,
         variables=["x", "y", "a"],
-        constraints=["x = d", f"a = {time_sum}"],
+        constraints=["x = d", f"a = {time_amount}"],
         objective="sum(x)",
         data={"d": [1, 2, 3, 4], "k": [1, 1, 1, 1]},
         constants={},

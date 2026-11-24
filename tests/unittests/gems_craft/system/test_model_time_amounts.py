@@ -10,8 +10,9 @@
 #
 # This file is part of the Antares project.
 
-"""A time sum bound must be declared time-independent and contain no variable,
-checked when the model is created (here through the Python API)."""
+"""A time shift, time index or time sum bound must be time-independent and
+contain no variable, port field or time operator, checked when the model is
+created (here through the Python API)."""
 
 import re
 from typing import Dict, Optional
@@ -60,9 +61,8 @@ def _model(
     [
         pytest.param(var("x").time_sum_between(0, param("c")), id="constant"),
         pytest.param(var("x").time_sum_between(0, param("s")), id="scenario-dependent"),
-        pytest.param(
-            var("x").time_sum_between(0, param("k").eval(0)), id="time-operator"
-        ),
+        pytest.param(var("x").shift(param("s")), id="shift-scenario-dependent"),
+        pytest.param(var("x").eval(param("c")), id="index-constant"),
         pytest.param(
             var("x").time_sum_between(relative_time(-param("c")), relative_time(0)),
             id="relative-constant",
@@ -70,7 +70,7 @@ def _model(
         pytest.param(var("x").time_sum_between(0, relative_time(0)), id="mixed"),
     ],
 )
-def test_time_independent_bounds_are_accepted(time_sum: ExpressionNode) -> None:
+def test_time_independent_amounts_are_accepted(time_sum: ExpressionNode) -> None:
     _model(constraint=time_sum)
 
 
@@ -89,16 +89,27 @@ def test_time_independent_bounds_are_accepted(time_sum: ExpressionNode) -> None:
             id="relative-offset",
         ),
         pytest.param(
-            var("x").time_sum_between(0, param("k").eval(0) + param("j")),
-            "the time sum bound '((k.eval(0.0)) + j)' depends on time, but must be "
-            "time-independent. Declare 'j' with `time-dependent: false`.",
-            id="names-only-the-time-dependent-parameter",
+            var("x").time_sum_between(0, param("k") + param("c") + param("j")),
+            "the time sum bound '(k + c + j)' depends on time, but must be "
+            "time-independent. Declare 'j', 'k' with `time-dependent: false`.",
+            id="names-the-time-dependent-parameters",
         ),
         pytest.param(
-            var("x").time_sum_between(0, param("k").shift(-1)),
-            "the time sum bound '(k.shift(-1.0))' depends on time, but must be "
-            "time-independent. Declare 'k' with `time-dependent: false`.",
-            id="time-shift-moves-with-t",
+            var("x").time_sum_between(0, param("c").eval(0)),
+            "the time sum bound '(c.eval(0.0))' cannot contain a time operator.",
+            id="time-operator",
+        ),
+        pytest.param(
+            var("x").shift(-param("k")),
+            "the time shift '-(k)' depends on time, but must be time-independent. "
+            "Declare 'k' with `time-dependent: false`.",
+            id="shift",
+        ),
+        pytest.param(
+            var("x").eval(param("k")),
+            "the time index 'k' depends on time, but must be time-independent. "
+            "Declare 'k' with `time-dependent: false`.",
+            id="index",
         ),
         pytest.param(
             var("x").time_sum_between(0, var("y")),
@@ -112,7 +123,7 @@ def test_time_independent_bounds_are_accepted(time_sum: ExpressionNode) -> None:
         ),
     ],
 )
-def test_invalid_bounds_are_rejected_in_constraints(
+def test_invalid_amounts_are_rejected_in_constraints(
     time_sum: ExpressionNode, error: str
 ) -> None:
     with pytest.raises(

@@ -205,48 +205,18 @@ def test_nested_shifts_and_combined():
 
 
 # ---------------------------------------------------------------------------
-# Invalid time amounts — raise ValueError
+# Shift varying per scenario
 # ---------------------------------------------------------------------------
 
 
-def test_time_dependent_param_in_time_sum_bound_raises():
-    lag = xr.DataArray([1.0, 2.0, 1.0, 2.0], dims=["time"], coords={"time": range(4)})
-    expr = var("x").time_sum(-param("lag"), 0)
-    with pytest.raises(ValueError, match="depends on time"):
-        visit(expr, _visitor({("m", "lag"): lag}, block_length=4))
-
-
-# ---------------------------------------------------------------------------
-# Shift varying per component, time step or scenario
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "lag, expected",
-    [
-        pytest.param(
-            # t + lag = [1, 3, 3, 5] for c1, [2, 2, 4, 4] for c2
-            xr.DataArray(
-                [[1.0, 2.0, 1.0, 2.0], [2.0, 1.0, 2.0, 1.0]],
-                dims=["component", "time"],
-                coords={"component": ["c1", "c2"], "time": [0, 1, 2, 3]},
-            ),
-            [[True, True, True, False], [True, True, False, False]],
-            id="time",
-        ),
-        pytest.param(
-            # t + lag = [1, 2, 3, 4] for s1, [2, 3, 4, 5] for s2
-            xr.DataArray([1.0, 2.0], dims=["scenario"], coords={"scenario": [0, 1]}),
-            [[True, True, True, False], [True, True, False, False]],
-            id="scenario",
-        ),
-    ],
-)
-def test_shift_by_a_varying_parameter(lag, expected):
-    expr = var("x").shift(param("lag"))
-    mask = visit(expr, _visitor({("m", "lag"): lag}, block_length=4))
-    other = "component" if "component" in lag.dims else "scenario"
-    np.testing.assert_array_equal(mask.transpose(other, "time").values, expected)
+def test_shift_per_scenario_param():
+    # t + lag = [1, 2, 3, 4] for s1, [2, 3, 4, 5] for s2
+    lag = xr.DataArray([1.0, 2.0], dims=["scenario"], coords={"scenario": [0, 1]})
+    mask = visit(var("x").shift(param("lag")), _visitor({("m", "lag"): lag}))
+    np.testing.assert_array_equal(
+        mask.transpose("scenario", "time").values,
+        [[True, True, True, False], [True, True, False, False]],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -266,19 +236,10 @@ def test_shift_by_a_varying_parameter(lag, expected):
             id="shifted-port-field",
         ),
         pytest.param(var("x").eval(4), False, id="index-out"),
-        pytest.param(
-            var("x").eval(param("d")), [True, False, False, True], id="index-by-d"
-        ),
+        pytest.param(var("x").eval(param("d")), [True, False], id="index-by-d"),
         pytest.param(var("x").time_sum_between(-1, 1), False, id="absolute-sum"),
         pytest.param(
             var("x").time_sum_between(-1, relative_time(0)), False, id="mixed-sum"
-        ),
-        # x[s + d[s]] for s in t-1 .. t: d[-1] is out of the block at t = 0,
-        # x is read out of the block at s = 1 and s = 3
-        pytest.param(
-            var("x").shift(param("d")).time_sum(-1, 0),
-            [False, False, False, False],
-            id="sum-of-shift-by-d",
         ),
         # Nested time operators: shifts add up
         pytest.param(var("x").shift(-1).shift(1), True, id="shift-of-shift"),
@@ -291,7 +252,7 @@ def test_shift_by_a_varying_parameter(lag, expected):
     ],
 )
 def test_read_out_of_the_block_is_dropped(expr, expected):
-    d = xr.DataArray([1.0, 5.0, -1.0, 2.0], dims=["time"], coords={"time": range(4)})
+    d = xr.DataArray([1.0, 5.0], dims=["component"], coords={"component": ["c1", "c2"]})
     mask = visit(expr, _visitor({("m", "d"): d}))
     np.testing.assert_array_equal(_valid(mask), expected)
 

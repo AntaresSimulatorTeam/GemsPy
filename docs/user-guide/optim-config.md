@@ -341,7 +341,8 @@ models:
 In `drop` mode, the constraint is skipped for a component, time step and
 scenario as soon as it reads a **variable**, a **parameter** or a **port field**
 at a time step outside the block, whether through a time shift, a time index or
-a time sum, including in the shift amount, the time index or the sum bounds.
+a time sum. Shift amounts, time indices and sum bounds are time-independent:
+they may vary per component and scenario only.
 Nothing wraps around the block in `drop` mode.
 
 Examples, in a block of 168 time steps (`t` from 0 to 167):
@@ -352,7 +353,7 @@ Examples, in a block of 168 time steps (`t` from 0 to 167):
 | `p[t-1]`, `sum_connections(p.f)[t-1]` | at `t = 0` |
 | `x[t + k]`, `x[t - lag]` | where `t + k` or `t - lag` is out of the block, per component and scenario |
 | `x[200]`, `sum(-1 .. 1, x)` | at every time step |
-| `x[d]` | where the value of `d` is out of the block |
+| `x[d]` | at every time step, for the components and scenarios where `d` is out of the block |
 | `(x[t-1])[t+2]` | at `t = 167`: shifts add up, so it reads `x[t+1]` |
 | `(x[t-1])[0]` | at every time step: it reads `x[-1]` |
 | `y[t-1]`, `y` a time-independent variable | at `t = 0` |

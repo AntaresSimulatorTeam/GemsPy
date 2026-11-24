@@ -32,6 +32,8 @@ All notable changes to GemsPy are documented here.
   `ceil`, `round`, `abs`, `max`, `min`, `expec`. Variables, port fields, sums
   and comparisons are rejected when the library is parsed. A unary minus must
   start the expression or a parenthesis: write `x[a * (-1)]`, not `x[a * -1]`.
+  Their parameters must be declared `time-dependent: false`: `x[t - d]` or
+  `x[d]` with `d` varying in time is rejected when the model is created.
 - **Breaking** - a port field outside `sum_connections` (e.g. `p.f <= 0`) is a
   syntax error.
 - **Breaking** - **`drop` out-of-bounds mode** skips a constraint where it
@@ -49,8 +51,8 @@ All notable changes to GemsPy are documented here.
 - A port field defined by a constant expression (e.g. `definition: 0`) no
   longer makes `build_problem` fail when its component is connected; the
   constant is contributed once per connection.
-- `x[d]` with `d` varying in time, per component or per scenario read `x` at
-  the first value of `d` only.
+- `x[d]` with `d` varying per component or per scenario read `x` at the
+  first value of `d` only.
 - In `drop` mode, a time shift or index of a shifted expression (e.g.
   `(x[t-1])[0]`) skipped the constraint at the wrong time steps.
 - In `drop` mode, a bound without a component dimension was masked differently
