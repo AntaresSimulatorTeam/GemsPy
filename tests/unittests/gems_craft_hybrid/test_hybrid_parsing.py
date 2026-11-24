@@ -86,6 +86,19 @@ def test_parse_yaml_hybrid_system_reads_hybrid_fields() -> None:
     assert system == _load_hybrid_system(FIXTURES / "hybrid_system.yml")
 
 
+def test_hybrid_system_duplicate_component_ids_raises() -> None:
+    """HybridSystemSchema inherits SystemSchema's unique component id check."""
+    with pytest.raises(ValueError, match=r"Duplicate component id\(s\).*'G'"):
+        HybridSystemSchema.model_validate(
+            {
+                "components": [
+                    {"id": "G", "model": "lib.generator"},
+                    {"id": "G", "model": "lib.generator"},
+                ]
+            }
+        )
+
+
 # ---------------------------------------------------------------------------
 # HybridSystemSchema — roundtrip via write_yaml_system
 # ---------------------------------------------------------------------------

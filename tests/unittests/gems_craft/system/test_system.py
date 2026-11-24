@@ -55,3 +55,14 @@ def test_system(lib_dict: dict[str, Library]) -> None:
     assert system.get_component("N1") == Component(model=node_model, id="N1")
     with pytest.raises(KeyError):
         system.get_component("unknown")
+
+
+def test_add_component_with_duplicate_id_raises(lib_dict: dict[str, Library]) -> None:
+    system = System("test")
+    node_model = lib_dict["basic"].models["basic.node"]
+    system.add_component(Component(model=node_model, id="N1"))
+
+    with pytest.raises(ValueError, match="'N1' is already defined"):
+        system.add_component(Component(model=node_model, id="N1"))
+
+    assert len(list(system.components)) == 1
