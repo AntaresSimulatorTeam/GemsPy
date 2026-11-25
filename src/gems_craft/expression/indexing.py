@@ -10,9 +10,10 @@
 #
 # This file is part of the Antares project.
 
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 from gems_craft.expression.indexing_structure import IndexingStructure
 
@@ -48,7 +49,16 @@ from .expression import (
     UpperBoundNode,
     VariableNode,
 )
+from .print import print_expr
 from .visitor import ExpressionVisitor, T, visit
+
+
+class UnresolvedPortFieldError(ValueError):
+    """Raised when an expression still contains port fields (not yet resolved)."""
+
+
+class IndexingUsageError(ValueError):
+    """Raised when a set index/shift targets a set the expression isn't indexed by."""
 
 
 class IndexingStructureProvider(ABC):
@@ -65,7 +75,9 @@ class IndexingStructureProvider(ABC):
 @dataclass(frozen=True)
 class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
     """
-    Determines if the expression represents a single expression or an expression that should be instantiated for all time steps.
+    Computes the time, scenario and custom-set dimensions an expression varies over.
+    Raises IndexingUsageError when a set index targets a set the operand is not
+    indexed by.
     """
 
     context: IndexingStructureProvider
@@ -77,21 +89,20 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return visit(node.operand, self)
 
     def _combine(self, operands: List[ExpressionNode]) -> IndexingStructure:
-        if not operands:
-            return IndexingStructure(False, False)
-        res = visit(operands[0], self)
-        if res.is_time_scenario_varying():
-            return res
-        for o in operands[1:]:
-            res = res | visit(o, self)
-            if res.is_time_scenario_varying():
-                return res
+        res = IndexingStructure(False, False)
+        unresolved: Optional[UnresolvedPortFieldError] = None
+        for o in operands:
+            try:
+                res = res | visit(o, self)
+            except UnresolvedPortFieldError as e:
+                # Keep visiting the other operands so their index errors are
+                # still reported; the unresolved port field is re-raised after.
+                unresolved = unresolved or e
+        if unresolved is not None:
+            raise unresolved
         return res
 
     def addition(self, node: AdditionNode) -> IndexingStructure:
-        # performance note:
-        # here we don't need to visit all nodes, we can stop as soon as
-        # index is true/true
         return self._combine(node.operands)
 
     def multiplication(self, node: MultiplicationNode) -> IndexingStructure:
@@ -107,14 +118,10 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         return self._combine([node.left, node.right])
 
     def variable(self, node: VariableNode) -> IndexingStructure:
-        time = self.context.get_variable_structure(node.name).time == True
-        scenario = self.context.get_variable_structure(node.name).scenario == True
-        return IndexingStructure(time, scenario)
+        return self.context.get_variable_structure(node.name)
 
     def parameter(self, node: ParameterNode) -> IndexingStructure:
-        time = self.context.get_parameter_structure(node.name).time == True
-        scenario = self.context.get_parameter_structure(node.name).scenario == True
-        return IndexingStructure(time, scenario)
+        return self.context.get_parameter_structure(node.name)
 
     def time_shift(self, node: TimeShiftNode) -> IndexingStructure:
         operand = visit(node.operand, self)
@@ -130,7 +137,7 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         # The index is time-independent (checked when the model is created): it
         # removes the time dimension and can only add a scenario dependency.
         index = visit(node.eval_time, self)
-        return IndexingStructure(False, operand.scenario or index.scenario)
+        return IndexingStructure(False, operand.scenario, operand.sets) | index
 
     def time_sum(self, node: TimeSumNode) -> IndexingStructure:
         # Bounds are time-independent (checked when the model is created), so
@@ -144,39 +151,63 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
             ).scenario
             for bound in bounds
         )
+        sets = operand.sets
         if all(relative):
-            return IndexingStructure(operand.time, scenario)  # window moves with t
+            return IndexingStructure(
+                operand.time, scenario, sets
+            )  # window moves with t
         if any(relative):
-            return IndexingStructure(True, scenario)  # number of terms changes with t
-        return IndexingStructure(False, scenario)  # fixed window
+            return IndexingStructure(True, scenario, sets)  # terms change with t
+        return IndexingStructure(False, scenario, sets)  # fixed window
 
     def all_time_sum(self, node: AllTimeSumNode) -> IndexingStructure:
-        return IndexingStructure(False, visit(node.operand, self).scenario)
+        inner = visit(node.operand, self)
+        return IndexingStructure(False, inner.scenario, inner.sets)
 
     def set_index(self, node: SetIndexNode) -> IndexingStructure:
-        # TODO(custom sets): resolve the `node.set_id` dimension once
-        # IndexingStructure tracks sets.
-        result = visit(node.operand, self)
-        # The position or shift brings its own time/scenario dependency.
+        inner = visit(node.operand, self)
+        if node.set_id not in inner.sets:
+            raise IndexingUsageError(
+                f"'{node.set_id}' index applied to '{print_expr(node.operand)}', "
+                f"which is not indexed by '{node.set_id}'."
+            )
+        result = inner
+        if node.position is not None:
+            # Explicit position resolves to a single element: collapses the
+            # dimension, mirroring how time_eval collapses time.
+            result = IndexingStructure(
+                inner.time, inner.scenario, inner.sets - {node.set_id}
+            )
+        # Bare (`X[fuel]`) or relative-shift (`X[fuel+1]`) forms still vary
+        # over the set, mirroring how time_shift keeps time.
+        # The position or shift does not depend on the indexed set (checked when
+        # the model is created): it brings its own time/scenario/set dependency.
         for index in (node.position, node.relative_shift):
             if index is not None:
                 result = result | visit(index, self)
         return result
 
     def sum_over(self, node: SumOverNode) -> IndexingStructure:
-        # TODO(custom sets): remove `node.set_id` once IndexingStructure tracks sets.
-        return visit(node.operand, self)
+        inner = visit(node.operand, self)
+        if node.set_id not in inner.sets:
+            warnings.warn(
+                f"sum_over({node.set_id}, ...) applied to "
+                f"'{print_expr(node.operand)}', which is not indexed by "
+                f"'{node.set_id}': its value is multiplied by the set size."
+            )
+        return IndexingStructure(inner.time, inner.scenario, inner.sets - {node.set_id})
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> IndexingStructure:
-        return IndexingStructure(visit(node.operand, self).time, False)
+        inner = visit(node.operand, self)
+        return IndexingStructure(inner.time, False, inner.sets)
 
     def port_field(self, node: PortFieldNode) -> IndexingStructure:
-        raise ValueError(
+        raise UnresolvedPortFieldError(
             "Port fields must be resolved before computing indexing structure."
         )
 
     def port_field_aggregator(self, node: PortFieldAggregatorNode) -> IndexingStructure:
-        raise ValueError(
+        raise UnresolvedPortFieldError(
             "Port fields aggregators must be resolved before computing indexing structure."
         )
 

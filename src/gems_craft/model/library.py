@@ -9,8 +9,8 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # This file is part of the Antares project.
-from dataclasses import dataclass
-from typing import Dict, Iterable, Optional
+from dataclasses import dataclass, field
+from typing import Dict, Iterable, Optional, Set
 
 from gems_craft.model import Model, PortType
 
@@ -21,6 +21,7 @@ class Library:
     port_types: Dict[str, PortType]
     models: Dict[str, Model]
     taxonomy: Optional[str] = None
+    sets: Set[str] = field(default_factory=set)
 
 
 def library(
@@ -28,10 +29,12 @@ def library(
     port_types: Iterable[PortType],
     models: Iterable[Model],
     taxonomy: Optional[str] = None,
+    sets: Optional[Iterable[str]] = None,
 ) -> Library:
     return Library(
         id=id,
         port_types=dict((p.id, p) for p in port_types),
         models=dict((m.id, m) for m in models),
         taxonomy=taxonomy,
+        sets=set(sets) if sets else set(),
     )
