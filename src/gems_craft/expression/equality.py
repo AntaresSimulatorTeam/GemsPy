@@ -23,6 +23,7 @@ from gems_craft.expression import (
     MultiplicationNode,
     NegationNode,
     ParameterNode,
+    PowerNode,
     VariableNode,
 )
 from gems_craft.expression.expression import (
@@ -76,6 +77,8 @@ class EqualityVisitor:
             return self.addition(left, right)
         if isinstance(left, DivisionNode) and isinstance(right, DivisionNode):
             return self.division(left, right)
+        if isinstance(left, PowerNode) and isinstance(right, PowerNode):
+            return self.power(left, right)
         if isinstance(left, MultiplicationNode) and isinstance(
             right, MultiplicationNode
         ):
@@ -158,6 +161,9 @@ class EqualityVisitor:
         return self._visit_operands(left, right)
 
     def division(self, left: DivisionNode, right: DivisionNode) -> bool:
+        return self._visit_operands(left, right)
+
+    def power(self, left: PowerNode, right: PowerNode) -> bool:
         return self._visit_operands(left, right)
 
     def comparison(self, left: ComparisonNode, right: ComparisonNode) -> bool:

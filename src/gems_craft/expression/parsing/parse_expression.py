@@ -120,6 +120,12 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
             return left - right
         raise ValueError(f"Invalid operator {op}")
 
+    # Visit a parse tree produced by ExprParser#power.
+    def visitPower(self, ctx: ExprParser.PowerContext) -> ExpressionNode:
+        left = ctx.expr(0).accept(self)  # type: ignore
+        right = ctx.expr(1).accept(self)  # type: ignore
+        return left**right
+
     # Visit a parse tree produced by ExprParser#negation.
     def visitNegation(self, ctx: ExprParser.NegationContext) -> ExpressionNode:
         return -ctx.expr().accept(self)  # type: ignore
@@ -226,7 +232,8 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     ) -> Tuple[Optional[str], Callable[[ExpressionNode], ExpressionNode]]:
         """Returns (set_id, apply) -- set_id is None for a time-denoting term."""
         amount = ctx.shift().accept(self)  # type: ignore
-        return None, lambda expr: _shift(expr, amount)
+        # x[t] is kept as a zero shift: x must depend on time.
+        return None, lambda expr: expr.shift(amount)
 
     # Visit a parse tree produced by ExprParser#keywordTerm.
     def visitKeywordTerm(
@@ -271,12 +278,13 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         """The set id if ctx starts with a bare declared set id, else None."""
         if ctx.neg is not None:  # type: ignore
             return None
-        factors = ctx.time_term(0).time_factor()  # type: ignore
-        if len(factors) != 1 or not isinstance(
-            factors[0], ExprParser.TimeIdentifierContext
-        ):
+        powers = ctx.time_term(0).time_power()  # type: ignore
+        if len(powers) != 1 or powers[0].time_power() is not None:
             return None
-        identifier: str = factors[0].IDENTIFIER().getText()  # type: ignore
+        factor = powers[0].time_factor()
+        if not isinstance(factor, ExprParser.TimeIdentifierContext):
+            return None
+        identifier: str = factor.IDENTIFIER().getText()  # type: ignore
         return identifier if self.identifiers.is_set(identifier) else None
 
     def visitTimeSum(self, ctx: ExprParser.TimeSumContext) -> ExpressionNode:
@@ -360,8 +368,16 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
 
     # Visit a parse tree produced by ExprParser#time_term.
     def visitTime_term(self, ctx: ExprParser.Time_termContext) -> ExpressionNode:
-        factors = [factor.accept(self) for factor in ctx.time_factor()]  # type: ignore
+        factors = [factor.accept(self) for factor in ctx.time_power()]  # type: ignore
         return _fold(factors[0], ctx.ops, factors[1:])  # type: ignore
+
+    # Visit a parse tree produced by ExprParser#time_power.
+    def visitTime_power(self, ctx: ExprParser.Time_powerContext) -> ExpressionNode:
+        base = ctx.time_factor().accept(self)  # type: ignore
+        exponent = ctx.time_power()  # type: ignore
+        if exponent is None:
+            return base
+        return base ** exponent.accept(self)
 
     # Visit a parse tree produced by ExprParser#timeNumber.
     def visitTimeNumber(self, ctx: ExprParser.TimeNumberContext) -> ExpressionNode:
@@ -372,20 +388,6 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         self, ctx: ExprParser.TimeIdentifierContext
     ) -> ExpressionNode:
         return self._convert_time_identifier(ctx.IDENTIFIER().getText())  # type: ignore
-
-    # Visit a parse tree produced by ExprParser#timeFactorIndex.
-    def visitTimeFactorIndex(
-        self, ctx: ExprParser.TimeFactorIndexContext
-    ) -> ExpressionNode:
-        expr = self._convert_time_identifier(ctx.IDENTIFIER().getText())  # type: ignore
-        return expr.eval(ctx.time_expr().accept(self))  # type: ignore
-
-    # Visit a parse tree produced by ExprParser#timeFactorShift.
-    def visitTimeFactorShift(
-        self, ctx: ExprParser.TimeFactorShiftContext
-    ) -> ExpressionNode:
-        expr = self._convert_time_identifier(ctx.IDENTIFIER().getText())  # type: ignore
-        return _shift(expr, ctx.shift().accept(self))  # type: ignore
 
     def _convert_time_identifier(self, identifier: str) -> ExpressionNode:
         if self.identifiers.is_variable(identifier):
@@ -414,13 +416,6 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         self, ctx: ExprParser.TimeParenthesisContext
     ) -> ExpressionNode:
         return ctx.time_expr().accept(self)  # type: ignore
-
-
-def _shift(expr: ExpressionNode, time_shift: ExpressionNode) -> ExpressionNode:
-    """expr shifted by time_shift; x[t] is x itself."""
-    if _is_zero(time_shift):
-        return expr
-    return expr.shift(time_shift)
 
 
 def _is_zero(amount: ExpressionNode) -> bool:

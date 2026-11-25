@@ -123,7 +123,7 @@ def test_library_parsing(libs_dir: Path) -> None:
         constraints=[
             Constraint(
                 name="Level equation",
-                expression=var("level")
+                expression=var("level").shift(0)
                 - var("level").shift(-literal(1))
                 - param("efficiency") * var("injection")
                 + var("withdrawal")
@@ -316,6 +316,7 @@ _UNRESTRICTED_EXPRS = [
     pytest.param("abs(x)", var("x").abs(), id="abs"),
     pytest.param("floor(x)", var("x").floor(), id="floor"),
     pytest.param("ceil(x)", var("x").ceil(), id="ceil"),
+    pytest.param("x^2", var("x") ** 2, id="power"),
 ]
 
 # Parameter-only expressions (degree 0).  Accepted in every context:
@@ -326,6 +327,7 @@ _CONSTANT_EXPRS = [
     pytest.param("abs(a)", param("a").abs(), id="abs"),
     pytest.param("floor(a)", param("a").floor(), id="floor"),
     pytest.param("ceil(a)", param("a").ceil(), id="ceil"),
+    pytest.param("a^b", param("a") ** param("b"), id="power"),
 ]
 
 # Degree-1 variable expressions.  Rejected in variable bounds (not constant);
@@ -631,8 +633,8 @@ def test_sum_connections_on_own_port_in_extra_output_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_bare_defined_port_field_in_binding_constraint_raises() -> None:
-    """balance_port.flow bare (no sum_connections) in a BC is invalid."""
+def test_bare_port_field_in_binding_constraint_raises() -> None:
+    """A port field outside sum_connections is a syntax error."""
     input_lib = parse_yaml_library(
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.flow >= 0"))
     )
@@ -640,12 +642,14 @@ def test_bare_defined_port_field_in_binding_constraint_raises() -> None:
         resolve_library([input_lib])
 
 
-def test_bare_undefined_port_field_in_binding_constraint_raises() -> None:
-    """balance_port.price bare (not defined in this model either) in a BC is invalid."""
+def test_sum_connections_rules_apply_inside_power() -> None:
+    """The operands of ^ are checked; extra outputs allow non-linear ^."""
     input_lib = parse_yaml_library(
-        io.StringIO(_port_model_yaml(constraint_expr="balance_port.price >= 0"))
+        io.StringIO(
+            _port_model_yaml(extra_output_expr="2^sum_connections(balance_port.flow)")
+        )
     )
-    with pytest.raises(ParsingException, match="ParseCancellationException"):
+    with pytest.raises(ValueError, match="sum_connections"):
         resolve_library([input_lib])
 
 
