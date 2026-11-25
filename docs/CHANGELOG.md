@@ -15,7 +15,8 @@ All notable changes to GemsPy are documented here.
   - New expression forms: `X[fuel]`, `X[fuel=2]`, `X[fuel+1]`,
     `X[segment=2, fuel=1]` and `sum_over(fuel, expr)`. Positions are 0-based and
     `X[fuel+1]` wraps around the component's own elements. A position or shift
-    may be given by a parameter varying per component, time step or scenario,
+    follows the same grammar as a time shift and may be given by a parameter
+    varying per component, time step or scenario,
     but not by the indexed set (`x[fuel=a]` with `a` indexed by `fuel` is
     rejected when the model is created). An index list may combine time and
     sets (`x[t-1, fuel=0]`), and `x[t=3]` is accepted as a time index, like
