@@ -273,6 +273,10 @@ def _model_expressions(model: "Model") -> Iterator[Tuple[str, ExpressionNode]]:
     for c in model.get_all_constraints():
         for expr in (c.expression, c.lower_bound, c.upper_bound):
             yield f"constraint '{c.name}'", expr
+    for v in model.variables.values():
+        for bound in (v.lower_bound, v.upper_bound):
+            if bound is not None:
+                yield f"variable '{v.name}'", bound
     for name, expr in (model.objective_contributions or {}).items():
         yield f"objective contribution '{name}'", expr
     for name, expr in (model.extra_outputs or {}).items():
