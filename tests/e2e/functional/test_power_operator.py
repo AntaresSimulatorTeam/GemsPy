@@ -15,7 +15,7 @@ E2E test: the power operator ``^`` in a YAML study.
 
 In constraints and objectives, ``^`` may only be applied to parameters and
 literals; in extra outputs, it may also be applied to variables. ``^`` binds
-tighter than unary minus: ``-k^2`` is ``-(k^2)``, also inside a time shift.
+tighter than unary minus: ``-k^2`` is ``-(k^2)``.
 """
 
 from pathlib import Path
@@ -132,6 +132,7 @@ def test_power_of_parameters_in_constraints_and_of_variables_in_extra_outputs(
         tmp_path,
         constraints=[
             "x = d^k",
+            # "^" binds tighter than unary minus: -(k^2) + 10 = 6.
             "z = -k^2 + 10",
             # -(k^2)/4 = -1: x one time step before, cyclic in the block.
             "s = x[t-(k^2)/4]",
@@ -154,15 +155,16 @@ def test_power_with_time_shift_in_drop_mode(tmp_path: Path) -> None:
     study_dir = _make_study(
         tmp_path,
         constraints=[
-            # The shift inside the power operand drops t = 0.
-            "s = d[t-(k^2)/4]^2",
-            "w = sum(t-(k^2)/4 .. t, d)",
+            "x = d",
+            # k^2/4 = 1: x read one time step before, out of the block at t = 0.
+            "s = x[t-k^2/4]",
+            "w = sum(t-k^2/4 .. t, x)",
         ],
-        dropped_constraints=(0, 1),
+        dropped_constraints=(1, 2),
     )
 
     results = _solve(study_dir)
 
     # d = [1, 2, 3, 4], k = 2; at t = 0, s and w are free and minimized to 0.
-    assert results["s"] == [0, 1, 4, 9]
+    assert results["s"] == [0, 1, 2, 3]
     assert results["w"] == [0, 3, 5, 7]

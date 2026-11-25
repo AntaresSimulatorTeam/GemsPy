@@ -524,91 +524,26 @@ def _scalar_time_da(values: list) -> xr.DataArray:
     )
 
 
-def test_time_shift_by_zero(empty_builder: VectorizedLinearExprBuilder) -> None:
-    da = _scalar_time_da([1.0, 2.0, 3.0])
+@pytest.mark.parametrize(
+    "shift, expected",
+    [
+        pytest.param(0, [1.0, 2.0, 3.0], id="zero"),
+        # position t reads t + shift, cyclic: time coords stay [0, 1, 2]
+        pytest.param(1, [2.0, 3.0, 1.0], id="plus-one"),
+        pytest.param(-1, [3.0, 1.0, 2.0], id="minus-one"),
+        pytest.param(3, [1.0, 2.0, 3.0], id="block-length"),
+    ],
+)
+def test_time_shift_cycles_in_the_block(shift: int, expected: list) -> None:
     b = VectorizedLinearExprBuilder(
         model_id="m",
         linopy_vars={},
-        param_arrays={("m", "s"): da},
+        param_arrays={("m", "s"): _scalar_time_da([1.0, 2.0, 3.0])},
         port_arrays={},
         block_length=3,
     )
-    result = visit(param("s").shift(0), b)
-    xr.testing.assert_allclose(result, da)
-
-
-def test_time_shift_by_one_cycles(empty_builder: VectorizedLinearExprBuilder) -> None:
-    """Shift by +1: [1,2,3] → [2,3,1] (element at position t = original[t+1 % T])."""
-    da = _scalar_time_da([1.0, 2.0, 3.0])
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): da},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").shift(1), b)
-    expected = _scalar_time_da([2.0, 3.0, 1.0])
-    xr.testing.assert_allclose(result, expected)
-
-
-def test_time_shift_by_negative_one_cycles(
-    empty_builder: VectorizedLinearExprBuilder,
-) -> None:
-    """Shift by -1: [1,2,3] → [3,1,2]."""
-    da = _scalar_time_da([1.0, 2.0, 3.0])
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): da},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").shift(-1), b)
-    expected = _scalar_time_da([3.0, 1.0, 2.0])
-    xr.testing.assert_allclose(result, expected)
-
-
-def test_time_shift_by_block_length_is_identity() -> None:
-    """Shift by block_length should produce the same array (full cycle)."""
-    da = _scalar_time_da([10.0, 20.0, 30.0])
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): da},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").shift(3), b)  # shift by block_length
-    xr.testing.assert_allclose(result, da)
-
-
-def test_time_shift_on_no_time_dim_is_noop() -> None:
-    """Scalar (no time dim) DataArray: shift is a no-op."""
-    scalar = xr.DataArray(99.0)
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): scalar},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").shift(1), b)
-    assert float(result) == pytest.approx(99.0)
-
-
-def test_time_shift_coordinates_are_reassigned() -> None:
-    """After a shift, time coords must be [0,1,2] not the shifted positions."""
-    da = _scalar_time_da([1.0, 2.0, 3.0])
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): da},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").shift(1), b)
-    assert list(result.coords["time"].values) == [0, 1, 2]
+    result = visit(param("s").shift(shift), b)
+    xr.testing.assert_allclose(result, _scalar_time_da(expected))
 
 
 # ---------------------------------------------------------------------------
@@ -644,19 +579,6 @@ def test_time_eval_wraps_beyond_block() -> None:
     r1 = visit(param("s").eval(1), b)
     r4 = visit(param("s").eval(4), b)  # 4 % 3 = 1
     xr.testing.assert_allclose(r1, r4)
-
-
-def test_time_eval_on_no_time_dim() -> None:
-    scalar = xr.DataArray(7.0)
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): scalar},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").eval(2), b)
-    assert float(result) == pytest.approx(7.0)
 
 
 # ---------------------------------------------------------------------------
@@ -881,14 +803,119 @@ def test_eval_int_from_non_integer_float_raises() -> None:
         VectorizedBuilderBase._eval_int(literal(3.5))
 
 
-def test_da_to_int_from_integer_array() -> None:
-    da = xr.DataArray(2.0)
-    result = VectorizedBuilderBase._da_to_int(da)
-    assert result == 2
-    assert isinstance(result, int)
+@pytest.mark.parametrize(
+    "node",
+    [
+        literal(-8) ** (literal(1) / 3),  # nan
+        literal(0) ** -literal(1),  # inf
+        literal(10) ** 400,  # overflow: inf
+    ],
+)
+def test_eval_int_from_non_finite_float_raises(node: ExpressionNode) -> None:
+    with pytest.raises(ValueError, match="Expected an integer constant expression"):
+        VectorizedBuilderBase._eval_int(node)
 
 
-def test_da_to_int_from_non_integer_raises() -> None:
-    da = xr.DataArray(2.5)
-    with pytest.raises(ValueError, match="integer"):
-        VectorizedBuilderBase._da_to_int(da)
+# ---------------------------------------------------------------------------
+# Time index that depends on the data
+# ---------------------------------------------------------------------------
+
+
+def _builder_with_index(
+    comp_time_var: linopy.Variable, param_da: xr.DataArray, index: xr.DataArray
+) -> VectorizedLinearExprBuilder:
+    return VectorizedLinearExprBuilder(
+        model_id="m",
+        linopy_vars={("m", "x"): comp_time_var},
+        param_arrays={("m", "p"): param_da, ("m", "d"): index},
+        port_arrays={},
+        block_length=3,
+    )
+
+
+@pytest.mark.parametrize(
+    "index, expected",
+    [
+        pytest.param(
+            xr.DataArray(
+                [1.0, 2.0], dims="component", coords={"component": ["c1", "c2"]}
+            ),
+            [2.0, 6.0],
+            id="component",
+        ),
+        pytest.param(
+            xr.DataArray([0.0, 2.0], dims="scenario", coords={"scenario": [0, 1]}),
+            [[1.0, 3.0], [4.0, 6.0]],
+            id="scenario",
+        ),
+    ],
+)
+def test_time_eval_at_an_index_given_by_a_parameter(
+    comp_time_var: linopy.Variable,
+    param_da: xr.DataArray,
+    index: xr.DataArray,
+    expected: list,
+) -> None:
+    """p[d] reads p at the value d takes for each element, wrapped into the block."""
+    builder = _builder_with_index(comp_time_var, param_da, index)
+    result = visit(param("p").eval(param("d")), builder)
+    assert result.values.tolist() == expected
+
+
+def test_time_eval_of_a_variable_at_an_index_per_component(
+    comp_time_var: linopy.Variable, param_da: xr.DataArray
+) -> None:
+    """x[d] with d per component: one time step per component, no time left."""
+    index = xr.DataArray(
+        [2.0, 4.0], dims="component", coords={"component": ["c1", "c2"]}
+    )
+    builder = _builder_with_index(comp_time_var, param_da, index)
+    result = visit(var("x").eval(param("d")), builder)
+    labels = comp_time_var.labels
+    # 4 wraps to 1 in a block of 3
+    expected = [
+        labels.sel(component="c1", time=2).item(),
+        labels.sel(component="c2", time=1).item(),
+    ]
+    assert "time" not in result.dims
+    assert result.vars.squeeze("_term").values.tolist() == expected
+
+
+def test_time_sum_bound_given_by_a_non_integer_parameter_raises(
+    comp_time_var: linopy.Variable, param_da: xr.DataArray
+) -> None:
+    """sum(t - k .. t, x) with k = 1.5 raises: k is not truncated."""
+    builder = _builder_with_index(comp_time_var, param_da, xr.DataArray(1.5))
+    with pytest.raises(ValueError, match="integer values"):
+        visit(var("x").time_sum(-param("d"), 0), builder)
+
+
+def test_time_shift_tolerates_rounding_errors(
+    comp_time_var: linopy.Variable, param_da: xr.DataArray
+) -> None:
+    """d / 3 * 3 with d = 1 is 0.999..., read as 1."""
+    index = xr.DataArray(1.0)
+    builder = _builder_with_index(comp_time_var, param_da, index)
+    result = visit(param("p").shift(param("d") / 3 * 3), builder)
+    expected = visit(param("p").shift(1), builder)
+    xr.testing.assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "values, message",
+    [
+        (list(np.arange(100) + 0.5), r"got 0\.5, 1\.5, 2\.5, 3\.5, 4\.5, \.\.\.\.$"),
+        ([1.0, np.nan], "missing values"),
+        ([1.0, np.inf], r"integer values, got inf\.$"),
+    ],
+)
+def test_invalid_time_shift_raises(
+    comp_time_var: linopy.Variable,
+    param_da: xr.DataArray,
+    values: list[float],
+    message: str,
+) -> None:
+    index = xr.DataArray(values, dims="component")
+    builder = _builder_with_index(comp_time_var, param_da, index)
+    with pytest.raises(ValueError, match=message):
+        visit(param("p").shift(param("d")), builder)

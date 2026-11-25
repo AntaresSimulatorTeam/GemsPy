@@ -147,15 +147,26 @@ _OUTSIDE_THE_BLOCK = {
 }
 
 
-@pytest.mark.parametrize("mode", ["cyclic", "drop"])
-def test_absolute_indices_outside_the_block_wrap(tmp_path: Path, mode: str) -> None:
-    """An absolute index outside the block wraps around it, as x[N], and never
-    causes the constraint to be dropped."""
+@pytest.mark.parametrize(
+    "mode, expected",
+    [
+        # An absolute index outside the block wraps around it, as x[N].
+        (
+            "cyclic",
+            {"n": [7] * 4, "p": [10] * 4, "w": [13] * 4, "m": [5, 7, 10, 14]},
+        ),
+        # x is read outside the block at every t: every instance is dropped.
+        ("drop", {v: [0] * 4 for v in _OUTSIDE_THE_BLOCK}),
+    ],
+)
+def test_absolute_indices_outside_the_block(
+    tmp_path: Path, mode: str, expected: Dict[str, List[float]]
+) -> None:
     study_dir = _make_study(
         tmp_path,
         variables=["x", *_OUTSIDE_THE_BLOCK],
         constraints=["x = d", *(f"{v} = {s}" for v, s in _OUTSIDE_THE_BLOCK.items())],
-        objective="sum(x)",
+        objective="sum(x) + " + " + ".join(f"sum({v})" for v in _OUTSIDE_THE_BLOCK),
         data={"d": [1, 2, 3, 4]},
         constants={},
         nb_time_steps=4,
@@ -164,10 +175,7 @@ def test_absolute_indices_outside_the_block_wrap(tmp_path: Path, mode: str) -> N
 
     results = _solve(study_dir)
 
-    assert results["n"] == [7, 7, 7, 7]
-    assert results["p"] == [10, 10, 10, 10]
-    assert results["w"] == [13, 13, 13, 13]
-    assert results["m"] == [5, 7, 10, 14]
+    assert {v: results[v] for v in _OUTSIDE_THE_BLOCK} == expected
 
 
 def test_absolute_bounds_in_extra_outputs(tmp_path: Path) -> None:
@@ -200,35 +208,6 @@ def test_absolute_bound_given_by_a_parameter(tmp_path: Path) -> None:
     )
 
     assert _solve(study_dir)["a"] == [5, 5, 5, 5]
-
-
-@pytest.mark.parametrize(
-    "mode, time_sum, expected",
-    [
-        pytest.param("cyclic", "sum(0 .. d[1], x)", [6, 6, 6, 6], id="absolute"),
-        pytest.param("cyclic", "sum(t - (d[0]) .. t, x)", [5, 3, 5, 7], id="relative"),
-        # dropped at t = 0, where a is then 0
-        pytest.param(
-            "drop", "sum(t - (d[0]) .. t, x)", [0, 3, 5, 7], id="relative-drop"
-        ),
-        pytest.param("cyclic", "sum(t - (d[0]) .. 3, x)", [14, 10, 9, 7], id="mixed"),
-    ],
-)
-def test_bound_with_a_time_operator(
-    tmp_path: Path, mode: str, time_sum: str, expected: List[float]
-) -> None:
-    study_dir = _make_study(
-        tmp_path,
-        variables=["x", "a"],
-        constraints=["x = d", f"a = {time_sum}"],
-        objective="sum(x) + sum(a)",
-        data={"d": [1, 2, 3, 4]},
-        constants={},
-        nb_time_steps=4,
-        resolution=_out_of_bounds(mode, ["c1"]),
-    )
-
-    assert _solve(study_dir)["a"] == expected
 
 
 @pytest.mark.parametrize(
@@ -270,7 +249,7 @@ def test_absolute_index_refers_to_the_block(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "time_sum, error",
+    "time_amount, error",
     [
         pytest.param(
             "sum(0 .. k, x)",
@@ -285,21 +264,28 @@ def test_absolute_index_refers_to_the_block(tmp_path: Path) -> None:
             id="relative",
         ),
         pytest.param(
-            "sum(0 .. y, x)",
-            "the time sum bound 'y' cannot contain a variable.",
-            id="variable",
+            "x[t - k]",
+            "the time shift '-(k)' depends on time, but must be time-independent. "
+            "Declare 'k' with `time-dependent: false`.",
+            id="shift",
+        ),
+        pytest.param(
+            "x[k]",
+            "the time index 'k' depends on time, but must be time-independent. "
+            "Declare 'k' with `time-dependent: false`.",
+            id="index",
         ),
     ],
 )
-def test_bound_must_be_declared_time_independent(
-    tmp_path: Path, time_sum: str, error: str
+def test_time_amount_must_be_declared_time_independent(
+    tmp_path: Path, time_amount: str, error: str
 ) -> None:
     """The declared structure decides, whatever the data: k is declared
     time-dependent, so it is rejected although its series is constant."""
     study_dir = _make_study(
         tmp_path,
         variables=["x", "y", "a"],
-        constraints=["x = d", f"a = {time_sum}"],
+        constraints=["x = d", f"a = {time_amount}"],
         objective="sum(x)",
         data={"d": [1, 2, 3, 4], "k": [1, 1, 1, 1]},
         constants={},

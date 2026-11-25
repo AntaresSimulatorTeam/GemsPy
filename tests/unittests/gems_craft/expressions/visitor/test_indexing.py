@@ -188,6 +188,23 @@ def test_time_sum_with_scenario_dependent_bound_depends_on_scenario(
     assert compute_indexation(expr, NamedParameterProvider()) == expected
 
 
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        # d read at t + p: a time step per scenario
+        pytest.param(
+            param("d").shift(param("p")), IndexingStructure(True, True), id="shift"
+        ),
+        # d read at a time step per scenario
+        pytest.param(
+            param("d").eval(param("p")), IndexingStructure(False, True), id="index"
+        ),
+    ],
+)
+def test_time_operator_given_by_a_parameter(expr, expected) -> None:
+    assert compute_indexation(expr, NamedParameterProvider()) == expected
+
+
 def test_power_of_differently_indexed_terms() -> None:
     class CustomStructureProvider(StructureProvider):
         def get_parameter_structure(self, name: str) -> IndexingStructure:

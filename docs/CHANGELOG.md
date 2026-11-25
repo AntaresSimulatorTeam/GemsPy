@@ -4,6 +4,42 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Changed
+- **Breaking** - time shifts, time indices and time sum bounds only accept
+  numbers, parameters, `+ - * / ^`, parentheses and the functions `floor`,
+  `ceil`, `round`, `abs`, `max`, `min`, `expec`, with the usual precedence and
+  no extra parentheses: `x[t-2^2]` is `x[t-4]`, and `x[t - ceil(d / 2)]` no
+  longer needs to be written `x[t - (ceil(d / 2))]`. Variables, port fields,
+  sums and comparisons are rejected when the library is parsed. A unary minus
+  must start the expression or a parenthesis: write `x[a * (-1)]`, not
+  `x[a * -1]`, and `x[t - 4 * 2^(-1)]`, not `x[t - 4 * 2^-1]`. Their
+  parameters must be declared `time-dependent: false`: `x[t - d]` or `x[d]`
+  with `d` varying in time is rejected when the model is created.
+- **Breaking** - a time shift, a time index or a time sum with bounds applies
+  only to an expression that depends on time: `y[t]`, `y[t-1]`, `y[0]` or
+  `sum(t-1 .. t, y)` with `y` time-independent is rejected when the model is
+  created. `sum(y)` still accepts it.
+- **Breaking** - a port field outside `sum_connections` (e.g. `p.f <= 0`) is a
+  syntax error.
+- **Breaking** - **`drop` out-of-bounds mode** skips a constraint where it
+  reads a variable, a parameter or a port field outside the block, in its
+  expression or its bounds, including through a time index or a time sum bound
+  (e.g. `x[200]`, `x[d]`, `sum(-1 .. 1, x)`), instead of wrapping around the
+  block. Aggregations (`sum(x[t-1])`, `expec(...)`) are skipped as soon as one
+  read is out of the block. The definition of a port field is not inspected. A
+  constraint skipped for every component, time step and scenario logs a
+  warning.
+
+### Fixed
+- `x[d]` with `d` varying per component or per scenario read `x` at the
+  first value of `d` only.
+- In `drop` mode, a time shift or index of a shifted expression (e.g.
+  `(x[t-1])[0]`) skipped the constraint at the wrong time steps.
+- In `drop` mode, a bound without a component dimension was masked differently
+  from the other side of the constraint.
+- A non-integer time sum bound given by a parameter was truncated. It now
+  raises an error.
+
 ## [0.4.0] - 2026-11-20
 
 The expression language gains the power operator `^`. Simulation table views
