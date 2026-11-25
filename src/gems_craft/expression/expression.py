@@ -17,12 +17,14 @@ Defines the model for generic expressions.
 import enum
 import inspect
 from dataclasses import dataclass
-from typing import Any, Callable, List, Optional, Sequence, Union
+from typing import Any, Callable, List, Literal, Optional, Sequence, Union
 
 import gems_craft.expression.port_operator
 import gems_craft.expression.scenario_operator
 
 AnyExpression = Union[int, float, "ExpressionNode"]
+# Element of a tree set read relative to the current one: its parent, or the root.
+TreePosition = Literal["parent", "root"]
 
 
 @dataclass(frozen=True)
@@ -136,6 +138,7 @@ class ExpressionNode:
         set_id: str,
         position: Optional[AnyExpression] = None,
         relative_shift: Optional[AnyExpression] = None,
+        tree_position: Optional[TreePosition] = None,
     ) -> "ExpressionNode":
         return SetIndexNode(
             self,
@@ -144,6 +147,7 @@ class ExpressionNode:
             relative_shift=(
                 _wrap_in_node(relative_shift) if relative_shift is not None else None
             ),
+            tree_position=tree_position,
         )
 
     def sum_over(self, set_id: str) -> "ExpressionNode":
@@ -387,10 +391,12 @@ class SetIndexNode(UnaryOperatorNode):
     References one element of a custom index set (local or global) that the
     operand is indexed by.
 
-    At most one of ``position`` and ``relative_shift`` may be set:
-      - bare form ``X[fuel]``      -> position=None, relative_shift=None (current element)
+    At most one of ``position``, ``relative_shift`` and ``tree_position`` may be set:
+      - bare form ``X[fuel]``      -> none set (current element)
       - keyword form ``X[fuel=2]`` -> position=<expr> (explicit position)
       - shift form ``X[fuel+1]``   -> relative_shift=<expr> (relative to current element)
+      - tree forms ``X[year=parent(year)]`` / ``X[year=root(year)]`` ->
+        tree_position="parent" / "root" (set declared as a tree)
 
     Note: the field is named ``relative_shift`` rather than ``shift`` to avoid
     shadowing the inherited ``ExpressionNode.shift()`` method.
@@ -399,11 +405,14 @@ class SetIndexNode(UnaryOperatorNode):
     set_id: str
     position: Optional[ExpressionNode] = None
     relative_shift: Optional[ExpressionNode] = None
+    tree_position: Optional[TreePosition] = None
 
     def __post_init__(self) -> None:
-        if self.position is not None and self.relative_shift is not None:
+        forms = (self.position, self.relative_shift, self.tree_position)
+        if sum(f is not None for f in forms) > 1:
             raise ValueError(
-                "SetIndexNode cannot have both an explicit position and a relative shift."
+                "SetIndexNode accepts at most one of an explicit position, a relative "
+                "shift and a tree position."
             )
 
 

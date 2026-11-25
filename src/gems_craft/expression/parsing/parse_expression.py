@@ -27,6 +27,7 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     ReducedCostNode,
+    TreePosition,
     UpperBoundNode,
     maximum,
     minimum,
@@ -233,6 +234,9 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         self, ctx: ExprParser.KeywordTermContext
     ) -> Tuple[Optional[str], Callable[[ExpressionNode], ExpressionNode]]:
         """Returns (set_id, apply) -- set_id is None for a time-denoting term."""
+        tree_term = self._tree_position_term(ctx)
+        if tree_term is not None:
+            return tree_term
         position = ctx.time_expr().accept(self)  # type: ignore
         if ctx.TIME() is not None:  # type: ignore
             return None, lambda expr: expr.eval(position)
@@ -244,6 +248,34 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         raise ValueError(
             f"'{identifier}' is neither 't' nor a declared set; the keyword "
             f"index form ('{identifier}=...') is only valid for those."
+        )
+
+    def _tree_position_term(
+        self, ctx: ExprParser.KeywordTermContext
+    ) -> Optional[Tuple[str, Callable[[ExpressionNode], ExpressionNode]]]:
+        """`set=parent(set)` or `set=root(set)` as (set_id, apply), else None."""
+        time_expr = ctx.time_expr()  # type: ignore
+        factors = time_expr.time_term(0).time_factor()  # type: ignore
+        if (
+            time_expr.neg is not None  # type: ignore
+            or len(time_expr.time_term()) != 1  # type: ignore
+            or len(factors) != 1
+            or not isinstance(factors[0], ExprParser.TimeFunctionContext)
+        ):
+            return None
+        name: str = factors[0].IDENTIFIER().getText()  # type: ignore
+        if name not in _TREE_POSITIONS:
+            return None
+        keyword: str = ctx.getText().split("=", 1)[0]
+        args = [arg.getText() for arg in factors[0].time_expr()]  # type: ignore
+        if args != [keyword] or not self.identifiers.is_set(keyword):
+            raise ValueError(
+                f"{name}() must take the indexed set as its argument, as in "
+                f"'X[year={name}(year)]'; got '{ctx.getText()}'."
+            )
+        tree_position = _TREE_POSITIONS[name]
+        return keyword, lambda expr: expr.set_index(
+            keyword, tree_position=tree_position
         )
 
     # Visit a parse tree produced by ExprParser#bareTerm.
@@ -398,6 +430,11 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
     # Visit a parse tree produced by ExprParser#timeFunction.
     def visitTimeFunction(self, ctx: ExprParser.TimeFunctionContext) -> ExpressionNode:
         function_name: str = ctx.IDENTIFIER().getText()  # type: ignore
+        if function_name in _TREE_POSITIONS:
+            raise ValueError(
+                f"{function_name}() can only be used alone as a set index, as in "
+                f"'X[year={function_name}(year)]'."
+            )
         if (
             function_name not in _UNARY_FUNCTIONS
             and function_name not in _N_ARY_FUNCTIONS
@@ -455,6 +492,8 @@ _BINARY_OPERATORS = {
     "/": ExpressionNode.__truediv__,
 }
 
+
+_TREE_POSITIONS: Dict[str, TreePosition] = {"parent": "parent", "root": "root"}
 
 _UNARY_FUNCTIONS = {
     "expec": ExpressionNode.expec,

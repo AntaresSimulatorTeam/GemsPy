@@ -133,6 +133,8 @@ class PrinterVisitor(ExpressionVisitor[str]):
             args += f", position={visit(node.position, self)}"
         elif node.relative_shift is not None:
             args += f", relative_shift={visit(node.relative_shift, self)}"
+        elif node.tree_position is not None:
+            args += f", tree_position={node.tree_position}"
         return f"({visit(node.operand, self)}.set_index({args}))"
 
     def sum_over(self, node: SumOverNode) -> str:

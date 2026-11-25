@@ -38,6 +38,7 @@ from gems_craft.study.parsing import (
     ComponentPropertySchema,
     ComponentSchema,
     PortConnectionsSchema,
+    SetInstanceSchema,
     SystemSchema,
 )
 from gems_craft.study.scenario_builder import ScenarioBuilder
@@ -76,6 +77,7 @@ def resolve_system(input_system: SystemSchema, libraries: dict[str, Library]) ->
             inst.id: tuple(inst.elements)  # type: ignore[arg-type]
             for inst in input_system.sets or []
         },
+        global_set_parents=_set_parents(input_system.sets),
     )
     for component in components_list:
         s.add_component(component)
@@ -124,7 +126,20 @@ def _resolve_component(
             inst.id: tuple(inst.elements)  # type: ignore[arg-type]
             for inst in component.sets or []
         },
+        local_set_parents=_set_parents(component.sets),
     )
+
+
+def _set_parents(
+    instances: Optional[List[SetInstanceSchema]],
+) -> Dict[str, Tuple[int, ...]]:
+    """Parent positions of the tree sets among *instances*."""
+    result = {}
+    for inst in instances or []:
+        parents = inst.parent_positions()
+        if parents is not None:
+            result[inst.id] = parents
+    return result
 
 
 def _resolve_port_refs(

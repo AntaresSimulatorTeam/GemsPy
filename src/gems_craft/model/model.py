@@ -41,6 +41,7 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     RelativeTimeNode,
+    SetIndexNode,
     SumOverNode,
     TimeEvalNode,
     TimeSumNode,
@@ -297,6 +298,43 @@ def _model_expressions(model: "Model") -> Iterator[Tuple[str, ExpressionNode]]:
         )
 
 
+def _check_tree_positions(model: "Model") -> None:
+    """``parent()`` / ``root()`` only index tree sets. ``parent()`` drops the
+    instances at the root, so it may not appear where no instance can be
+    dropped (variable bounds, port field definitions), nor be nested on the
+    same set."""
+    bounds = [
+        (f"bound of variable '{var.name}'", bound)
+        for var in model.variables.values()
+        for bound in (var.lower_bound, var.upper_bound)
+        if bound is not None
+    ]
+    for where, expr in [*_model_expressions(model), *bounds]:
+        for node in _iter_nodes(expr):
+            if not isinstance(node, SetIndexNode) or node.tree_position is None:
+                continue
+            prefix = f"Model '{model.id}', {where}: {node.tree_position}({node.set_id})"
+            if node.set_id not in model.tree_sets:
+                raise ValueError(
+                    f"{prefix} requires set '{node.set_id}' to be declared with "
+                    "`structure: tree`."
+                )
+            if node.tree_position != "parent":
+                continue
+            if where.startswith(("port field definition", "bound of variable")):
+                raise ValueError(
+                    f"{prefix} is not allowed here: no instance can be dropped "
+                    "at the root."
+                )
+            if any(
+                isinstance(n, SetIndexNode)
+                and n.tree_position == "parent"
+                and n.set_id == node.set_id
+                for n in _iter_nodes(node.operand)
+            ):
+                raise ValueError(f"{prefix} cannot be nested on the same set.")
+
+
 def sets_used_by_model(model: "Model") -> Set[str]:
     """Sets indexing some parameter or variable of *model*, or summed over by a
     sum_over (whose operand may not be indexed by it)."""
@@ -404,6 +442,8 @@ class Model:
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None
     properties: List[str] = field(default_factory=list)
     local_sets: FrozenSet[str] = field(default_factory=frozenset)
+    # Visible sets (local or global) declared as trees.
+    tree_sets: FrozenSet[str] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
         _check_time_sum_bounds(self)
@@ -413,6 +453,7 @@ class Model:
                 _is_objective_contribution_valid(self, expr)
 
         _check_model_set_indexing(self)
+        _check_tree_positions(self)
 
         for definition in self.port_fields_definitions.values():
             port_name = definition.port_field.port_name
@@ -451,6 +492,7 @@ def model(
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None,
     properties: Optional[Iterable[str]] = None,
     local_sets: Optional[Iterable[str]] = None,
+    tree_sets: Optional[Iterable[str]] = None,
 ) -> Model:
     """
     Utility method to create Models from relaxed arguments
@@ -495,4 +537,5 @@ def model(
         extra_outputs=extra_outputs,
         properties=list(properties) if properties else [],
         local_sets=frozenset(local_sets) if local_sets else frozenset(),
+        tree_sets=frozenset(tree_sets) if tree_sets else frozenset(),
     )

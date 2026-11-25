@@ -31,6 +31,11 @@ All notable changes to GemsPy are documented here.
   - Simulation tables gain `set_id` (set ids, sorted and joined by `|`) and
     `set_index` (element names) columns. For a set-indexed output,
     `component(...).output(...).value()` returns data keyed by `set_index`.
+  - Tree sets: a set declared with `structure: tree` gets the `parents` of its
+    elements in `system.yml` (a single root, no cycle). `X[year=parent(year)]`
+    reads the parent, without wrapping around: a constraint is not generated at
+    the root, and `sum_over` leaves the root out. `X[year=root(year)]` reads the
+    root.
 - **Data series**
   - Series files may also use the `.tsv` extension.
   - A time- or scenario-dependent parameter may also read a tidy file (columns

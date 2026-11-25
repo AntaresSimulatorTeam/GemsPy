@@ -22,6 +22,7 @@ class Library:
     models: Dict[str, Model]
     taxonomy: Optional[str] = None
     sets: Set[str] = field(default_factory=set)
+    tree_sets: Set[str] = field(default_factory=set)
 
 
 def library(
@@ -30,6 +31,7 @@ def library(
     models: Iterable[Model],
     taxonomy: Optional[str] = None,
     sets: Optional[Iterable[str]] = None,
+    tree_sets: Optional[Iterable[str]] = None,
 ) -> Library:
     return Library(
         id=id,
@@ -37,4 +39,5 @@ def library(
         models=dict((m.id, m) for m in models),
         taxonomy=taxonomy,
         sets=set(sets) if sets else set(),
+        tree_sets=set(tree_sets) if tree_sets else set(),
     )

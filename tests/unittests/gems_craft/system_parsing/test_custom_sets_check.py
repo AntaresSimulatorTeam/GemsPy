@@ -61,6 +61,10 @@ def _fuel_lib(model: str) -> str:
 
 
 _NO_SETS = {"global_sets": None, "local_sets": None}
+_TREE_LIB = (
+    "library: {id: setlib, sets: [{id: fuel, structure: tree}], "
+    "models: [{id: m, parameters: [{id: p, indexed-by: [fuel]}]}]}"
+)
 
 # (system_args, library yaml, expected error regex or None when the check passes)
 _CASES = {
@@ -105,6 +109,28 @@ _CASES = {
             "extra-outputs: [{id: o, expression: 'sum_over(fuel, p)'}]"
         ),
         "not instantiated",
+    ),
+    **{
+        f"tree parents: {name}": (
+            {
+                "global_sets": f"[{{id: fuel, elements: [a, b, c]{parents}}}]",
+                "local_sets": None,
+            },
+            _TREE_LIB,
+            error,
+        )
+        for name, parents, error in [
+            ("valid", ", parents: {b: a, c: b}", None),
+            ("missing", "", "'parents' are required"),
+            ("unknown element", ", parents: {b: z, c: a}", "unknown element"),
+            ("two roots", ", parents: {c: a}", "exactly one root"),
+            ("cycle", ", parents: {a: b, b: a, c: a}", "exactly one root|cycle"),
+        ]
+    },
+    "parents on a list set": (
+        {"local_sets": "[{id: segment, elements: 0..2, parents: {1: 0, 2: 0}}]"},
+        _LIB,
+        "not declared as a tree",
     ),
 }
 

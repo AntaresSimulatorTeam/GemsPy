@@ -192,6 +192,7 @@ class EqualityVisitor:
     def set_index(self, left: SetIndexNode, right: SetIndexNode) -> bool:
         return (
             left.set_id == right.set_id
+            and left.tree_position == right.tree_position
             and self._optional(left.position, right.position)
             and self._optional(left.relative_shift, right.relative_shift)
             and self.visit(left.operand, right.operand)

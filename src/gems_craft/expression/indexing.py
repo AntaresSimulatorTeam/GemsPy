@@ -167,7 +167,7 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
                 f"which is not indexed by '{node.set_id}'."
             )
         result = inner
-        if node.position is not None:
+        if node.position is not None or node.tree_position == "root":
             # Explicit position resolves to a single element: collapses the
             # dimension, mirroring how time_eval collapses time.
             result = IndexingStructure(

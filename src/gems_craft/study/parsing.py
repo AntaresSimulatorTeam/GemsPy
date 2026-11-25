@@ -15,7 +15,18 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TextIO, Type, TypeVar, Union, overload
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    TextIO,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    overload,
+)
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 from yaml import safe_dump, safe_load
@@ -82,6 +93,8 @@ class IntegerStrategy(ModifiedBaseModel):
 class SetInstanceSchema(ModifiedBaseModel):
     id: str
     elements: Union[List[Union[str, int]], str]
+    # Parent of each element of a tree set; the element absent is the root.
+    parents: Optional[Dict[Union[str, int], Union[str, int]]] = None
 
     @field_validator("elements", mode="after")
     @classmethod
@@ -99,6 +112,37 @@ class SetInstanceSchema(ModifiedBaseModel):
                 raise ValueError(f"Range start must be <= end, got {v!r}")
             return list(range(a, b + 1))
         return v
+
+    def parent_positions(self) -> Optional[Tuple[int, ...]]:
+        """Position of each element's parent (-1 for the root), or None without
+        ``parents``. Elements are matched as strings, as in output tables.
+
+        Raises if a parent is unknown, or if the parents do not form a single tree.
+        """
+        if self.parents is None:
+            return None
+        names = [str(e) for e in self.elements]
+        position = {name: i for i, name in enumerate(names)}
+        parents = {str(k): str(v) for k, v in self.parents.items()}
+        unknown = sorted(n for n in [*parents, *parents.values()] if n not in position)
+        if unknown:
+            raise ValueError(
+                f"Set '{self.id}': parents name unknown element(s) {unknown}."
+            )
+        roots = [n for n in names if n not in parents]
+        if len(roots) != 1:
+            raise ValueError(
+                f"Set '{self.id}' must have exactly one root (an element without "
+                f"parent), got {roots}."
+            )
+        for name in names:  # every element must reach the root
+            seen = set()
+            while name in parents:
+                if name in seen:
+                    raise ValueError(f"Set '{self.id}': parents form a cycle.")
+                seen.add(name)
+                name = parents[name]
+        return tuple(position[parents[n]] if n in parents else -1 for n in names)
 
 
 class ComponentSchema(ModifiedBaseModel):
