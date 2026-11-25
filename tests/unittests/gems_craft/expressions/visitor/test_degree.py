@@ -114,3 +114,14 @@ def test_degree_computation_should_take_into_account_simplifications() -> None:
 
     expr = LiteralNode(0) * x
     assert visit(expr, ExpressionDegreeVisitor()) == 0
+
+
+def test_power_degree() -> None:
+    x = var("x")
+    p = param("p")
+
+    assert visit(p**2, ExpressionDegreeVisitor()) == 0
+    assert visit(2**p, ExpressionDegreeVisitor()) == 0
+    # Any power of a variable is non-linear, whatever the exponent.
+    for expr in [x**0, x**1, x**p, 2**x]:
+        assert visit(expr, ExpressionDegreeVisitor()) == math.inf

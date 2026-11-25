@@ -20,18 +20,7 @@ import dataclasses
 import itertools
 import warnings
 from dataclasses import dataclass, field, replace
-from typing import (
-    Any,
-    Dict,
-    FrozenSet,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    Type,
-)
+from typing import Any, Dict, FrozenSet, Iterable, Iterator, List, Optional, Set, Tuple
 
 from gems_craft.expression import ExpressionNode
 from gems_craft.expression.degree import is_constant, is_linear
@@ -41,8 +30,10 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     RelativeTimeNode,
+    SetIndexNode,
     SumOverNode,
     TimeEvalNode,
+    TimeShiftNode,
     TimeSumNode,
 )
 from gems_craft.expression.indexing import (
@@ -267,18 +258,14 @@ def _check_model_set_indexing(model: "Model") -> None:
         _check_local_set_crosses_port(definition, model.local_sets, provider)
 
 
-def _iter_nodes(
-    node: ExpressionNode, skip: Tuple[Type[ExpressionNode], ...] = ()
-) -> Iterator[ExpressionNode]:
-    """*node* and every node below it, without going below a *skip* node."""
+def _iter_nodes(node: ExpressionNode) -> Iterator[ExpressionNode]:
+    """*node* and every node below it."""
     yield node
-    if isinstance(node, skip):
-        return
     for f in dataclasses.fields(node):
         value = getattr(node, f.name)
         for child in value if isinstance(value, list) else [value]:
             if isinstance(child, ExpressionNode):
-                yield from _iter_nodes(child, skip)
+                yield from _iter_nodes(child)
 
 
 def _model_expressions(model: "Model") -> Iterator[Tuple[str, ExpressionNode]]:
@@ -316,55 +303,122 @@ def sets_used_by_model(model: "Model") -> Set[str]:
     return used
 
 
-def _check_time_sum_bounds(model: "Model") -> None:
-    """A time sum bound (an absolute bound, or the offset of a bound relative
-    to ``t``) must be time-independent and contain no variable. This depends on
-    the declared structure only, not on the data."""
-    provider = _make_structure_provider(model.parameters, model.variables)
+_TIME_OPERATOR_KINDS = {
+    TimeShiftNode: "time shift",
+    TimeEvalNode: "time index",
+    TimeSumNode: "time sum",
+}
+
+
+def _time_amounts(
+    node: TimeShiftNode | TimeEvalNode | TimeSumNode,
+) -> Iterator[Tuple[ExpressionNode, ExpressionNode]]:
+    """The time amounts of a time operator: (expression shown, amount)."""
+    if isinstance(node, TimeShiftNode):
+        yield node.time_shift, node.time_shift
+    elif isinstance(node, TimeEvalNode):
+        yield node.eval_time, node.eval_time
+    else:
+        for bound in (node.from_time, node.to_time):
+            value = bound.offset if isinstance(bound, RelativeTimeNode) else bound
+            yield bound, value
+
+
+def _check_time_amounts(model: "Model") -> None:
+    """A time shift, time index or time sum bound (an absolute bound, or the
+    offset of a bound relative to ``t``) must be time-independent and contain
+    no variable, port field or time operator. A time shift, time index or time
+    sum with bounds must apply to an expression that depends on time (``sum(y)``
+    need not). This depends on the declared structure only, not on the data."""
+    provider = _make_structure_provider(
+        model.parameters,
+        model.variables,
+        {c.name: c for c in model.get_all_constraints()},
+    )
     for where, expr in _model_expressions(model):
         for node in _iter_nodes(expr):
-            if not isinstance(node, TimeSumNode):
+            if not isinstance(node, (TimeShiftNode, TimeEvalNode, TimeSumNode)):
                 continue
-            for bound in (node.from_time, node.to_time):
-                value = bound.offset if isinstance(bound, RelativeTimeNode) else bound
-                _check_time_sum_bound(model.id, where, bound, value, provider)
+            kind = _TIME_OPERATOR_KINDS[type(node)]
+            amount_kind = f"{kind} bound" if isinstance(node, TimeSumNode) else kind
+            for shown, value in _time_amounts(node):
+                prefix = f"Model '{model.id}', {where}: the {amount_kind} '{print_expr(shown)}'"
+                _check_time_amount(prefix, value, provider)
+            prefix = f"Model '{model.id}', {where}: the {kind} of '{print_expr(node.operand)}'"
+            _check_time_operand(prefix, node.operand, provider)
 
 
-def _check_time_sum_bound(
-    model_id: str,
-    where: str,
-    bound: ExpressionNode,
-    value: ExpressionNode,
-    provider: IndexingStructureProvider,
+def _check_time_operand(
+    prefix: str, operand: ExpressionNode, provider: IndexingStructureProvider
 ) -> None:
-    """Check *value*: the bound itself, or the offset of a relative *bound*."""
-    prefix = f"Model '{model_id}', {where}: the time sum bound '{print_expr(bound)}'"
-    port_field_types = (PortFieldNode, PortFieldAggregatorNode)
-    if any(isinstance(n, port_field_types) for n in _iter_nodes(value)):
+    # The structure of a port field is known once the system is resolved.
+    if any(
+        isinstance(n, (PortFieldNode, PortFieldAggregatorNode))
+        for n in _iter_nodes(operand)
+    ):
+        return
+    if not compute_indexation(operand, provider).time:
+        raise ValueError(f"{prefix} reads an expression that does not depend on time.")
+
+
+def _check_time_amount(
+    prefix: str, value: ExpressionNode, provider: IndexingStructureProvider
+) -> None:
+    """The variable, port field and time operator checks are only reachable from
+    the Python API: the grammar already rejects them in YAML libraries."""
+    nodes = list(_iter_nodes(value))
+    if any(isinstance(n, (PortFieldNode, PortFieldAggregatorNode)) for n in nodes):
         raise ValueError(f"{prefix} cannot contain a port field.")
     if not is_constant(value):
         raise ValueError(f"{prefix} cannot contain a variable.")
+    time_operators = (TimeShiftNode, TimeEvalNode, TimeSumNode, AllTimeSumNode)
+    if any(isinstance(n, time_operators) for n in nodes):
+        raise ValueError(f"{prefix} cannot contain a time operator.")
     if not compute_indexation(value, provider).time:
         return
-    # Parameters that make the bound time-dependent: those outside an operator
-    # that removes the time dimension (e.g. d[0] or sum(d)).
     names = sorted(
         {
             n.name
-            for n in _iter_nodes(
-                value, skip=(TimeEvalNode, AllTimeSumNode, TimeSumNode)
-            )
+            for n in nodes
             if isinstance(n, ParameterNode)
             and provider.get_parameter_structure(n.name).time
         }
     )
-    hint = (
-        " Declare " + ", ".join(f"'{name}'" for name in names) + " with "
-        "`time-dependent: false`."
-        if names
-        else ""
+    raise ValueError(
+        f"{prefix} depends on time, but must be time-independent. Declare "
+        + ", ".join(f"'{name}'" for name in names)
+        + " with `time-dependent: false`."
     )
-    raise ValueError(f"{prefix} depends on time, but must be time-independent.{hint}")
+
+
+def _check_set_amounts(model: "Model") -> None:
+    """The position (``x[fuel=a]``) or shift (``x[fuel+a]``) of a set index must
+    not depend on the indexed set."""
+    provider = _make_structure_provider(
+        model.parameters,
+        model.variables,
+        {c.name: c for c in model.get_all_constraints()},
+    )
+    for where, expr in _model_expressions(model):
+        for node in _iter_nodes(expr):
+            if not isinstance(node, SetIndexNode):
+                continue
+            for kind, amount in (
+                ("index", node.position),
+                ("shift", node.relative_shift),
+            ):
+                if amount is None:
+                    continue
+                try:
+                    sets = compute_indexation(amount, provider).sets
+                except UnresolvedPortFieldError:
+                    continue  # structure known once ports are resolved
+                if node.set_id in sets:
+                    raise ValueError(
+                        f"Model '{model.id}', {where}: the '{node.set_id}' {kind} "
+                        f"'{print_expr(amount)}' depends on '{node.set_id}', "
+                        "but must not."
+                    )
 
 
 @dataclass(frozen=True)
@@ -406,13 +460,14 @@ class Model:
     local_sets: FrozenSet[str] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
-        _check_time_sum_bounds(self)
+        _check_time_amounts(self)
         # Validate each contribution if present
         if self.objective_contributions:
             for expr in self.objective_contributions.values():
                 _is_objective_contribution_valid(self, expr)
 
         _check_model_set_indexing(self)
+        _check_set_amounts(self)
 
         for definition in self.port_fields_definitions.values():
             port_name = definition.port_field.port_name

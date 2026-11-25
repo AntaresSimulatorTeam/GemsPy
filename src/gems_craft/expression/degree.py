@@ -43,6 +43,7 @@ from .expression import (
     MultiplicationNode,
     NegationNode,
     ParameterNode,
+    PowerNode,
     ScenarioOperatorNode,
     VariableNode,
 )
@@ -73,6 +74,13 @@ class ExpressionDegreeVisitor(ExpressionVisitor[int | float]):
         if right_degree != 0:
             raise ValueError("Degree computation not implemented for divisions.")
         return visit(node.left, self)
+
+    def power(self, node: PowerNode) -> int | float:
+        """Constant when both operands are constant; any power of a variable is
+        non-linear, whatever the exponent."""
+        if visit(node.left, self) == 0 and visit(node.right, self) == 0:
+            return 0
+        return math.inf
 
     def comparison(self, node: ComparisonNode) -> int | float:
         return max(visit(node.left, self), visit(node.right, self))

@@ -71,6 +71,10 @@ class ExprVisitor(ParseTreeVisitor):
     def visitFunction(self, ctx: ExprParser.FunctionContext):
         return self.visitChildren(ctx)
 
+    # Visit a parse tree produced by ExprParser#power.
+    def visitPower(self, ctx: ExprParser.PowerContext):
+        return self.visitChildren(ctx)
+
     # Visit a parse tree produced by ExprParser#argList.
     def visitArgList(self, ctx: ExprParser.ArgListContext):
         return self.visitChildren(ctx)
@@ -115,6 +119,10 @@ class ExprVisitor(ParseTreeVisitor):
     def visitTime_term(self, ctx: ExprParser.Time_termContext):
         return self.visitChildren(ctx)
 
+    # Visit a parse tree produced by ExprParser#time_power.
+    def visitTime_power(self, ctx: ExprParser.Time_powerContext):
+        return self.visitChildren(ctx)
+
     # Visit a parse tree produced by ExprParser#timeNumber.
     def visitTimeNumber(self, ctx: ExprParser.TimeNumberContext):
         return self.visitChildren(ctx)
@@ -125,14 +133,6 @@ class ExprVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by ExprParser#timeFunction.
     def visitTimeFunction(self, ctx: ExprParser.TimeFunctionContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by ExprParser#timeFactorShift.
-    def visitTimeFactorShift(self, ctx: ExprParser.TimeFactorShiftContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by ExprParser#timeFactorIndex.
-    def visitTimeFactorIndex(self, ctx: ExprParser.TimeFactorIndexContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by ExprParser#timeParenthesis.
