@@ -4,6 +4,13 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-20
+
+The expression language gains the power operator `^`. Simulation table views
+are renamed so they are not confused with GEMS views, and heuristic
+inputs/outputs must set `type` explicitly. This release contains breaking
+changes, marked **Breaking** below.
+
 ### Added
 - **Expression language**
   - Time shifts, time indices and time sum bounds accept functions without
