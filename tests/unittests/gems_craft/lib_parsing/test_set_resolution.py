@@ -94,6 +94,14 @@ _CASES = {
         ),
         "the 'fuel' shift 'a' depends on 'fuel', but must not.",
     ),
+    "variable bound with a set position depending on the indexed set": (
+        _model_lib(
+            "parameters: [{id: a, indexed-by: [fuel]}, {id: cap, indexed-by: [fuel]}], "
+            "variables: [{id: x, indexed-by: [fuel], upper-bound: 'cap[fuel=a]'}]",
+            _FUEL,
+        ),
+        "variable 'x': the 'fuel' index 'a' depends on 'fuel', but must not.",
+    ),
     "set position depending on another set": (
         _model_lib(
             "sets: [{id: segment}], parameters: [{id: a, indexed-by: [segment]}], "

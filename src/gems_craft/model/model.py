@@ -296,13 +296,7 @@ def sets_used_by_model(model: "Model") -> Set[str]:
         used |= p.structure.sets
     for v in model.variables.values():
         used |= v.structure.sets
-    expressions = [expr for _, expr in _model_expressions(model)] + [
-        bound
-        for v in model.variables.values()
-        for bound in (v.lower_bound, v.upper_bound)
-        if bound is not None
-    ]
-    for expr in expressions:
+    for _, expr in _model_expressions(model):
         used |= {n.set_id for n in _iter_nodes(expr) if isinstance(n, SumOverNode)}
     return used
 
