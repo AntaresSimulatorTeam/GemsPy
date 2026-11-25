@@ -10,12 +10,36 @@
 #
 # This file is part of the Antares project.
 
-"""Unit tests for _apply_validity_mask (OutOfBoundsMode.DROP)."""
+"""Unit tests for the validity masks of OutOfBoundsMode.DROP."""
 
 import numpy as np
 import xarray as xr
 
-from gems_runner.simulation.optimization import _apply_validity_mask
+from gems_craft.expression.expression import literal, param, var
+from gems_craft.model.constraint import Constraint
+from gems_runner.simulation.optimization import (
+    _apply_validity_mask,
+    _constraint_validity_mask,
+)
+from gems_runner.simulation.vectorized_builder import ShiftValidityVisitor
+
+
+def test_constraint_mask_includes_the_bounds() -> None:
+    # x in [p[t-1], p[t+1]]: p is read out of the block at t = 0 and t = 2.
+    p = xr.DataArray([1.0, 2.0, 3.0], dims="time")
+    constraint = Constraint(
+        "c",
+        var("x"),
+        lower_bound=param("p").shift(-literal(1)),
+        upper_bound=param("p").shift(literal(1)),
+    )
+    visitor = ShiftValidityVisitor(
+        model_id="m", param_arrays={("m", "p"): p}, block_length=3
+    )
+    mask = _constraint_validity_mask(constraint, visitor)
+    assert mask is not None
+    assert mask.values.tolist() == [False, True, False]
+
 
 # Valid everywhere but at (c1, t=0) and (c2, t=0..1).
 MASK = xr.DataArray(

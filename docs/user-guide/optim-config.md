@@ -64,8 +64,10 @@ models:
             type: variable-upper-bound
           - heuristic-element: min_up_duration
             id: min_up_duration
+            type: parameter
           - heuristic-element: min_down_duration
             id: min_down_duration
+            type: parameter
         outputs:
           - heuristic-element: minimum_num_units_on
             id: num_units_on
@@ -318,14 +320,14 @@ The optional `models` list lets you override behaviour for specific models.
 
 ### `out-of-bounds-processing`
 
-When a constraint references a time-shifted variable (e.g. `x[t-1]`), timestep
-`t = 0` refers to a time index *before* the start of the horizon.  Two
-strategies are available:
+When a constraint reads a time step outside the block, through a time shift, a
+time index or a time sum (e.g. `x[t-1]` at `t = 0`), two strategies are
+available:
 
 | Mode | Behaviour |
 |---|---|
-| `cyclic` (default) | Wrap around: time shift are defined modulo `block-length` |
-| `drop` | Skip the constraint where it reads a variable out of the block |
+| `cyclic` (default) | Wrap around: time steps are taken modulo `block-length` |
+| `drop` | Skip the constraint where it reads a variable, parameter or port field out of the block |
 
 ~~~ yaml
 models:
@@ -337,29 +339,33 @@ models:
 ~~~
 
 In `drop` mode, the constraint is skipped for a component, time step and
-scenario as soon as it reads a **variable** at a time step outside the block,
-whether through a time shift, a time index or a time sum. **Parameters** are
-always read modulo the block, as in `cyclic` mode.
+scenario as soon as it reads a **variable**, a **parameter** or a **port field**
+at a time step outside the block, whether through a time shift, a time index or
+a time sum, in its expression or in its `lower-bound` and `upper-bound`. Shift
+amounts, time indices and sum bounds are time-independent: they may vary per
+component and scenario only.
+Nothing wraps around the block in `drop` mode.
 
 Examples, in a block of 168 time steps (`t` from 0 to 167):
 
 | Expression | Skipped |
 |---|---|
 | `x[t-1]`, `sum(t-1 .. t, x)` | at `t = 0` |
-| `x[t + k[t]]`, `x[t - lag]` | where `t + k[t]` or `t - lag` is out of the block, per component and scenario |
+| `p[t-1]`, `(sum_connections(p.f))[t-1]` | at `t = 0` |
+| `x[t + k]`, `x[t - lag]` | where `t + k` or `t - lag` is out of the block, per component and scenario |
 | `x[200]`, `sum(-1 .. 1, x)` | at every time step |
-| `x[d]`, `x[d[t-1]]` | where the value of `d` is out of the block (`d[t-1]` reads `d[167]` at `t = 0`) |
-| `x[t + d[t-1]]` | where `t + d[t-1]` is out of the block |
-| `p[t-1]`, `x[t] - p[t-1]` | never: `p[t-1]` reads `p[167]` at `t = 0` |
+| `x[d]` | at every time step, for the components and scenarios where `d` is out of the block |
 | `(x[t-1])[t+2]` | at `t = 167`: shifts add up, so it reads `x[t+1]` |
 | `(x[t-1])[0]` | at every time step: it reads `x[-1]` |
-| `y[t-1]`, `y` a time-independent variable | never |
+| `sum(x[t-1])`, `expec(x[t + k])` | aggregations read every time step (or scenario): skipped as soon as one read is out of the block, so `sum(x[t-1])` is always skipped |
 
 A time sum that is empty at a time step reads nothing there.
 
-**Port fields** are never checked: they are read as in `cyclic` mode, so
-`sum_connections(p.f)[t-1]` never skips the constraint, nor does a time shift
-in the definition of the port field in the connected model (e.g. `x[t-1]`).
+A constraint skipped for every component, time step and scenario logs a
+warning.
+
+**Limitation:** the definition of a port field (e.g. `p.f = x[t-1]`) is not
+inspected, so a read of `x[-1]` there does not skip the constraint.
 
 ### `model-decomposition`
 
@@ -438,15 +444,15 @@ variables via `models[].heuristics`:
 Each `inputs`/`outputs` entry binds a fixed `heuristic-element` name (see
 table below) to one of the model's own parameter/variable ids:
 
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `heuristic-element` | str | — | Fixed name the heuristic function expects |
-| `id` | str | — | The model's own parameter or variable id |
-| `type` | str | `parameter` | How the element is read/written |
+| Key | Type | Description |
+|---|---|---|
+| `heuristic-element` | str | Fixed name the heuristic function expects |
+| `id` | str | The model's own parameter or variable id |
+| `type` | str | How the element is read/written |
 
 | `type` | Meaning |
 |---|---|
-| `parameter` (default) | Read the model's parameter value (inputs only) |
+| `parameter` | Read the model's parameter value (inputs only) |
 | `variable-solution` | Read the variable's solved value from the first solve (inputs only) |
 | `variable-lower-bound` | Read/write the variable's lower bound |
 | `variable-upper-bound` | Read/write the variable's upper bound |
@@ -467,8 +473,10 @@ models:
             type: variable-upper-bound
           - heuristic-element: min_up_duration
             id: min_up_duration
+            type: parameter
           - heuristic-element: min_down_duration
             id: min_down_duration
+            type: parameter
         outputs:
           - heuristic-element: minimum_num_units_on
             id: num_units_on

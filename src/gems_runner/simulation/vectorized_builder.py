@@ -32,15 +32,15 @@ behaviour (operand-swap in addition, type guards in nonlinear functions).
 """
 
 import functools
+import math
 from abc import abstractmethod
 from dataclasses import dataclass, replace
-from typing import Any, Dict, FrozenSet, Generic, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, Optional, Tuple, TypeVar, Union
 
 import linopy
 import numpy as np
 import xarray as xr
 
-from gems_craft.expression.degree import is_constant
 from gems_craft.expression.expression import (
     AbsNode,
     AdditionNode,
@@ -60,6 +60,7 @@ from gems_craft.expression.expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RelativeTimeNode,
     RoundNode,
@@ -79,6 +80,7 @@ from gems_craft.expression.visitor import (
 )
 from gems_craft.model.port import PortFieldId
 from gems_runner.expression.evaluate import EvaluationContext, EvaluationVisitor
+from gems_runner.expression.power import real_power
 
 # ---------------------------------------------------------------------------
 # Public types
@@ -95,7 +97,7 @@ T_expr = TypeVar("T_expr", bound=VectorizedExpr)
 
 
 # ---------------------------------------------------------------------------
-# Module-level helper — also used by optimization.py
+# Module-level helpers — also used by optimization.py and linearize.py
 # ---------------------------------------------------------------------------
 
 
@@ -200,6 +202,14 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         right = visit(node.right, self)
         return left / right  # type: ignore[operator,return-value]
 
+    def power(self, node: PowerNode) -> VectorizedExpr:
+        """DataArray default; overridden in
+        :class:`~gems_runner.simulation.linearize.VectorizedLinearExprBuilder`
+        to raise when an operand contains linopy types."""
+        left = visit(node.left, self)
+        right = visit(node.right, self)
+        return real_power(left, right)  # type: ignore[arg-type]
+
     def comparison(self, node: ComparisonNode) -> VectorizedExpr:
         raise NotImplementedError(
             f"ComparisonNode is not supported by {type(self).__name__}. "
@@ -213,12 +223,12 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     def time_shift(self, node: TimeShiftNode) -> VectorizedExpr:
         operand = visit(node.operand, self)
         shift = self._time_value(node.time_shift, "Time shift")
+        if isinstance(shift, int) and shift == 0:  # x[t]
+            return operand
         return self._apply_time_shift(operand, shift)  # type: ignore[return-value]
 
     def time_eval(self, node: TimeEvalNode) -> VectorizedExpr:
         operand = visit(node.operand, self)
-        if not self._has_dim(operand, "time"):
-            return operand  # type: ignore[return-value]
         index = self._time_value(node.eval_time, "Time index")
         return self._take_time(operand, index)  # type: ignore[return-value]
 
@@ -251,39 +261,21 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         acc: Optional[Any] = None
         for shift in range(min_from, max_to + 1):
             shifted = self._apply_time_shift(operand, shift)
-            include_from = (
-                (from_int <= shift).astype(float)
-                if isinstance(from_int, xr.DataArray) and from_int.dims
-                else xr.DataArray(1.0)
-            )
-            include_to = (
-                (to_int >= shift).astype(float)
-                if isinstance(to_int, xr.DataArray) and to_int.dims
-                else xr.DataArray(1.0)
-            )
-            mask: xr.DataArray = include_from * include_to
+            # 1 where shift is within the bounds of the component and scenario.
+            mask = ((from_int <= shift) & (to_int >= shift)).astype(float)
             contrib = shifted * mask  # type: ignore[operator]
             acc = contrib if acc is None else _linopy_add(acc, contrib)
         return acc  # type: ignore[return-value]
 
     def _bound_value(self, node: ExpressionNode) -> xr.DataArray:
         """Integer value of a time sum bound (an absolute bound or a relative
-        offset). It is time-independent: this is checked when the model is
-        created."""
+        offset)."""
         result = self._time_value(node, "Time sum bound")
-        if isinstance(result, int):
-            return xr.DataArray(result)
-        if "time" in result.dims:  # cannot happen in a model that passed the check
-            raise ValueError(
-                f"Model '{self.model_id}': the time sum bound '{print_expr(node)}' "
-                "depends on time, but must be time-independent."
-            )
-        # A time operator such as d[0] leaves a scalar time coordinate.
-        return result.drop_vars("time", errors="ignore")
+        return xr.DataArray(result) if isinstance(result, int) else result
 
     def _time_sum_bound(self, bound: ExpressionNode, t: xr.DataArray) -> xr.DataArray:
-        """Time index of a time sum bound at each time step: ``t + offset`` for a
-        relative bound, the bound itself for an absolute one."""
+        """Time index of a time sum bound at the time steps *t*: ``t + offset``
+        for a relative bound, the bound itself for an absolute one."""
         relative = isinstance(bound, RelativeTimeNode)
         value_node = bound.offset if isinstance(bound, RelativeTimeNode) else bound
         value = self._bound_value(value_node)
@@ -454,7 +446,7 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     def _apply_time_shift(self, operand: Any, shift: Union[int, xr.DataArray]) -> Any:
         """Apply a cyclic (modulo ``self.block_length``) time shift to *operand*.
 
-        *shift* may vary per component, time step or scenario."""
+        *shift* may vary per component or scenario."""
         t = xr.DataArray(np.arange(self.block_length), dims="time")
         return self._take_time(operand, t + shift)
 
@@ -486,8 +478,9 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
 
     def _time_value(self, node: ExpressionNode, what: str) -> Union[int, xr.DataArray]:
         """Integer value of a time shift, time index or time sum bound: an int
-        when it is a constant, else an integer DataArray computed from the data.
-        A non-integer value raises, whether it is a constant or not."""
+        when it is a constant, else an integer DataArray computed from the data,
+        varying per component or scenario only. A non-integer value raises,
+        whether it is a constant or not."""
         try:
             return self._eval_int(node)
         except (KeyError, NotImplementedError):  # depends on the data
@@ -502,6 +495,11 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
                 f"{what} expression must evaluate to a parameter (DataArray), "
                 f"got {type(value).__name__!r}."
             )
+        if "time" in value.dims:  # cannot happen in a model that passed the check
+            raise ValueError(
+                f"{what} '{print_expr(node)}' in model '{self.model_id}' depends on "
+                "time, but must be time-independent."
+            )
         values = value.values
         if np.isnan(values).any():
             raise ValueError(
@@ -509,8 +507,12 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
                 "values (NaN)."
             )
         rounded = np.round(values)
-        # A tolerance absorbs rounding errors, e.g. d / 3 * 3.
-        wrong = values[~np.isclose(values, rounded, rtol=0.0, atol=_INTEGER_TOLERANCE)]
+        # A tolerance absorbs rounding errors, e.g. d / 3 * 3. An infinite value
+        # (e.g. 1 / 0) is not an integer, although isclose(inf, inf) is true.
+        wrong = values[
+            ~np.isfinite(values)
+            | ~np.isclose(values, rounded, rtol=0.0, atol=_INTEGER_TOLERANCE)
+        ]
         if wrong.size:
             raise ValueError(
                 f"{what} '{print_expr(node)}' in model '{self.model_id}' must take "
@@ -525,7 +527,11 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         value = visit(node, visitor)
         if isinstance(value, int):
             return value
-        if isinstance(value, float) and abs(value - round(value)) <= _INTEGER_TOLERANCE:
+        if (
+            isinstance(value, float)
+            and math.isfinite(value)  # round() raises on nan and inf
+            and abs(value - round(value)) <= _INTEGER_TOLERANCE
+        ):
             return int(round(value))
         raise ValueError(
             f"Expected an integer constant expression, got {value!r} from "
@@ -582,10 +588,11 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     """Validity mask of an expression for ``OutOfBoundsMode.DROP``.
 
     An instance (component, time step, scenario) is valid iff the expression
-    reads no variable at a time step outside ``[0, block_length)``. Time
-    operators compose: ``(x[t-1])[t+1]`` reads ``x[t]``. Parameters, including
-    those of shift amounts and time indices, are read modulo the block, as in
-    cyclic mode.
+    reads no variable, parameter or port field at a time step outside
+    ``[0, block_length)``. Time operators compose: ``(x[t-1])[t+1]`` reads ``x[t]``.
+    Aggregations (time sum, expectation) read every step: the instance is
+    invalid as soon as one read is out of the block. Limitation: the
+    definition of a port field (``p.f = x[t-1]``) is not inspected.
 
     Returns ``None`` when every instance is valid, else a boolean DataArray
     where ``True`` marks the valid instances.
@@ -594,18 +601,24 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     model_id: str
     param_arrays: Dict[Tuple[str, str], xr.DataArray]
     block_length: int
-    time_independent_variables: FrozenSet[str] = frozenset()
     # Time steps at which the expression is read, not wrapped into the block;
     # None for t itself.
     positions: Optional[xr.DataArray] = None
+    # Evaluates the time amounts; shared with the copies made for nested reads.
+    evaluator: Optional[_TimeAmountEvaluator] = None
+
+    def __post_init__(self) -> None:
+        if self.evaluator is None:
+            self.evaluator = _TimeAmountEvaluator(
+                model_id=self.model_id,
+                param_arrays=self.param_arrays,
+                port_arrays={},
+                block_length=self.block_length,
+            )
 
     def _evaluator(self) -> _TimeAmountEvaluator:
-        return _TimeAmountEvaluator(
-            model_id=self.model_id,
-            param_arrays=self.param_arrays,
-            port_arrays={},
-            block_length=self.block_length,
-        )
+        assert self.evaluator is not None  # set in __post_init__
+        return self.evaluator
 
     def _positions(self) -> xr.DataArray:
         if self.positions is None:
@@ -617,13 +630,6 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     ) -> Optional[xr.DataArray]:
         return visit(operand, replace(self, positions=positions))
 
-    def _at_positions(self, value: Union[int, xr.DataArray]) -> Any:
-        """*value*, computed over the block, at the positions read (modulo the
-        block, as parameters are read)."""
-        if isinstance(value, int):
-            return value
-        return self._evaluator()._take_time(value, self._positions())
-
     def _in_block(self) -> Optional[xr.DataArray]:
         positions = self._positions()
         mask = (positions >= 0) & (positions < self.block_length)
@@ -634,22 +640,17 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     # ------------------------------------------------------------------ #
 
     def time_shift(self, node: TimeShiftNode) -> Optional[xr.DataArray]:
-        if is_constant(node.operand):  # reads no variable: nothing to drop
-            return None
         amount = self._evaluator()._time_value(node.time_shift, "Time shift")
-        return self._read_at(
-            node.operand, self._positions() + self._at_positions(amount)
-        )
+        return self._read_at(node.operand, self._positions() + amount)
 
     def time_eval(self, node: TimeEvalNode) -> Optional[xr.DataArray]:
-        if is_constant(node.operand):  # reads no variable: nothing to drop
-            return None
         index = self._evaluator()._time_value(node.eval_time, "Time index")
-        return self._read_at(node.operand, xr.DataArray(self._at_positions(index)))
+        return self._read_at(node.operand, xr.DataArray(index))
 
     def time_sum(self, node: TimeSumNode) -> Optional[xr.DataArray]:
-        start = self._time_sum_position(node.from_time)
-        end = self._time_sum_position(node.to_time)
+        evaluator = self._evaluator()
+        start = evaluator._time_sum_bound(node.from_time, self._positions())
+        end = evaluator._time_sum_bound(node.to_time, self._positions())
         first, last = int(start.min()), int(end.max())
         if last < first:  # empty sum: the operand is never read
             return None
@@ -674,13 +675,6 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         valid = counted.isel({dim: upper}) - counted.isel({dim: lower}) <= 0
         return None if bool(valid.all()) else valid
 
-    def _time_sum_position(self, bound: ExpressionNode) -> xr.DataArray:
-        """Position of a time sum bound: offset from the positions read for a
-        relative bound, the bound itself for an absolute one."""
-        if isinstance(bound, RelativeTimeNode):
-            return self._positions() + self._evaluator()._bound_value(bound.offset)
-        return self._evaluator()._bound_value(bound)
-
     # ------------------------------------------------------------------ #
     # Structural nodes — AND-propagate children                             #
     # ------------------------------------------------------------------ #
@@ -697,6 +691,9 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return _and_mask(visit(node.left, self), visit(node.right, self))
 
     def division(self, node: DivisionNode) -> Optional[xr.DataArray]:
+        return _and_mask(visit(node.left, self), visit(node.right, self))
+
+    def power(self, node: PowerNode) -> Optional[xr.DataArray]:
         return _and_mask(visit(node.left, self), visit(node.right, self))
 
     def comparison(self, node: ComparisonNode) -> Optional[xr.DataArray]:
@@ -725,7 +722,9 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         )
 
     def all_time_sum(self, node: AllTimeSumNode) -> Optional[xr.DataArray]:
-        return visit(node.operand, self)
+        # Every time step is read: valid only if all the reads are in the block.
+        mask = visit(node.operand, replace(self, positions=None))
+        return mask.all("time") if mask is not None and "time" in mask.dims else mask
 
     def set_index(self, node: SetIndexNode) -> Optional[xr.DataArray]:
         return visit(node.operand, self)
@@ -734,7 +733,11 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return visit(node.operand, self)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> Optional[xr.DataArray]:
-        return visit(node.operand, self)
+        # Every scenario is read: valid only if all the reads are in the block.
+        mask = visit(node.operand, self)
+        if mask is not None and "scenario" in mask.dims:
+            return mask.all("scenario")
+        return mask
 
     def port_field_aggregator(
         self, node: PortFieldAggregatorNode
@@ -749,16 +752,13 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return None
 
     def parameter(self, node: ParameterNode) -> Optional[xr.DataArray]:
-        return None
+        return self._in_block()
 
     def variable(self, node: VariableNode) -> Optional[xr.DataArray]:
-        if node.name in self.time_independent_variables:
-            return None
         return self._in_block()
 
     def port_field(self, node: PortFieldNode) -> Optional[xr.DataArray]:
-        # Port fields are never checked: they are read as in cyclic mode.
-        return None
+        return self._in_block()
 
     def dual(self, node: DualNode) -> Optional[xr.DataArray]:
         return None

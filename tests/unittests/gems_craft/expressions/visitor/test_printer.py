@@ -83,3 +83,11 @@ def test_lower_upper_bound_printer() -> None:
 )
 def test_set_index_sum_over_printer(expr: ExpressionNode, printed: str) -> None:
     assert visit(expr, PrinterVisitor()) == printed
+
+
+def test_power_printer() -> None:
+    p = param("p")
+    q = param("q")
+
+    assert visit(p**2, PrinterVisitor()) == "(p ^ 2.0)"
+    assert visit((p**q) ** 2, PrinterVisitor()) == "((p ^ q) ^ 2.0)"
