@@ -41,6 +41,7 @@ def _model(
     constraint: Optional[ExpressionNode] = None,
     extra_outputs: Optional[Dict[str, ExpressionNode]] = None,
     objective: Optional[ExpressionNode] = None,
+    upper_bound: Optional[ExpressionNode] = None,
 ) -> Model:
     return model(
         id="m",
@@ -52,7 +53,7 @@ def _model(
         ],
         variables=[
             float_variable("x"),
-            float_variable("y"),
+            float_variable("y", upper_bound=upper_bound),
             float_variable("z", structure=CONSTANT),
         ],
         constraints=(
@@ -169,6 +170,11 @@ def test_invalid_time_operators_are_rejected_in_constraints(
             "objective contribution 'o'",
             {"objective": var("z").shift(-1).expec()},
             id="objective",
+        ),
+        pytest.param(
+            "variable 'y'",
+            {"upper_bound": param("k").shift(param("j"))},
+            id="variable-bound",
         ),
     ],
 )
