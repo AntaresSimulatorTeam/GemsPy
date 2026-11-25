@@ -221,12 +221,12 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     def time_shift(self, node: TimeShiftNode) -> VectorizedExpr:
         operand = visit(node.operand, self)
         shift = self._time_value(node.time_shift, "Time shift")
+        if isinstance(shift, int) and shift == 0:  # x[t]
+            return operand
         return self._apply_time_shift(operand, shift)  # type: ignore[return-value]
 
     def time_eval(self, node: TimeEvalNode) -> VectorizedExpr:
         operand = visit(node.operand, self)
-        if not self._has_dim(operand, "time"):
-            return operand  # type: ignore[return-value]
         index = self._time_value(node.eval_time, "Time index")
         return self._take_time(operand, index)  # type: ignore[return-value]
 

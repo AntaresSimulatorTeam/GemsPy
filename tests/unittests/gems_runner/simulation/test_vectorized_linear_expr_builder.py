@@ -524,91 +524,26 @@ def _scalar_time_da(values: list) -> xr.DataArray:
     )
 
 
-def test_time_shift_by_zero(empty_builder: VectorizedLinearExprBuilder) -> None:
-    da = _scalar_time_da([1.0, 2.0, 3.0])
+@pytest.mark.parametrize(
+    "shift, expected",
+    [
+        pytest.param(0, [1.0, 2.0, 3.0], id="zero"),
+        # position t reads t + shift, cyclic: time coords stay [0, 1, 2]
+        pytest.param(1, [2.0, 3.0, 1.0], id="plus-one"),
+        pytest.param(-1, [3.0, 1.0, 2.0], id="minus-one"),
+        pytest.param(3, [1.0, 2.0, 3.0], id="block-length"),
+    ],
+)
+def test_time_shift_cycles_in_the_block(shift: int, expected: list) -> None:
     b = VectorizedLinearExprBuilder(
         model_id="m",
         linopy_vars={},
-        param_arrays={("m", "s"): da},
+        param_arrays={("m", "s"): _scalar_time_da([1.0, 2.0, 3.0])},
         port_arrays={},
         block_length=3,
     )
-    result = visit(param("s").shift(0), b)
-    xr.testing.assert_allclose(result, da)
-
-
-def test_time_shift_by_one_cycles(empty_builder: VectorizedLinearExprBuilder) -> None:
-    """Shift by +1: [1,2,3] → [2,3,1] (element at position t = original[t+1 % T])."""
-    da = _scalar_time_da([1.0, 2.0, 3.0])
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): da},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").shift(1), b)
-    expected = _scalar_time_da([2.0, 3.0, 1.0])
-    xr.testing.assert_allclose(result, expected)
-
-
-def test_time_shift_by_negative_one_cycles(
-    empty_builder: VectorizedLinearExprBuilder,
-) -> None:
-    """Shift by -1: [1,2,3] → [3,1,2]."""
-    da = _scalar_time_da([1.0, 2.0, 3.0])
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): da},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").shift(-1), b)
-    expected = _scalar_time_da([3.0, 1.0, 2.0])
-    xr.testing.assert_allclose(result, expected)
-
-
-def test_time_shift_by_block_length_is_identity() -> None:
-    """Shift by block_length should produce the same array (full cycle)."""
-    da = _scalar_time_da([10.0, 20.0, 30.0])
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): da},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").shift(3), b)  # shift by block_length
-    xr.testing.assert_allclose(result, da)
-
-
-def test_time_shift_on_no_time_dim_is_noop() -> None:
-    """Scalar (no time dim) DataArray: shift is a no-op."""
-    scalar = xr.DataArray(99.0)
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): scalar},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").shift(1), b)
-    assert float(result) == pytest.approx(99.0)
-
-
-def test_time_shift_coordinates_are_reassigned() -> None:
-    """After a shift, time coords must be [0,1,2] not the shifted positions."""
-    da = _scalar_time_da([1.0, 2.0, 3.0])
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): da},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").shift(1), b)
-    assert list(result.coords["time"].values) == [0, 1, 2]
+    result = visit(param("s").shift(shift), b)
+    xr.testing.assert_allclose(result, _scalar_time_da(expected))
 
 
 # ---------------------------------------------------------------------------
@@ -644,19 +579,6 @@ def test_time_eval_wraps_beyond_block() -> None:
     r1 = visit(param("s").eval(1), b)
     r4 = visit(param("s").eval(4), b)  # 4 % 3 = 1
     xr.testing.assert_allclose(r1, r4)
-
-
-def test_time_eval_on_no_time_dim() -> None:
-    scalar = xr.DataArray(7.0)
-    b = VectorizedLinearExprBuilder(
-        model_id="m",
-        linopy_vars={},
-        param_arrays={("m", "s"): scalar},
-        port_arrays={},
-        block_length=3,
-    )
-    result = visit(param("s").eval(2), b)
-    assert float(result) == pytest.approx(7.0)
 
 
 # ---------------------------------------------------------------------------

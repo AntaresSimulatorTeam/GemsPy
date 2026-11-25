@@ -123,7 +123,7 @@ def test_library_parsing(libs_dir: Path) -> None:
         constraints=[
             Constraint(
                 name="Level equation",
-                expression=var("level")
+                expression=var("level").shift(0)
                 - var("level").shift(-literal(1))
                 - param("efficiency") * var("injection")
                 + var("withdrawal")

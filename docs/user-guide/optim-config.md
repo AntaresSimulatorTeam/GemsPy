@@ -356,7 +356,6 @@ Examples, in a block of 168 time steps (`t` from 0 to 167):
 | `x[d]` | at every time step, for the components and scenarios where `d` is out of the block |
 | `(x[t-1])[t+2]` | at `t = 167`: shifts add up, so it reads `x[t+1]` |
 | `(x[t-1])[0]` | at every time step: it reads `x[-1]` |
-| `y[t-1]`, `y` a time-independent variable | at `t = 0` |
 | `sum(x[t-1])`, `expec(x[t + k])` | aggregations read every time step (or scenario): skipped as soon as one read is out of the block |
 
 A time sum that is empty at a time step reads nothing there.

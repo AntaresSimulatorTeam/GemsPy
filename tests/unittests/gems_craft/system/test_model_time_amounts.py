@@ -11,11 +11,12 @@
 # This file is part of the Antares project.
 
 """A time shift, time index or time sum bound must be time-independent and
-contain no variable, port field or time operator, checked when the model is
-created (here through the Python API)."""
+contain no variable, port field or time operator, and a time shift, time index
+or time sum with bounds must apply to an expression that depends on time,
+checked when the model is created (here through the Python API)."""
 
 import re
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import pytest
 
@@ -33,6 +34,8 @@ TIME_DEPENDENT = IndexingStructure(True, False)
 CONSTANT = IndexingStructure(False, False)
 SCENARIO_DEPENDENT = IndexingStructure(False, True)
 
+_DOES_NOT_DEPEND_ON_TIME = "reads an expression that does not depend on time."
+
 
 def _model(
     constraint: Optional[ExpressionNode] = None,
@@ -47,7 +50,11 @@ def _model(
             float_parameter("c", CONSTANT),
             float_parameter("s", SCENARIO_DEPENDENT),
         ],
-        variables=[float_variable("x"), float_variable("y")],
+        variables=[
+            float_variable("x"),
+            float_variable("y"),
+            float_variable("z", structure=CONSTANT),
+        ],
         constraints=(
             [Constraint("c0", constraint <= 10)] if constraint is not None else None
         ),
@@ -57,32 +64,24 @@ def _model(
 
 
 @pytest.mark.parametrize(
-    "time_sum",
+    "expr",
     [
         pytest.param(var("x").time_sum_between(0, param("c")), id="constant"),
         pytest.param(var("x").time_sum_between(0, param("s")), id="scenario-dependent"),
         pytest.param(var("x").shift(param("s")), id="shift-scenario-dependent"),
         pytest.param(var("x").eval(param("c")), id="index-constant"),
-        pytest.param(
-            var("x").time_sum_between(relative_time(-param("c")), relative_time(0)),
-            id="relative-constant",
-        ),
-        pytest.param(var("x").time_sum_between(0, relative_time(0)), id="mixed"),
+        # sum(z) accepts an expression that does not depend on time.
+        pytest.param(var("z").time_sum(), id="sum-of-constant"),
+        pytest.param((var("x") + var("z")).shift(-1), id="shift-of-time-dependent"),
     ],
 )
-def test_time_independent_amounts_are_accepted(time_sum: ExpressionNode) -> None:
-    _model(constraint=time_sum)
+def test_valid_time_operators_are_accepted(expr: ExpressionNode) -> None:
+    _model(constraint=expr)
 
 
 @pytest.mark.parametrize(
-    "time_sum, error",
+    "expr, error",
     [
-        pytest.param(
-            var("x").time_sum_between(0, param("k")),
-            "the time sum bound 'k' depends on time, but must be time-independent. "
-            "Declare 'k' with `time-dependent: false`.",
-            id="absolute",
-        ),
         pytest.param(
             var("x").time_sum_between(relative_time(-param("k")), relative_time(0)),
             "the time sum bound '(t + -(k))' depends on time",
@@ -121,28 +120,60 @@ def test_time_independent_amounts_are_accepted(time_sum: ExpressionNode) -> None
             "the time sum bound 'p.f' cannot contain a port field.",
             id="port-field",
         ),
+        # A time shift or time index of an expression that does not depend on time
+        pytest.param(
+            var("z").shift(0),
+            f"the time shift of 'z' {_DOES_NOT_DEPEND_ON_TIME}",
+            id="z[t]",
+        ),
+        pytest.param(
+            var("z").shift(-1),
+            f"the time shift of 'z' {_DOES_NOT_DEPEND_ON_TIME}",
+            id="z[t-1]",
+        ),
+        pytest.param(
+            var("z").eval(0),
+            f"the time index of 'z' {_DOES_NOT_DEPEND_ON_TIME}",
+            id="z[0]",
+        ),
+        pytest.param(
+            param("c").shift(-1),
+            f"the time shift of 'c' {_DOES_NOT_DEPEND_ON_TIME}",
+            id="c[t-1]",
+        ),
+        pytest.param(
+            var("z").time_sum(-1, 0),
+            f"the time sum of 'z' {_DOES_NOT_DEPEND_ON_TIME}",
+            id="sum(t-1 .. t, z)",
+        ),
     ],
 )
-def test_invalid_amounts_are_rejected_in_constraints(
-    time_sum: ExpressionNode, error: str
+def test_invalid_time_operators_are_rejected_in_constraints(
+    expr: ExpressionNode, error: str
 ) -> None:
     with pytest.raises(
         ValueError, match=re.escape(f"Model 'm', constraint 'c0': {error}")
     ):
-        _model(constraint=time_sum)
+        _model(constraint=expr)
 
 
-def test_invalid_bounds_are_rejected_in_extra_outputs() -> None:
-    with pytest.raises(ValueError, match="Model 'm', extra output 'e': "):
-        _model(extra_outputs={"e": var("x").time_sum_between(0, param("k"))})
-
-
-def test_invalid_bounds_are_rejected_in_objective_contributions() -> None:
-    with pytest.raises(ValueError, match="Model 'm', objective contribution 'o': "):
-        _model(objective=var("x").time_sum_between(0, param("k")).expec())
-
-
-def test_invalid_bounds_of_a_nested_time_sum_are_rejected() -> None:
-    inner = var("x").time_sum_between(0, param("k"))
-    with pytest.raises(ValueError, match="the time sum bound 'k' depends on time"):
-        _model(constraint=inner.time_sum_between(0, 2))
+@pytest.mark.parametrize(
+    "location, kwargs",
+    [
+        pytest.param(
+            "extra output 'e'",
+            {"extra_outputs": {"e": var("z").shift(-1)}},
+            id="extra-output",
+        ),
+        pytest.param(
+            "objective contribution 'o'",
+            {"objective": var("z").shift(-1).expec()},
+            id="objective",
+        ),
+    ],
+)
+def test_invalid_time_operators_are_rejected_everywhere(
+    location: str, kwargs: Dict[str, Any]
+) -> None:
+    with pytest.raises(ValueError, match=re.escape(f"Model 'm', {location}: ")):
+        _model(**kwargs)

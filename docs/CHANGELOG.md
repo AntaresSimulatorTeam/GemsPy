@@ -34,6 +34,10 @@ All notable changes to GemsPy are documented here.
   start the expression or a parenthesis: write `x[a * (-1)]`, not `x[a * -1]`.
   Their parameters must be declared `time-dependent: false`: `x[t - d]` or
   `x[d]` with `d` varying in time is rejected when the model is created.
+- **Breaking** - a time shift, a time index or a time sum with bounds applies
+  only to an expression that depends on time: `y[t]`, `y[t-1]`, `y[0]` or
+  `sum(t-1 .. t, y)` with `y` time-independent is rejected when the model is
+  created. `sum(y)` still accepts it.
 - **Breaking** - a port field outside `sum_connections` (e.g. `p.f <= 0`) is a
   syntax error.
 - **Breaking** - **`drop` out-of-bounds mode** skips a constraint where it

@@ -126,7 +126,7 @@ from gems_craft.expression.parsing.parse_expression import (
             "sum(p .. d + 1, x)",
             var("x").time_sum_between(param("p"), param("d") + literal(1)),
         ),
-        ({"x"}, {}, "x[t]", var("x")),
+        ({"x"}, {}, "x[t]", var("x").shift(0)),
         ({"x"}, {"p"}, "x[t+p]", var("x").shift(param("p"))),
         ({}, {}, "sum_connections(port.f)", port_field("port", "f").sum_connections()),
         (
@@ -240,7 +240,7 @@ from gems_craft.expression.parsing.parse_expression import (
             {},
             {"p", "q"},
             "(ceil(p/q))[t]",
-            (param("p") / param("q")).ceil(),
+            (param("p") / param("q")).ceil().shift(0),
         ),
         (
             {},

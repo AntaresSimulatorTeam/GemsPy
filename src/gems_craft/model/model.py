@@ -197,9 +197,14 @@ def _time_amounts(
 def _check_time_amounts(model: "Model") -> None:
     """A time shift, time index or time sum bound (an absolute bound, or the
     offset of a bound relative to ``t``) must be time-independent and contain
-    no variable, port field or time operator. This depends on the declared
-    structure only, not on the data."""
-    provider = _make_structure_provider(model.parameters, model.variables)
+    no variable, port field or time operator. A time shift, time index or time
+    sum with bounds must apply to an expression that depends on time (``sum(y)``
+    need not). This depends on the declared structure only, not on the data."""
+    provider = _make_structure_provider(
+        model.parameters,
+        model.variables,
+        {c.name: c for c in model.get_all_constraints()},
+    )
     for where, expr in _model_expressions(model):
         for node in _iter_nodes(expr):
             for kind, shown, value in _time_amounts(node):
@@ -207,6 +212,32 @@ def _check_time_amounts(model: "Model") -> None:
                     f"Model '{model.id}', {where}: the {kind} '{print_expr(shown)}'"
                 )
                 _check_time_amount(prefix, value, provider)
+            if isinstance(node, (TimeShiftNode, TimeEvalNode, TimeSumNode)):
+                _check_time_operand(f"Model '{model.id}', {where}", node, provider)
+
+
+_TIME_OPERATOR_KINDS = {
+    TimeShiftNode: "time shift",
+    TimeEvalNode: "time index",
+    TimeSumNode: "time sum",
+}
+
+
+def _check_time_operand(
+    prefix: str,
+    node: TimeShiftNode | TimeEvalNode | TimeSumNode,
+    provider: IndexingStructureProvider,
+) -> None:
+    try:
+        time_dependent = compute_indexation(node.operand, provider).time
+    except ValueError:  # port fields: their structure is known once resolved
+        return
+    if not time_dependent:
+        kind = _TIME_OPERATOR_KINDS[type(node)]
+        raise ValueError(
+            f"{prefix}: the {kind} of '{print_expr(node.operand)}' reads an "
+            "expression that does not depend on time."
+        )
 
 
 def _check_time_amount(

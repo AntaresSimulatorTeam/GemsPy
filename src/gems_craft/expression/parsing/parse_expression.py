@@ -17,7 +17,6 @@ from antlr4.error.ErrorStrategy import BailErrorStrategy
 from antlr4.Token import Token
 
 from gems_craft.expression import ExpressionNode, literal, param, relative_time, var
-from gems_craft.expression.equality import expressions_equal
 from gems_craft.expression.expression import (
     Comparator,
     ComparisonNode,
@@ -151,12 +150,13 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
 
     def visitTimeShift(self, ctx: ExprParser.TimeShiftContext) -> ExpressionNode:
         shifted_expr = self._convert_identifier(ctx.IDENTIFIER().getText())  # type: ignore
-        return _shift(shifted_expr, ctx.shift().accept(self))  # type: ignore
+        # x[t] is kept as a zero shift: x must depend on time.
+        return shifted_expr.shift(ctx.shift().accept(self))  # type: ignore
 
     def visitTimeShiftExpr(
         self, ctx: ExprParser.TimeShiftExprContext
     ) -> ExpressionNode:
-        return _shift(ctx.expr().accept(self), ctx.shift().accept(self))  # type: ignore
+        return ctx.expr().accept(self).shift(ctx.shift().accept(self))  # type: ignore
 
     def visitTimeIndexExpr(
         self, ctx: ExprParser.TimeIndexExprContext
@@ -298,13 +298,6 @@ class ExpressionNodeBuilderVisitor(ExprVisitor):
         self, ctx: ExprParser.TimeParenthesisContext
     ) -> ExpressionNode:
         return ctx.time_expr().accept(self)  # type: ignore
-
-
-def _shift(expr: ExpressionNode, time_shift: ExpressionNode) -> ExpressionNode:
-    """expr shifted by time_shift; x[t] is x itself."""
-    if expressions_equal(time_shift, literal(0)):
-        return expr
-    return expr.shift(time_shift)
 
 
 def _fold(
