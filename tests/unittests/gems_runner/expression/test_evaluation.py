@@ -109,6 +109,12 @@ def test_abs_round() -> None:
     assert visit(param("p").round(), EvaluationVisitor(context)) == -3.0
 
 
+def test_power() -> None:
+    context = EvaluationContext(variables={"x": 3}, parameters={"p": 2})
+    expr = var("x") ** (2 + param("p"))
+    assert visit(expr, EvaluationVisitor(context)) == pytest.approx(81.0)
+
+
 def test_dual_reduced_cost_evaluation_raises() -> None:
     ctx = EvaluationContext()
     with pytest.raises(NotImplementedError, match="dual"):
