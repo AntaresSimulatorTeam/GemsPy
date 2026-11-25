@@ -180,18 +180,25 @@ def _model_expressions(model: "Model") -> Iterator[Tuple[str, ExpressionNode]]:
         )
 
 
+_TIME_OPERATOR_KINDS = {
+    TimeShiftNode: "time shift",
+    TimeEvalNode: "time index",
+    TimeSumNode: "time sum",
+}
+
+
 def _time_amounts(
-    node: ExpressionNode,
-) -> Iterator[Tuple[str, ExpressionNode, ExpressionNode]]:
-    """The time amounts of *node*: (kind, expression shown, amount)."""
+    node: TimeShiftNode | TimeEvalNode | TimeSumNode,
+) -> Iterator[Tuple[ExpressionNode, ExpressionNode]]:
+    """The time amounts of a time operator: (expression shown, amount)."""
     if isinstance(node, TimeShiftNode):
-        yield "time shift", node.time_shift, node.time_shift
+        yield node.time_shift, node.time_shift
     elif isinstance(node, TimeEvalNode):
-        yield "time index", node.eval_time, node.eval_time
-    elif isinstance(node, TimeSumNode):
+        yield node.eval_time, node.eval_time
+    else:
         for bound in (node.from_time, node.to_time):
             value = bound.offset if isinstance(bound, RelativeTimeNode) else bound
-            yield "time sum bound", bound, value
+            yield bound, value
 
 
 def _check_time_amounts(model: "Model") -> None:
@@ -207,42 +214,35 @@ def _check_time_amounts(model: "Model") -> None:
     )
     for where, expr in _model_expressions(model):
         for node in _iter_nodes(expr):
-            for kind, shown, value in _time_amounts(node):
-                prefix = (
-                    f"Model '{model.id}', {where}: the {kind} '{print_expr(shown)}'"
-                )
+            if not isinstance(node, (TimeShiftNode, TimeEvalNode, TimeSumNode)):
+                continue
+            kind = _TIME_OPERATOR_KINDS[type(node)]
+            amount_kind = f"{kind} bound" if isinstance(node, TimeSumNode) else kind
+            for shown, value in _time_amounts(node):
+                prefix = f"Model '{model.id}', {where}: the {amount_kind} '{print_expr(shown)}'"
                 _check_time_amount(prefix, value, provider)
-            if isinstance(node, (TimeShiftNode, TimeEvalNode, TimeSumNode)):
-                _check_time_operand(f"Model '{model.id}', {where}", node, provider)
-
-
-_TIME_OPERATOR_KINDS = {
-    TimeShiftNode: "time shift",
-    TimeEvalNode: "time index",
-    TimeSumNode: "time sum",
-}
+            prefix = f"Model '{model.id}', {where}: the {kind} of '{print_expr(node.operand)}'"
+            _check_time_operand(prefix, node.operand, provider)
 
 
 def _check_time_operand(
-    prefix: str,
-    node: TimeShiftNode | TimeEvalNode | TimeSumNode,
-    provider: IndexingStructureProvider,
+    prefix: str, operand: ExpressionNode, provider: IndexingStructureProvider
 ) -> None:
-    try:
-        time_dependent = compute_indexation(node.operand, provider).time
-    except ValueError:  # port fields: their structure is known once resolved
+    # The structure of a port field is known once the system is resolved.
+    if any(
+        isinstance(n, (PortFieldNode, PortFieldAggregatorNode))
+        for n in _iter_nodes(operand)
+    ):
         return
-    if not time_dependent:
-        kind = _TIME_OPERATOR_KINDS[type(node)]
-        raise ValueError(
-            f"{prefix}: the {kind} of '{print_expr(node.operand)}' reads an "
-            "expression that does not depend on time."
-        )
+    if not compute_indexation(operand, provider).time:
+        raise ValueError(f"{prefix} reads an expression that does not depend on time.")
 
 
 def _check_time_amount(
     prefix: str, value: ExpressionNode, provider: IndexingStructureProvider
 ) -> None:
+    """The variable, port field and time operator checks are only reachable from
+    the Python API: the grammar already rejects them in YAML libraries."""
     nodes = list(_iter_nodes(value))
     if any(isinstance(n, (PortFieldNode, PortFieldAggregatorNode)) for n in nodes):
         raise ValueError(f"{prefix} cannot contain a port field.")

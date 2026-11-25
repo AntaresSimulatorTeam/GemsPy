@@ -588,14 +588,21 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
     # Time steps at which the expression is read, not wrapped into the block;
     # None for t itself.
     positions: Optional[xr.DataArray] = None
+    # Evaluates the time amounts; shared with the copies made for nested reads.
+    evaluator: Optional[_TimeAmountEvaluator] = None
+
+    def __post_init__(self) -> None:
+        if self.evaluator is None:
+            self.evaluator = _TimeAmountEvaluator(
+                model_id=self.model_id,
+                param_arrays=self.param_arrays,
+                port_arrays={},
+                block_length=self.block_length,
+            )
 
     def _evaluator(self) -> _TimeAmountEvaluator:
-        return _TimeAmountEvaluator(
-            model_id=self.model_id,
-            param_arrays=self.param_arrays,
-            port_arrays={},
-            block_length=self.block_length,
-        )
+        assert self.evaluator is not None  # set in __post_init__
+        return self.evaluator
 
     def _positions(self) -> xr.DataArray:
         if self.positions is None:
