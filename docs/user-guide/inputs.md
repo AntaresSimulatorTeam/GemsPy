@@ -111,33 +111,6 @@ parameters:
 The keys at each level must be exactly the elements instantiated for that set,
 and the leaves must be numbers.
 
-### Tree sets
-
-A set declared with `structure: tree` in its library (e.g. investment horizons)
-gives the parent of each element in `system.yml`; the one element without a
-parent is the root:
-
-~~~ yaml
-sets:
-  - id: year
-    elements: [2025, 2030_hi, 2030_lo]
-    parents: {2030_hi: 2025, 2030_lo: 2025}
-~~~
-
-Expressions read the parent with `X[year=parent(year)]` and the root with
-`X[year=root(year)]`. An instance that reads the parent of the root is left
-out: a constraint is not generated at the root, a `sum_over(year, ...)` leaves
-the root out of the sum, and an extra output is NaN there. `parent()` is not
-allowed in variable bounds and port field definitions.
-
-~~~ yaml
-constraints:
-  - id: trajectory
-    expression: capacity = capacity[year=parent(year)] + invest
-  - id: root
-    expression: capacity[year=root(year)] = initial + invest[year=root(year)]
-~~~
-
 ### Assembling a Study
 
 Once you have `system` and `database`, wrap them in a `Study`:
