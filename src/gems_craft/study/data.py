@@ -39,6 +39,11 @@ class ScenarioIndex:
 
 @dataclass(frozen=True)
 class AbstractDataStructure(ABC):
+    @property
+    def set_dims(self) -> Tuple[str, ...]:
+        """Ids of the custom sets the values vary over (none for legacy structures)."""
+        return ()
+
     @abstractmethod
     def get_value(
         self,

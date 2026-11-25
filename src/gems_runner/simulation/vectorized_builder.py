@@ -34,7 +34,7 @@ behaviour (operand-swap in addition, type guards in nonlinear functions).
 import functools
 import math
 from abc import abstractmethod
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Generic, Optional, Tuple, TypeVar, Union
 
 import linopy
@@ -143,12 +143,17 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         Keyed by ``PortFieldId(port_name, field_name)``.
     block_length:
         Number of time steps in the current time block.
+    set_sizes:
+        For each custom-set id used by the model, a ``component``-indexed
+        DataArray of how many elements each component instantiates (set
+        dimensions are padded to the largest one).
     """
 
     model_id: str
     param_arrays: Dict[Tuple[str, str], xr.DataArray]
     port_arrays: Dict[PortFieldId, T_expr]
     block_length: int
+    set_sizes: Dict[str, xr.DataArray] = field(default_factory=dict)
 
     # ------------------------------------------------------------------ #
     # Abstract                                                              #
@@ -320,17 +325,60 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         return operand * self.block_length  # type: ignore[operator,return-value]
 
     # ------------------------------------------------------------------ #
-    # Custom-set operators (not yet supported)                            #
+    # Custom-set operators                                                  #
     # ------------------------------------------------------------------ #
 
     def set_index(self, node: SetIndexNode) -> VectorizedExpr:
-        raise NotImplementedError(
-            "Custom-set indexing is not yet supported by the vectorized builder."
+        operand = visit(node.operand, self)
+        set_id = node.set_id
+        if not self._has_dim(operand, set_id):
+            return operand  # type: ignore[return-value]
+
+        # Each component's own number of elements (the dimension may be padded).
+        sizes: Union[int, xr.DataArray] = self.set_sizes.get(
+            set_id, operand.sizes[set_id]  # type: ignore[union-attr]
         )
 
+        if node.position is not None:
+            position = self._int_value(node.position, "Set position")
+            out = (xr.DataArray(position) < 0) | (xr.DataArray(position) >= sizes)
+            if bool(out.any()):
+                where = ""
+                if "component" in out.dims:
+                    per_comp = out.any([d for d in out.dims if d != "component"])
+                    names = out.component.values[per_comp.values]
+                    where = f" for component(s) {', '.join(map(str, names))}"
+                raise ValueError(
+                    f"Set position '{print_expr(node.position)}' in model "
+                    f"'{self.model_id}' is out of range for set {set_id!r}{where}."
+                )
+            return self._take_set(operand, set_id, position)  # type: ignore[no-any-return]
+
+        if node.relative_shift is not None:
+            shift = self._int_value(node.relative_shift, "Set shift")
+            # Cyclic within each component's own size: padded positions read
+            # valid ones, and are masked anyway.
+            n = operand.sizes[set_id]  # type: ignore[union-attr]
+            positions = (xr.DataArray(np.arange(n), dims=set_id) + shift) % sizes
+            # Align the result on the positions, not on the elements read.
+            result = operand.isel({set_id: positions})  # type: ignore[union-attr]
+            return result.assign_coords({set_id: list(range(n))})  # type: ignore[no-any-return]
+
+        return operand  # type: ignore[return-value]
+
     def sum_over(self, node: SumOverNode) -> VectorizedExpr:
-        raise NotImplementedError(
-            "sum_over() is not yet supported by the vectorized builder."
+        operand = visit(node.operand, self)
+        set_id = node.set_id
+        if self._has_dim(operand, set_id):
+            return operand.sum(set_id)  # type: ignore[union-attr,return-value]
+        # Constant over the set: every element contributes the same value.
+        sizes = self.set_sizes.get(set_id)
+        if sizes is None:
+            raise KeyError(
+                f"Size of set {set_id!r} is unknown for model {self.model_id!r}."
+            )
+        return operand * (  # type: ignore[operator,return-value]
+            int(sizes.max()) if int(sizes.min()) == int(sizes.max()) else sizes
         )
 
     # ------------------------------------------------------------------ #
@@ -476,29 +524,55 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
             operand = operand.to_linexpr()
         return operand.isel(time=indexer).drop_vars("time")
 
-    def _time_value(self, node: ExpressionNode, what: str) -> Union[int, xr.DataArray]:
-        """Integer value of a time shift, time index or time sum bound: an int
-        when it is a constant, else an integer DataArray computed from the data,
-        varying per component or scenario only. A non-integer value raises,
-        whether it is a constant or not."""
+    @staticmethod
+    def _take_set(
+        operand: Any, set_id: str, positions: Union[int, xr.DataArray]
+    ) -> Any:
+        """*operand* read at the position *positions* along *set_id*, which is
+        dropped.
+
+        *positions* is an integer or an integer DataArray: along its dimensions
+        (component, time, scenario — never *set_id*, checked when the model is
+        created), each element reads its own position. Works for both
+        ``xr.DataArray`` and linopy Variable/LinearExpression.
+        """
+        if not isinstance(positions, xr.DataArray) or not positions.dims:
+            return operand.isel({set_id: int(positions)}, drop=True)
+        # Drop the elements read, left as a coordinate (linopy variables have
+        # no drop_vars).
+        if isinstance(operand, linopy.Variable):
+            operand = operand.to_linexpr()
+        return operand.isel({set_id: positions}).drop_vars(set_id)
+
+    def _int_value(self, node: ExpressionNode, what: str) -> Union[int, xr.DataArray]:
+        """Integer value of a time or set index, shift or time sum bound: an int
+        when it is a constant, else an integer DataArray computed from the data.
+        A non-integer value raises, whether it is a constant or not."""
         try:
             return self._eval_int(node)
         except (KeyError, NotImplementedError):  # depends on the data
-            return self._time_amount(node, what)
+            return self._int_values(node, what)
 
-    def _time_amount(self, node: ExpressionNode, what: str) -> xr.DataArray:
-        """Integer values of a time shift, time index or time sum bound that
+    def _time_value(self, node: ExpressionNode, what: str) -> Union[int, xr.DataArray]:
+        """:meth:`_int_value` of a time shift, time index or time sum bound,
+        varying per component or scenario only."""
+        value = self._int_value(node, what)
+        if isinstance(value, xr.DataArray) and "time" in value.dims:
+            # Cannot happen in a model that passed the check.
+            raise ValueError(
+                f"{what} '{print_expr(node)}' in model '{self.model_id}' depends on "
+                "time, but must be time-independent."
+            )
+        return value
+
+    def _int_values(self, node: ExpressionNode, what: str) -> xr.DataArray:
+        """Integer values of a time or set index, shift or time sum bound that
         depends on the data."""
         value = visit(node, self)
         if not isinstance(value, xr.DataArray):
             raise ValueError(
                 f"{what} expression must evaluate to a parameter (DataArray), "
                 f"got {type(value).__name__!r}."
-            )
-        if "time" in value.dims:  # cannot happen in a model that passed the check
-            raise ValueError(
-                f"{what} '{print_expr(node)}' in model '{self.model_id}' depends on "
-                "time, but must be time-independent."
             )
         values = value.values
         if np.isnan(values).any():
@@ -544,7 +618,7 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         return dim in operand.dims
 
 
-# Gap to the nearest integer accepted for a time shift, time index or sum bound.
+# Gap to the nearest integer accepted for a time or set index, shift or sum bound.
 _INTEGER_TOLERANCE = 1e-9
 
 
