@@ -65,6 +65,8 @@ from gems_craft.expression.expression import (
     RelativeTimeNode,
     RoundNode,
     ScenarioOperatorNode,
+    SetIndexNode,
+    SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
     TimeSumNode,
@@ -316,6 +318,20 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         if self._has_dim(operand, "time"):
             return operand.sum("time")  # type: ignore[union-attr,attr-defined,return-value]
         return operand * self.block_length  # type: ignore[operator,return-value]
+
+    # ------------------------------------------------------------------ #
+    # Custom-set operators (not yet supported)                            #
+    # ------------------------------------------------------------------ #
+
+    def set_index(self, node: SetIndexNode) -> VectorizedExpr:
+        raise NotImplementedError(
+            "Custom-set indexing is not yet supported by the vectorized builder."
+        )
+
+    def sum_over(self, node: SumOverNode) -> VectorizedExpr:
+        raise NotImplementedError(
+            "sum_over() is not yet supported by the vectorized builder."
+        )
 
     # ------------------------------------------------------------------ #
     # Scenario operators                                                    #
@@ -709,6 +725,12 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         # Every time step is read: valid only if all the reads are in the block.
         mask = visit(node.operand, replace(self, positions=None))
         return mask.all("time") if mask is not None and "time" in mask.dims else mask
+
+    def set_index(self, node: SetIndexNode) -> Optional[xr.DataArray]:
+        return visit(node.operand, self)
+
+    def sum_over(self, node: SumOverNode) -> Optional[xr.DataArray]:
+        return visit(node.operand, self)
 
     def scenario_operator(self, node: ScenarioOperatorNode) -> Optional[xr.DataArray]:
         # Every scenario is read: valid only if all the reads are in the block.

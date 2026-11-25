@@ -13,7 +13,7 @@
 
 import pytest
 
-from gems_craft.expression import param, relative_time, var
+from gems_craft.expression import ExpressionNode, param, relative_time, var
 from gems_craft.expression.expression import (
     DualNode,
     LowerBoundNode,
@@ -129,6 +129,34 @@ def test_dual_reduced_cost_indexing() -> None:
     assert compute_indexation(ReducedCostNode("p"), provider) == IndexingStructure(
         True, True
     )
+
+
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        (
+            var("x").set_index("fuel", position=param("p")),
+            IndexingStructure(False, True),
+        ),
+        (
+            var("x").set_index("fuel", relative_shift=param("p")),
+            IndexingStructure(False, True),
+        ),
+        (param("p").set_index("fuel"), IndexingStructure(False, True)),
+        (param("p").sum_over("fuel"), IndexingStructure(False, True)),
+    ],
+)
+def test_set_index_sum_over_indexing(
+    expr: ExpressionNode, expected: IndexingStructure
+) -> None:
+    class ScenarioParameterProvider(StructureProvider):
+        def get_parameter_structure(self, name: str) -> IndexingStructure:
+            return IndexingStructure(False, True)
+
+        def get_variable_structure(self, name: str) -> IndexingStructure:
+            return IndexingStructure(False, False)
+
+    assert compute_indexation(expr, ScenarioParameterProvider()) == expected
 
 
 def test_lower_upper_bound_indexing() -> None:
