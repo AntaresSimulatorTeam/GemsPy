@@ -30,6 +30,7 @@ from gems_craft.expression.expression import (
     PortFieldAggregatorNode,
     PortFieldNode,
     RelativeTimeNode,
+    SetIndexNode,
     SumOverNode,
     TimeEvalNode,
     TimeShiftNode,
@@ -390,6 +391,36 @@ def _check_time_amount(
     )
 
 
+def _check_set_amounts(model: "Model") -> None:
+    """The position (``x[fuel=a]``) or shift (``x[fuel+a]``) of a set index must
+    not depend on the indexed set."""
+    provider = _make_structure_provider(
+        model.parameters,
+        model.variables,
+        {c.name: c for c in model.get_all_constraints()},
+    )
+    for where, expr in _model_expressions(model):
+        for node in _iter_nodes(expr):
+            if not isinstance(node, SetIndexNode):
+                continue
+            for kind, amount in (
+                ("index", node.position),
+                ("shift", node.relative_shift),
+            ):
+                if amount is None:
+                    continue
+                try:
+                    sets = compute_indexation(amount, provider).sets
+                except UnresolvedPortFieldError:
+                    continue  # structure known once ports are resolved
+                if node.set_id in sets:
+                    raise ValueError(
+                        f"Model '{model.id}', {where}: the '{node.set_id}' {kind} "
+                        f"'{print_expr(amount)}' depends on '{node.set_id}', "
+                        "but must not."
+                    )
+
+
 @dataclass(frozen=True)
 class ModelPort:
     """
@@ -436,6 +467,7 @@ class Model:
                 _is_objective_contribution_valid(self, expr)
 
         _check_model_set_indexing(self)
+        _check_set_amounts(self)
 
         for definition in self.port_fields_definitions.values():
             port_name = definition.port_field.port_name
