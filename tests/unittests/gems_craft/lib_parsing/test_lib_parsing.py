@@ -633,19 +633,10 @@ def test_sum_connections_on_own_port_in_extra_output_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_bare_defined_port_field_in_binding_constraint_raises() -> None:
-    """balance_port.flow bare (no sum_connections) in a BC is invalid."""
+def test_bare_port_field_in_binding_constraint_raises() -> None:
+    """A port field outside sum_connections is a syntax error."""
     input_lib = parse_yaml_library(
         io.StringIO(_port_model_yaml(constraint_expr="balance_port.flow >= 0"))
-    )
-    with pytest.raises(ParsingException, match="ParseCancellationException"):
-        resolve_library([input_lib])
-
-
-def test_bare_undefined_port_field_in_binding_constraint_raises() -> None:
-    """balance_port.price bare (not defined in this model either) in a BC is invalid."""
-    input_lib = parse_yaml_library(
-        io.StringIO(_port_model_yaml(constraint_expr="balance_port.price >= 0"))
     )
     with pytest.raises(ParsingException, match="ParseCancellationException"):
         resolve_library([input_lib])

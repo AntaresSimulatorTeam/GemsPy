@@ -320,13 +320,13 @@ The optional `models` list lets you override behaviour for specific models.
 
 ### `out-of-bounds-processing`
 
-When a constraint references a time-shifted variable (e.g. `x[t-1]`), timestep
-`t = 0` refers to a time index *before* the start of the horizon.  Two
-strategies are available:
+When a constraint reads a time step outside the block, through a time shift, a
+time index or a time sum (e.g. `x[t-1]` at `t = 0`), two strategies are
+available:
 
 | Mode | Behaviour |
 |---|---|
-| `cyclic` (default) | Wrap around: time shift are defined modulo `block-length` |
+| `cyclic` (default) | Wrap around: time steps are taken modulo `block-length` |
 | `drop` | Skip the constraint where it reads a variable, parameter or port field out of the block |
 
 ~~~ yaml

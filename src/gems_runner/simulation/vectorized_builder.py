@@ -259,17 +259,8 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         acc: Optional[Any] = None
         for shift in range(min_from, max_to + 1):
             shifted = self._apply_time_shift(operand, shift)
-            include_from = (
-                (from_int <= shift).astype(float)
-                if isinstance(from_int, xr.DataArray) and from_int.dims
-                else xr.DataArray(1.0)
-            )
-            include_to = (
-                (to_int >= shift).astype(float)
-                if isinstance(to_int, xr.DataArray) and to_int.dims
-                else xr.DataArray(1.0)
-            )
-            mask: xr.DataArray = include_from * include_to
+            # 1 where shift is within the bounds of the component and scenario.
+            mask = ((from_int <= shift) & (to_int >= shift)).astype(float)
             contrib = shifted * mask  # type: ignore[operator]
             acc = contrib if acc is None else _linopy_add(acc, contrib)
         return acc  # type: ignore[return-value]
@@ -281,8 +272,8 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         return xr.DataArray(result) if isinstance(result, int) else result
 
     def _time_sum_bound(self, bound: ExpressionNode, t: xr.DataArray) -> xr.DataArray:
-        """Time index of a time sum bound at each time step: ``t + offset`` for a
-        relative bound, the bound itself for an absolute one."""
+        """Time index of a time sum bound at the time steps *t*: ``t + offset``
+        for a relative bound, the bound itself for an absolute one."""
         relative = isinstance(bound, RelativeTimeNode)
         value_node = bound.offset if isinstance(bound, RelativeTimeNode) else bound
         value = self._bound_value(value_node)
@@ -634,8 +625,9 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         return self._read_at(node.operand, xr.DataArray(index))
 
     def time_sum(self, node: TimeSumNode) -> Optional[xr.DataArray]:
-        start = self._time_sum_position(node.from_time)
-        end = self._time_sum_position(node.to_time)
+        evaluator = self._evaluator()
+        start = evaluator._time_sum_bound(node.from_time, self._positions())
+        end = evaluator._time_sum_bound(node.to_time, self._positions())
         first, last = int(start.min()), int(end.max())
         if last < first:  # empty sum: the operand is never read
             return None
@@ -659,13 +651,6 @@ class ShiftValidityVisitor(ExpressionVisitor[Optional[xr.DataArray]]):
         lower = (start - first).clip(0, size)
         valid = counted.isel({dim: upper}) - counted.isel({dim: lower}) <= 0
         return None if bool(valid.all()) else valid
-
-    def _time_sum_position(self, bound: ExpressionNode) -> xr.DataArray:
-        """Position of a time sum bound: offset from the positions read for a
-        relative bound, the bound itself for an absolute one."""
-        if isinstance(bound, RelativeTimeNode):
-            return self._positions() + self._evaluator()._bound_value(bound.offset)
-        return self._evaluator()._bound_value(bound)
 
     # ------------------------------------------------------------------ #
     # Structural nodes — AND-propagate children                             #

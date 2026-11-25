@@ -965,14 +965,6 @@ class _OptimizationProblemBuilder:
                                 block_length=self.block_length,
                             ),
                         )
-                        if validity_mask is not None and not bool(validity_mask.any()):
-                            logger.warning(
-                                "Constraint '%s' of model '%s' is dropped at every "
-                                "instance: out-of-bounds processing is 'drop' and "
-                                "each instance reads outside the block.",
-                                constraint.name,
-                                model.id,
-                            )
 
                 lhs = visit(constraint.expression, builder)
 
@@ -982,6 +974,14 @@ class _OptimizationProblemBuilder:
                     continue
 
                 if validity_mask is not None:
+                    if not bool(validity_mask.any()):
+                        logger.warning(
+                            "Constraint '%s' of model '%s' is dropped at every "
+                            "instance: out-of-bounds processing is 'drop' and "
+                            "each instance reads outside the block.",
+                            constraint.name,
+                            model.id,
+                        )
                     lhs = _apply_validity_mask(lhs, validity_mask)
 
                 # Sanitize constraint name for LP format (spaces → underscores)
