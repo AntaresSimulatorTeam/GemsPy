@@ -86,18 +86,27 @@ def _fast_heuristic_config(
             HeuristicElementConfig(
                 heuristic_element="cluster_max_generation",
                 id=cluster_max_generation_id,
+                type=ModelElementAccessType.PARAMETER,
             ),
             HeuristicElementConfig(
-                heuristic_element="min_power_per_unit", id="min_power_per_unit"
+                heuristic_element="min_power_per_unit",
+                id="min_power_per_unit",
+                type=ModelElementAccessType.PARAMETER,
             ),
             HeuristicElementConfig(
-                heuristic_element="max_power_per_unit", id="max_power_per_unit"
+                heuristic_element="max_power_per_unit",
+                id="max_power_per_unit",
+                type=ModelElementAccessType.PARAMETER,
             ),
             HeuristicElementConfig(
-                heuristic_element="min_up_duration", id="min_up_duration"
+                heuristic_element="min_up_duration",
+                id="min_up_duration",
+                type=ModelElementAccessType.PARAMETER,
             ),
             HeuristicElementConfig(
-                heuristic_element="min_down_duration", id="min_down_duration"
+                heuristic_element="min_down_duration",
+                id="min_down_duration",
+                type=ModelElementAccessType.PARAMETER,
             ),
         ],
         outputs=[
@@ -133,10 +142,14 @@ def _accurate_heuristic_config(
                 type=num_units_max_type,
             ),
             HeuristicElementConfig(
-                heuristic_element="min_up_duration", id="min_up_duration"
+                heuristic_element="min_up_duration",
+                id="min_up_duration",
+                type=ModelElementAccessType.PARAMETER,
             ),
             HeuristicElementConfig(
-                heuristic_element="min_down_duration", id="min_down_duration"
+                heuristic_element="min_down_duration",
+                id="min_down_duration",
+                type=ModelElementAccessType.PARAMETER,
             ),
         ],
         outputs=[

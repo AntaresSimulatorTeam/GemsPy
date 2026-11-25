@@ -39,8 +39,10 @@ models:
             type: variable-upper-bound
           - heuristic-element: min_up_duration
             id: min_up_duration
+            type: parameter
           - heuristic-element: min_down_duration
             id: min_down_duration
+            type: parameter
         outputs:
           - heuristic-element: minimum_num_units_on
             id: num_units_on
@@ -55,14 +57,19 @@ models:
             type: variable-solution
           - heuristic-element: cluster_max_generation
             id: cluster_max_generation
+            type: parameter
           - heuristic-element: min_power_per_unit
             id: min_power_per_unit
+            type: parameter
           - heuristic-element: max_power_per_unit
             id: max_power_per_unit
+            type: parameter
           - heuristic-element: min_up_duration
             id: min_up_duration
+            type: parameter
           - heuristic-element: min_down_duration
             id: min_down_duration
+            type: parameter
         outputs:
           - heuristic-element: minimum_generation_power
             id: generation_power
