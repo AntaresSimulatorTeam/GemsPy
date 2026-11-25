@@ -35,6 +35,7 @@ from .expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RelativeTimeNode,
     RoundNode,
@@ -99,6 +100,9 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
     def division(self, node: DivisionNode) -> IndexingStructure:
         return self._combine([node.left, node.right])
 
+    def power(self, node: PowerNode) -> IndexingStructure:
+        return self._combine([node.left, node.right])
+
     def comparison(self, node: ComparisonNode) -> IndexingStructure:
         return self._combine([node.left, node.right])
 
@@ -123,9 +127,10 @@ class TimeScenarioIndexingVisitor(ExpressionVisitor[IndexingStructure]):
         operand = visit(node.operand, self)
         if not operand.time:  # the same value at every time step
             return operand
-        # The time index removes the operand's time dimension, but brings its own.
+        # The index is time-independent (checked when the model is created): it
+        # removes the time dimension and can only add a scenario dependency.
         index = visit(node.eval_time, self)
-        return IndexingStructure(False, operand.scenario) | index
+        return IndexingStructure(False, operand.scenario or index.scenario)
 
     def time_sum(self, node: TimeSumNode) -> IndexingStructure:
         # Bounds are time-independent (checked when the model is created), so

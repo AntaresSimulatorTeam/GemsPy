@@ -70,7 +70,7 @@ class ModelElementAccessType(str, Enum):
 class HeuristicElementConfig(ModifiedBaseModel):
     heuristic_element: str
     id: str
-    type: ModelElementAccessType = ModelElementAccessType.PARAMETER
+    type: ModelElementAccessType
 
 
 _HEURISTIC_SCHEMA: Dict[HeuristicId, Dict[str, Set[str]]] = {

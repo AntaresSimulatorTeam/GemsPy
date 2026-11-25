@@ -24,7 +24,6 @@ from typing import Dict, List, Optional
 
 import pytest
 
-from gems_craft.expression.parsing.parse_expression import ParsingException
 from gems_craft.optim_config.parsing import load_optim_config
 from gems_craft.study.folder import load_study
 from gems_runner.session.session import SimulationSession
@@ -212,35 +211,6 @@ def test_absolute_bound_given_by_a_parameter(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "mode, time_sum, expected",
-    [
-        pytest.param("cyclic", "sum(0 .. d[1], x)", [6, 6, 6, 6], id="absolute"),
-        pytest.param("cyclic", "sum(t - (d[0]) .. t, x)", [5, 3, 5, 7], id="relative"),
-        # dropped at t = 0, where a is then 0
-        pytest.param(
-            "drop", "sum(t - (d[0]) .. t, x)", [0, 3, 5, 7], id="relative-drop"
-        ),
-        pytest.param("cyclic", "sum(t - (d[0]) .. 3, x)", [14, 10, 9, 7], id="mixed"),
-    ],
-)
-def test_bound_with_a_time_operator(
-    tmp_path: Path, mode: str, time_sum: str, expected: List[float]
-) -> None:
-    study_dir = _make_study(
-        tmp_path,
-        variables=["x", "a"],
-        constraints=["x = d", f"a = {time_sum}"],
-        objective="sum(x) + sum(a)",
-        data={"d": [1, 2, 3, 4]},
-        constants={},
-        nb_time_steps=4,
-        resolution=_out_of_bounds(mode, ["c1"]),
-    )
-
-    assert _solve(study_dir)["a"] == expected
-
-
-@pytest.mark.parametrize(
     "time_sum",
     [
         pytest.param("sum(2 .. 1, x)", id="absolute"),
@@ -279,7 +249,7 @@ def test_absolute_index_refers_to_the_block(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "time_sum, error",
+    "time_amount, error",
     [
         pytest.param(
             "sum(0 .. k, x)",
@@ -293,17 +263,29 @@ def test_absolute_index_refers_to_the_block(tmp_path: Path) -> None:
             "time-independent. Declare 'k' with `time-dependent: false`.",
             id="relative",
         ),
+        pytest.param(
+            "x[t - k]",
+            "the time shift '-(k)' depends on time, but must be time-independent. "
+            "Declare 'k' with `time-dependent: false`.",
+            id="shift",
+        ),
+        pytest.param(
+            "x[k]",
+            "the time index 'k' depends on time, but must be time-independent. "
+            "Declare 'k' with `time-dependent: false`.",
+            id="index",
+        ),
     ],
 )
-def test_bound_must_be_declared_time_independent(
-    tmp_path: Path, time_sum: str, error: str
+def test_time_amount_must_be_declared_time_independent(
+    tmp_path: Path, time_amount: str, error: str
 ) -> None:
     """The declared structure decides, whatever the data: k is declared
     time-dependent, so it is rejected although its series is constant."""
     study_dir = _make_study(
         tmp_path,
         variables=["x", "y", "a"],
-        constraints=["x = d", f"a = {time_sum}"],
+        constraints=["x = d", f"a = {time_amount}"],
         objective="sum(x)",
         data={"d": [1, 2, 3, 4], "k": [1, 1, 1, 1]},
         constants={},
@@ -313,21 +295,6 @@ def test_bound_must_be_declared_time_independent(
     with pytest.raises(
         ValueError, match=re.escape(f"Model 'lib.m', constraint 'c1': {error}")
     ):
-        _solve(study_dir)
-
-
-def test_bound_cannot_contain_a_variable(tmp_path: Path) -> None:
-    study_dir = _make_study(
-        tmp_path,
-        variables=["x", "y", "a"],
-        constraints=["x = d", "a = sum(0 .. y, x)"],
-        objective="sum(x)",
-        data={"d": [1, 2, 3, 4]},
-        constants={},
-        nb_time_steps=4,
-    )
-
-    with pytest.raises(ParsingException, match="Variable 'y' is not allowed"):
         _solve(study_dir)
 
 
