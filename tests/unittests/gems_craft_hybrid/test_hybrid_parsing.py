@@ -361,7 +361,6 @@ area-connections:
     area: area1
 """
     with pytest.raises(
-        ValueError,
-        match="Unknown root key 'area-connections' in system file; did you mean to put it under 'system:'",
+        ValueError, match=r"area-connections\n\s+Extra inputs are not permitted"
     ):
         parse_yaml_hybrid_system(io.StringIO(system))

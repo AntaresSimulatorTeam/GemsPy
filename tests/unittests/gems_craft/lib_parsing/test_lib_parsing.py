@@ -788,23 +788,30 @@ def test_plain_numbers_in_expression_fields() -> None:
 def test_parse_yaml_library_rejects_key_outside_library() -> None:
     library = "library:\n  id: lib\nmodels: []\n"
 
+    with pytest.raises(ValueError, match=r"models\n\s+Extra inputs are not permitted"):
+        parse_yaml_library(io.StringIO(library))
+
+
+def test_parse_yaml_library_without_library_key_raises() -> None:
+    library = "id: lib\nmodels: []\n"
+
+    with pytest.raises(ValueError, match=r"library\n\s+Field required"):
+        parse_yaml_library(io.StringIO(library))
+
+
+def test_parse_yaml_empty_library_file_raises() -> None:
     with pytest.raises(
         ValueError,
-        match="Unknown root key 'models' in library file; did you mean to put it under 'library:'",
+        match="Input should be a valid dictionary or instance of LibraryFileSchema",
     ):
-        parse_yaml_library(io.StringIO(library))
-
-
-@pytest.mark.parametrize("library", ["id: lib\nmodels: []\n", ""])
-def test_parse_yaml_library_without_library_key_raises(library: str) -> None:
-    with pytest.raises(ValueError, match="Missing root key 'library' in library file"):
-        parse_yaml_library(io.StringIO(library))
+        parse_yaml_library(io.StringIO(""))
 
 
 @pytest.mark.parametrize("library", ["library:\n", "library: [1, 2]\n"])
 def test_parse_yaml_library_with_empty_section_raises(library: str) -> None:
     with pytest.raises(
-        ValueError, match="'library:' in library file is empty or not a mapping"
+        ValueError,
+        match="Input should be a valid dictionary or instance of LibrarySchema",
     ):
         parse_yaml_library(io.StringIO(library))
 
@@ -816,4 +823,4 @@ def test_parse_yaml_library_error_names_the_file(tmp_path: Path) -> None:
     with library_file.open() as f:
         with pytest.raises(ValueError) as error:
             parse_yaml_library(f)
-    assert f"in library file '{library_file}'" in str(error.value)
+    assert f"Invalid library file {library_file}:" in str(error.value)
