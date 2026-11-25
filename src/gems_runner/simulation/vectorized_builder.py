@@ -360,7 +360,9 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
             # valid ones, and are masked anyway.
             n = operand.sizes[set_id]  # type: ignore[union-attr]
             positions = (xr.DataArray(np.arange(n), dims=set_id) + shift) % sizes
-            return self._take_set(operand, set_id, positions)  # type: ignore[no-any-return]
+            # Align the result on the positions, not on the elements read.
+            result = operand.isel({set_id: positions})  # type: ignore[union-attr]
+            return result.assign_coords({set_id: list(range(n))})  # type: ignore[no-any-return]
 
         return operand  # type: ignore[return-value]
 
@@ -526,20 +528,18 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     def _take_set(
         operand: Any, set_id: str, positions: Union[int, xr.DataArray]
     ) -> Any:
-        """*operand* read at the positions *positions* along *set_id*.
+        """*operand* read at the position *positions* along *set_id*, which is
+        dropped.
 
         *positions* is an integer or an integer DataArray: along its dimensions
-        (component, time, scenario, *set_id*), each element reads its own
-        position. Works for both ``xr.DataArray`` and linopy Variable/LinearExpression.
+        (component, time, scenario — never *set_id*, checked when the model is
+        created), each element reads its own position. Works for both
+        ``xr.DataArray`` and linopy Variable/LinearExpression.
         """
         if not isinstance(positions, xr.DataArray) or not positions.dims:
             return operand.isel({set_id: int(positions)}, drop=True)
-        if set_id in positions.dims:
-            # Align the result on the positions, not on the elements read.
-            result = operand.isel({set_id: positions})
-            return result.assign_coords({set_id: list(range(positions.sizes[set_id]))})
-        # The position varies, but not along the set: drop the elements read,
-        # left as a coordinate (linopy variables have no drop_vars).
+        # Drop the elements read, left as a coordinate (linopy variables have
+        # no drop_vars).
         if isinstance(operand, linopy.Variable):
             operand = operand.to_linexpr()
         return operand.isel({set_id: positions}).drop_vars(set_id)
