@@ -57,6 +57,8 @@ def _table(
                 "absolute_time_index": t,
                 "block_time_index": t,
                 "scenario_index": s,
+                "set_id": None,
+                "set_index": None,
                 "value": v,
                 "basis_status": None,
             }

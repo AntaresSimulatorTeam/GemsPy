@@ -52,7 +52,7 @@ from gems_runner.simulation.table_schema import (
 from gems_runner.simulation.table_store import _RowFilter
 
 MANIFEST_FILE = "manifest.json"
-MANIFEST_SCHEMA_VERSION = 1
+MANIFEST_SCHEMA_VERSION = 2
 COMMON_FILE_STEM = "scenario-common"
 
 _COLUMNS = [

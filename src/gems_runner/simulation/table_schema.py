@@ -27,6 +27,8 @@ class SimulationColumns(str, Enum):
     ABSOLUTE_TIME_INDEX = "absolute_time_index"
     BLOCK_TIME_INDEX = "block_time_index"
     SCENARIO_INDEX = "scenario_index"
+    SET_ID = "set_id"
+    SET_INDEX = "set_index"
     VALUE = "value"
     BASIS_STATUS = "basis_status"
 
@@ -36,6 +38,7 @@ _COMPONENT = SimulationColumns.COMPONENT.value
 _OUTPUT = SimulationColumns.OUTPUT.value
 _TIME = SimulationColumns.ABSOLUTE_TIME_INDEX.value
 _SCENARIO = SimulationColumns.SCENARIO_INDEX.value
+_SET_INDEX = SimulationColumns.SET_INDEX.value
 _VALUE = SimulationColumns.VALUE.value
 
 OBJECTIVE_VALUE_OUTPUT = "objective-value"
@@ -55,6 +58,8 @@ _INDEX_COLUMNS = {
 _LABEL_COLUMNS = {
     SimulationColumns.COMPONENT,
     SimulationColumns.OUTPUT,
+    SimulationColumns.SET_ID,
+    SimulationColumns.SET_INDEX,
     SimulationColumns.BASIS_STATUS,
 }
 SIMULATION_TABLE_SCHEMA = pa.schema(
