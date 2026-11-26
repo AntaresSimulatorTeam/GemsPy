@@ -90,17 +90,23 @@ class IntegerStrategy(ModifiedBaseModel):
         return self
 
 
+class SetTreeNodeSchema(ModifiedBaseModel):
+    """An element of a tree set and the subtrees of its children."""
+
+    node: Union[str, int]
+    children: List["SetTreeNodeSchema"] = Field(default_factory=list)
+
+
 class SetInstanceSchema(ModifiedBaseModel):
     id: str
-    elements: Union[List[Union[str, int]], str]
-    # Parent of each element of a tree set; the element absent is the root.
-    parents: Optional[Dict[Union[str, int], Union[str, int]]] = None
+    # A list, an "a..b" range, or the tree of a tree set (from its root)
+    elements: Union[List[Union[str, int]], str, SetTreeNodeSchema]
 
     @field_validator("elements", mode="after")
     @classmethod
     def _expand_range(
-        cls, v: Union[List[Union[str, int]], str]
-    ) -> Union[List[Union[str, int]], str]:
+        cls, v: Union[List[Union[str, int]], str, SetTreeNodeSchema]
+    ) -> Union[List[Union[str, int]], str, SetTreeNodeSchema]:
         if isinstance(v, str):
             m = re.fullmatch(r"(\d+)\.\.(\d+)", v.strip())
             if not m:
@@ -113,36 +119,31 @@ class SetInstanceSchema(ModifiedBaseModel):
             return list(range(a, b + 1))
         return v
 
-    def parent_positions(self) -> Optional[Tuple[int, ...]]:
-        """Position of each element's parent (-1 for the root), or None without
-        ``parents``. Elements are matched as strings, as in output tables.
+    def _tree_walk(self) -> List[Tuple[Union[str, int], int]]:
+        """(element, parent position) of a tree set, in pre-order (root first)."""
+        assert isinstance(self.elements, SetTreeNodeSchema)
+        result: List[Tuple[Union[str, int], int]] = []
+        stack = [(self.elements, -1)]
+        while stack:
+            node, parent = stack.pop()
+            position = len(result)
+            result.append((node.node, parent))
+            stack.extend((child, position) for child in reversed(node.children))
+        return result
 
-        Raises if a parent is unknown, or if the parents do not form a single tree.
-        """
-        if self.parents is None:
+    def element_list(self) -> List[Union[str, int]]:
+        """The elements, a tree being listed in pre-order (root first)."""
+        if isinstance(self.elements, SetTreeNodeSchema):
+            return [element for element, _ in self._tree_walk()]
+        assert isinstance(self.elements, list)  # ranges are expanded at parsing
+        return list(self.elements)
+
+    def parent_positions(self) -> Optional[Tuple[int, ...]]:
+        """Position of each element's parent (-1 for the root), or None if the
+        elements are not a tree."""
+        if not isinstance(self.elements, SetTreeNodeSchema):
             return None
-        names = [str(e) for e in self.elements]
-        position = {name: i for i, name in enumerate(names)}
-        parents = {str(k): str(v) for k, v in self.parents.items()}
-        unknown = sorted(n for n in [*parents, *parents.values()] if n not in position)
-        if unknown:
-            raise ValueError(
-                f"Set '{self.id}': parents name unknown element(s) {unknown}."
-            )
-        roots = [n for n in names if n not in parents]
-        if len(roots) != 1:
-            raise ValueError(
-                f"Set '{self.id}' must have exactly one root (an element without "
-                f"parent), got {roots}."
-            )
-        for name in names:  # every element must reach the root
-            seen = set()
-            while name in parents:
-                if name in seen:
-                    raise ValueError(f"Set '{self.id}': parents form a cycle.")
-                seen.add(name)
-                name = parents[name]
-        return tuple(position[parents[n]] if n in parents else -1 for n in names)
+        return tuple(parent for _, parent in self._tree_walk())
 
 
 class ComponentSchema(ModifiedBaseModel):

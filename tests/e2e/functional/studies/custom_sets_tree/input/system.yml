@@ -1,8 +1,7 @@
 system:
   sets:
     - id: year
-      elements: [2025, 2030_hi, 2030_lo]
-      parents: {2030_hi: 2025, 2030_lo: 2025}
+      elements: {node: 2025, children: [{node: 2030_hi}, {node: 2030_lo}]}
   components:
     - id: E
       model: tree.expansion

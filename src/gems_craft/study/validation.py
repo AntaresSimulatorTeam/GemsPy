@@ -44,22 +44,23 @@ def check_component_models(system: System, input_models: Dict[str, Model]) -> bo
 
 def _check_set_elements(instance: SetInstanceSchema, is_tree: bool) -> None:
     # Compared as strings: elements are written as text in output tables
-    names = [str(e) for e in instance.elements]
+    names = [str(e) for e in instance.element_list()]
     if len(set(names)) != len(names):
         raise ValueError(f"Set '{instance.id}' has duplicate elements.")
     # '|' joins element names in output tables' `set_index` column
     if any("|" in name for name in names):
         raise ValueError(f"Set '{instance.id}' has an element containing '|'.")
-    if is_tree and instance.parents is None:
+    has_tree = instance.parent_positions() is not None
+    if is_tree and not has_tree:
         raise ValueError(
-            f"Set '{instance.id}' is declared as a tree: its 'parents' are required."
+            f"Set '{instance.id}' is declared as a tree: its elements must be a "
+            "tree ('node' and 'children')."
         )
-    if not is_tree and instance.parents is not None:
+    if not is_tree and has_tree:
         raise ValueError(
-            f"Set '{instance.id}' has 'parents' but is not declared as a tree "
+            f"Set '{instance.id}' has tree elements but is not declared as a tree "
             "(`structure: tree`)."
         )
-    instance.parent_positions()  # raises if the parents do not form one tree
 
 
 def check_custom_sets(
@@ -77,7 +78,7 @@ def check_custom_sets(
       - every instantiated set's element list is duplicate-free (an empty
         list is a valid, if degenerate, set) and has no element containing
         '|';
-      - a tree set (and only a tree set) has 'parents', forming one tree;
+      - a tree set (and only a tree set) has its elements given as a tree;
       - every instantiated global set is declared by some library, and every
         locally instantiated set is a local set of the component's model.
     """

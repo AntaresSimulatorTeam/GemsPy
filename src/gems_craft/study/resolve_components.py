@@ -74,8 +74,7 @@ def resolve_system(input_system: SystemSchema, libraries: dict[str, Library]) ->
     s = System(
         "study",
         global_sets={
-            inst.id: tuple(inst.elements)  # type: ignore[arg-type]
-            for inst in input_system.sets or []
+            inst.id: tuple(inst.element_list()) for inst in input_system.sets or []
         },
         global_set_parents=_set_parents(input_system.sets),
     )
@@ -123,8 +122,7 @@ def _resolve_component(
         properties=properties,
         integer_strategy=component.integer_strategy,
         local_sets={
-            inst.id: tuple(inst.elements)  # type: ignore[arg-type]
-            for inst in component.sets or []
+            inst.id: tuple(inst.element_list()) for inst in component.sets or []
         },
         local_set_parents=_set_parents(component.sets),
     )
@@ -173,9 +171,9 @@ def build_data_base(
     to data-series column indices at use time.
     """
     database = DataBase(scenario_builder=scenario_builder)
-    global_sets = {s.id: list(s.elements) for s in input_system.sets or []}
+    global_sets = {s.id: s.element_list() for s in input_system.sets or []}
     for comp in input_system.components:
-        local_sets = {s.id: list(s.elements) for s in comp.sets or []}
+        local_sets = {s.id: s.element_list() for s in comp.sets or []}
         for param in comp.parameters or []:
             group = param.scenario_group or comp.scenario_group
             set_elements: Dict[str, List[Union[str, int]]] = {}

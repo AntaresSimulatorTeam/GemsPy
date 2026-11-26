@@ -65,6 +65,7 @@ _TREE_LIB = (
     "library: {id: setlib, sets: [{id: fuel, structure: tree}], "
     "models: [{id: m, parameters: [{id: p, indexed-by: [fuel]}]}]}"
 )
+_TREE = "{node: a, children: [{node: b, children: [{node: c}]}, {node: d}]}"
 
 # (system_args, library yaml, expected error regex or None when the check passes)
 _CASES = {
@@ -111,28 +112,32 @@ _CASES = {
         "not instantiated",
     ),
     **{
-        f"tree parents: {name}": (
+        f"tree set: {name}": (
             {
-                "global_sets": f"[{{id: fuel, elements: [a, b, c]{parents}}}]",
+                "global_sets": f"[{{id: fuel, elements: {elements}}}]",
                 "local_sets": None,
             },
             _TREE_LIB,
             error,
         )
-        for name, parents, error in [
-            ("valid", ", parents: {b: a, c: b}", None),
-            ("missing", "", "'parents' are required"),
-            ("unknown element", ", parents: {b: z, c: a}", "unknown element"),
-            ("two roots", ", parents: {c: a}", "exactly one root"),
-            ("cycle", ", parents: {a: b, b: a, c: a}", "exactly one root|cycle"),
+        for name, elements, error in [
+            ("valid", _TREE, None),
+            ("list elements", "[a, b, c]", "must be a tree"),
+            ("duplicate node", "{node: a, children: [{node: a}]}", "duplicate"),
         ]
     },
-    "parents on a list set": (
-        {"local_sets": "[{id: segment, elements: 0..2, parents: {1: 0, 2: 0}}]"},
+    "tree elements on a list set": (
+        {"local_sets": "[{id: segment, elements: {node: 0, children: [{node: 1}]}}]"},
         _LIB,
         "not declared as a tree",
     ),
 }
+
+
+def test_tree_set_elements_in_pre_order() -> None:
+    (instance,) = _system(f"[{{id: fuel, elements: {_TREE}}}]", None).sets or []
+    assert instance.element_list() == ["a", "b", "c", "d"]
+    assert instance.parent_positions() == (-1, 0, 1, 0)
 
 
 @pytest.mark.filterwarnings("ignore:sum_over")
