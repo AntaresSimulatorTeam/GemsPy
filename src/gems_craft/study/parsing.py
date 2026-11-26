@@ -14,7 +14,7 @@ import argparse
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, TextIO, Type, TypeVar, Union, overload
+from typing import Generic, List, Optional, TextIO, Type, TypeVar, Union, overload
 
 from pydantic import Field, ValidationError, model_validator
 from yaml import safe_dump, safe_load
@@ -95,6 +95,10 @@ class SystemSchema(ModifiedBaseModel):
 _S = TypeVar("_S", bound=SystemSchema)
 
 
+class SystemFileSchema(ModifiedBaseModel, Generic[_S]):
+    system: _S
+
+
 @overload
 def load_input_system(input_study: Path) -> SystemSchema: ...
 @overload
@@ -116,8 +120,11 @@ def parse_yaml_system(input_study: TextIO, schema: Type[_S]) -> _S: ...
 def parse_yaml_system(
     input_study: TextIO, schema: Type[SystemSchema] = SystemSchema
 ) -> SystemSchema:
-    tree = safe_load(input_study)
-    return schema.model_validate(tree["system"])
+    try:
+        return SystemFileSchema[schema].model_validate(safe_load(input_study)).system  # type: ignore[valid-type]
+    except ValidationError as e:
+        name = getattr(input_study, "name", "<string>")
+        raise ValueError(f"Invalid system file {name}: {e}") from e
 
 
 def write_yaml_system(system: SystemSchema, path: Path) -> None:

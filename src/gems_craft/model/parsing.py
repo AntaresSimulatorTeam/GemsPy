@@ -133,12 +133,16 @@ class LibrarySchema(ModifiedBaseModel):
     version: Optional[str] = None
 
 
+class LibraryFileSchema(ModifiedBaseModel):
+    library: LibrarySchema
+
+
 def parse_yaml_library(input: typing.TextIO) -> LibrarySchema:
-    tree = safe_load(input)
     try:
-        return LibrarySchema.model_validate(tree["library"])
+        return LibraryFileSchema.model_validate(safe_load(input)).library
     except ValidationError as e:
-        raise ValueError(f"An error occurred during parsing: {e}")
+        name = getattr(input, "name", "<string>")
+        raise ValueError(f"Invalid library file {name}: {e}") from e
 
 
 def write_yaml_library(library: LibrarySchema, path: Path) -> None:

@@ -2,7 +2,6 @@ import io
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
 from yaml import dump, safe_load
 
 from gems_craft.expression import literal, maximum, var
@@ -227,7 +226,7 @@ system:
 
 
 def test_parse_yaml_system_properties_missing_key_raises() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         parse_yaml_system(io.StringIO(_SYSTEM_WITH_PROPERTIES_MISSING_KEY))
 
 
@@ -264,7 +263,7 @@ system:
 
 
 def test_parse_yaml_system_system_level_properties_rejected() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         parse_yaml_system(io.StringIO(_SYSTEM_WITH_SYSTEM_LEVEL_PROPERTIES))
 
 
@@ -374,3 +373,65 @@ system:
         "technology": "nuclear",
         "company": "rhonepower",
     }
+
+
+def test_parse_yaml_system_rejects_key_outside_system() -> None:
+    system = """
+system:
+  id: s
+  components: []
+connections:
+  - component1: a
+    port1: p
+    component2: b
+    port2: p
+"""
+    with pytest.raises(
+        ValueError, match=r"connections\n\s+Extra inputs are not permitted"
+    ):
+        parse_yaml_system(io.StringIO(system))
+
+
+def test_parse_yaml_system_lists_all_keys_outside_system() -> None:
+    system = "system:\n  id: s\nconnections: []\nmodel-libraries: lib\n"
+
+    with pytest.raises(ValueError) as error:
+        parse_yaml_system(io.StringIO(system))
+    message = str(error.value)
+    assert "2 validation errors" in message
+    assert "\nconnections\n" in message
+    assert "\nmodel-libraries\n" in message
+
+
+def test_parse_yaml_system_without_system_key_raises() -> None:
+    system = "id: s\ncomponents: []\n"
+
+    with pytest.raises(ValueError, match=r"system\n\s+Field required"):
+        parse_yaml_system(io.StringIO(system))
+
+
+def test_parse_yaml_empty_system_file_raises() -> None:
+    with pytest.raises(
+        ValueError,
+        match="Input should be a valid dictionary or instance of SystemFileSchema",
+    ):
+        parse_yaml_system(io.StringIO(""))
+
+
+@pytest.mark.parametrize("system", ["system:\n", "system: [1, 2]\n"])
+def test_parse_yaml_system_with_empty_section_raises(system: str) -> None:
+    with pytest.raises(
+        ValueError,
+        match="Input should be a valid dictionary or instance of SystemSchema",
+    ):
+        parse_yaml_system(io.StringIO(system))
+
+
+def test_parse_yaml_system_error_names_the_file(tmp_path: Path) -> None:
+    system_file = tmp_path / "system.yml"
+    system_file.write_text("system:\n  id: s\nconnections: []\n")
+
+    with system_file.open() as f:
+        with pytest.raises(ValueError) as error:
+            parse_yaml_system(f)
+    assert f"Invalid system file {system_file}:" in str(error.value)
