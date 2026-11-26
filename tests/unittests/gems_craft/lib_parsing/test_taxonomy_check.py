@@ -14,10 +14,11 @@ import io
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from gems_craft.model.parsing import parse_yaml_library
 from gems_craft.model.taxonomy import (
-    Importance,
+    DisplayPriority,
     Taxonomy,
     TaxonomyCategory,
     TaxonomyInputItem,
@@ -183,11 +184,11 @@ taxonomy:
         - id: injection_port
       parameters:
         - id: p_max
-          importance: main
+          display-priority: high
         - id: cost
       properties:
         - id: technology
-          importance: main
+          display-priority: high
     - id: balance
       ports:
         - id: balance_port
@@ -201,17 +202,32 @@ taxonomy:
 
     production = next(c for c in taxonomy.categories if c.id == "production")
     assert [p.id for p in production.ports] == ["injection_port"]
-    assert [(p.id, p.importance) for p in production.parameters] == [
-        ("p_max", Importance.MAIN),
-        ("cost", Importance.STANDARD),
+    assert [(p.id, p.display_priority) for p in production.parameters] == [
+        ("p_max", DisplayPriority.HIGH),
+        ("cost", DisplayPriority.NORMAL),
     ]
-    assert production.properties[0].importance == Importance.MAIN
+    assert production.properties[0].display_priority == DisplayPriority.HIGH
 
     balance = next(c for c in taxonomy.categories if c.id == "balance")
     assert [p.id for p in balance.ports] == ["balance_port"]
 
     storage = next(c for c in taxonomy.categories if c.id == "storage")
     assert storage.ports == []
+
+
+def test_load_taxonomy_unknown_display_priority_raises(tmp_path: Path) -> None:
+    taxonomy_file = tmp_path / "taxonomy.yml"
+    taxonomy_file.write_text("""
+taxonomy:
+  id: my_taxonomy
+  categories:
+    - id: production
+      parameters:
+        - id: p_max
+          display-priority: urgent
+""")
+    with pytest.raises(ValidationError, match="display-priority"):
+        load_taxonomy(taxonomy_file)
 
 
 def test_load_taxonomy_missing_root_key_raises(tmp_path: Path) -> None:

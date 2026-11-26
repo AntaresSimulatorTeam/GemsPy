@@ -25,16 +25,17 @@ class TaxonomyItem(ModifiedBaseModel):
     id: str
 
 
-class Importance(str, Enum):
-    MAIN = "main"
-    STANDARD = "standard"
+class DisplayPriority(str, Enum):
+    """UI-only hint on which inputs to show first; no effect on solving or validation."""
+
+    HIGH = "high"
+    NORMAL = "normal"
 
 
 class TaxonomyInputItem(TaxonomyItem):
-    """Component input data (parameter or property) with an importance,
-    used to select which inputs to display."""
+    """Component input data (parameter or property) with a display priority."""
 
-    importance: Importance = Importance.STANDARD
+    display_priority: DisplayPriority = DisplayPriority.NORMAL
 
 
 class TaxonomyCategory(ModifiedBaseModel):
