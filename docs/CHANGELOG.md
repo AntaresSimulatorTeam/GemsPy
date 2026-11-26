@@ -4,6 +4,20 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Changed
+- **Breaking** - `parse_yaml_system` now raises `ValueError` (wrapping
+  pydantic's `ValidationError`) on invalid input, like `parse_yaml_library`.
+  Code catching `ValidationError` from it must catch `ValueError` instead.
+
+### Fixed
+- `parse_yaml_system` and `parse_yaml_library` now reject a key placed at the
+  root of the file instead of under `system:` or `library:` (e.g.
+  `connections` or `area-connections` at the wrong indentation level); such
+  a key was silently ignored, so a study could run with its components
+  disconnected. A file without the `system:` or `library:` key now raises a
+  `ValueError` instead of a `KeyError`. Errors name the file that was read and
+  give locations from the root of the file (e.g. `system.components.0.bogus`).
+
 ## [0.4.0] - 2026-11-20
 
 The expression language gains the power operator `^`. Simulation table views
@@ -36,12 +50,6 @@ changes, marked **Breaking** below.
 - `ComponentView` and `OutputView`: use `ComponentResults` and `OutputResults`.
 
 ### Fixed
-- `parse_yaml_system` and `parse_yaml_library` now reject a key placed at the
-  root of the file instead of under `system:` or `library:` (e.g.
-  `connections` or `area-connections` at the wrong indentation level); such
-  a key was silently ignored. A file without the `system:` or `library:` key,
-  or with nothing under it, now raises a `ValueError` instead of a `KeyError`
-  or a pydantic error. These errors name the file that was read.
 - A port field defined by a constant expression (e.g. `definition: 0`) no
   longer makes `build_problem` fail when its component is connected; the
   constant is contributed once per connection.
