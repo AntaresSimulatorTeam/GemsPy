@@ -22,3 +22,4 @@ from .optimization import (
 from .runner import BendersRunner
 from .simulation_table import SimulationColumns, SimulationTable, SimulationTableBuilder
 from .time_block import TimeBlock
+from .vectorized_builder import NonFiniteValueError

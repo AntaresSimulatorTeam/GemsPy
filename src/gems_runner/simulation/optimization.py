@@ -30,9 +30,21 @@ optimization problem in four phases:
 """
 
 from collections import defaultdict
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    cast,
+)
 
 import linopy
 import numpy as np
@@ -55,7 +67,12 @@ from gems_runner.simulation.linearize import (
     _linopy_add,
 )
 from gems_runner.simulation.time_block import TimeBlock
-from gems_runner.simulation.vectorized_builder import ShiftValidityVisitor
+from gems_runner.simulation.vectorized_builder import (
+    NonFiniteValueError,
+    ShiftValidityVisitor,
+    _NonFiniteOperandError,
+    _raise_if_invalid,
+)
 
 if TYPE_CHECKING:
     from gems_craft.optim_config.parsing import (
@@ -168,6 +185,17 @@ class OutOfBoundsFilter:
         return self._modes.get((model_id, constraint_name))
 
 
+@contextmanager
+def _naming_port_field(pf_id: PortFieldId) -> Iterator[None]:
+    """Name the port field whose definition holds an invalid value."""
+    try:
+        yield
+    except _NonFiniteOperandError as e:
+        if e.what is None:
+            e.what = f"definition of port field '{pf_id.port_name}.{pf_id.field_name}'"
+        raise
+
+
 def build_port_arrays(
     model: Model,
     components: List[Component],
@@ -207,7 +235,8 @@ def build_port_arrays(
                 builder = make_builder(model.id, model)
                 defn = model.port_fields_definitions[pf_id].definition
                 try:
-                    port_arrays[pf_id] = visit(defn, builder)
+                    with _naming_port_field(pf_id):
+                        port_arrays[pf_id] = visit(defn, builder)
                 except KeyError:
                     # A variable referenced in the port definition is not
                     # available in the current problem (e.g. a subproblem-only
@@ -293,7 +322,8 @@ def _build_slave_port_array(
         defn = master_model.port_fields_definitions[master_pf_id].definition
         master_builder = make_builder(master_mk, master_model)
         try:
-            expr_master = visit(defn, master_builder)
+            with _naming_port_field(master_pf_id):
+                expr_master = visit(defn, master_builder)
         except KeyError:
             # The connected model has no variables in the current problem
             # (e.g. a subproblem-only model when building the master).
@@ -632,10 +662,14 @@ class _OptimizationProblemBuilder:
             # block's horizon (a truncated final block can be shorter than the
             # carried window).
             pin_length = min(init_val.sizes["time"], self.block_length)
+            pinned = init_val.isel(time=slice(0, pin_length))
+            # linopy would read a NaN as "no constraint": the variable would not be pinned.
+            with self._naming_non_finite(f"initial value of variable '{var_name}'"):
+                _raise_if_invalid(mk, pinned)
             safe = f"{mk}__{var_name}".replace("-", "_")
             self.linopy_model.add_constraints(
                 linopy_var.isel(time=slice(0, pin_length))
-                == init_val.isel(time=slice(0, pin_length)),  # type: ignore[arg-type]
+                == pinned,  # type: ignore[arg-type]
                 name=f"carry_over__{safe}",
             )
 
@@ -882,6 +916,16 @@ class _OptimizationProblemBuilder:
 
         lower_arr = lower if isinstance(lower, np.ndarray) else np.array(lower)
         upper_arr = upper if isinstance(upper, np.ndarray) else np.array(upper)
+        # NaN is never valid; +inf/-inf only mean "no bound" on the matching side.
+        for arr, side, invalid_inf in (
+            (lower_arr, "lower", np.inf),
+            (upper_arr, "upper", -np.inf),
+        ):
+            bound_da = xr.DataArray(arr, dims=dims, coords=coords)
+            with self._naming_non_finite(f"{side} bound of variable '{var.name}'"):
+                _raise_if_invalid(
+                    model.id, bound_da, bound_da.isnull() | (bound_da == invalid_inf)
+                )
         for ci, comp_id in enumerate(comp_ids):
             lo = np.asarray(lower_arr[ci] if lower_arr.ndim > 0 else lower_arr)
             up = np.asarray(upper_arr[ci] if upper_arr.ndim > 0 else upper_arr)
@@ -922,12 +966,14 @@ class _OptimizationProblemBuilder:
         if not has_vars and model.variables:
             self.port_arrays[model.id] = {}
             return
-        self.port_arrays[model.id] = build_port_arrays(
-            model,
-            components,
-            self.study,
-            lambda mk_, m: self._make_builder(m, port_arrays={}),
-        )
+        # The port field is named by build_port_arrays.
+        with self._naming_non_finite("a port field definition"):
+            self.port_arrays[model.id] = build_port_arrays(
+                model,
+                components,
+                self.study,
+                lambda mk_, m: self._make_builder(m, port_arrays={}),
+            )
 
     # ------------------------------------------------------------------
     # Phase 4 — Constraints and Objectives
@@ -962,12 +1008,30 @@ class _OptimizationProblemBuilder:
                             ),
                         )
 
-                lhs = visit(constraint.expression, builder)
+                what = f"constraint '{constraint.name}'"
+                with self._naming_non_finite(what):
+                    lhs = visit(constraint.expression, builder)
 
                 # Skip constraints whose LHS evaluated to a pure DataArray (no
                 # decision variables — e.g. an unconnected port aggregation).
                 if isinstance(lhs, xr.DataArray):
                     continue
+
+                # A constant of the left-hand side moves to the right-hand side:
+                # -inf (resp. +inf) only means "no bound" for an upper (resp. lower) bound.
+                const = getattr(lhs, "const", None)
+                if const is not None:
+                    invalid = const.isnull()
+                    if constraint.is_equality or not is_unbounded(
+                        constraint.upper_bound
+                    ):
+                        invalid |= const == np.inf
+                    if constraint.is_equality or not is_unbounded(
+                        constraint.lower_bound
+                    ):
+                        invalid |= const == -np.inf
+                    with self._naming_non_finite(what):
+                        _raise_if_invalid(model.id, const, invalid)
 
                 if validity_mask is not None:
                     lhs = _apply_validity_mask(lhs, validity_mask)
@@ -976,18 +1040,22 @@ class _OptimizationProblemBuilder:
                 safe_name = constraint.name.replace(" ", "_").replace("-", "_")
 
                 if constraint.is_equality:
-                    lb = visit(constraint.lower_bound, builder)
+                    lb = self._visit_bound(constraint.lower_bound, builder, what, None)
                     if validity_mask is not None:
                         lb = _apply_validity_mask(lb, validity_mask)
                     self.linopy_model.add_constraints(lhs == lb, name=f"{prefix}__{safe_name}__eq")  # type: ignore[operator,arg-type]
                 else:
                     if not is_unbounded(constraint.lower_bound):
-                        lb = visit(constraint.lower_bound, builder)
+                        lb = self._visit_bound(
+                            constraint.lower_bound, builder, what, np.inf
+                        )
                         if validity_mask is not None:
                             lb = _apply_validity_mask(lb, validity_mask)
                         self.linopy_model.add_constraints(lhs >= lb, name=f"{prefix}__{safe_name}__lb")  # type: ignore[operator,arg-type]
                     if not is_unbounded(constraint.upper_bound):
-                        ub = visit(constraint.upper_bound, builder)
+                        ub = self._visit_bound(
+                            constraint.upper_bound, builder, what, -np.inf
+                        )
                         if validity_mask is not None:
                             ub = _apply_validity_mask(ub, validity_mask)
                         self.linopy_model.add_constraints(lhs <= ub, name=f"{prefix}__{safe_name}__ub")  # type: ignore[operator,arg-type]
@@ -1016,7 +1084,15 @@ class _OptimizationProblemBuilder:
                     not self._location_filter
                     or self._location_filter.include_objective(model.id, obj_id)
                 ) and expr is not None:
-                    obj_term = visit(expr, builder)
+                    with self._naming_non_finite(f"objective contribution '{obj_id}'"):
+                        obj_term = visit(expr, builder)
+                        constant = (
+                            obj_term
+                            if isinstance(obj_term, xr.DataArray)
+                            else getattr(obj_term, "const", None)
+                        )
+                        if constant is not None:
+                            _raise_if_invalid(model.id, constant)
                     total_obj = _accumulate(total_obj, obj_term)
 
         return total_obj
@@ -1024,6 +1100,46 @@ class _OptimizationProblemBuilder:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    @contextmanager
+    def _naming_non_finite(self, what: str) -> Iterator[None]:
+        """Convert an invalid value found in *what* into a :class:`NonFiniteValueError`.
+
+        The time step is that of the expression where the value is found: after
+        a time shift (``p[t-1]``), it is not the time step of the data.
+        """
+        try:
+            yield
+        except _NonFiniteOperandError as e:
+            location = [f"model '{e.model_id}'"]
+            if "component" in e.cell:
+                location.append(f"component '{e.cell['component']}'")
+            if "time" in e.cell:
+                location.append(f"time {self.block.timesteps[e.cell['time']]}")
+            if "scenario" in e.cell:
+                location.append(f"scenario {self.scenario_ids[e.cell['scenario']]}")
+            raise NonFiniteValueError(
+                f"Invalid value {e.value} in {e.what or what}, {', '.join(location)}"
+            ) from None
+
+    def _visit_bound(
+        self,
+        node: Any,
+        builder: VectorizedLinearExprBuilder,
+        what: str,
+        invalid_inf: Optional[float],
+    ) -> VectorizedExpr:
+        """Visit a constraint bound, rejecting NaN and *invalid_inf* (any inf if None)."""
+        with self._naming_non_finite(what):
+            bound = visit(node, builder)
+            if isinstance(bound, xr.DataArray):
+                invalid = (
+                    None
+                    if invalid_inf is None
+                    else bound.isnull() | (bound == invalid_inf)
+                )
+                _raise_if_invalid(builder.model_id, bound, invalid)
+        return bound
 
     @staticmethod
     def _to_bound_array(

@@ -34,7 +34,7 @@ behaviour (operand-swap in addition, type guards in nonlinear functions).
 import functools
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, Optional, Tuple, TypeVar, Union, cast
 
 import linopy
 import numpy as np
@@ -110,6 +110,43 @@ def _linopy_add(a: VectorizedExpr, b: VectorizedExpr) -> VectorizedExpr:
     if isinstance(a, xr.DataArray) and not isinstance(b, xr.DataArray):
         return b + a  # type: ignore[operator]
     return a + b  # type: ignore[operator]
+
+
+class NonFiniteValueError(ValueError):
+    """A NaN, or an infinite value where it is not allowed, would reach the linopy model."""
+
+
+class _NonFiniteOperandError(Exception):
+    """Invalid value found while building the problem.
+
+    Converted to :class:`NonFiniteValueError` by the problem builder, which
+    knows the name of the constraint, variable or objective being built.
+    *what* names the item instead when it is set before, e.g. a port field.
+    """
+
+    def __init__(self, model_id: str, cell: Dict[str, Any], value: float) -> None:
+        super().__init__(model_id, cell, value)
+        self.model_id = model_id
+        self.cell = cell
+        self.value = value
+        self.what: Optional[str] = None
+
+
+def _raise_if_invalid(
+    model_id: str, values: xr.DataArray, invalid: Optional[xr.DataArray] = None
+) -> None:
+    """Raise :class:`_NonFiniteOperandError` for the first *invalid* cell of *values*.
+
+    *invalid* defaults to the non-finite cells of *values*.
+    """
+    if invalid is None:
+        invalid = cast(xr.DataArray, ~np.isfinite(values))
+    if not bool(invalid.any()):
+        return
+    index = dict(zip(invalid.dims, np.argwhere(invalid.values)[0]))
+    bad = values.isel(index)
+    cell = {str(dim): bad.coords[dim].item() for dim in index if dim in bad.coords}
+    raise _NonFiniteOperandError(model_id, cell, float(bad))
 
 
 # ---------------------------------------------------------------------------
