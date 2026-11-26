@@ -11,6 +11,7 @@
 # This file is part of the Antares project.
 
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import List, Optional
 
@@ -24,17 +25,30 @@ class TaxonomyItem(ModifiedBaseModel):
     id: str
 
 
+class DisplayPriority(str, Enum):
+    """UI-only hint on which inputs to show first; no effect on solving or validation."""
+
+    HIGH = "high"
+    NORMAL = "normal"
+
+
+class TaxonomyInputItem(TaxonomyItem):
+    """Component input data (parameter or property) with a display priority."""
+
+    display_priority: DisplayPriority = DisplayPriority.NORMAL
+
+
 class TaxonomyCategory(ModifiedBaseModel):
     id: str
     parent_category: Optional[str] = None
     variables: List[TaxonomyItem] = Field(default_factory=list)
-    parameters: List[TaxonomyItem] = Field(default_factory=list)
+    parameters: List[TaxonomyInputItem] = Field(default_factory=list)
     ports: List[TaxonomyItem] = Field(default_factory=list)
     port_field_definitions: List[TaxonomyItem] = Field(default_factory=list)
     constraints: List[TaxonomyItem] = Field(default_factory=list)
     binding_constraints: List[TaxonomyItem] = Field(default_factory=list)
     extra_outputs: List[TaxonomyItem] = Field(default_factory=list)
-    properties: List[TaxonomyItem] = Field(default_factory=list)
+    properties: List[TaxonomyInputItem] = Field(default_factory=list)
 
 
 class TaxonomySchema(ModifiedBaseModel):

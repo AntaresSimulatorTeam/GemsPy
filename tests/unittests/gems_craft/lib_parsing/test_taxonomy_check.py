@@ -14,11 +14,14 @@ import io
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from gems_craft.model.parsing import parse_yaml_library
 from gems_craft.model.taxonomy import (
+    DisplayPriority,
     Taxonomy,
     TaxonomyCategory,
+    TaxonomyInputItem,
     TaxonomyItem,
     load_taxonomy,
 )
@@ -181,6 +184,11 @@ taxonomy:
         - id: injection_port
       parameters:
         - id: p_max
+          display-priority: high
+        - id: cost
+      properties:
+        - id: technology
+          display-priority: high
     - id: balance
       ports:
         - id: balance_port
@@ -194,12 +202,32 @@ taxonomy:
 
     production = next(c for c in taxonomy.categories if c.id == "production")
     assert [p.id for p in production.ports] == ["injection_port"]
+    assert [(p.id, p.display_priority) for p in production.parameters] == [
+        ("p_max", DisplayPriority.HIGH),
+        ("cost", DisplayPriority.NORMAL),
+    ]
+    assert production.properties[0].display_priority == DisplayPriority.HIGH
 
     balance = next(c for c in taxonomy.categories if c.id == "balance")
     assert [p.id for p in balance.ports] == ["balance_port"]
 
     storage = next(c for c in taxonomy.categories if c.id == "storage")
     assert storage.ports == []
+
+
+def test_load_taxonomy_unknown_display_priority_raises(tmp_path: Path) -> None:
+    taxonomy_file = tmp_path / "taxonomy.yml"
+    taxonomy_file.write_text("""
+taxonomy:
+  id: my_taxonomy
+  categories:
+    - id: production
+      parameters:
+        - id: p_max
+          display-priority: urgent
+""")
+    with pytest.raises(ValidationError, match="display-priority"):
+        load_taxonomy(taxonomy_file)
 
 
 def test_load_taxonomy_missing_root_key_raises(tmp_path: Path) -> None:
@@ -266,7 +294,7 @@ library:
 
 def test_model_missing_required_taxonomy_parameter_raises() -> None:
     taxonomy = _make_taxonomy(
-        TaxonomyCategory(id="production", parameters=[TaxonomyItem(id="p_max")])
+        TaxonomyCategory(id="production", parameters=[TaxonomyInputItem(id="p_max")])
     )
     lib = _parse_lib("""
 library:
@@ -333,7 +361,9 @@ library:
 
 def test_model_missing_required_taxonomy_property_raises() -> None:
     taxonomy = _make_taxonomy(
-        TaxonomyCategory(id="production", properties=[TaxonomyItem(id="technology")])
+        TaxonomyCategory(
+            id="production", properties=[TaxonomyInputItem(id="technology")]
+        )
     )
     lib = _parse_lib("""
 library:
@@ -378,13 +408,13 @@ def test_model_exposing_all_required_fields_is_valid() -> None:
         TaxonomyCategory(
             id="production",
             variables=[TaxonomyItem(id="generation")],
-            parameters=[TaxonomyItem(id="p_max")],
+            parameters=[TaxonomyInputItem(id="p_max")],
             ports=[TaxonomyItem(id="injection_port")],
             port_field_definitions=[TaxonomyItem(id="injection_port.flow")],
             constraints=[TaxonomyItem(id="max_output")],
             binding_constraints=[TaxonomyItem(id="balance")],
             extra_outputs=[TaxonomyItem(id="co2")],
-            properties=[TaxonomyItem(id="technology")],
+            properties=[TaxonomyInputItem(id="technology")],
         )
     )
     lib = _parse_lib("""

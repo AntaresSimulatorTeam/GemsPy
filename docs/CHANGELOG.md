@@ -4,6 +4,12 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Taxonomy display priority** - taxonomy parameters and properties accept an
+  optional `display-priority`: `high` or `normal` (default), a UI-only hint on
+  which inputs to show first. Exposed as `TaxonomyInputItem.display_priority`
+  (`DisplayPriority` enum).
+
 ## [0.4.0] - 2026-11-20
 
 The expression language gains the power operator `^`. Simulation table views
