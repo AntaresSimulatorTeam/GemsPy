@@ -42,14 +42,25 @@ def check_component_models(system: System, input_models: Dict[str, Model]) -> bo
     return True
 
 
-def _check_set_elements(instance: SetInstanceSchema) -> None:
+def _check_set_elements(instance: SetInstanceSchema, is_tree: bool) -> None:
     # Compared as strings: elements are written as text in output tables
-    names = [str(e) for e in instance.elements]
+    names = [str(e) for e in instance.element_list()]
     if len(set(names)) != len(names):
         raise ValueError(f"Set '{instance.id}' has duplicate elements.")
     # '|' joins element names in output tables' `set_index` column
     if any("|" in name for name in names):
         raise ValueError(f"Set '{instance.id}' has an element containing '|'.")
+    has_tree = instance.parent_positions() is not None
+    if is_tree and not has_tree:
+        raise ValueError(
+            f"Set '{instance.id}' is declared as a tree: its elements must be a "
+            "tree ('node' and 'children')."
+        )
+    if not is_tree and has_tree:
+        raise ValueError(
+            f"Set '{instance.id}' has tree elements but is not declared as a tree "
+            "(`structure: tree`)."
+        )
 
 
 def check_custom_sets(
@@ -67,6 +78,7 @@ def check_custom_sets(
       - every instantiated set's element list is duplicate-free (an empty
         list is a valid, if degenerate, set) and has no element containing
         '|';
+      - a tree set (and only a tree set) has its elements given as a tree;
       - every instantiated global set is declared by some library, and every
         locally instantiated set is a local set of the component's model.
     """
@@ -93,8 +105,9 @@ def check_custom_sets(
             f"System-level set(s) {sorted(unknown_global)} are instantiated in "
             "system.yml but not declared by any library."
         )
+    global_trees = set().union(*(lib.tree_sets for lib in lib_dict.values()))
     for s in instantiated_global.values():
-        _check_set_elements(s)
+        _check_set_elements(s, s.id in global_trees)
 
     for component in input_study.components:
         component_model = model_dict.get(component.model)
@@ -117,7 +130,7 @@ def check_custom_sets(
                 f"set(s) {sorted(missing_local)} used by its model."
             )
         for s in instantiated_local.values():
-            _check_set_elements(s)
+            _check_set_elements(s, s.id in component_model.tree_sets)
 
 
 def check_data_requirements(study: Study) -> None:

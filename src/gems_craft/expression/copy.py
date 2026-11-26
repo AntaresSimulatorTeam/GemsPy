@@ -100,6 +100,7 @@ class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
                 if node.relative_shift is not None
                 else None
             ),
+            tree_position=node.tree_position,
         )
 
     def sum_over(self, node: SumOverNode) -> ExpressionNode:

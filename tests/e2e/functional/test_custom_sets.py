@@ -85,3 +85,25 @@ def test_positive_lower_bound_on_ragged_sets(tmp_path: Path) -> None:
     assert problem.termination_condition == "optimal"
     x = problem.get_variable_solution("custom_sets.grid", "x").values
     assert np.all(x[~np.isnan(x)] >= 0.5 - 1e-9)
+
+
+def test_tree_set_study() -> None:
+    """Capacity expansion over the tree 2025 -> {2030_hi, 2030_lo}.
+
+    `capacity = capacity[year=parent(year)] + invest` is not generated at the
+    root, which `root()` fixes instead; the upkeep `sum_over` of the inherited
+    capacity leaves the root out: 10 * (3 + 0.5 * 7) + 0.5 * 8 + 0.5 * 8 = 73.
+    """
+    study_dir = Path(__file__).parent / "studies" / "custom_sets_tree"
+    problem = build_problem(load_study(study_dir), TimeBlock(1, [0]), [0])
+    problem.solve()
+    assert problem.termination_condition == "optimal"
+    assert problem.objective_value == pytest.approx(73)
+
+    df = SimulationTableBuilder().build(problem).data
+    capacity = df[df["output"] == "capacity"]
+    assert dict(zip(capacity["set_index"], capacity["value"])) == {
+        "2025": pytest.approx(8),
+        "2030_hi": pytest.approx(15),
+        "2030_lo": pytest.approx(8),
+    }

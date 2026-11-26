@@ -519,6 +519,7 @@ class SimulationTable:
 from gems_craft.expression.visitor import visit
 from gems_runner.simulation.extra_output import VectorizedExtraOutputBuilder
 from gems_runner.simulation.optimization import OptimizationProblem, build_port_arrays
+from gems_runner.simulation.vectorized_builder import parent_mask, parent_sets
 
 
 def _tag_single_scenario(df: pd.DataFrame, scenario_id: int) -> pd.DataFrame:
@@ -755,6 +756,7 @@ class SimulationTableBuilder:
                     port_arrays={},
                     block_length=problem.block_length,
                     set_sizes=problem.set_sizes.get(mk_, {}),
+                    set_parents=problem.set_parents.get(mk_, {}),
                 ),
             )
 
@@ -770,8 +772,15 @@ class SimulationTableBuilder:
                     port_arrays=port_arrays,
                     block_length=problem.block_length,
                     set_sizes=problem.set_sizes.get(mk, {}),
+                    set_parents=problem.set_parents.get(mk, {}),
                 )
                 result_da: xr.DataArray = cast(xr.DataArray, visit(expr_node, builder))
+                # NaN where the parent of the root is read.
+                root_mask = parent_mask(
+                    parent_sets(expr_node), problem.set_parents.get(mk, {})
+                )
+                if root_mask is not None:
+                    result_da = result_da.where(root_mask)
 
                 if "component" in result_da.dims:
                     own_ids = [c.id for c in components]

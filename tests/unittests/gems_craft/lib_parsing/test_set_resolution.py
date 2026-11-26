@@ -181,6 +181,22 @@ _CASES = {
         ),
         None,
     ),
+    "parent of a list set": (
+        _model_lib(
+            "variables: [{id: x, indexed-by: [fuel]}], "
+            "constraints: [{id: c, expression: 'x = x[fuel=parent(fuel)]'}]",
+            _FUEL,
+        ),
+        "structure: tree",
+    ),
+    "parent in a variable bound": (
+        _model_lib(
+            "parameters: [{id: p, indexed-by: [fuel]}], variables: "
+            "[{id: x, indexed-by: [fuel], upper-bound: 'p[fuel=parent(fuel)]'}]",
+            "sets: [{id: fuel, structure: tree}]",
+        ),
+        "not allowed here",
+    ),
 }
 
 

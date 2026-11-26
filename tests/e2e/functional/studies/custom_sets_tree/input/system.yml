@@ -1,0 +1,18 @@
+system:
+  sets:
+    - id: year
+      elements: {node: 2025, children: [{node: 2030_hi}, {node: 2030_lo}]}
+  components:
+    - id: E
+      model: tree.expansion
+      parameters:
+        - id: demand
+          indexed-by: [year]
+          value: {2025: 8, 2030_hi: 15, 2030_lo: 6}
+        - id: proba
+          indexed-by: [year]
+          value: {2025: 1, 2030_hi: 0.5, 2030_lo: 0.5}
+        - id: initial
+          time-dependent: false
+          scenario-dependent: false
+          value: 5

@@ -134,6 +134,7 @@ def _add_resolved_dependent_sets_to_current_lib(
     done_dependencies = set(cur_yaml_lib.dependencies) & treated_lib_ids
     for done_lib in done_dependencies:
         current_lib.sets.update(output_lib_dict[done_lib].sets)
+        current_lib.tree_sets.update(output_lib_dict[done_lib].tree_sets)
 
 
 def _update_treated_libs_and_import_stack(
@@ -158,6 +159,9 @@ def _resolve_lib(
     if current_lib.sets & own_sets:
         raise Exception(f"Set(s): {current_lib.sets & own_sets} is(are) defined twice.")
     current_lib.sets.update(own_sets)
+    current_lib.tree_sets.update(
+        s.id for s in cur_yaml_lib.sets if s.structure == "tree"
+    )
 
     cur_yaml_lib_model_ids = [model.id for model in cur_yaml_lib.models]
     for id in cur_yaml_lib_model_ids:
@@ -165,7 +169,13 @@ def _resolve_lib(
             raise Exception(f"Model {id} is defined twice")
 
     models = [
-        _resolve_model(m, current_lib.port_types, current_lib.id, current_lib.sets)
+        _resolve_model(
+            m,
+            current_lib.port_types,
+            current_lib.id,
+            current_lib.sets,
+            current_lib.tree_sets,
+        )
         for m in cur_yaml_lib.models
     ]
 
@@ -220,6 +230,7 @@ def _resolve_model(
     port_types: Dict[str, PortType],
     library_id: str,
     visible_global_sets: Set[str],
+    visible_global_tree_sets: Optional[Set[str]] = None,
 ) -> Model:
     local_set_ids = {s.id for s in input_model.sets}
     collision = local_set_ids & visible_global_sets
@@ -294,6 +305,8 @@ def _resolve_model(
         extra_outputs=extra_outputs,
         properties=[p.id for p in input_model.properties],
         local_sets=local_set_ids,
+        tree_sets={s.id for s in input_model.sets if s.structure == "tree"}
+        | (visible_global_tree_sets or set()),
     )
 
 

@@ -27,6 +27,8 @@ from gems_craft.study.parsing import IntegerStrategy
 from gems_craft.utils import require_not_none
 
 SetElements = Tuple[Union[str, int], ...]
+# Position of each element's parent in a tree set, -1 for the root.
+SetParents = Tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,7 @@ class Component:
     properties: Dict[str, str] = field(default_factory=dict)
     integer_strategy: IntegerStrategy = field(default_factory=IntegerStrategy)
     local_sets: Dict[str, SetElements] = field(default_factory=dict)
+    local_set_parents: Dict[str, SetParents] = field(default_factory=dict)
 
     def is_variable_in_model(self, var_id: str) -> bool:
         return var_id in self.model.variables.keys()
@@ -152,6 +155,7 @@ class System:
 
     id: str
     global_sets: Dict[str, SetElements] = field(default_factory=dict)
+    global_set_parents: Dict[str, SetParents] = field(default_factory=dict)
     _components: Dict[str, Component] = field(init=False, default_factory=dict)
     _connections: List[PortsConnection] = field(init=False, default_factory=list)
 
@@ -197,6 +201,18 @@ class System:
                 f"Set {set_id!r} is not instantiated for component {component.id!r}."
             )
         return elements
+
+    def set_parents(self, component: Component, set_id: str) -> SetParents:
+        """Parent positions of the tree set *set_id* that *component* sees."""
+        if set_id in component.local_sets:
+            parents = component.local_set_parents.get(set_id)
+        else:
+            parents = self.global_set_parents.get(set_id)
+        if parents is None:
+            raise KeyError(
+                f"Tree set {set_id!r} has no parents for component {component.id!r}."
+            )
+        return parents
 
     def is_empty(self) -> bool:
         return (not self._components) and (not self._connections)

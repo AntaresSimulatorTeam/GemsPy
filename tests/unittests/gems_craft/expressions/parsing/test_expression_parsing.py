@@ -448,6 +448,16 @@ def test_parse_upper_bound_unknown_variable_raises() -> None:
             "(x + p)[fuel]",
             (var("x") + param("p")).set_index("fuel"),
         ),
+        (
+            {"year"},
+            "x[year=parent(year)]",
+            var("x").set_index("year", tree_position="parent"),
+        ),
+        (
+            {"year"},
+            "x[year=root(year)]",
+            var("x").set_index("year", tree_position="root"),
+        ),
     ],
 )
 def test_parsing_visitor_with_sets(
@@ -486,6 +496,8 @@ def test_parsing_equivalent_index_forms(lhs: str, rhs: str) -> None:
         ("x[fuel*2]", "'fuel' is a set.*X\\[fuel=k\\].*sum_over\\(fuel"),
         ("sum_over(p, x)", "'p' is not a declared set"),
         ("x[p=2]", "neither 't' nor a declared set"),
+        ("x[fuel=parent(segment)]", "must take the indexed set"),
+        ("x[fuel=parent(fuel)+1]", "only be used alone as a set index"),
     ],
 )
 def test_parsing_custom_set_indexing_raises(expression_str: str, match: str) -> None:
@@ -497,7 +509,7 @@ def test_parsing_custom_set_indexing_raises(expression_str: str, match: str) -> 
 
 
 def test_set_index_node_rejects_position_and_relative_shift() -> None:
-    with pytest.raises(ValueError, match="both an explicit position"):
+    with pytest.raises(ValueError, match="at most one of an explicit position"):
         SetIndexNode(var("x"), "fuel", position=literal(1), relative_shift=literal(1))
 
 

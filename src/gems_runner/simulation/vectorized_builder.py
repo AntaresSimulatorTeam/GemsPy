@@ -31,11 +31,23 @@ implemented here once, with DataArray-friendly semantics as their default.
 behaviour (operand-swap in addition, type guards in nonlinear functions).
 """
 
+import dataclasses
 import functools
 import math
 from abc import abstractmethod
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, Generic, Optional, Tuple, TypeVar, Union
+from typing import (
+    Any,
+    Dict,
+    FrozenSet,
+    Generic,
+    Iterable,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import linopy
 import numpy as np
@@ -119,6 +131,39 @@ def _linopy_add(a: VectorizedExpr, b: VectorizedExpr) -> VectorizedExpr:
 # ---------------------------------------------------------------------------
 
 
+ROOT = -1
+"""Parent position of the root of a tree set."""
+PADDING = -2
+"""Parent position of a padded element of a tree set."""
+
+
+def parent_sets(node: ExpressionNode) -> Set[str]:
+    """Sets read at the parent (``X[s=parent(s)]``) in *node*, outside a
+    ``sum_over`` of the same set (which leaves the root out of its sum)."""
+    found: Set[str] = set()
+    if isinstance(node, SetIndexNode) and node.tree_position == "parent":
+        found.add(node.set_id)
+    for f in dataclasses.fields(node):
+        value = getattr(node, f.name)
+        for child in value if isinstance(value, list) else [value]:
+            if isinstance(child, ExpressionNode):
+                found |= parent_sets(child)
+    if isinstance(node, SumOverNode):
+        found.discard(node.set_id)
+    return found
+
+
+def parent_mask(
+    set_ids: Iterable[str], set_parents: Dict[str, xr.DataArray]
+) -> Optional[xr.DataArray]:
+    """True at the elements of *set_ids* that have a parent (None if no set)."""
+    mask: Optional[xr.DataArray] = None
+    for set_id in sorted(set_ids):
+        has_parent = set_parents[set_id] >= 0
+        mask = has_parent if mask is None else mask & has_parent
+    return mask
+
+
 @dataclass(kw_only=True)
 class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     """
@@ -147,6 +192,10 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         For each custom-set id used by the model, a ``component``-indexed
         DataArray of how many elements each component instantiates (set
         dimensions are padded to the largest one).
+    set_parents:
+        For each tree set used by the model, a DataArray (dims ``component``
+        and the set) of each element's parent position: ``ROOT`` for the root,
+        ``PADDING`` for a padded position.
     """
 
     model_id: str
@@ -154,6 +203,7 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     port_arrays: Dict[PortFieldId, T_expr]
     block_length: int
     set_sizes: Dict[str, xr.DataArray] = field(default_factory=dict)
+    set_parents: Dict[str, xr.DataArray] = field(default_factory=dict)
 
     # ------------------------------------------------------------------ #
     # Abstract                                                              #
@@ -339,6 +389,17 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
             set_id, operand.sizes[set_id]  # type: ignore[union-attr]
         )
 
+        if node.tree_position == "root":
+            root = (self._parents(set_id) == ROOT).argmax(set_id)
+            return self._take_set(operand, set_id, root)  # type: ignore[no-any-return,arg-type]
+
+        if node.tree_position == "parent":
+            # The root reads itself; parent_mask drops it.
+            parents = self._parents(set_id)
+            own = xr.DataArray(np.arange(parents.sizes[set_id]), dims=set_id)
+            positions = parents.where(parents >= 0, own).drop_vars(set_id)
+            return self._take_set(operand, set_id, positions)  # type: ignore[no-any-return]
+
         if node.position is not None:
             position = self._int_value(node.position, "Set position")
             out = (xr.DataArray(position) < 0) | (xr.DataArray(position) >= sizes)
@@ -369,6 +430,15 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
     def sum_over(self, node: SumOverNode) -> VectorizedExpr:
         operand = visit(node.operand, self)
         set_id = node.set_id
+        if set_id in parent_sets(node.operand):
+            # The root, which has no parent, is left out of the sum.
+            mask = self._parents(set_id) >= 0
+            if isinstance(operand, xr.DataArray):
+                operand = operand.where(mask, 0)
+            else:
+                if isinstance(operand, linopy.Variable):
+                    operand = operand.to_linexpr()
+                operand = operand.where(mask)  # type: ignore[union-attr]
         if self._has_dim(operand, set_id):
             return operand.sum(set_id)  # type: ignore[union-attr,return-value]
         # Constant over the set: every element contributes the same value.
@@ -523,6 +593,15 @@ class VectorizedBuilderBase(ExpressionVisitor[VectorizedExpr], Generic[T_expr]):
         if isinstance(operand, linopy.Variable):
             operand = operand.to_linexpr()
         return operand.isel(time=indexer).drop_vars("time")
+
+    def _parents(self, set_id: str) -> xr.DataArray:
+        parents = self.set_parents.get(set_id)
+        if parents is None:
+            raise KeyError(
+                f"Parents of tree set {set_id!r} are unknown for model "
+                f"{self.model_id!r}."
+            )
+        return parents
 
     @staticmethod
     def _take_set(

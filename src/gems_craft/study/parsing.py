@@ -15,7 +15,18 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TextIO, Type, TypeVar, Union, overload
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    TextIO,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    overload,
+)
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 from yaml import safe_dump, safe_load
@@ -79,15 +90,23 @@ class IntegerStrategy(ModifiedBaseModel):
         return self
 
 
+class SetTreeNodeSchema(ModifiedBaseModel):
+    """An element of a tree set and the subtrees of its children."""
+
+    node: Union[str, int]
+    children: List["SetTreeNodeSchema"] = Field(default_factory=list)
+
+
 class SetInstanceSchema(ModifiedBaseModel):
     id: str
-    elements: Union[List[Union[str, int]], str]
+    # A list, an "a..b" range, or the tree of a tree set (from its root)
+    elements: Union[List[Union[str, int]], str, SetTreeNodeSchema]
 
     @field_validator("elements", mode="after")
     @classmethod
     def _expand_range(
-        cls, v: Union[List[Union[str, int]], str]
-    ) -> Union[List[Union[str, int]], str]:
+        cls, v: Union[List[Union[str, int]], str, SetTreeNodeSchema]
+    ) -> Union[List[Union[str, int]], str, SetTreeNodeSchema]:
         if isinstance(v, str):
             m = re.fullmatch(r"(\d+)\.\.(\d+)", v.strip())
             if not m:
@@ -99,6 +118,32 @@ class SetInstanceSchema(ModifiedBaseModel):
                 raise ValueError(f"Range start must be <= end, got {v!r}")
             return list(range(a, b + 1))
         return v
+
+    def _tree_walk(self) -> List[Tuple[Union[str, int], int]]:
+        """(element, parent position) of a tree set, in pre-order (root first)."""
+        assert isinstance(self.elements, SetTreeNodeSchema)
+        result: List[Tuple[Union[str, int], int]] = []
+        stack = [(self.elements, -1)]
+        while stack:
+            node, parent = stack.pop()
+            position = len(result)
+            result.append((node.node, parent))
+            stack.extend((child, position) for child in reversed(node.children))
+        return result
+
+    def element_list(self) -> List[Union[str, int]]:
+        """The elements, a tree being listed in pre-order (root first)."""
+        if isinstance(self.elements, SetTreeNodeSchema):
+            return [element for element, _ in self._tree_walk()]
+        assert isinstance(self.elements, list)  # ranges are expanded at parsing
+        return list(self.elements)
+
+    def parent_positions(self) -> Optional[Tuple[int, ...]]:
+        """Position of each element's parent (-1 for the root), or None if the
+        elements are not a tree."""
+        if not isinstance(self.elements, SetTreeNodeSchema):
+            return None
+        return tuple(parent for _, parent in self._tree_walk())
 
 
 class ComponentSchema(ModifiedBaseModel):

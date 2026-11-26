@@ -12,7 +12,7 @@
 import typing
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import ConfigDict, Field, ValidationError
 from yaml import safe_dump, safe_load
@@ -98,6 +98,8 @@ class PropertySchema(ModifiedBaseModel):
 class SetSchema(ModifiedBaseModel):
     id: str
     description: Optional[str] = None
+    # "tree": the elements form a tree, whose parents system.yml gives. Default: list.
+    structure: Optional[Literal["list", "tree"]] = None
 
 
 class ObjectiveContributionSchema(_ExpressionSchema):

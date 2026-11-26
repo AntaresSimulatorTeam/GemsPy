@@ -70,7 +70,13 @@ from gems_runner.simulation.linearize import (
     _linopy_add,
 )
 from gems_runner.simulation.time_block import TimeBlock
-from gems_runner.simulation.vectorized_builder import ShiftValidityVisitor, _and_mask
+from gems_runner.simulation.vectorized_builder import (
+    PADDING,
+    ShiftValidityVisitor,
+    _and_mask,
+    parent_mask,
+    parent_sets,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -396,10 +402,13 @@ class OptimizationProblem:
         ] = None,
         set_sizes: Optional[Dict[str, Dict[str, xr.DataArray]]] = None,
         scenario_ids: Optional[List[int]] = None,
+        set_parents: Optional[Dict[str, Dict[str, xr.DataArray]]] = None,
     ) -> None:
         self.name = name
         # model_id -> set_id -> per-component element count (see VectorizedBuilderBase).
         self.set_sizes = set_sizes or {}
+        # model_id -> tree set id -> parent positions (see VectorizedBuilderBase).
+        self.set_parents = set_parents or {}
         self.linopy_model = linopy_model
         self.study = study
         self.block = block
@@ -662,6 +671,8 @@ class _OptimizationProblemBuilder:
         self.port_arrays: Dict[str, Dict[PortFieldId, VectorizedExpr]] = {}
         # model_id -> set_id -> per-component element count (sets used by the model).
         self.set_sizes: Dict[str, Dict[str, xr.DataArray]] = {}
+        # model_id -> tree set id -> parent positions (tree sets used by the model).
+        self.set_parents: Dict[str, Dict[str, xr.DataArray]] = {}
 
     def build(self) -> OptimizationProblem:
         # Phase 1: parameter arrays
@@ -745,6 +756,7 @@ class _OptimizationProblemBuilder:
             objective_constant=objective_constant,
             set_sizes=self.set_sizes,
             scenario_ids=self.scenario_ids,
+            set_parents=self.set_parents,
         )
 
     # ------------------------------------------------------------------
@@ -767,11 +779,30 @@ class _OptimizationProblemBuilder:
                 )
                 for set_id in set_ids
             }
+            self.set_parents[model.id] = {
+                set_id: self._parent_array(model, set_id, components)
+                for set_id in set_ids
+                if set_id in model.tree_sets
+            }
 
         for param in model.parameters.values():
             self.param_arrays[(model.id, param.name)] = self._build_param_array(
                 model, param, components
             )
+
+    def _parent_array(
+        self, model: Model, set_id: str, components: List[Component]
+    ) -> xr.DataArray:
+        """Parent positions of tree set *set_id*, dims ``[component, set_id]``,
+        padded with ``PADDING`` to the largest instantiation."""
+        n = int(self.set_sizes[model.id][set_id].max())
+        rows = [list(self.study.system.set_parents(c, set_id)) for c in components]
+        values = [row + [PADDING] * (n - len(row)) for row in rows]
+        return xr.DataArray(
+            np.array(values, dtype=int).reshape(len(components), n),
+            dims=["component", set_id],
+            coords={"component": [c.id for c in components], set_id: list(range(n))},
+        )
 
     def _build_param_array(
         self, model: Model, param: Parameter, components: List[Component]
@@ -952,6 +983,10 @@ class _OptimizationProblemBuilder:
             port_arrays={},
             block_length=self.block_length,
             set_sizes=self._set_sizes_for_components(model.id, comp_ids),
+            set_parents={
+                set_id: parents.sel(component=comp_ids)
+                for set_id, parents in self.set_parents.get(model.id, {}).items()
+            },
         )
 
         is_binary = var.data_type == ValueType.BINARY
@@ -1087,6 +1122,15 @@ class _OptimizationProblemBuilder:
                 safe_name = constraint.name.replace(" ", "_").replace("-", "_")
 
                 padding_mask = self._padding_mask(model, lhs)
+                # Instances reading the parent of the root are not generated.
+                root_mask = parent_mask(
+                    parent_sets(constraint.expression),
+                    self.set_parents.get(model.id, {}),
+                )
+                if root_mask is not None:
+                    padding_mask = (
+                        root_mask if padding_mask is None else padding_mask & root_mask
+                    )
 
                 if constraint.is_equality:
                     lb = visit(constraint.lower_bound, builder)
@@ -1171,6 +1215,7 @@ class _OptimizationProblemBuilder:
             port_arrays=port_arrays,
             block_length=self.block_length,
             set_sizes=self.set_sizes.get(model.id, {}),
+            set_parents=self.set_parents.get(model.id, {}),
         )
 
     def _padding_mask(

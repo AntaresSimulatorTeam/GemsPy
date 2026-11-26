@@ -1,0 +1,44 @@
+library:
+  id: tree
+  sets:
+    - id: year
+      structure: tree
+  models:
+    # Capacity expansion along a tree of investment horizons.
+    - id: expansion
+      parameters:
+        - id: demand
+          indexed-by: [year]
+          time-dependent: false
+          scenario-dependent: false
+        - id: proba
+          indexed-by: [year]
+          time-dependent: false
+          scenario-dependent: false
+        - id: initial
+          time-dependent: false
+          scenario-dependent: false
+      variables:
+        - id: capacity
+          indexed-by: [year]
+          time-dependent: false
+          scenario-dependent: false
+          lower-bound: 0
+        - id: invest
+          indexed-by: [year]
+          time-dependent: false
+          scenario-dependent: false
+          lower-bound: 0
+      constraints:
+        - id: trajectory  # not generated at the root
+          expression: capacity = capacity[year=parent(year)] + invest
+        - id: root
+          expression: capacity[year=root(year)] = initial + invest[year=root(year)]
+        - id: adequacy
+          expression: capacity >= demand
+      objective-contributions:
+        - id: invest-cost
+          expression: sum_over(year, 10 * proba * invest)
+        # Upkeep of the inherited capacity: the root is left out of the sum.
+        - id: upkeep
+          expression: sum_over(year, proba * capacity[year=parent(year)])
