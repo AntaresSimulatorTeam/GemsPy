@@ -161,7 +161,7 @@ library:
           time-dependent: false
           scenario-dependent: false
         - id: nb_units_max
-          time-dependent: false
+          time-dependent: true
           scenario-dependent: false
         - id: nb_failures
           time-dependent: true

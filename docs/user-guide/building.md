@@ -191,7 +191,8 @@ Components of one model may instantiate a local set (here `tier`) with
 different elements and sizes.
 Positions are 0-based: `X[tier=1]` is the second element (`high`), and must
 exist in each component's own instantiation of `tier`. `X[tier+1]` wraps
-around within each component's own elements.
+around within each component's own elements. A position or shift may be a
+parameter, e.g. `X[tier=k]`, but `k` must not be indexed by `tier`.
 
 A component may also set `integer_strategy` to relax or heuristically process
 its model's integer/binary variables — see

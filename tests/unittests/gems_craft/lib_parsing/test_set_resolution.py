@@ -76,6 +76,41 @@ _CASES = {
         ),
         None,
     ),
+    "set position depending on the indexed set": (
+        _model_lib(
+            "parameters: [{id: a, indexed-by: [fuel]}], "
+            "variables: [{id: x, indexed-by: [fuel]}], "
+            "constraints: [{id: c, expression: 'x[fuel=a] <= 0'}]",
+            _FUEL,
+        ),
+        "the 'fuel' index 'a' depends on 'fuel', but must not.",
+    ),
+    "set shift depending on the indexed set": (
+        _model_lib(
+            "parameters: [{id: a, indexed-by: [fuel]}], "
+            "variables: [{id: x, indexed-by: [fuel]}], "
+            "constraints: [{id: c, expression: 'x[fuel+a] <= 0'}]",
+            _FUEL,
+        ),
+        "the 'fuel' shift 'a' depends on 'fuel', but must not.",
+    ),
+    "set position depending on another set": (
+        _model_lib(
+            "sets: [{id: segment}], parameters: [{id: a, indexed-by: [segment]}], "
+            "variables: [{id: x, indexed-by: [fuel]}], "
+            "constraints: [{id: c, expression: 'x[fuel=a] <= 0'}]",
+            _FUEL,
+        ),
+        None,
+    ),
+    "set position independent of any set": (
+        _model_lib(
+            "parameters: [{id: a}], variables: [{id: x, indexed-by: [fuel]}], "
+            "constraints: [{id: c, expression: 'x[fuel=a] <= 0'}]",
+            _FUEL,
+        ),
+        None,
+    ),
     "constraint bound with an invalid set index": (
         _model_lib(
             "parameters: [{id: p}], variables: [{id: x}], "

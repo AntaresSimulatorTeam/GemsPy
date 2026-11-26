@@ -29,6 +29,8 @@ optimization problem in four phases:
    ``Model.add_constraints()`` call per constraint type.
 """
 
+import functools
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,6 +55,7 @@ from gems_craft.expression.degree import is_linear
 from gems_craft.expression.expression import is_unbounded
 from gems_craft.expression.visitor import visit
 from gems_craft.model.common import ValueType
+from gems_craft.model.constraint import Constraint
 from gems_craft.model.model import Model
 from gems_craft.model.parameter import Parameter
 from gems_craft.model.port import PortField, PortFieldId
@@ -70,9 +73,12 @@ from gems_runner.simulation.time_block import TimeBlock
 from gems_runner.simulation.vectorized_builder import (
     PADDING,
     ShiftValidityVisitor,
+    _and_mask,
     parent_mask,
     parent_sets,
 )
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from gems_craft.optim_config.parsing import (
@@ -140,13 +146,26 @@ class DecompositionFilter:
         return loc in self._target
 
 
+def _constraint_validity_mask(
+    constraint: Constraint, visitor: ShiftValidityVisitor
+) -> Optional[xr.DataArray]:
+    """Validity mask of *constraint* in drop mode: its expression and its bounds
+    must all be read in the block."""
+    masks = [
+        visit(e, visitor)
+        for e in (constraint.expression, constraint.lower_bound, constraint.upper_bound)
+    ]
+    return functools.reduce(_and_mask, masks)
+
+
 def _apply_validity_mask(expr: VectorizedExpr, mask: xr.DataArray) -> VectorizedExpr:
     """Mask *expr* where *mask* is False, element-wise.
 
-    The mask is broadcast against *expr*: a dimension of the mask that *expr*
-    lacks (e.g. a time-only bound against a [component, time, scenario] mask)
-    is added, so that both sides of a constraint are masked at the same
-    component, time step and scenario.
+    The mask is broadcast against *expr*: a component or scenario dimension of
+    the mask that *expr* lacks (e.g. a time-only bound against a [component,
+    time, scenario] mask) is added, so that both sides of a constraint are
+    masked at the same component, time step and scenario. The time dimension
+    is not added.
     """
     if not hasattr(expr, "dims"):
         return expr
@@ -323,6 +342,10 @@ def _build_slave_port_array(
                 raise
             continue
 
+        if "component" not in expr_master.dims:  # type: ignore[union-attr]
+            # A constant definition (e.g. ``0``) has no component dimension:
+            # broadcast it so that each connection contributes it once.
+            expr_master = expr_master.expand_dims(component=master_comp_ids)  # type: ignore[union-attr]
         expr_master_r = expr_master.rename({"component": "component_master"})  # type: ignore[union-attr]
         contribution = (A * expr_master_r).sum("component_master")  # type: ignore[operator]
 
@@ -1067,17 +1090,12 @@ class _OptimizationProblemBuilder:
 
                     mode = self._oob_filter.get_mode(model.id, constraint.name)
                     if mode == OutOfBoundsMode.DROP:
-                        validity_mask = visit(
-                            constraint.expression,
+                        validity_mask = _constraint_validity_mask(
+                            constraint,
                             ShiftValidityVisitor(
                                 model_id=model.id,
                                 param_arrays=self.param_arrays,
                                 block_length=self.block_length,
-                                time_independent_variables=frozenset(
-                                    name
-                                    for name, variable in model.variables.items()
-                                    if not variable.structure.time
-                                ),
                             ),
                         )
 
@@ -1089,6 +1107,15 @@ class _OptimizationProblemBuilder:
                     continue
 
                 if validity_mask is not None:
+                    if not bool(validity_mask.any()):
+                        logger.warning(
+                            "Constraint '%s' of model '%s' is dropped for every "
+                            "component, time step and scenario: out-of-bounds "
+                            "processing is 'drop' and each of them reads outside "
+                            "the block.",
+                            constraint.name,
+                            model.id,
+                        )
                     lhs = _apply_validity_mask(lhs, validity_mask)
 
                 # Sanitize constraint name for LP format (spaces → underscores)

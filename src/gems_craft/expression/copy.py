@@ -29,6 +29,7 @@ from .expression import (
     ParameterNode,
     PortFieldAggregatorNode,
     PortFieldNode,
+    PowerNode,
     ReducedCostNode,
     RelativeTimeNode,
     RoundNode,
@@ -55,6 +56,9 @@ class CopyVisitor(ExpressionVisitorOperations[ExpressionNode]):
 
     def literal(self, node: LiteralNode) -> ExpressionNode:
         return LiteralNode(node.value)
+
+    def power(self, node: PowerNode) -> ExpressionNode:
+        return PowerNode(visit(node.left, self), visit(node.right, self))
 
     def comparison(self, node: ComparisonNode) -> ExpressionNode:
         return ComparisonNode(

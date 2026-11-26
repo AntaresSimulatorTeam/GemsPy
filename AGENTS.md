@@ -80,10 +80,10 @@ The codebase is split into three packages along a solver-dependency boundary:
 - `ExpressionNode`: base frozen dataclass for all expression tree nodes
 - Grammar is defined in `grammar/Expr.g4` and parsed via ANTLR4 (generated files live in `expression/parsing/antlr/` — do not edit directly; regenerate with `uv run bash grammar/generate-parser.sh`, then `black`/`isort`)
 - `ExpressionVisitor` is the dominant pattern for traversing and transforming expression trees (linearization support, printing, degree analysis, indexing)
-- `TimeScenarioIndexingVisitor` (`indexing.py`) computes an expression's `IndexingStructure` (time, scenario, `sets: FrozenSet[str]`) and validates time shifts/indices and set indexing; time shifts, indices and sum bounds use the restricted `time_expr` grammar rule (numbers, parameters, `+ - * /`, scalar functions).
+- `TimeScenarioIndexingVisitor` (`indexing.py`) computes an expression's `IndexingStructure` (time, scenario, `sets: FrozenSet[str]`) and validates time shifts/indices and set indexing; time shifts, indices and sum bounds use the restricted `time_expr` grammar rule (numbers, parameters, `+ - * / ^`, scalar functions). `model.py` (`_check_time_amounts`) also rejects, when the model is created, time-dependent amounts and time operators on a time-independent operand.
 - Custom sets (`SetIndexNode`, `SumOverNode` — `X[fuel]`, `X[fuel=2]`, `X[fuel+1]`, `X[segment=2, fuel=1]`, `sum_over(fuel, expr)`):
   - Schemas: `sets:` on libraries (global) and models (local), `indexed-by:` on parameters/variables; `system.yml` instantiates global sets at system level and local sets per component (`SetInstanceSchema`, list or `"a..b"` range). Set ids may not clash with variable/parameter ids nor be `t`, `time`, `scenario`, `component` (`ModelIdentifiers`, `parse_expression.py`).
-  - Validation: resolution-time in `resolve_library.py`/`model.py`; instantiations in `study/validation.py` (`check_custom_sets`).
+  - Validation: resolution-time in `resolve_library.py`/`model.py` — set positions/shifts use the `time_expr` rule and may not depend on the indexed set (`x[fuel=a]` with `a` indexed by `fuel`, `_check_set_amounts`); instantiations in `study/validation.py` (`check_custom_sets`).
   - Data: `SetIndexedSeriesData` (`study/data.py`), from tidy files (`dataframe_to_set_indexed_series`) or inline nested dicts in `system.yml` (`nested_dict_to_set_indexed_series`).
   - Solve-time: `VectorizedBuilderBase` implements both nodes (one xarray/linopy dim per set, 0-based positions, cyclic `X[fuel+1]`; positions/shifts may vary per component, time or scenario). Local sets may be ragged across a model's components — dims are padded to the largest and masked, with per-component sizes in `set_sizes`.
   - Tree sets: `structure: tree` on the set, `parents:` on its instantiation (`SetInstanceSchema.parent_positions`, one root). `X[year=parent(year)]` / `X[year=root(year)]` are `SetIndexNode.tree_position`; at the root, `parent()` instances are dropped (constraint mask, left out of `sum_over`, NaN in extra outputs) via `parent_sets`/`parent_mask` (`vectorized_builder.py`).
@@ -128,7 +128,7 @@ The codebase is split into three packages along a solver-dependency boundary:
 
 ### Key Design Patterns
 
-- **Visitor pattern** for all expression tree operations (`ExpressionVisitor` subclasses). Use `ExpressionVisitorOperations` as a base when the return type supports `+, -, *, /` — it provides those four method implementations for free.
+- **Visitor pattern** for all expression tree operations (`ExpressionVisitor` subclasses). Use `ExpressionVisitorOperations` as a base when the return type supports `+, -, *, /` — it provides those four method implementations for free. `power` is not among them: numeric visitors implement it with `gems_runner.expression.power.real_power`.
 - **Template-method via single abstract method**: `VectorizedBuilderBase` implements all 18+ visitor methods once with `xr.DataArray`-compatible semantics; concrete subclasses only override `variable()` (and optionally a few linopy-specific methods).
 - **Indexing dimensions**: parameters and variables carry time and scenario indices explicitly via `IndexingStructure`; expressions track these automatically.
 
