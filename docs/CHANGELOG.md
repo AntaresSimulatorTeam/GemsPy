@@ -4,6 +4,17 @@ All notable changes to GemsPy are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- A NaN in a constraint, a coefficient, a variable bound, an objective or an
+  `initial_values` entry of `build_problem`
+  (e.g. `p / q` with `p = q = 0`, `p^0.5` with `p < 0`, or a NaN in a data
+  series) no longer silently changes the problem: `build_problem` raises
+  `NonFiniteValueError`, naming the model, component, constraint, variable,
+  objective or port field, and the time step and scenario of the first invalid
+  value. An
+  infinite value raises too, except where it means "no bound" (`+inf` upper
+  bound, `-inf` lower bound).
+
 ## [0.4.0] - 2026-11-20
 
 The expression language gains the power operator `^`. Simulation table views

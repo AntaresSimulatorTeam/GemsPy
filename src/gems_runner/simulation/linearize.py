@@ -34,9 +34,11 @@ from gems_craft.expression.expression import (
     AbsNode,
     AdditionNode,
     CeilNode,
+    DivisionNode,
     FloorNode,
     MaxNode,
     MinNode,
+    MultiplicationNode,
     PowerNode,
     RoundNode,
     VariableNode,
@@ -48,6 +50,7 @@ from gems_runner.simulation.vectorized_builder import (
     VectorizedBuilderBase,
     VectorizedExpr,
     _linopy_add,
+    _raise_if_invalid,
 )
 
 
@@ -107,8 +110,39 @@ class VectorizedLinearExprBuilder(VectorizedBuilderBase[VectorizedExpr]):
         operands = [visit(op, self) for op in node.operands]
         result: VectorizedExpr = operands[0]
         for op in operands[1:]:
+            # An infinite constant is kept: whether it is valid depends on the
+            # constraint sense, checked by the problem builder.
+            self._check_constant_operand(result, op, allow_inf=True)
+            self._check_constant_operand(op, result, allow_inf=True)
             result = _linopy_add(result, op)
         return result
+
+    def multiplication(self, node: MultiplicationNode) -> VectorizedExpr:
+        left = visit(node.left, self)
+        right = visit(node.right, self)
+        self._check_constant_operand(left, right, allow_inf=False)
+        self._check_constant_operand(right, left, allow_inf=False)
+        return left * right  # type: ignore[operator,return-value]
+
+    def division(self, node: DivisionNode) -> VectorizedExpr:
+        left = visit(node.left, self)
+        right = visit(node.right, self)
+        if isinstance(right, xr.DataArray) and not isinstance(left, xr.DataArray):
+            # Check the resulting coefficient: a zero divisor gives inf.
+            with np.errstate(divide="ignore", invalid="ignore"):
+                _raise_if_invalid(self.model_id, 1 / right)
+        return left / right  # type: ignore[operator,return-value]
+
+    def _check_constant_operand(
+        self, operand: VectorizedExpr, other: VectorizedExpr, allow_inf: bool
+    ) -> None:
+        """Raise if *operand*, a constant combined with a linopy object, is NaN (or inf).
+
+        linopy replaces NaN with 0 in such operations, so the check is made here.
+        """
+        if isinstance(operand, xr.DataArray) and not isinstance(other, xr.DataArray):
+            invalid = operand.isnull() if allow_inf else None
+            _raise_if_invalid(self.model_id, operand, invalid)
 
     def power(self, node: PowerNode) -> VectorizedExpr:
         base = visit(node.left, self)

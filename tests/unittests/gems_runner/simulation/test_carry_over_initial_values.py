@@ -30,7 +30,7 @@ from gems_craft.expression.expression import literal, param, var
 from gems_craft.expression.indexing_structure import IndexingStructure
 from gems_craft.model import Constraint, float_parameter, float_variable, model
 from gems_craft.study import ConstantData, DataBase, Study, System, create_component
-from gems_runner.simulation import TimeBlock, build_problem
+from gems_runner.simulation import NonFiniteValueError, TimeBlock, build_problem
 from gems_runner.simulation.optimization import _validate_initial_values
 
 CONSTANT = IndexingStructure(False, False)
@@ -109,3 +109,18 @@ def test_initial_values_without_time_dim_rejected() -> None:
         _validate_initial_values({("PLANT", "gen"): xr.DataArray(2.0)})
 
     assert _validate_initial_values(None) == {}
+
+
+def test_nan_initial_value_rejected() -> None:
+    """linopy would read a NaN as "no constraint", leaving the variable unpinned."""
+    with pytest.raises(
+        NonFiniteValueError,
+        match="Invalid value nan in initial value of variable 'gen', "
+        "model 'PLANT', time 11",
+    ):
+        build_problem(
+            _one_time_dependent_one_constant_study(),
+            TimeBlock(1, [10, 11, 12]),
+            [0],
+            initial_values={("PLANT", "gen"): _time_da([2.0, float("nan")])},
+        )
